@@ -1,6 +1,4 @@
-import React from 'react'
 import { LoginForm } from "./Authentication/form"
-import { Separator } from "@/components/ui/separator"
 const Authentication = () => {
   return (
     <div className='flex w-screen h-screen box-border'>

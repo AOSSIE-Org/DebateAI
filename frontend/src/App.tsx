@@ -1,14 +1,12 @@
-import { useContext, useState } from 'react'
+import { useContext } from 'react'
 import './App.css'
 import AuthenticationPage from './Pages/Authentication'
 import { ThemeProvider, ThemeContext } from './context/theme-provider'
 import { Button } from './components/ui/button'
-
 import { LuMoon } from "react-icons/lu";
 import { LuSun } from "react-icons/lu";
 
-
-function Subscriber(){
+function Subscriber(): JSX.Element {
   const value = useContext(ThemeContext);
   return(
     <Button onClick={value!.toggleTheme} className='p-0 h-8 w-8 md:h-12 md:w-12 fixed right-4 bottom-4'>
@@ -16,13 +14,13 @@ function Subscriber(){
     </Button>
   )
 }
-function App() {
 
+function App() {
   return (
     <div>
       <ThemeProvider>
         <AuthenticationPage></AuthenticationPage>
-        {/* <Subscriber></Subscriber> */}
+        <Subscriber></Subscriber>
       </ThemeProvider>
     </div>
   )
