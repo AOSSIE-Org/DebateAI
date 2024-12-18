@@ -15,7 +15,7 @@ const Authentication = () => {
             <div className="bg-border h-px w-full" />
           </div>
           {/* todo */}
-          <p>By clicking continue, you agree to our <a href='https://www.optmyzr.com' target='_blank'>Terms of Service</a> and <a>Privacy Policy</a>.</p>
+          <p>By clicking continue, you agree to our <a rel='_blank' ref='https://www.optmyzr.com' target='_blank'>Terms of Service</a> and <a>Privacy Policy</a>.</p>
         </div>
       </div>
     </div>
