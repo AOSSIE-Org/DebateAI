@@ -18,129 +18,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 )
 var(
-	
+	appClientId = "your-app-client-id" // Cognito App Client ID
+    appClientSecret = "your-app-client-secret" // Cognito App Client Secret
 )
-func SignUpRouteHandler(ctx *gin.Context){
-	fmt.Println("signing up");
-	
-	password := "abc123!"
-	email := "keshavnischal@gmail.com";
 
-	signUpWithCognito(email, password);
-	ctx.JSON(200, "signing up");
-}
-func signUpWithCognito(email string, password string) {
-	ctx := context.Background()
-	config, err := config.LoadDefaultConfig(ctx, config.WithRegion("ap-south-1"))
-	
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Successfully Loaded the cognito config for signUp")
-	}
-	
-	cognitoClient := cognitoidentityprovider.NewFromConfig(config)
-	
-	secretHash := generateSecretHash(email, appClientId, appClientSecret)
-	
-	signupInput := cognitoidentityprovider.SignUpInput{
-		ClientId:   aws.String(appClientId),
-		Password:   aws.String(password),
-		SecretHash: aws.String(secretHash),
-		Username: aws.String(email),
-		UserAttributes: []types.AttributeType{
-			{
-				Name:  aws.String("email"),
-				Value: aws.String(email),
-			},
-			{
-				//todo: email and other fields should have some validation
-				Name:  aws.String("nickname"),
-				Value: aws.String(extractNameFromEmail(email)),
-			},
-		},
-	}
-	signupStatus, err := cognitoClient.SignUp(ctx, &signupInput)
-	
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Sign-up successful:", signupStatus)
-	}
-}
-func VerifyEmailRouteHandler(ctx *gin.Context){
-	email := "keshavnischal@gmail.com"
-	confirmationCode := "985588";
-	
-	verifyEmailWithCognito(email, confirmationCode)
-}
-func verifyEmailWithCognito(email string, confirmationCode string){
-	ctx := context.Background()
-	config, _ := config.LoadDefaultConfig(ctx, config.WithRegion("ap-south-1"))
-	
-	cognitoClient := cognitoidentityprovider.NewFromConfig(config)
-	
-	
-
-	secretHash := generateSecretHash(email, appClientId, appClientSecret)
-	confirmSignUpInput := cognitoidentityprovider.ConfirmSignUpInput{
-		ClientId: aws.String(appClientId), 
-		ConfirmationCode: aws.String(confirmationCode),
-		Username: aws.String(email), 
-		SecretHash: aws.String(secretHash),
-	}
-	confirmationStatus, err := cognitoClient.ConfirmSignUp(ctx, &confirmSignUpInput);
-
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Sign-up successful:", confirmationStatus)
-	}
-}
-func generateSecretHash(username, clientId, clientSecret string) string {
-	hmacInstance := hmac.New(sha256.New, []byte(clientSecret));
-	hmacInstance.Write([]byte(username+clientId));
-	secretHashByte := hmacInstance.Sum(nil);
-	
-	secretHashString := base64.StdEncoding.EncodeToString(secretHashByte);
-	return secretHashString;
-}
-func extractNameFromEmail(email string) string{
-	re := regexp.MustCompile(`^([^@]+)`)
-    
-    match := re.FindStringSubmatch(email)
-
-	return match[1];
-}
-func SignInRouteHandler(ctx *gin.Context){
-	email := "keshavnischal@gmail.com"
-	password := "abc123!"
-	signInWithCognito(email, password)
-}
-func signInWithCognito(email string, password string){
-	ctx := context.Background()
-	config, _ := config.LoadDefaultConfig(ctx, config.WithRegion("ap-south-1"))
-	
-	cognitoClient := cognitoidentityprovider.NewFromConfig(config)
-	
-	secretHash := generateSecretHash(email, appClientId, appClientSecret)
-	authInput := cognitoidentityprovider.InitiateAuthInput{
-		AuthFlow: types.AuthFlowTypeUserPasswordAuth,
-		ClientId: aws.String(appClientId),
-		AuthParameters: map[string]string{
-			"USERNAME":email,
-			"PASSWORD":password,
-			"SECRET_HASH": secretHash,
-		},
-	}
-	authOutput,err := cognitoClient.InitiateAuth(ctx, &authInput)
-
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Sign-in successful:", authOutput.AuthenticationResult)
-	}
-}
 
 
 
@@ -175,10 +56,20 @@ func server() {
 	router.GET("/", helloWorld)
 	
 	//authentication
-	router.GET("/signup", SignUpRouteHandler)
-	router.GET("/verifyEmail", VerifyEmailRouteHandler)
-
-	router.GET("/signin", SignInRouteHandler)
+	authGroup := router.Group("/auth")
+	{
+		authGroup.GET("/signup", SignUpRouteHandler)
+		authGroup.GET("/confirmSignUp", ConfirmSignUpRouteHandler)
+		authGroup.POST("/signin", SignInRouteHandler)
+		authGroup.POST("/signout", SignOutRouteHandler)
+		authGroup.POST("/refresh", RefreshTokenRouteHandler)
+		authGroup.POST("/forgotPassword", ForgotPasswordRouteHandler)
+		authGroup.POST("/resetPassword", ResetPasswordRouteHandler)
+		authGroup.GET("/verifyEmail", VerifyEmailRouteHandler)
+		authGroup.GET("/profile", ProfileRouteHandler)
+		authGroup.PUT("/profile", UpdateProfileRouteHandler)
+		authGroup.DELETE("/account", DeleteAccountRouteHandler)
+	}
 
 
 	//web rtc
