@@ -1,25 +1,162 @@
-import React from 'react'
-import { LoginForm } from "./Authentication/form"
-import { Separator } from "@/components/ui/separator"
-const Authentication = () => {
-  return (
-    <div className='flex w-screen h-screen box-border'>
- {/* overflow-hidden */}
-      <div className='hidden md:flex w-full h-full justify-center items-center'>keshav</div>
-      <div className='flex items-center justify-center w-full h-full'>
-        <div className='flex flex-col items-center justify-center h-full w-3/4 text-center'>
-          <LoginForm></LoginForm>
-          <div className='flex items-center w-1/2'>
-            <div className="bg-border h-px w-full" />
-            <p className='text-xs mx-2 w-full'>OR CONTINUE WITH</p>
-            <div className="bg-border h-px w-full" />
-          </div>
-          {/* todo */}
-          <p>By clicking continue, you agree to our <a href='https://www.optmyzr.com' target='_blank'>Terms of Service</a> and <a>Privacy Policy</a>.</p>
-        </div>
-      </div>
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
+
+
+const LeftSection = () => (
+
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-white">
+    <div className="flex items-center text-lg font-medium">
+      <Link to="/" className="flex items-center">
+        {/* Logo and App Name */}
+        <svg /* SVG attributes */>
+          {/* SVG Content */}
+        </svg>
+        Arguehub
+      </Link>
     </div>
-  )
+    <div>
+      <blockquote className="space-y-2">
+        <p className="text-lg">
+          "We cannot solve our problems with the same thinking we used when we created them."
+        </p>
+        <footer className="text-sm">Albert Einstein</footer>
+      </blockquote>
+    </div>
+  </div>
+);
+
+
+
+interface RightSectionProps {
+  authMode: 'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword';
+  toggleAuthMode: () => void;
+  startOtpVerification: (email: string) => void;
+  handleOtpVerified: () => void;
+  startForgotPassword: () => void;
+  startResetPassword: (email: string) => void; // New prop
+  handlePasswordReset: () => void; // New prop
+  emailForOTP: string;
+  emailForPasswordReset: string; // New prop
+  infoMessage: string; // New prop
 }
 
-export default Authentication
+const RightSection: React.FC<RightSectionProps> = ({
+  authMode,
+  toggleAuthMode,
+  startOtpVerification,
+  handleOtpVerified,
+  startForgotPassword,
+  startResetPassword,
+  handlePasswordReset,
+  emailForOTP,
+  emailForPasswordReset,
+  infoMessage,
+}) => (
+  <div className="flex items-center justify-center w-full h-full relative">
+    {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
+      <Button
+        className="absolute right-4 top-4 md:right-8 md:top-8"
+        onClick={toggleAuthMode}
+        variant="outline"
+      >
+        {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
+      </Button>
+    )}
+    <div className="flex flex-col items-center justify-center h-full w-3/5 text-center">
+      {authMode === 'login' && (
+        <>
+          <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
+          <LoginForm startForgotPassword={startForgotPassword} infoMessage={infoMessage} />
+        </>
+      )}
+      {authMode === 'signup' && (
+        <>
+          <h3 className="text-2xl font-medium my-4">Create an account</h3>
+          <SignUpForm startOtpVerification={startOtpVerification} />
+        </>
+      )}
+      {authMode === 'otpVerification' && (
+        <OTPVerificationForm email={emailForOTP} handleOtpVerified={handleOtpVerified} />
+      )}
+      {authMode === 'forgotPassword' && (
+        <ForgotPasswordForm startResetPassword={startResetPassword} />
+      )}
+      {authMode === 'resetPassword' && (
+        <ResetPasswordForm
+          email={emailForPasswordReset}
+          handlePasswordReset={handlePasswordReset}
+        />
+      )}
+    </div>
+  </div>
+);
+
+import { Link } from 'react-router-dom';
+
+const Authentication = () => {
+  // Extend authMode to include 'resetPassword'
+  const [authMode, setAuthMode] = useState<
+    'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
+  >('login');
+
+  const [emailForOTP, setEmailForOTP] = useState('');
+  const [emailForPasswordReset, setEmailForPasswordReset] = useState(''); // New state for reset password
+  const [infoMessage, setInfoMessage] = useState('');
+
+  // Toggle between 'login' and 'signup'
+  const toggleAuthMode = () => {
+    setAuthMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'));
+  };
+
+  // Start OTP verification process
+  const startOtpVerification = (email: string) => {
+    setEmailForOTP(email);
+    setAuthMode('otpVerification');
+  };
+
+  // Handle successful OTP verification
+  const handleOtpVerified = () => {
+    setAuthMode('login');
+  };
+
+  // Start forgot password process
+  const startForgotPassword = () => {
+    setAuthMode('forgotPassword');
+  };
+
+  // Start reset password process
+  const startResetPassword = (email: string) => {
+    setEmailForPasswordReset(email);
+    setAuthMode('resetPassword');
+  };
+
+  // Handle successful password reset
+  const handlePasswordReset = () => {
+    setInfoMessage('Your password was successfully reset. You can now log in.');
+    setAuthMode('login');
+  };
+
+  return (
+    <div className="flex w-screen h-screen">
+      {/* LeftSection component remains the same */}
+      <LeftSection />
+
+      {/* Pass new props to RightSection */}
+      <RightSection
+        authMode={authMode}
+        toggleAuthMode={toggleAuthMode}
+        startOtpVerification={startOtpVerification}
+        handleOtpVerified={handleOtpVerified}
+        startForgotPassword={startForgotPassword}
+        startResetPassword={startResetPassword} // New prop
+        handlePasswordReset={handlePasswordReset} // New prop
+        emailForOTP={emailForOTP}
+        emailForPasswordReset={emailForPasswordReset} // New prop
+        infoMessage={infoMessage} // New prop
+      />
+    </div>
+  );
+};
+
+export default Authentication;

@@ -1,31 +1,42 @@
-import { useContext, useState } from 'react'
-import './App.css'
-import AuthenticationPage from './Pages/Authentication'
-import { ThemeProvider, ThemeContext } from './context/theme-provider'
-import { Button } from './components/ui/button'
+import './App.css';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Authentication from './Pages/Authentication';
+import Home from './Pages/Home';
+import { ThemeProvider } from './context/theme-provider';
 
-import { LuMoon } from "react-icons/lu";
-import { LuSun } from "react-icons/lu";
+// Dummy authentication check function (replace with real logic)
+const isAuthenticated = (): boolean => {
+  // Example: Check if a token exists in localStorage
+  return true;
+  // return localStorage.getItem('authToken') ? true : false;
+};
 
-
-function Subscriber(){
-  const value = useContext(ThemeContext);
-  return(
-    <Button onClick={value!.toggleTheme} className='p-0 h-8 w-8 md:h-12 md:w-12 fixed right-4 bottom-4'>
-      {value?.theme ? <LuMoon className='text-xl'/> : <LuSun className="text-xl"/>}
-    </Button>
-  )
+// Define props for ProtectedRoute
+interface ProtectedRouteProps {
+  children: React.ReactNode; // React children
 }
+
+// Protected Route Component
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  return isAuthenticated() ? <>{children}</> : <Navigate to="/auth" replace />;
+};
+
+
 function App() {
-
   return (
-    <div>
-      <ThemeProvider>
-        <AuthenticationPage></AuthenticationPage>
-        {/* <Subscriber></Subscriber> */}
-      </ThemeProvider>
-    </div>
-  )
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/auth" element={<Authentication />} />
+          <Route path="/" element={<Home />} />
+        </Routes>
+      </Router>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
+
+{/* <ProtectedRoute>
+                <Home />
+              </ProtectedRoute> */}
