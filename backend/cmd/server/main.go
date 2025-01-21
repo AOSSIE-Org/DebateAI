@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"log"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
@@ -189,8 +190,12 @@ func server() {
 }
 
 func main(){
-	// server();
-	StartWebSocketServer();
+	// Initialize the WebSocket hub
+	hub := NewChatHub()
+	go hub.Start()
+
+	// WebSocket route for handling connections
+	router.GET("/ws", WebSocketHandler(hub))
 }
 
 func helloWorld(ctx *gin.Context){
