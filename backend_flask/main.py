@@ -2,16 +2,18 @@ from flask import Flask, request, jsonify
 import requests
 import json
 from flask_cors import CORS
+import os
+from dotenv import load_dotenv
 
-
-
+load_dotenv()
 app = Flask(__name__)
 
 # CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 CORS(app)
 
-OPENROUTER_API_KEY = "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"
-OPENROUTER_API_KEY1 = "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"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_API_KEY1 = os.getenv("OPENROUTER_API_KEY1")
+
 
 # Flask route to handle debate requests
 @app.route('/debate', methods=['POST'])
