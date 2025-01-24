@@ -60,7 +60,7 @@ const StyledWrapper = styled.div`
    }
 
    25% {
-    transform: rotate(70deg);
+    transform: rotate(40deg);
     animation-timing-function: ease-in;
    }
 
@@ -82,7 +82,7 @@ const StyledWrapper = styled.div`
    }
 
    75% {
-    transform: rotate(-70deg);
+    transform: rotate(-40deg);
     animation-timing-function: ease-in;
    }
   }`;
