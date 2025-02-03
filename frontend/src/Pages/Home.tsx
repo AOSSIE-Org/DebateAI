@@ -31,7 +31,7 @@ const Home: React.FC = () => {
 
   const handlePlayBotClick = () => {
     if (authContext?.isAuthenticated) {
-      navigate('/game');  // Navigate to play page if authenticated
+      navigate('/debatewithai');  // Navigate to play page if authenticated
     } else {
       navigate('/auth', { state: { isSignUp: false } });  // Navigate to login page if not authenticated
     }

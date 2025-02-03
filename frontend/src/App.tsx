@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/theme-provider';
 import DebateApp from './Pages/Game';
 import { AuthContext, AuthProvider } from  "./context/authContext";
 import { useContext, useEffect, useState } from 'react';
+import DebateWithAI from './Pages/DebateWithAI';
 
 const ProtectedRoute = () => {
   const auth = useContext(AuthContext);
@@ -28,12 +29,14 @@ function App() {
           <Routes>
             <Route path="/auth" element={<Authentication />} />
             <Route path="/" element={<Home />} />
+            <Route path="/debatewithai" element={<DebateWithAI />} />
             <Route element={<ProtectedRoute />}>
-              <Route path="/game/:userId" element={<DebateApp />} />
+            <Route path="/game/:userId" element={<DebateApp />} />
             </Route>
           </Routes>
       </ThemeProvider>
     </AuthProvider>
+    
   );
 }
 

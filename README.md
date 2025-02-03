@@ -1,52 +1,15 @@
-# Project Setup Guide
+# DebateAI
+DebateAI is an interactive debating platform that allows users to engage in debates with both AI and real users. The project is built using multiple technologies, integrating real-time WebSocket communication and AI-based argument analysis.
 
-## Backend Setup
+## 🛠️ Tech Stack
+### **Backend**
+- **Go** (WebSockets) – Real-time User vs User debates.
+- **Flask** (REST API) – User vs AI debates and AI analysis.
 
-1. Navigate to the backend directory:
-   ```sh
-   cd ./backend
-   ```
-2. Run the backend server:
-   ```sh
-   go run cmd/server/main.go
-   ```
+### **Frontend**
+- **React (TypeScript + Tailwind CSS)** – User interface and interaction.
+- **WebSockets** – Real-time messaging between users.
 
-## Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```sh
-   cd ./frontend
-   ```
-2. Install dependencies:
-   ```sh
-   npm install
-   ```
-3. Start the development server:
-   ```sh
-   npm run dev
-   ```
-
-## Setting Up Amazon Cognito
-
-Follow these steps to configure Amazon Cognito for authentication:
-
-1. **Navigate to Cognito**
-   - Go to the [AWS Management Console](https://aws.amazon.com/console/) and open Cognito.
-
-2. **Create a User Pool**
-   - Configure authentication settings as per your requirements.
-
-3. **Retrieve Credentials**
-   - Once the User Pool is set up, obtain the necessary credentials:
-     - **User Pool ID**
-     - **App Client ID**
-
-4. **Update Application Configuration**
-   - Add the retrieved credentials to your application's configuration file (e.g., `config.yml`).
-
-For more details, refer to the [official AWS documentation](https://docs.aws.amazon.com/cognito/).
-
----
-
-This guide follows the approach used in the project implementation. If you encounter any issues, check the AWS documentation or relevant project files.
+## 📜 Setup & Installation
+Follow the setup guide in [SETUP.md](.DOCS/Setup.md) to get started.
 
