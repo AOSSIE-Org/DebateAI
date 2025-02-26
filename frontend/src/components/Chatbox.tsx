@@ -1,14 +1,14 @@
-import React from "react";
-import { BsFillSendFill } from "react-icons/bs";
+import React from 'react'
+import { BsFillSendFill } from 'react-icons/bs'
 
 export interface ChatMessage {
-  isUser: boolean;
-  text: string;
+  isUser: boolean
+  text: string
 }
 
-const Chatbox: React.FC<{ 
-  messages: ChatMessage[]; 
-  transcriptStatus: { loading: boolean; isUser: boolean }; 
+const Chatbox: React.FC<{
+  messages: ChatMessage[]
+  transcriptStatus: { loading: boolean; isUser: boolean }
 }> = ({ messages, transcriptStatus }) => {
   return (
     <div className="rounded-xl bg-card text-card-foreground shadow flex flex-col h-full">
@@ -29,8 +29,8 @@ const Chatbox: React.FC<{
               key={index}
               className={`flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm ${
                 message.isUser
-                  ? "ml-auto bg-primary text-primary-foreground"
-                  : "bg-muted"
+                  ? 'ml-auto bg-primary text-primary-foreground'
+                  : 'bg-muted'
               }`}
             >
               {message.text}
@@ -39,7 +39,9 @@ const Chatbox: React.FC<{
           {transcriptStatus.loading && (
             <div
               className={`flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm bg-muted animate-pulse ${
-                transcriptStatus.isUser ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"
+                transcriptStatus.isUser
+                  ? 'ml-auto bg-primary text-primary-foreground'
+                  : 'bg-muted'
               }`}
             >
               Generating transcript...
@@ -70,7 +72,7 @@ const Chatbox: React.FC<{
         </form>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Chatbox;
+export default Chatbox

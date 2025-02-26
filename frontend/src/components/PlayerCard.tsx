@@ -1,19 +1,19 @@
-import React from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { FiCamera, FiCameraOff } from "react-icons/fi";
-import { IoMdMic, IoMdMicOff } from "react-icons/io";
-import Timer from "./Timer";
-import avatar1 from "../assets/avatar2.jpg"; // Adjust the path as necessary
+import React from 'react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Separator } from '@/components/ui/separator'
+import { FiCamera, FiCameraOff } from 'react-icons/fi'
+import { IoMdMic, IoMdMicOff } from 'react-icons/io'
+import Timer from './Timer'
+import avatar1 from '../assets/avatar2.jpg' // Adjust the path as necessary
 
 interface PlayerCardProps {
-  isUser: boolean;
-  cameraOn?: boolean;
-  micOn?: boolean;
-  setCameraOn?: React.Dispatch<React.SetStateAction<boolean>>;
-  setMicOn?: React.Dispatch<React.SetStateAction<boolean>>;
-  isTurn: boolean;
-  turnDuration?: number;
+  isUser: boolean
+  cameraOn?: boolean
+  micOn?: boolean
+  setCameraOn?: React.Dispatch<React.SetStateAction<boolean>>
+  setMicOn?: React.Dispatch<React.SetStateAction<boolean>>
+  isTurn: boolean
+  turnDuration?: number
 }
 
 const PlayerCard: React.FC<PlayerCardProps> = ({
@@ -25,8 +25,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   isTurn,
   turnDuration = 0,
 }) => {
-  console.log("turn duration: ", turnDuration);
-  console.log(isTurn);
+  console.log('turn duration: ', turnDuration)
+  console.log(isTurn)
   return (
     <div className="flex justify-between items-center border rounded w-full p-2 ">
       {/* Player Details Section */}
@@ -51,9 +51,12 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         </div>
       )}
       {/* Timer */}
-      <Timer key={isTurn ? 'turn' : 'not-turn'} initialTime={isTurn ? turnDuration : 0} />
+      <Timer
+        key={isTurn ? 'turn' : 'not-turn'}
+        initialTime={isTurn ? turnDuration : 0}
+      />
     </div>
-  );
-};
+  )
+}
 
-export default PlayerCard;
+export default PlayerCard
