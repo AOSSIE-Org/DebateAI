@@ -55,5 +55,5 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.GET("/ws", websocket.WebsocketHandler)
 	router.GET("/debate/ws", services.DebateHandler)
 
-	return router
+	return router
 }
