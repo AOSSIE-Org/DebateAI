@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
-	"strconv"
-
 	"arguehub/config"
 	"arguehub/routes"
+	"arguehub/services"
 	"arguehub/websocket"
+	"log"
+	"strconv"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -51,8 +51,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
-	
+
 	router.GET("/ws", websocket.WebsocketHandler)
+	router.GET("/debate/ws", services.DebateHandler)
 
 	return router
 }
