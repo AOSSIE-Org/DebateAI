@@ -1,6 +1,11 @@
-# Project Setup Guide
+# DebateAI
+DebateAI is an interactive debating platform that allows users to engage in debates with both AI and real users. The project is built using multiple technologies, integrating real-time WebSocket communication and AI-based argument analysis.
 
-## Backend Setup
+## 🛠️ Tech Stack
+### **Backend**
+- **Go** (WebSockets) – Real-time User vs User debates.
+- **Flask** (REST API) – User vs AI debates and AI analysis.
+
 
 1. Navigate to the backend directory:
    ```sh
@@ -66,5 +71,6 @@ To use OpenAI services, obtain an API key from OpenRouter:
 3. Add the API key to your `config.yml` file.
 
 ---
+
 
 This guide follows the project implementation approach. If you encounter any issues, check the AWS documentation or relevant project files.
