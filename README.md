@@ -1,6 +1,10 @@
-# Project Setup Guide
+# DebateAI
+DebateAI is an interactive debating platform that allows users to engage in debates with both AI and real users. The project is built using multiple technologies, integrating real-time WebSocket communication and AI-based argument analysis.
 
-## Backend Setup
+## 🛠️ Tech Stack
+### **Backend**
+- **Go** (WebSockets) – Real-time User vs User debates.
+- **Flask** (REST API) – User vs AI debates and AI analysis.
 
 1. Navigate to the backend directory:
    ```sh
