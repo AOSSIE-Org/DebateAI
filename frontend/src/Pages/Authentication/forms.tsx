@@ -92,6 +92,7 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
@@ -116,25 +117,33 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         onChange={(e) => setEmail(e.target.value)}
         placeholder="name@example.com"
       />
-      <FormInput
-        id="password"
-        label="Password"
-        type="password"
+      <Input
+        type={passwordVisible ? "text" : "password"}
+        placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="password"
       />
-      <ErrorMessage error={error} />
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={startForgotPassword}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline transition-all"
-        >
-          Forgot your password?
-        </button>
+      <div className='w-full flex justify-start items-center pl-1'>
+        <div className='w-4'>
+          <Input
+            type='checkbox'
+            checked={passwordVisible}
+            onChange={(e) => setPasswordVisible(e.target.checked)}
+          />
+        </div>
+        <div className='pl-2'>show password</div>
       </div>
-      <FormButton loading={loading}>Sign In With Email</FormButton>
+      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      <p className="text-sm text-muted mb-4">
+        Forgot your password?{' '}
+        <span className="underline cursor-pointer" onClick={startForgotPassword}>
+          Reset Password
+        </span>
+      </p>
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? 'Signing In...' : 'Sign In With Email'}
+      </Button>
     </form>
   );
 };
@@ -147,6 +156,7 @@ interface SignUpFormProps {
 export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('');
   const authContext = useContext(AuthContext);
 
@@ -178,24 +188,34 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         onChange={(e) => setEmail(e.target.value)}
         placeholder="name@example.com"
       />
-      <FormInput
-        id="password"
-        label="Password"
-        type="password"
+      <Input
+        type={passwordVisible ? "text" : "password"}
+        placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="password"
       />
-      <FormInput
-        id="confirmPassword"
-        label="Confirm Password"
-        type="password"
+      <Input
+        type={passwordVisible ? "text" : "password"}
+        placeholder="confirm password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
         placeholder="confirm password"
       />
-      <ErrorMessage error={error} />
-      <FormButton loading={loading}>Sign Up With Email</FormButton>
+      <div className='w-full flex justify-start items-center pl-1'>
+        <div className='w-4'>
+          <Input
+            type='checkbox'
+            checked={passwordVisible}
+            onChange={(e) => setPasswordVisible(e.target.checked)}
+          />
+        </div>
+        <div className='pl-2'>show password</div>
+      </div>
+      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? 'Creating Account...' : 'Sign Up With Email'}
+      </Button>
     </form>
   );
 };
@@ -305,6 +325,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
@@ -338,24 +359,32 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
           onChange={(e) => setCode(e.target.value)}
           placeholder="Enter Code"
         />
-        <FormInput
-          id="newPassword"
-          label="New Password"
-          type="password"
+        <Input
+          type={passwordVisible ? "text" : "password"}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           placeholder="New Password"
         />
-        <FormInput
-          id="confirmNewPassword"
-          label="Confirm New Password"
-          type="password"
+        <Input
+          type={passwordVisible ? "text" : "password"}
           value={confirmNewPassword}
           onChange={(e) => setConfirmNewPassword(e.target.value)}
           placeholder="Confirm New Password"
         />
-        <ErrorMessage error={error} />
-        <FormButton loading={loading}>Reset Password</FormButton>
+      <div className='w-full flex justify-start items-center pl-1'>
+        <div className='w-4'>
+          <Input
+            type='checkbox'
+            checked={passwordVisible}
+            onChange={(e) => setPasswordVisible(e.target.checked)}
+          />
+        </div>
+        <div className='pl-2'>show password</div>
+      </div>
+        {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Resetting Password...' : 'Reset Password'}
+        </Button>
       </form>
     </div>
   );
