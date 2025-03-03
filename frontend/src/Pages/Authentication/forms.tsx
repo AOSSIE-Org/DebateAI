@@ -54,7 +54,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         </div>
         <div className='pl-2'>show password</div>
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      {/* {error && <p className="text-sm text-red-500 mb-2">{error}</p>} */}
       <p className="text-sm text-muted mb-4">
         Forgot your password?{' '}
         <span className="underline cursor-pointer" onClick={startForgotPassword}>
@@ -131,7 +131,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         </div>
         <div className='pl-2'>show password</div>
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      {/* {error && <p className="text-sm text-red-500 mb-2">{error}</p>} */}
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
@@ -172,7 +172,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
           placeholder="Enter OTP"
           className="w-full mb-4"
         />
-        {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+        {/* {error && <p className="text-sm text-red-500 mb-2">{error}</p>} */}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Verifying...' : 'Verify OTP'}
         </Button>
@@ -229,7 +229,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           placeholder="name@example.com"
           className="w-full mb-4"
         />
-        {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+        {/* {error && <p className="text-sm text-red-500 mb-2">{error}</p>} */}
         <Button type="submit" className="w-full">
           Send Reset Code
         </Button>
@@ -310,7 +310,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
         </div>
         <div className='pl-2'>show password</div>
       </div>
-        {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+        {/* {error && <p className="text-sm text-red-500 mb-2">{error}</p>} */}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Resetting Password...' : 'Reset Password'}
         </Button>

@@ -1,5 +1,7 @@
 import { createContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { ToastNotificationAtom } from "@/atoms/ToastNotificationAtom";
+import { useSetRecoilState } from "recoil";
 
 const baseURL = import.meta.env.VITE_BASE_URL;
 
@@ -24,9 +26,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const setToastNotification = useSetRecoilState(ToastNotificationAtom)
 
   const handleError = (error: unknown) => {
     const message = error instanceof Error ? error.message : "An unexpected error occurred";
+    setToastNotification({
+      message : "An unexpected error occurred",
+      colour : "red",
+      visible : true
+    })
     setError(message);
     throw error;
   };
@@ -40,7 +48,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         headers: { Authorization: `Bearer ${storedToken}` },
       });
 
-      if (!response.ok) throw new Error("Token expired or invalid");
+      if (!response.ok){
+        setToastNotification({
+          message : "Token expired or invalid",
+          colour : "red",
+          visible : true
+        })
+        throw new Error("Token expired or invalid");
+      } 
+      else{
+        setToastNotification({
+          message : "token verified sucessfully",
+          colour : "green",
+          visible : true
+        })
+      }
       setToken(storedToken);
     } catch (error) {
       logout();
@@ -61,7 +83,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Login failed");
+      if (!response.ok){
+        setToastNotification({
+          message : "Login failed",
+          colour : "red",
+          visible : true
+        })
+        throw new Error(data.message || "Login failed");
+      } 
+      else{
+        setToastNotification({
+          message : "Login sucessful",
+          colour : "green",
+          visible : true
+        })
+      }
 
       setToken(data.accessToken);
       localStorage.setItem("token", data.accessToken);
@@ -84,7 +120,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const data = await response.json();
+        setToastNotification({
+          message : "Signup failed",
+          colour : "red",
+          visible : true
+        })
         throw new Error(data.message || "Signup failed");
+      }
+      else{
+        setToastNotification({
+          message : "Signup sucessful",
+          colour : "green",
+          visible : true
+        })
       }
     } catch (error) {
       handleError(error);
@@ -104,7 +152,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const data = await response.json();
+        setToastNotification({
+          message : "Verification failed",
+          colour : "red",
+          visible : true
+        })
         throw new Error(data.message || "Verification failed");
+      }
+      else{
+        setToastNotification({
+          message : "verification sucessful",
+          colour : "green",
+          visible : true
+        })
       }
     } catch (error) {
       handleError(error);
@@ -124,7 +184,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const data = await response.json();
+        setToastNotification({
+          message : "Password reset failed",
+          colour : "red",
+          visible : true
+        })
         throw new Error(data.message || "Password reset failed");
+      }
+      else{
+        setToastNotification({
+          message : "Password reset sucessfully",
+          colour : "green",
+          visible : true
+        })
       }
     } catch (error) {
       handleError(error);
@@ -144,7 +216,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const data = await response.json();
+        setToastNotification({
+          message : "Password update failed",
+          colour : "red",
+          visible : true
+        })
         throw new Error(data.message || "Password update failed");
+      }
+      else{
+        setToastNotification({
+          message : "password updated sucessfully",
+          colour : "green",
+          visible : true
+        })
       }
     } catch (error) {
       handleError(error);
@@ -156,6 +240,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setToken(null);
     localStorage.removeItem("token");
+    setToastNotification({
+      message : "logout sucessfully",
+      colour : "green",
+      visible : true
+    })
     navigate("/auth");
   };
 
