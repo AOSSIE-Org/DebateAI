@@ -1,11 +1,12 @@
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Authentication from './Pages/Authentication';
 import Home from './Pages/Home';
 import { ThemeProvider } from './context/theme-provider';
 import DebateApp from './Pages/Game';
 import { AuthContext, AuthProvider } from  "./context/authContext";
 import { useContext, useEffect, useState } from 'react';
+import ToastNotification from './components/ToastNotification';
 
 const ProtectedRoute = () => {
   const auth = useContext(AuthContext);
@@ -22,18 +23,21 @@ const ProtectedRoute = () => {
 
 
 function App() {
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-          <Routes>
-            <Route path="/auth" element={<Authentication />} />
-            <Route path="/" element={<Home />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/game/:userId" element={<DebateApp />} />
-            </Route>
-          </Routes>
-      </ThemeProvider>
-    </AuthProvider>
+  return (<div>
+      <ToastNotification />
+      <AuthProvider>
+        <ThemeProvider>
+            <Routes>
+              <Route path="/auth" element={<Authentication />} />
+              <Route path="/" element={<Home />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/game/:userId" element={<DebateApp />} />
+              </Route>
+            </Routes>
+        </ThemeProvider>
+      </AuthProvider>
+    </div>
+    
   );
 }
 
