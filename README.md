@@ -1,33 +1,22 @@
 # Project Setup Guide
 
-## Backend Setup
+## Project Setup
 
-1. Navigate to the backend directory:
+1. Install dependencies by running the following command in the root directory:
+
    ```sh
-   cd backend
-   ```
-2. Run the backend server:
-   ```sh
-   go run cmd/server/main.go
+   npm run installer
    ```
 
-## Frontend Setup
+2. Create an environment file:
 
-1. Navigate to the frontend directory:
-   ```sh
-   cd frontend
-   ```
-2. Install dependencies:
-   ```sh
-   npm install
-   ```
-3. Create an environment file:
-   - Create a `.env` file in the frontend directory.
-   - Add the following environment variables:
+   - Navigate to the **frontend** directory.
+   - Create a `.env` file and add the following environment variable:
      ```sh
      VITE_BASE_URL="http://localhost:<BACKEND_SERVER_PORT>"
      ```
-4. Start the development server:
+
+3. Start the development server (this will start both the frontend and backend concurrently):
    ```sh
    npm run dev
    ```
@@ -37,12 +26,15 @@
 Follow these steps to configure Amazon Cognito for authentication:
 
 1. **Navigate to Cognito**
+
    - Go to the [AWS Management Console](https://aws.amazon.com/console/) and open Cognito.
 
 2. **Create a User Pool**
+
    - Configure authentication settings as per your requirements.
 
 3. **Retrieve Credentials**
+
    - Once the User Pool is set up, obtain the necessary credentials:
      - **User Pool ID**
      - **App Client ID**
