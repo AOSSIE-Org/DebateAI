@@ -63,17 +63,14 @@ func Login(ctx *gin.Context) {
 	if cfg == nil {
 		return
 	}
-	log.Println("I came inside the login function")
 
 	var request structs.LoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Check email and password format"})
 		return
 	}
-	log.Println("I came inside the login function2")
 	token, err := loginWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, ctx)
 	if err != nil {
-		log.Println("I came inside the login function3")
 		ctx.JSON(401, gin.H{"error": "Failed to sign in", "message": "Invalid email or password"})
 		return
 	}
