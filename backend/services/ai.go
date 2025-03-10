@@ -9,13 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	appConfig "arguehub/config"
-	"strings"
-	
 )
 
-type OpenAIRequest struct {
+type AIRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
 }
@@ -25,26 +24,67 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-type ChatGPT struct {
-	APIKey string
-	URL    string
+type LLM struct {
+	APIKey   string
+	URL      string
+	Provider string
 }
 
-func NewChatGPT(apiKey string) *ChatGPT {
-	return &ChatGPT{
-		APIKey: apiKey,
-		URL:    "https://api.openai.com/v1/chat/completions",
+func NewLLM(apiKey string) *LLM {
+	provider := detectProvider(apiKey)
+	baseURL := getProviderURL(provider)
+
+	return &LLM{
+		APIKey:   apiKey,
+		URL:      baseURL,
+		Provider: provider,
 	}
 }
 
-func (c *ChatGPT) Chat(model, developerPrompt, userMessage string) (string, error) {
+func detectProvider(apiKey string) string {
+	if strings.HasPrefix(apiKey, "gsk_") {
+		return "groq"
+	} else if strings.HasPrefix(apiKey, "sk-") || strings.HasPrefix(apiKey, "sk-proj-") {
+		return "openai"
+	}
+	return "openai"
+}
+
+func getProviderURL(provider string) string {
+	switch provider {
+	case "groq":
+		return "https://api.groq.com/openai/v1/chat/completions"
+	case "openai":
+		return "https://api.openai.com/v1/chat/completions"
+	default:
+		return "https://api.openai.com/v1/chat/completions"
+	}
+}
+
+func getProviderModel(provider string, requestedModel string) string {
+
+	if provider == "groq" {
+		if strings.Contains(requestedModel, "llama") ||
+			strings.Contains(requestedModel, "mixtral") ||
+			strings.Contains(requestedModel, "gemma") {
+			return requestedModel
+		}
+		return "llama3-8b-8192"
+	}
+
+	return requestedModel
+}
+
+func (l *LLM) Chat(model, developerPrompt, userMessage string) (string, error) {
+	modelToUse := getProviderModel(l.Provider, model)
+
 	messages := []Message{
-		{Role: "developer", Content: developerPrompt},
+		{Role: "system", Content: developerPrompt},
 		{Role: "user", Content: userMessage},
 	}
 
-	requestData := OpenAIRequest{
-		Model:    model,
+	requestData := AIRequest{
+		Model:    modelToUse,
 		Messages: messages,
 	}
 
@@ -53,13 +93,13 @@ func (c *ChatGPT) Chat(model, developerPrompt, userMessage string) (string, erro
 		return "", fmt.Errorf("failed to marshal request data: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.URL, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", l.URL, bytes.NewBuffer(payload))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.APIKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", l.APIKey))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -74,7 +114,7 @@ func (c *ChatGPT) Chat(model, developerPrompt, userMessage string) (string, erro
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API error: %s", string(body))
+		return "", fmt.Errorf("API error (%s): %s", l.Provider, string(body))
 	}
 
 	var responseData struct {
@@ -94,18 +134,17 @@ func (c *ChatGPT) Chat(model, developerPrompt, userMessage string) (string, erro
 		return responseData.Choices[0].Message.Content, nil
 	}
 
-	return "", fmt.Errorf("unexpected response format")
+	return "", fmt.Errorf("unexpected response format from %s", l.Provider)
 }
 
 type DebateFormat struct {
-	Sections []string         `json:"sections"`
-	CurrentTurn string        `json:"currentTurn"` // User ID of the current user's turn.
+	Sections    []string `json:"sections"`
+	CurrentTurn string   `json:"currentTurn"` // User ID of the current user's turn.
 }
 
 type DebateContent map[string]map[string]string
 
-func evaluate(chatGPT *ChatGPT, format DebateFormat, content DebateContent) (string, error) {
-	// Combine the debate content into a single transcript for comparison
+func evaluate(llm *LLM, format DebateFormat, content DebateContent) (string, error) {
 	var debateTranscript strings.Builder
 	for _, section := range format.Sections {
 		debateTranscript.WriteString(fmt.Sprintf("Section: %s\n", section))
@@ -119,12 +158,15 @@ func evaluate(chatGPT *ChatGPT, format DebateFormat, content DebateContent) (str
 		debateTranscript.WriteString("\n")
 	}
 
-	// Prepare the prompt for comparative evaluation
 	developerInstructions := "You are an expert debate evaluator. Below is a transcript of a debate between two participants. Please compare their arguments, determine who won the debate, and explain your reasoning.\n\nthe last line should be the final answer, the name of the participant"
 	prompt := debateTranscript.String()
 
-	// Get the evaluation from ChatGPT
-	response, err := chatGPT.Chat("gpt-4o-mini-2024-07-18", developerInstructions, prompt)
+	defaultModel := "gpt-4o"
+	if llm.Provider == "groq" {
+		defaultModel = "llama3-8b-8192"
+	}
+
+	response, err := llm.Chat(defaultModel, developerInstructions, prompt)
 	if err != nil {
 		return "", err
 	}
@@ -145,41 +187,40 @@ func main() {
 		return
 	}
 
-	// Load your configuration (assuming appConfig is defined)
+	// Load your configuration
 	cfg, err := appConfig.LoadConfig(configPath)
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
 		return
 	}
-	if cfg.Openai.GptApiKey == "" {
-		fmt.Println("OpenAI configuration is missing or API key is not set")
+
+	if cfg.LLM.APIKey == "" {
+		fmt.Println("LLM API key is not set in configuration")
 		return
 	}
 
-	// For demonstration purposes, we'll use a placeholder API key
-	chatGPT := NewChatGPT(cfg.Openai.GptApiKey)
+	llmClient := NewLLM(cfg.LLM.APIKey)
+	fmt.Printf("Using LLM provider: %s\n", llmClient.Provider)
 
-	// Define your debate format and content
 	debateSections := []string{"opening", "constructive argument", "rebuttal", "closing"}
 	debateContent := DebateContent{
 		"Participant1": {
-			"opening": "Participant 1: Good evening, everyone. Today, I stand firmly on the side of nature in the nature vs. nurture debate. Our genetic makeup profoundly influences who we are, from our physical characteristics to innate talents and predispositions. Scientific studies, such as those involving identical twins raised apart, show remarkable similarities in traits like intelligence, temperament, and even preferences. This demonstrates that nature plays a crucial role in shaping our identity.",
+			"opening":               "Participant 1: Good evening, everyone. Today, I stand firmly on the side of nature in the nature vs. nurture debate. Our genetic makeup profoundly influences who we are, from our physical characteristics to innate talents and predispositions. Scientific studies, such as those involving identical twins raised apart, show remarkable similarities in traits like intelligence, temperament, and even preferences. This demonstrates that nature plays a crucial role in shaping our identity.",
 			"constructive argument": "Participant 1: Consider the field of behavioral genetics, which has consistently found strong correlations between genetics and traits like personality, intelligence, and even susceptibility to certain mental health conditions. Furthermore, evolutionary psychology highlights how traits passed down through generations influence our behavior. For example, fight-or-flight responses are innate survival mechanisms, hardwired into our DNA. The evidence clearly indicates that nature is the dominant factor in determining who we are.",
-			"rebuttal": "Participant 1: My opponent argues that environment and upbringing shape individuals significantly. While I agree that nurture has an influence, it often acts as a moderator rather than a creator of traits. For example, a child with a natural aptitude for music will excel when given the right environment, but that aptitude originates from their genetic predisposition. Without nature providing the foundation, nurture alone would not yield such results.",
-			"closing": "Participant 1: In conclusion, the evidence overwhelmingly supports the idea that nature is the primary determinant of who we are. While nurture can shape and refine, it is our genetic blueprint that sets the stage for our potential. Thank you.",
+			"rebuttal":              "Participant 1: My opponent argues that environment and upbringing shape individuals significantly. While I agree that nurture has an influence, it often acts as a moderator rather than a creator of traits. For example, a child with a natural aptitude for music will excel when given the right environment, but that aptitude originates from their genetic predisposition. Without nature providing the foundation, nurture alone would not yield such results.",
+			"closing":               "Participant 1: In conclusion, the evidence overwhelmingly supports the idea that nature is the primary determinant of who we are. While nurture can shape and refine, it is our genetic blueprint that sets the stage for our potential. Thank you.",
 		},
 		"Participant2": {
-			"opening": "Participant 2: Good evening, everyone. I firmly believe that nurture plays a more significant role in shaping who we are. Our experiences, education, and environment define our abilities, beliefs, and personalities. Studies have shown that children raised in enriched environments tend to perform better academically and socially, regardless of their genetic background. This clearly demonstrates the power of nurture.",
+			"opening":               "Participant 2: Good evening, everyone. I firmly believe that nurture plays a more significant role in shaping who we are. Our experiences, education, and environment define our abilities, beliefs, and personalities. Studies have shown that children raised in enriched environments tend to perform better academically and socially, regardless of their genetic background. This clearly demonstrates the power of nurture.",
 			"constructive argument": "Participant 2: Consider how culture and upbringing influence language, behavior, and values. A child born with a genetic predisposition for intelligence will not reach their full potential without proper education and support. Moreover, cases of children overcoming genetic disadvantages through determination and favorable environments underscore the importance of nurture. The famous case of Albert Einstein, who was considered a slow learner as a child but thrived due to a nurturing environment, is a testament to this.",
-			"rebuttal": "Participant 2: My opponent emphasizes genetic influence but overlooks the dynamic role of environment. For instance, identical twins raised apart often show differences in attitudes, hobbies, and career choices due to their distinct environments. Genes provide a starting point, but it is nurture that refines and ultimately shapes those traits into tangible outcomes. Without proper nurturing, even the most promising genetic traits can remain dormant.",
-			"closing": "Participant 2: In conclusion, while nature provides the raw material, it is nurture that sculpts it into something meaningful. The environment, experiences, and opportunities we encounter ultimately determine who we become. Thank you.",
+			"rebuttal":              "Participant 2: My opponent emphasizes genetic influence but overlooks the dynamic role of environment. For instance, identical twins raised apart often show differences in attitudes, hobbies, and career choices due to their distinct environments. Genes provide a starting point, but it is nurture that refines and ultimately shapes those traits into tangible outcomes. Without proper nurturing, even the most promising genetic traits can remain dormant.",
+			"closing":               "Participant 2: In conclusion, while nature provides the raw material, it is nurture that sculpts it into something meaningful. The environment, experiences, and opportunities we encounter ultimately determine who we become. Thank you.",
 		},
 	}
-	
 
 	debateFormat := DebateFormat{Sections: debateSections}
 
-	result, err := evaluate(chatGPT, debateFormat, debateContent)
+	result, err := evaluate(llmClient, debateFormat, debateContent)
 	if err != nil {
 		fmt.Printf("Error during evaluation: %v\n", err)
 		return

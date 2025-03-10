@@ -2,11 +2,12 @@ server:
   port: 1313
 
 cognito:
-  appClientId: 
-  appClientSecret: 
-  userPoolId:
-  region:
+  appClientId: "2pp018v2cpj4m8otg5n400c0bu"
+  appClientSecret: "15t63qleqft3lo5dvpirbt8jo3e596dvtbhg78dfmaqdubonvcik"
+  userPoolId: "eu-north-1_OByfK0cM8"
+  region: "eu-north-1"
 
-openai:
-  gptApiKey: 
+
+llm:
+  apiKey: 
   
