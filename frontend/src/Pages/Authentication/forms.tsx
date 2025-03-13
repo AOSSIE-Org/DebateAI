@@ -2,8 +2,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useContext, useState } from 'react';
 import { AuthContext } from '../../context/authContext'; // Adjust import path
-
-
+import PasswordInput  from '@/components/PasswordInput';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface LoginFormProps {
   startForgotPassword: () => void;
@@ -13,14 +14,14 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false)
   const authContext = useContext(AuthContext);
+  const [checked, setChecked] = useState(false);
 
   if (!authContext) {
     throw new Error('LoginForm must be used within an AuthProvider');
   }
 
-  const { login, error, loading } = authContext;
+  const { login,  loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,30 +38,33 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         onChange={(e) => setEmail(e.target.value)}
         className="mb-2"
       />
-      <Input
-        type={passwordVisible ? "text" : "password"}
-        placeholder="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="mb-1"
-      />
-      <div className='w-full flex justify-start items-center pl-1'>
-        <div className='w-4'>
-          <Input
-            type='checkbox'
-            checked={passwordVisible}
-            onChange={(e) => setPasswordVisible(e.target.checked)}
-          />
-        </div>
-        <div className='pl-2'>show password</div>
+      <div className="space-y-2">
+        <PasswordInput
+          id="password"
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted mb-4">
-        Forgot your password?{' '}
-        <span className="underline cursor-pointer" onClick={startForgotPassword}>
-          Reset Password
-        </span>
-      </p>
+      <div className='flex items-center justify-between py-4 gap-2'>
+        <div className='flex items-center ml-1 gap-2'>
+          <Checkbox
+            id="remember"
+            checked={checked}
+            onCheckedChange={(checked) => setChecked(checked === true)}
+            className='w-3 h-3 border border-primary rounded-full focus:ring-2 focus:ring-primary'
+          />
+          <Label htmlFor="remember" className="text-xs text-muted text-muted-foreground">
+            Remember me
+          </Label>
+        </div>
+
+        <div className='flex mr-1 gap-2'>
+          <p className="text-xs text-muted text-muted-foreground cursor-pointer hover:text-primary" onClick={startForgotPassword}>Forgot Password?</p>
+        </div>
+
+      </div>
+      
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
@@ -76,7 +80,6 @@ interface SignUpFormProps {
 export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('');
   const authContext = useContext(AuthContext);
 
@@ -84,7 +87,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     throw new Error('SignUpForm must be used within an AuthProvider');
   }
 
-  const { signup, error, loading } = authContext;
+  const { signup, loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,31 +110,22 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         onChange={(e) => setEmail(e.target.value)}
         className="mb-2"
       />
-      <Input
-        type={passwordVisible ? "text" : "password"}
-        placeholder="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="mb-2"
-      />
-      <Input
-        type={passwordVisible ? "text" : "password"}
-        placeholder="confirm password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4"
-      />
-      <div className='w-full flex justify-start items-center pl-1'>
-        <div className='w-4'>
-          <Input
-            type='checkbox'
-            checked={passwordVisible}
-            onChange={(e) => setPasswordVisible(e.target.checked)}
-          />
-        </div>
-        <div className='pl-2'>show password</div>
+      <div className="space-y-2 mb-2">
+        <PasswordInput
+          id="password"
+          placeholder="Create a password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      <div className="space-y-2 mb-6">
+        <PasswordInput
+          id="confirmPassword"
+          placeholder="Confirm your password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+      </div>
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
@@ -244,23 +238,17 @@ interface ResetPasswordFormProps {
   handlePasswordReset: () => void;
 }
 
-interface ResetPasswordFormProps {
-  email: string;
-  handlePasswordReset: () => void;
-}
-
 export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, handlePasswordReset }) => {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false)
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
     throw new Error('ResetPasswordForm must be used within an AuthProvider');
   }
 
-  const { confirmForgotPassword, login, error, loading } = authContext;
+  const { confirmForgotPassword, login, loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,31 +274,23 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
           placeholder="Enter Code"
           className="w-full mb-2"
         />
-        <Input
-          type={passwordVisible ? "text" : "password"}
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          placeholder="New Password"
-          className="w-full mb-2"
-        />
-        <Input
-          type={passwordVisible ? "text" : "password"}
-          value={confirmNewPassword}
-          onChange={(e) => setConfirmNewPassword(e.target.value)}
-          placeholder="Confirm New Password"
-          className="w-full mb-4"
-        />
-      <div className='w-full flex justify-start items-center pl-1'>
-        <div className='w-4'>
-          <Input
-            type='checkbox'
-            checked={passwordVisible}
-            onChange={(e) => setPasswordVisible(e.target.checked)}
+        <div className="space-y-2">
+          <PasswordInput
+            id="newPassword"
+            placeholder="Enter new password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+
           />
         </div>
-        <div className='pl-2'>show password</div>
-      </div>
-        {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+        <div className="space-y-2">
+          <PasswordInput
+            id="confirmNewPassword"
+            placeholder="Confirm new password"
+            value={confirmNewPassword}
+            onChange={(e) => setConfirmNewPassword(e.target.value)}
+          />
+        </div>
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Resetting Password...' : 'Reset Password'}
         </Button>
