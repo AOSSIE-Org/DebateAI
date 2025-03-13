@@ -1,1 +1,3 @@
 *.local
+config.prod.yml
+config.prod.yaml
