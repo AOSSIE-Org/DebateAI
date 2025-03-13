@@ -2,29 +2,39 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
 import { Link } from 'react-router-dom';
+import loginSvg from '@/assets/login.svg';
+import signupSvg from '@/assets/signup.svg';
 
-const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-white">
-    <div className="flex items-center text-lg font-medium">
-      <Link to="/" className="flex items-center">
+interface LeftSectionProps {
+  authMode: 'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword';
+}
+
+const LeftSection: React.FC<LeftSectionProps> = ({ authMode }) => (
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10">
+    <div className="flex items-center text-lg font-medium text-white">
+      <Link to="/" className="flex items-center text-2xl">
         <svg>
-          {/* SVG Content */}
+          {/* <img src={logo} alt="Arguehub Logo" className="w-10 h-10" /> */}
         </svg>
         Arguehub
       </Link>
     </div>
-    <div>
+
+    <div className="flex flex-col items-center justify-center flex-grow">
+      <img 
+        src={authMode === 'signup' ? signupSvg : loginSvg} 
+        alt={`${authMode === 'signup' ? 'Sign up' : 'Login'} illustration`}
+        className="w-4/5 max-w-md mb-16 scale-150"
+      />
       <blockquote className="space-y-2">
-        <p className="text-lg">
+        <p className="text-lg text-white text-center">
           "We cannot solve our problems with the same thinking we used when we created them."
         </p>
-        <footer className="text-sm">Albert Einstein</footer>
+        <footer className="text-sm text-muted-foreground text-right italic">- Albert Einstein</footer>
       </blockquote>
     </div>
   </div>
 );
-
-
 
 interface RightSectionProps {
   authMode: 'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword';
@@ -90,9 +100,7 @@ const RightSection: React.FC<RightSectionProps> = ({
   </div>
 );
 
-
 const Authentication = () => {
-  // Extend authMode to include 'resetPassword'
   const [authMode, setAuthMode] = useState<
     'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
   >('login');
@@ -105,29 +113,24 @@ const Authentication = () => {
     setAuthMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'));
   };
 
-  // Start OTP verification process
   const startOtpVerification = (email: string) => {
     setEmailForOTP(email);
     setAuthMode('otpVerification');
   };
 
-  // Handle successful OTP verification
   const handleOtpVerified = () => {
     setAuthMode('login');
   };
 
-  // Start forgot password process
   const startForgotPassword = () => {
     setAuthMode('forgotPassword');
   };
 
-  // Start reset password process
   const startResetPassword = (email: string) => {
     setEmailForPasswordReset(email);
     setAuthMode('resetPassword');
   };
 
-  // Handle successful password reset
   const handlePasswordReset = () => {
     setInfoMessage('Your password was successfully reset. You can now log in.');
     setAuthMode('login');
@@ -135,7 +138,7 @@ const Authentication = () => {
 
   return (
     <div className="flex w-screen h-screen">
-      <LeftSection />
+      <LeftSection authMode={authMode} />
 
       <RightSection
         authMode={authMode}
