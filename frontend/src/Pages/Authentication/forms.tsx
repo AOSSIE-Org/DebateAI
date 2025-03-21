@@ -86,12 +86,21 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
   const { signup, error, loading } = authContext;
 
+  const checkPasswordStrength = (password: string) => {
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{8,}$/;
+    return passwordRegex.test(password);
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password !== confirmPassword) {
       authContext.handleError('Passwords do not match');
       return;
+    }
+
+    if(checkPasswordStrength(password) === false){
+      authContext.handleError('Password must be at least 8 characters long and contain at least one number and one special character');
     }
 
     await signup(email, password);
