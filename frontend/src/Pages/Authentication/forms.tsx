@@ -55,9 +55,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         <div className='pl-2'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted mb-4">
+      <p className="text-sm text-muted text-gray-600 mb-4">
         Forgot your password?{' '}
-        <span className="underline cursor-pointer" onClick={startForgotPassword}>
+        <span className="underline cursor-pointer text-orange-500" onClick={startForgotPassword}>
           Reset Password
         </span>
       </p>

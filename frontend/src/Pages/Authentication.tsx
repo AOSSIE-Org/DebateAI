@@ -4,7 +4,7 @@ import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPa
 import { Link } from 'react-router-dom';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-white">
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-orange-500">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
         <svg>
