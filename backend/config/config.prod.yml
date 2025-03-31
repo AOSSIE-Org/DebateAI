@@ -2,11 +2,13 @@ server:
   port: 1313
 
 cognito:
-  appClientId: 
-  appClientSecret: 
-  userPoolId:
-  region:
+  appClientId: <your-cognito-app-client-id>
+  appClientSecret: <your-cognito-app-client-secret>
+  userPoolId: <your-cognito-user-pool-id>
+  region: eu-north-1
 
 openai:
-  gptApiKey: 
-  
+  gptApiKey: <your-openai-gpt-api-key>
+
+database:
+  uri: "<your-mongodb-connection-string>"
