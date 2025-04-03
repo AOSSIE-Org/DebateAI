@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 
 	appConfig "arguehub/config"
 	"strings"
-	
 )
 
 type OpenAIRequest struct {
@@ -98,8 +97,8 @@ func (c *ChatGPT) Chat(model, developerPrompt, userMessage string) (string, erro
 }
 
 type DebateFormat struct {
-	Sections []string         `json:"sections"`
-	CurrentTurn string        `json:"currentTurn"` // User ID of the current user's turn.
+	Sections    []string `json:"sections"`
+	CurrentTurn string   `json:"currentTurn"` // User ID of the current user's turn.
 }
 
 type DebateContent map[string]map[string]string
@@ -163,19 +162,18 @@ func main() {
 	debateSections := []string{"opening", "constructive argument", "rebuttal", "closing"}
 	debateContent := DebateContent{
 		"Participant1": {
-			"opening": "Participant 1: Good evening, everyone. Today, I stand firmly on the side of nature in the nature vs. nurture debate. Our genetic makeup profoundly influences who we are, from our physical characteristics to innate talents and predispositions. Scientific studies, such as those involving identical twins raised apart, show remarkable similarities in traits like intelligence, temperament, and even preferences. This demonstrates that nature plays a crucial role in shaping our identity.",
+			"opening":               "Participant 1: Good evening, everyone. Today, I stand firmly on the side of nature in the nature vs. nurture debate. Our genetic makeup profoundly influences who we are, from our physical characteristics to innate talents and predispositions. Scientific studies, such as those involving identical twins raised apart, show remarkable similarities in traits like intelligence, temperament, and even preferences. This demonstrates that nature plays a crucial role in shaping our identity.",
 			"constructive argument": "Participant 1: Consider the field of behavioral genetics, which has consistently found strong correlations between genetics and traits like personality, intelligence, and even susceptibility to certain mental health conditions. Furthermore, evolutionary psychology highlights how traits passed down through generations influence our behavior. For example, fight-or-flight responses are innate survival mechanisms, hardwired into our DNA. The evidence clearly indicates that nature is the dominant factor in determining who we are.",
-			"rebuttal": "Participant 1: My opponent argues that environment and upbringing shape individuals significantly. While I agree that nurture has an influence, it often acts as a moderator rather than a creator of traits. For example, a child with a natural aptitude for music will excel when given the right environment, but that aptitude originates from their genetic predisposition. Without nature providing the foundation, nurture alone would not yield such results.",
-			"closing": "Participant 1: In conclusion, the evidence overwhelmingly supports the idea that nature is the primary determinant of who we are. While nurture can shape and refine, it is our genetic blueprint that sets the stage for our potential. Thank you.",
+			"rebuttal":              "Participant 1: My opponent argues that environment and upbringing shape individuals significantly. While I agree that nurture has an influence, it often acts as a moderator rather than a creator of traits. For example, a child with a natural aptitude for music will excel when given the right environment, but that aptitude originates from their genetic predisposition. Without nature providing the foundation, nurture alone would not yield such results.",
+			"closing":               "Participant 1: In conclusion, the evidence overwhelmingly supports the idea that nature is the primary determinant of who we are. While nurture can shape and refine, it is our genetic blueprint that sets the stage for our potential. Thank you.",
 		},
 		"Participant2": {
-			"opening": "Participant 2: Good evening, everyone. I firmly believe that nurture plays a more significant role in shaping who we are. Our experiences, education, and environment define our abilities, beliefs, and personalities. Studies have shown that children raised in enriched environments tend to perform better academically and socially, regardless of their genetic background. This clearly demonstrates the power of nurture.",
+			"opening":               "Participant 2: Good evening, everyone. I firmly believe that nurture plays a more significant role in shaping who we are. Our experiences, education, and environment define our abilities, beliefs, and personalities. Studies have shown that children raised in enriched environments tend to perform better academically and socially, regardless of their genetic background. This clearly demonstrates the power of nurture.",
 			"constructive argument": "Participant 2: Consider how culture and upbringing influence language, behavior, and values. A child born with a genetic predisposition for intelligence will not reach their full potential without proper education and support. Moreover, cases of children overcoming genetic disadvantages through determination and favorable environments underscore the importance of nurture. The famous case of Albert Einstein, who was considered a slow learner as a child but thrived due to a nurturing environment, is a testament to this.",
-			"rebuttal": "Participant 2: My opponent emphasizes genetic influence but overlooks the dynamic role of environment. For instance, identical twins raised apart often show differences in attitudes, hobbies, and career choices due to their distinct environments. Genes provide a starting point, but it is nurture that refines and ultimately shapes those traits into tangible outcomes. Without proper nurturing, even the most promising genetic traits can remain dormant.",
-			"closing": "Participant 2: In conclusion, while nature provides the raw material, it is nurture that sculpts it into something meaningful. The environment, experiences, and opportunities we encounter ultimately determine who we become. Thank you.",
+			"rebuttal":              "Participant 2: My opponent emphasizes genetic influence but overlooks the dynamic role of environment. For instance, identical twins raised apart often show differences in attitudes, hobbies, and career choices due to their distinct environments. Genes provide a starting point, but it is nurture that refines and ultimately shapes those traits into tangible outcomes. Without proper nurturing, even the most promising genetic traits can remain dormant.",
+			"closing":               "Participant 2: In conclusion, while nature provides the raw material, it is nurture that sculpts it into something meaningful. The environment, experiences, and opportunities we encounter ultimately determine who we become. Thank you.",
 		},
 	}
-	
 
 	debateFormat := DebateFormat{Sections: debateSections}
 
