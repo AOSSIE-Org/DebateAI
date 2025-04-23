@@ -67,3 +67,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-150px);
+    opacity: 0;
+  }
+}
+
+.animate-floating {
+  animation: floatUp 2s ease-out forwards;
+}

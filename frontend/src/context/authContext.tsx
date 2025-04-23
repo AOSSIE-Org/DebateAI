@@ -34,22 +34,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyToken = useCallback(async () => {
     const storedToken = localStorage.getItem("token");
     if (!storedToken) return;
-
+    console.log(storedToken);
     try {
       const response = await fetch(`${baseURL}/verifyToken`, {
+        method: "POST", // <-- Make sure this matches your backend route
         headers: { Authorization: `Bearer ${storedToken}` },
       });
-
+  
       if (!response.ok) throw new Error("Token expired or invalid");
       setToken(storedToken);
     } catch (error) {
+      console.log("error", error);
       logout();
     }
   }, []);
-
+  
   useEffect(() => {
     verifyToken();
   }, [verifyToken]);
+  
 
   const login = async (email: string, password: string) => {
     setLoading(true);
