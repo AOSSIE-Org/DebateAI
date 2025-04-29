@@ -8,15 +8,29 @@ import (
 	"log"
 	"os"
 	"strings"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
-	"github.com/gin-gonic/gin"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
+	"github.com/gin-gonic/gin"
 )
 
+func getAwsConfig(ctx *gin.Context, region string) (aws.Config, error) {
+	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(region))
+	if err != nil {
+		log.Printf("Error loading AWS config: %v", err)
+		return aws.Config{}, fmt.Errorf("failed to load AWS config: %v", err)
+	}
+	return config, nil
+}
+
 func SignUp(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
+	cfg, err := loadConfig(ctx)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Internal server error", "message": err.Error()})
+		return
+	}
 	if cfg == nil {
 		return
 	}
@@ -27,7 +41,7 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	err := signUpWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, ctx)
+	err = signUpWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, cfg.Cognito.Region, ctx)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to sign up", "message": err.Error()})
 		return
@@ -37,7 +51,11 @@ func SignUp(ctx *gin.Context) {
 }
 
 func VerifyEmail(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
+	cfg, err := loadConfig(ctx)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Internal server error", "message": err.Error()})
+		return
+	}
 	if cfg == nil {
 		return
 	}
@@ -48,7 +66,7 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	err := verifyEmailWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.ConfirmationCode, ctx)
+	err = verifyEmailWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.ConfirmationCode, cfg.Cognito.Region, ctx)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to verify email", "message": err.Error()})
 		return
@@ -58,7 +76,12 @@ func VerifyEmail(ctx *gin.Context) {
 }
 
 func Login(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
+	cfg, err := loadConfig(ctx)
+
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Internal server error", "message": err.Error()})
+		return
+	}
 	if cfg == nil {
 		return
 	}
@@ -69,8 +92,9 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	token, err := loginWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, ctx)
+	token, err := loginWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, cfg.Cognito.Region, ctx)
 	if err != nil {
+		fmt.Println(err)
 		ctx.JSON(401, gin.H{"error": "Failed to sign in", "message": "Invalid email or password"})
 		return
 	}
@@ -79,7 +103,11 @@ func Login(ctx *gin.Context) {
 }
 
 func ForgotPassword(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
+	cfg, err := loadConfig(ctx)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Internal server error", "message": err.Error()})
+		return
+	}
 	if cfg == nil {
 		return
 	}
@@ -90,7 +118,7 @@ func ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	_, err := initiateForgotPassword(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, ctx)
+	_, err = initiateForgotPassword(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, cfg.Cognito.Region, ctx)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to initiate password reset", "message": err.Error()})
 		return
@@ -100,7 +128,11 @@ func ForgotPassword(ctx *gin.Context) {
 }
 
 func VerifyForgotPassword(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
+	cfg, err := loadConfig(ctx)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Internal server error", "message": err.Error()})
+		return
+	}
 	if cfg == nil {
 		return
 	}
@@ -111,7 +143,7 @@ func VerifyForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	_, err := confirmForgotPassword(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Code, request.NewPassword, ctx)
+	_, err = confirmForgotPassword(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Code, request.NewPassword, cfg.Cognito.Region, ctx)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to confirm password reset", "message": err.Error()})
 		return
@@ -121,7 +153,12 @@ func VerifyForgotPassword(ctx *gin.Context) {
 }
 
 func VerifyToken(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
+	cfg, err := loadConfig(ctx)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Internal server error", "message": err.Error()})
+		return
+	}
+
 	if cfg == nil {
 		return
 	}
@@ -139,7 +176,7 @@ func VerifyToken(ctx *gin.Context) {
 	}
 	token := tokenParts[1]
 
-	valid, err := validateTokenWithCognito(cfg.Cognito.UserPoolId, token, ctx)
+	valid, err := validateTokenWithCognito(cfg.Cognito.UserPoolId, token, cfg.Cognito.Region, ctx)
 	if err != nil {
 		ctx.JSON(401, gin.H{"error": "Invalid or expired token", "message": err.Error()})
 		return
@@ -153,22 +190,26 @@ func VerifyToken(ctx *gin.Context) {
 	ctx.JSON(200, gin.H{"message": "Token is valid"})
 }
 
-func loadConfig(ctx *gin.Context) *config.Config {
+func loadConfig(ctx *gin.Context) (*config.Config, error) {
 	cfgPath := os.Getenv("CONFIG_PATH")
 	if cfgPath == "" {
 		cfgPath = "./config/config.prod.yml"
 	}
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		log.Println("Failed to load config")
-		ctx.JSON(500, gin.H{"error": "Internal server error"})
-		return nil
+		log.Printf("Failed to load config from %s: %v", cfgPath, err)
+		return nil, fmt.Errorf("failed to load config: %v", err)
 	}
-	return cfg
+	return cfg, nil
 }
 
-func signUpWithCognito(appClientId, appClientSecret, email, password string, ctx *gin.Context) error {
-	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion("ap-south-1"))
+func signUpWithCognito(appClientId, appClientSecret, email, password, region string, ctx *gin.Context) error {
+	cfg, err := loadConfig(ctx)
+	if cfg == nil {
+		return fmt.Errorf("failed to load config")
+	}
+
+	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion(cfg.Cognito.Region)) // TODO: Hardcoded value should be replaced
 	if err != nil {
 		log.Println("Error loading AWS config:", err)
 		return fmt.Errorf("failed to load AWS config: %v", err)
@@ -194,7 +235,7 @@ func signUpWithCognito(appClientId, appClientSecret, email, password string, ctx
 			},
 		},
 	}
-
+	fmt.Println("Testing: ", appClientId)
 	signupStatus, err := cognitoClient.SignUp(ctx, &signupInput)
 	if err != nil {
 		log.Println("Error during sign-up:", err)
@@ -205,8 +246,9 @@ func signUpWithCognito(appClientId, appClientSecret, email, password string, ctx
 	return nil
 }
 
-func verifyEmailWithCognito(appClientId, appClientSecret, email, confirmationCode string, ctx *gin.Context) error {
-	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion("ap-south-1"))
+func verifyEmailWithCognito(appClientId, appClientSecret, email, confirmationCode, region string, ctx *gin.Context) error {
+	config, err := getAwsConfig(ctx, region)
+
 	if err != nil {
 		log.Println("Error loading AWS config:", err)
 		return fmt.Errorf("failed to load AWS config: %v", err)
@@ -233,9 +275,13 @@ func verifyEmailWithCognito(appClientId, appClientSecret, email, confirmationCod
 	return nil
 }
 
-func loginWithCognito(appClientId, appClientSecret, email, password string, ctx *gin.Context) (string, error) {
-	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion("ap-south-1"))
+func loginWithCognito(appClientId, appClientSecret, email, password, region string, ctx *gin.Context) (string, error) {
+	config, err := getAwsConfig(ctx, region)
+	// if cfg == nil {
+	// 	return "",fmt.Errorf("failed to load config")
+	// }
 	if err != nil {
+		fmt.Println(err)
 		return "", fmt.Errorf("failed to load AWS config")
 	}
 
@@ -251,6 +297,9 @@ func loginWithCognito(appClientId, appClientSecret, email, password string, ctx 
 			"SECRET_HASH": secretHash,
 		},
 	}
+	fmt.Println(email)
+	fmt.Println(appClientId)
+	fmt.Println(secretHash)
 
 	authOutput, err := cognitoClient.InitiateAuth(ctx, &authInput)
 	if err != nil {
@@ -260,8 +309,8 @@ func loginWithCognito(appClientId, appClientSecret, email, password string, ctx 
 	return *authOutput.AuthenticationResult.AccessToken, nil
 }
 
-func initiateForgotPassword(appClientId, appClientSecret, email string, ctx *gin.Context) (*cognitoidentityprovider.ForgotPasswordOutput, error) {
-	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion("ap-south-1"))
+func initiateForgotPassword(appClientId, appClientSecret, email, region string, ctx *gin.Context) (*cognitoidentityprovider.ForgotPasswordOutput, error) {
+	config, err := getAwsConfig(ctx, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config")
 	}
@@ -283,8 +332,9 @@ func initiateForgotPassword(appClientId, appClientSecret, email string, ctx *gin
 	return output, nil
 }
 
-func confirmForgotPassword(appClientId, appClientSecret, email, code, newPassword string, ctx *gin.Context) (*cognitoidentityprovider.ConfirmForgotPasswordOutput, error) {
-	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion("ap-south-1"))
+func confirmForgotPassword(appClientId, appClientSecret, email, code, newPassword, region string, ctx *gin.Context) (*cognitoidentityprovider.ConfirmForgotPasswordOutput, error) {
+	config, err := getAwsConfig(ctx, region)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config")
 	}
@@ -308,8 +358,9 @@ func confirmForgotPassword(appClientId, appClientSecret, email, code, newPasswor
 	return output, nil
 }
 
-func validateTokenWithCognito(userPoolId, token string, ctx *gin.Context) (bool, error) {
-	config, err := awsConfig.LoadDefaultConfig(ctx, awsConfig.WithRegion("ap-south-1"))
+func validateTokenWithCognito(userPoolId, token, region string, ctx *gin.Context) (bool, error) {
+	config, err := getAwsConfig(ctx, region)
+
 	if err != nil {
 		return false, fmt.Errorf("failed to load AWS config")
 	}

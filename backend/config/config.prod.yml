@@ -2,11 +2,11 @@ server:
   port: 1313
 
 cognito:
-  appClientId: 
-  appClientSecret: 
-  userPoolId:
-  region:
+  appClientId: 7hmap5ff4al6ma60rhmnohs3cp #551qeukcut5prntepn9l595c43
+  appClientSecret: 1n6jofn700ad1dgv1orrq8semfjpsd2iebg2ai2mmhlpk72tp381 #1ro4h1bes6eq4j19siujahc2s2o0sb1hatj1frreql0anq4k2tr4
+  userPoolId: eu-north-1_O3svahfGa #eu-north-1_epOMhW4Eu
+  region: eu-north-1
 
 openai:
-  gptApiKey: 
+  gptApiKey: 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
   
