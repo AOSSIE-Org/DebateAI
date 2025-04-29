@@ -42,7 +42,7 @@
     "aws-cdk": "^2.161.1",
     "aws-cdk-lib": "^2.161.1",
     "constructs": "^10.3.0",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.25.1",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",

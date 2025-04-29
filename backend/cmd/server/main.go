@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 
@@ -17,6 +18,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+	fmt.Printf("Loaded Config:\nClient ID: %s\n",
+		cfg.Cognito.AppClientId,
+	)
 
 	router := setupRouter(cfg)
 
@@ -44,6 +48,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.OPTIONS("/*path", func(c *gin.Context) {
 		c.Status(204)
 	})
+	router.GET("/", func(c *gin.Context) {
+		log.Println("Root route hit")
+		c.JSON(200, gin.H{"message": "Welcome to ArgueHub API!"})
+	})
 
 	router.POST("/signup", routes.SignUpRouteHandler)
 	router.POST("/verifyEmail", routes.VerifyEmailRouteHandler)
@@ -51,7 +59,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
-	
+
 	router.GET("/ws", websocket.WebsocketHandler)
 
 	return router
