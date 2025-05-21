@@ -23,13 +23,13 @@ func SignUp(ctx *gin.Context) {
 
 	var request structs.SignUpRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
+		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Invalid email or password format"})
 		return
 	}
 
 	err := signUpWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, ctx)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to sign up", "message": err.Error()})
+		ctx.JSON(500, gin.H{"error": "Failed to sign up", "message": "Failed to sign up with Cognito"})
 		return
 	}
 
@@ -65,13 +65,13 @@ func Login(ctx *gin.Context) {
 
 	var request structs.LoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Check email and password format"})
+		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Invalid email or password format. Please check your input and try again."})
 		return
 	}
 
 	token, err := loginWithCognito(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, request.Password, ctx)
 	if err != nil {
-		ctx.JSON(401, gin.H{"error": "Failed to sign in", "message": "Invalid email or password"})
+		ctx.JSON(401, gin.H{"error": "Failed to sign in", "message": "Invalid email or password. Please check your credentials and try again."})
 		return
 	}
 
@@ -86,13 +86,13 @@ func ForgotPassword(ctx *gin.Context) {
 
 	var request structs.ForgotPasswordRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Check email format"})
+		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Invalid email format. Please check your input and try again."})
 		return
 	}
 
 	_, err := initiateForgotPassword(cfg.Cognito.AppClientId, cfg.Cognito.AppClientSecret, request.Email, ctx)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to initiate password reset", "message": err.Error()})
+		ctx.JSON(500, gin.H{"error": "Failed to initiate password reset", "message": "Failed to initiate password reset. Please try again later."})
 		return
 	}
 
