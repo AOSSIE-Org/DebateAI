@@ -6,26 +6,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SignUpRouteHandler(ctx *gin.Context) {
-	controllers.SignUp(ctx)
+func SignUpRouteHandler(c *gin.Context) {
+	controllers.SignUp(c)
 }
 
-func VerifyEmailRouteHandler(ctx *gin.Context) {
-	controllers.VerifyEmail(ctx)
+func VerifyEmailRouteHandler(c *gin.Context) {
+	controllers.VerifyEmail(c)
 }
 
-func LoginRouteHandler(ctx *gin.Context) {
-	controllers.Login(ctx)
+func LoginRouteHandler(c *gin.Context) {
+	controllers.Login(c)
 }
 
-func ForgotPasswordRouteHandler(ctx *gin.Context) {
-	controllers.ForgotPassword(ctx)
+func ForgotPasswordRouteHandler(c *gin.Context) {
+	controllers.ForgotPassword(c)
 }
 
-func VerifyForgotPasswordRouteHandler(ctx *gin.Context) {
-	controllers.VerifyForgotPassword(ctx)
+func VerifyForgotPasswordRouteHandler(c *gin.Context) {
+	controllers.VerifyForgotPassword(c)
 }
 
-func VerifyTokenRouteHandler(ctx *gin.Context) {
-	controllers.VerifyToken(ctx)
+func VerifyTokenRouteHandler(c *gin.Context) {
+	controllers.VerifyToken(c)
 }
