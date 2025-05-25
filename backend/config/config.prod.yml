@@ -1,12 +1,32 @@
 server:
-  port: 1313
+  port: # Port number on which the server runs
 
 cognito:
-  appClientId: 
-  appClientSecret: 
-  userPoolId:
-  region:
+  appClientId: # AWS Cognito App Client ID
+  appClientSecret: # AWS Cognito App Client Secret
+  userPoolId: # AWS Cognito User Pool ID
+  region: # AWS region for Cognito
 
 openai:
-  gptApiKey: 
-  
+  gptApiKey: # OpenAI GPT API key
+
+database:
+  uri: # MongoDB connection URI
+
+gemini:
+  apiKey: # Google Gemini API key
+
+jwt:
+  secret: # Secret key for signing JWT tokens
+  expiry: # JWT token expiry time in minutes
+
+smtp:
+  host: # SMTP server host (e.g., smtp.gmail.com)
+  port: # SMTP server port (usually 587 for TLS)
+  username: # SMTP username (usually your email)
+  password: # SMTP app password (not your regular email password)
+  senderEmail: # Email address used to send emails
+  senderName: # Display name for the sender in outgoing emails
+
+googleOAuth:
+  clientID: # Google OAuth Client ID

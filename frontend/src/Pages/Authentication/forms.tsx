@@ -1,9 +1,8 @@
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useContext, useState } from 'react';
-import { AuthContext } from '../../context/authContext'; // Adjust import path
 
-
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useContext, useState, useEffect } from 'react';
+import { AuthContext } from '../../context/authContext';
 
 interface LoginFormProps {
   startForgotPassword: () => void;
@@ -13,19 +12,51 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
     throw new Error('LoginForm must be used within an AuthProvider');
   }
 
-  const { login, error, loading } = authContext;
+  const { login, googleLogin, error, loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await login(email, password);
   };
+
+  const handleGoogleLogin = (response: { credential: string; select_by: string }) => {
+    const idToken = response.credential;
+    googleLogin(idToken);
+  };
+
+  useEffect(() => {
+    const google = window.google;
+    if (!google?.accounts) {
+      console.warn('Google Sign-In script not loaded');
+      return;
+    }
+
+    google.accounts.id.initialize({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: handleGoogleLogin,
+    });
+
+    const buttonElement = document.getElementById('googleSignInButton');
+    if (buttonElement) {
+      google.accounts.id.renderButton(buttonElement, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+        width: '100%',
+      });
+    }
+
+    return () => {
+      google.accounts.id.cancel();
+    };
+  }, []);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -61,13 +92,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
           Reset Password
         </span>
       </p>
-      <Button type="submit" className="w-full" disabled={loading}>
+      <Button type="submit" className="w-full mb-2" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
+      <div id="googleSignInButton" className="w-full"></div>
     </form>
   );
 };
-
 
 interface SignUpFormProps {
   startOtpVerification: (email: string) => void;
@@ -76,7 +107,7 @@ interface SignUpFormProps {
 export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const authContext = useContext(AuthContext);
 
@@ -84,7 +115,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     throw new Error('SignUpForm must be used within an AuthProvider');
   }
 
-  const { signup, error, loading } = authContext;
+  const { signup, googleLogin, error, loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +128,38 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     await signup(email, password);
     startOtpVerification(email);
   };
+
+  const handleGoogleLogin = (response: { credential: string; select_by: string }) => {
+    const idToken = response.credential;
+    googleLogin(idToken);
+  };
+
+  useEffect(() => {
+    const google = window.google;
+    if (!google?.accounts) {
+      console.warn('Google Sign-In script not loaded');
+      return;
+    }
+
+    google.accounts.id.initialize({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: handleGoogleLogin,
+    });
+
+    const buttonElement = document.getElementById('googleSignUpButton');
+    if (buttonElement) {
+      google.accounts.id.renderButton(buttonElement, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signup_with',
+        width: '100%',
+      });
+    }
+
+    return () => {
+      google.accounts.id.cancel();
+    };
+  }, []);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -132,9 +195,10 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         <div className='pl-2'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <Button type="submit" className="w-full" disabled={loading}>
+      <Button type="submit" className="w-full mb-2" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
+      <div id="googleSignUpButton" className="w-full"></div>
     </form>
   );
 };
@@ -181,9 +245,8 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
   );
 };
 
-
 interface ForgotPasswordFormProps {
-  startResetPassword: (email: string) => void; // Accept the new prop
+  startResetPassword: (email: string) => void;
 }
 
 export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
@@ -210,7 +273,6 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
         return;
       }
 
-      // Move to the ResetPasswordForm
       startResetPassword(email);
     } catch {
       setError('An unexpected error occurred. Please try again later.');
@@ -238,12 +300,6 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   );
 };
 
-
-interface ResetPasswordFormProps {
-  email: string;
-  handlePasswordReset: () => void;
-}
-
 interface ResetPasswordFormProps {
   email: string;
   handlePasswordReset: () => void;
@@ -253,7 +309,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
@@ -300,16 +356,16 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
           placeholder="Confirm New Password"
           className="w-full mb-4"
         />
-      <div className='w-full flex justify-start items-center pl-1'>
-        <div className='w-4'>
-          <Input
-            type='checkbox'
-            checked={passwordVisible}
-            onChange={(e) => setPasswordVisible(e.target.checked)}
-          />
+        <div className='w-full flex justify-start items-center pl-1'>
+          <div className='w-4'>
+            <Input
+              type='checkbox'
+              checked={passwordVisible}
+              onChange={(e) => setPasswordVisible(e.target.checked)}
+            />
+          </div>
+          <div className='pl-2'>show password</div>
         </div>
-        <div className='pl-2'>show password</div>
-      </div>
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Resetting Password...' : 'Reset Password'}
