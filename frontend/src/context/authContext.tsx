@@ -15,6 +15,7 @@ interface AuthContextType {
   verifyEmail: (email: string, code: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<void>;
+  googleLogin: (idToken: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,19 +35,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyToken = useCallback(async () => {
     const storedToken = localStorage.getItem("token");
     if (!storedToken) return;
-
+    console.log(storedToken);
     try {
       const response = await fetch(`${baseURL}/verifyToken`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${storedToken}` },
       });
-
+  
       if (!response.ok) throw new Error("Token expired or invalid");
       setToken(storedToken);
     } catch (error) {
+      console.log("error", error);
       logout();
     }
   }, []);
-
+  
   useEffect(() => {
     verifyToken();
   }, [verifyToken]);
@@ -153,6 +156,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const googleLogin = async (idToken: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${baseURL}/googleLogin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Google login failed");
+
+      setToken(data.accessToken);
+      localStorage.setItem("token", data.accessToken);
+      navigate("/");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     setToken(null);
     localStorage.removeItem("token");
@@ -173,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         verifyEmail,
         forgotPassword,
         confirmForgotPassword,
+        googleLogin,
       }}
     >
       {children}
