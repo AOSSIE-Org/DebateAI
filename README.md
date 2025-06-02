@@ -102,6 +102,23 @@ googleOAuth:
 
 ---
 
+### Frontend Configuration
+
+1. In the `frontend/` directory, create a file named `.env`.
+
+2. Add the following environment variables to the `.env` file:
+
+```
+VITE_BASE_URL="http://localhost:1313"
+VITE_GOOGLE_CLIENT_ID="<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
+```
+
+- Replace `<YOUR_GOOGLE_OAUTH_CLIENT_ID>` with your actual Google OAuth Client ID from Google Cloud Console.
+
+> **Note:** Do **not** commit this file to a public repository. Add `.env` to your `.gitignore` to keep it secure.
+
+---
+
 ###  Running the Frontend (React + Vite)
 
 1. Open a new terminal and navigate to the frontend directory:
