@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"time"
 
@@ -22,6 +21,19 @@ var (
 	ErrInvalidToken = errors.New("invalid token")
 	ErrTokenExpired = errors.New("token has expired")
 )
+
+var jwtSecret string
+
+func SetJWTSecret(secret string) {
+	jwtSecret = secret
+}
+
+func getJWTSecret() string {
+	if jwtSecret == "" {
+		log.Fatal("JWT secret is not set in config")
+	}
+	return jwtSecret
+}
 
 // ExtractNameFromEmail extracts the username before '@'
 func ExtractNameFromEmail(email string) string {
@@ -113,15 +125,6 @@ func GenerateRandomToken(length int) (string, error) {
 		return "", fmt.Errorf("failed to generate random token")
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
-}
-
-func getJWTSecret() string {
-
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		log.Fatal("JWT_SECRET environment variable not set")
-	}
-	return secret
 }
 
 func ValidateTokenAndFetchEmail(configPath, token string, c *gin.Context) (bool, string, error) {
