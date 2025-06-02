@@ -35,7 +35,7 @@ func GoogleLogin(ctx *gin.Context) {
 
 	var request GoogleLoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
+		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Invalid email or password format"})
 		return
 	}
 

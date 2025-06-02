@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useContext, useState, useEffect } from 'react';
@@ -12,12 +11,33 @@ interface LoginFormProps {
 export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
-    throw new Error('LoginForm must be used within an AuthProvider');
+    throw new Error("LoginForm must be used within an AuthProvider");
   }
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError("Invalid email format");
+      return false;
+    }
+    setEmailError("");
+    return true;
+  };
+
+  const validatePassword = (password: string) => {
+    if (password.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
+      return false;
+    }
+    setPasswordError("");
+    return true;
+  };
 
   const { login, googleLogin, error, loading } = authContext;
 
@@ -60,35 +80,50 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
-      {infoMessage && <p className="text-sm text-green-500 mb-2">{infoMessage}</p>}
+      {infoMessage && (
+        <p className="text-sm text-green-500 mb-2">{infoMessage}</p>
+      )}
       <Input
         type="email"
         placeholder="name@example.com"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          validateEmail(e.target.value);
+        }}
         className="mb-2"
       />
+      {emailError && <p className="text-sm text-red-500 mb-2">{emailError}</p>}
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => {
+          setPassword(e.target.value);
+          validatePassword(e.target.value);
+        }}
         className="mb-1"
       />
-      <div className='w-full flex justify-start items-center pl-1'>
-        <div className='w-4'>
+      {passwordError && (
+        <p className="text-sm text-red-500 mb-2">{passwordError}</p>
+      )}
+      <div className="w-full flex justify-start items-center pl-1">
+        <div className="w-4">
           <Input
-            type='checkbox'
+            type="checkbox"
             checked={passwordVisible}
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className="pl-2">show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
       <p className="text-sm text-muted mb-4">
-        Forgot your password?{' '}
-        <span className="underline cursor-pointer" onClick={startForgotPassword}>
+        Forgot your password?{" "}
+        <span
+          className="underline cursor-pointer"
+          onClick={startForgotPassword}
+        >
           Reset Password
         </span>
       </p>
@@ -112,16 +147,16 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
-    throw new Error('SignUpForm must be used within an AuthProvider');
+    throw new Error("SignUpForm must be used within an AuthProvider");
   }
 
   const { signup, googleLogin, error, loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
-      authContext.handleError('Passwords do not match');
+      authContext.handleError("Passwords do not match");
       return;
     }
 
@@ -184,15 +219,15 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         onChange={(e) => setConfirmPassword(e.target.value)}
         className="mb-4"
       />
-      <div className='w-full flex justify-start items-center pl-1'>
-        <div className='w-4'>
+      <div className="w-full flex justify-start items-center pl-1">
+        <div className="w-4">
           <Input
-            type='checkbox'
+            type="checkbox"
             checked={passwordVisible}
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className="pl-2">show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
       <Button type="submit" className="w-full mb-2" disabled={loading}>
@@ -208,12 +243,15 @@ interface OTPVerificationFormProps {
   handleOtpVerified: () => void;
 }
 
-export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email, handleOtpVerified }) => {
-  const [otp, setOtp] = useState('');
+export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({
+  email,
+  handleOtpVerified,
+}) => {
+  const [otp, setOtp] = useState("");
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
-    throw new Error('OTPVerificationForm must be used within an AuthProvider');
+    throw new Error("OTPVerificationForm must be used within an AuthProvider");
   }
 
   const { verifyEmail, error, loading } = authContext;
@@ -227,7 +265,9 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
   return (
     <div className="w-full flex flex-col items-center">
       <h3 className="text-2xl font-medium my-4">Verify Your Email</h3>
-      <p className="mb-4">Enter the OTP sent to your email to complete the sign-up process.</p>
+      <p className="mb-4">
+        Enter the OTP sent to your email to complete the sign-up process.
+      </p>
       <form onSubmit={handleSubmit} className="w-full">
         <Input
           type="text"
@@ -238,7 +278,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Verifying...' : 'Verify OTP'}
+          {loading ? "Verifying..." : "Verify OTP"}
         </Button>
       </form>
     </div>
@@ -252,30 +292,30 @@ interface ForgotPasswordFormProps {
 export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   startResetPassword,
 }) => {
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
 
   const baseURL = import.meta.env.VITE_BASE_URL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     try {
       const response = await fetch(`${baseURL}/forgotPassword`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
 
       if (!response.ok) {
-        setError('Failed to send reset password code. Please try again.');
+        setError("Failed to send reset password code. Please try again.");
         return;
       }
 
       startResetPassword(email);
     } catch {
-      setError('An unexpected error occurred. Please try again later.');
+      setError("An unexpected error occurred. Please try again later.");
     }
   };
 
@@ -313,16 +353,16 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
-    throw new Error('ResetPasswordForm must be used within an AuthProvider');
+    throw new Error("ResetPasswordForm must be used within an AuthProvider");
   }
 
   const { confirmForgotPassword, login, error, loading } = authContext;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmNewPassword) {
-      authContext.handleError('Passwords do not match');
+      authContext.handleError("Passwords do not match");
       return;
     }
 
@@ -356,19 +396,19 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
           placeholder="Confirm New Password"
           className="w-full mb-4"
         />
-        <div className='w-full flex justify-start items-center pl-1'>
-          <div className='w-4'>
+        <div className="w-full flex justify-start items-center pl-1">
+          <div className="w-4">
             <Input
-              type='checkbox'
+              type="checkbox"
               checked={passwordVisible}
               onChange={(e) => setPasswordVisible(e.target.checked)}
             />
           </div>
-          <div className='pl-2'>show password</div>
+          <div className="pl-2">show password</div>
         </div>
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Resetting Password...' : 'Reset Password'}
+          {loading ? "Resetting Password..." : "Reset Password"}
         </Button>
       </form>
     </div>
