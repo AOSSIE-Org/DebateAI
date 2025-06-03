@@ -57,7 +57,7 @@ function Header() {
 
   return (
     <>
-      <header className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white">
+      <header className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
         <div className="text-lg font-semibold">{getBreadcrumbs()}</div>
         <div className="flex items-center gap-4">
           <button className="relative">

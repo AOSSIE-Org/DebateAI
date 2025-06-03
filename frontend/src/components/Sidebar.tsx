@@ -3,10 +3,11 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { MessageSquare, BarChart, User, Info, Trophy } from "lucide-react";
 import debateAiLogo from "@/assets/aossie.png";
+import { ThemeToggle } from "./ThemeToggle";
 
 function Sidebar() {
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
+    <aside className="hidden md:flex flex-col w-64 border-r border-gray-200">
       {/* Logo / Brand */}
       <div className="flex items-center h-16 px-4 border-b border-gray-200">
         <div className="flex items-center gap-2">
@@ -45,6 +46,7 @@ function Sidebar() {
           label="About"
           icon={<Info className="mr-3 h-4 w-4" />}
         />
+        <ThemeToggle/>
       </nav>
     </aside>
   );
@@ -63,8 +65,8 @@ function NavItem({ to, label, icon }: NavItemProps) {
       className={({ isActive }) =>
         `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
           isActive
-            ? "bg-gray-200 text-gray-900"
-            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            ? "bg-secondary text-secondary-foreground"
+            : "text-foreground hover:bg-muted hover:text-foreground"
         }`
       }
     >

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 
-enum ThemeOptions {
+export enum ThemeOptions {
     Light,
-    Dark
+    Dark,
+    Contrast
 }
 
 interface ThemeContextStructure {
@@ -53,24 +54,15 @@ export function ThemeProvider({ children }: { children: any }): any {
     const [theme, setTheme] = useState<ThemeOptions>(getInitialTheme());
 
     useEffect(() => {
-        //add a set function which will update the local storage.
-        let bodyElement = document.body;
-        if (theme == ThemeOptions.Light) {
-            localStorage.setItem("Theme", String(ThemeOptions.Light));
-            bodyElement.classList.remove("dark");
-        }
-        else {
-            localStorage.setItem("Theme", String(ThemeOptions.Dark));
-            bodyElement.classList.add("dark");
-        }
-    }, [theme])
+    const bodyElement = document.body;
+    bodyElement.classList.remove("dark", "contrast");
+    const className = ThemeOptions[theme].toLowerCase(); // "light", "dark", or "contrast"
+    bodyElement.classList.add(className);
+    localStorage.setItem("Theme", String(theme));
+}, [theme])
     function toggleTheme() {
-        if (theme == ThemeOptions.Dark) {
-            setTheme(ThemeOptions.Light);
-        }
-        else {
-            setTheme(ThemeOptions.Dark);
-        }
+        const enumCount = Object.values(ThemeOptions).filter(x => typeof x === "number").length;
+        setTheme((prev) => (prev + 1) % enumCount);
     }
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>
