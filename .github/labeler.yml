@@ -1,0 +1,19 @@
+docs:
+- changed-files:
+  - any-glob-to-any-file: '*.md'
+
+frontend:
+- changed-files:
+  - any-glob-to-any-file: 'frontend/**/*'
+  - any-glob-to-any-file: 'frontend/**/*.js'
+  - any-glob-to-any-file: 'frontend/**/*.ts'
+  - any-glob-to-any-file: 'frontend/**/*.tsx'
+  - any-glob-to-any-file: 'frontend/**/*.jsx'
+  - any-glob-to-any-file: 'frontend/**/*.css'
+  - any-glob-to-any-file: 'frontend/**/*.html'
+
+backend:
+  - changed-files:
+    - any-glob-to-any-file: 'backend/**/*'
+    - any-glob-to-any-file: 'backend/**/*.go'
+    - any-glob-to-any-file: 'backend/**/*.py'
