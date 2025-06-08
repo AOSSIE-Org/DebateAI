@@ -17,7 +17,10 @@ export const getProfile = async (token: string) => {
 export const updateProfile = async (
   token: string,
   displayName: string,
-  bio: string
+  bio: string,
+  twitter?: string,
+  instagram?: string,
+  linkedin?: string
 ) => {
   const response = await fetch(`${baseURL}/user/updateprofile`, {
     method: "PUT",
@@ -25,14 +28,13 @@ export const updateProfile = async (
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ displayName, bio }),
+    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin }),
   });
   if (!response.ok) {
     throw new Error("Failed to update profile");
   }
   return response.json();
 };
-
 export const getLeaderboard = async () => {
   const response = await fetch(`${baseURL}/leaderboard`, {
     method: "GET",

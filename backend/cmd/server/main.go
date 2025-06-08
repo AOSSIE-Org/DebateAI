@@ -26,11 +26,15 @@ func main() {
 
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
+	services.InitRatingService(cfg) 
+	
 	// Connect to MongoDB using the URI from the configuration
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 	log.Println("Connected to MongoDB")
+
+	utils.SetJWTSecret(cfg.JWT.Secret)
 
 	// Seed initial debate-related data
 	utils.SeedDebateData()
@@ -81,7 +85,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
-		auth.POST("/debate/result", routes.UpdateEloAfterDebateRouteHandler)
+		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler) 
 		routes.SetupDebateVsBotRoutes(auth)
 
 		// WebSocket signaling endpoint
