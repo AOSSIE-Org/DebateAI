@@ -13,6 +13,7 @@ type Debate struct {
 	Topic     string             `bson:"topic" json:"topic"`
 	Result    string             `bson:"result" json:"result"`
 	EloChange int                `bson:"eloChange" json:"eloChange"`
+	EloRating    float64            `bson:"eloRating" json:"eloRating"`
 	Date      time.Time          `bson:"date" json:"date"`
 }
 

@@ -14,6 +14,9 @@ type User struct {
 	Bio               string             `bson:"bio" json:"bio"`
 	EloRating         int                `bson:"eloRating" json:"eloRating"`
 	AvatarURL         string             `bson:"avatarUrl,omitempty" json:"avatarUrl,omitempty"`
+	Twitter           string             `bson:"twitter,omitempty" json:"twitter,omitempty"`
+	Instagram         string             `bson:"instagram,omitempty" json:"instagram,omitempty"`
+	LinkedIn          string             `bson:"linkedin,omitempty" json:"linkedin,omitempty"`
 	Password          string             `bson:"password"`
 	Nickname          string             `bson:"nickname"`
 	IsVerified        bool               `bson:"isVerified"`

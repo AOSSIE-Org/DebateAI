@@ -26,11 +26,13 @@ func main() {
 
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
-	// Connect to MongoDB using the URI from the configuration
+
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 	log.Println("Connected to MongoDB")
+
+	utils.SetJWTSecret(cfg.JWT.Secret)
 
 	// Seed initial debate-related data
 	utils.SeedDebateData()
