@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"time"
-
+	"arguehub/config"
+	
 	"crypto/sha256"
 
 	"github.com/gin-gonic/gin"
@@ -116,8 +116,11 @@ func GenerateRandomToken(length int) (string, error) {
 }
 
 func getJWTSecret() string {
-
-	secret := os.Getenv("JWT_SECRET")
+	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+	secret := cfg.JWT.Secret
 	if secret == "" {
 		log.Fatal("JWT_SECRET environment variable not set")
 	}
