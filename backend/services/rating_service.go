@@ -2,16 +2,15 @@ package services
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"arguehub/config"
 	"arguehub/models"
 	"arguehub/rating"
+	"arguehub/db"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var ratingSystem *rating.Glicko2
@@ -19,6 +18,11 @@ var ratingSystem *rating.Glicko2
 func InitRatingService(cfg *config.Config) {
 	ratingSystem = rating.New(nil)
 }
+
+func GetRatingSystem() *rating.Glicko2 {
+	return ratingSystem
+}
+
 
 // UpdateRatings updates ratings after a debate
 func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debateTime time.Time) (*models.Debate, error) {
@@ -51,8 +55,7 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 	// Save pre-rating state for history
 	preUserRating := user.Rating
 	preUserRD := user.RD
-	preOpponentRating := opponent.Rating
-	preOpponentRD := opponent.RD
+	
 
 	// Update ratings
 	ratingSystem.UpdateMatch(userPlayer, opponentPlayer, outcome, debateTime)
@@ -60,7 +63,7 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 	// Create debate record
 	debate := &models.Debate{
 		UserID:      userID,
-		UserEmail:   user.Email,
+		Email:   user.Email,
 		OpponentID:  opponentID,
 		OpponentEmail: opponent.Email,
 		Date:        debateTime,
@@ -88,14 +91,14 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 // Helper function to get user by ID
 func getUserByID(id primitive.ObjectID) (*models.User, error) {
 	var user models.User
-	collection := db.GetCollection("users")
+	collection := db.MongoDatabase.Collection("users")
 	err := collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&user)
 	return &user, err
 }
 
 // Helper function to update user rating
 func updateUserRating(id primitive.ObjectID, player *rating.Player) error {
-	collection := db.GetCollection("users")
+	collection := db.MongoDatabase.Collection("users")
 	update := bson.M{
 		"$set": bson.M{
 			"rating":          player.Rating,

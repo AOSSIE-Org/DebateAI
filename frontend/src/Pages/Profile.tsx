@@ -1,3 +1,4 @@
+// Profile.tsx (partial, focusing on avatar-related code)
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -40,6 +41,7 @@ import {
   Linkedin,
   Pen,
   X,
+  Image as ImageIcon,
 } from "lucide-react";
 import { format, isSameDay, subDays } from "date-fns";
 import defaultAvatar from "@/assets/avatar2.jpg";
@@ -63,6 +65,7 @@ import {
 import { getProfile, updateProfile } from "@/services/profileService";
 import { getAuthToken } from "@/utils/auth";
 import { DateRange } from "react-day-picker";
+import AvatarModal from "../components/AvatarModal";
 
 interface ProfileData {
   displayName: string;
@@ -112,6 +115,7 @@ const Profile: React.FC = () => {
   const [eloFilter, setEloFilter] = useState<
     "7days" | "30days" | "all" | "custom"
   >("all");
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   const [customDateRange, setCustomDateRange] = useState<DateRange>({
     from: undefined,
@@ -172,7 +176,8 @@ const Profile: React.FC = () => {
         dashboard.profile.bio,
         dashboard.profile.twitter,
         dashboard.profile.instagram,
-        dashboard.profile.linkedin
+        dashboard.profile.linkedin,
+        dashboard.profile.avatarUrl
       );
       setSuccessMessage(
         `${
@@ -186,6 +191,61 @@ const Profile: React.FC = () => {
       console.error(err);
     }
   };
+
+  const handleAvatarSelect = async (avatarUrl: string) => {
+    if (!dashboard?.profile) return;
+    const token = getAuthToken();
+    if (!token) {
+      setErrorMessage("Authentication token is missing.");
+      return;
+    }
+    try {
+      // Optimistically update the local state
+      setDashboard({
+        ...dashboard,
+        profile: { ...dashboard.profile, avatarUrl },
+      });
+      await updateProfile(
+        token,
+        dashboard.profile.displayName,
+        dashboard.profile.bio,
+        dashboard.profile.twitter,
+        dashboard.profile.instagram,
+        dashboard.profile.linkedin,
+        avatarUrl
+      );
+      setSuccessMessage("Avatar updated successfully!");
+      setErrorMessage("");
+    } catch (err) {
+      setErrorMessage("Failed to update avatar.");
+      console.error(err);
+      // Optionally revert state on failure
+      setDashboard({
+        ...dashboard,
+        profile: {
+          ...dashboard.profile,
+          avatarUrl: dashboard.profile.avatarUrl,
+        },
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-4 flex justify-center items-center min-h-[calc(100vh-4rem)]">
+        <div className="text-center">
+          <div className="animate-pulse rounded-full bg-muted h-10 w-10 mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm">Loading Profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboard) {
+    return (
+      <div className="p-4 text-red-500 text-center text-sm">{errorMessage}</div>
+    );
+  }
 
   const renderEditableSocialField = (
     field: keyof ProfileData,
@@ -288,7 +348,7 @@ const Profile: React.FC = () => {
           placeholder="Share your story"
           className="text-sm w-full resize-none h-20"
         />
-        <div className="flex gap-2">
+        <div className="flex gap- personally2">
           <Button type="submit" size="sm" variant="default" className="flex-1">
             Save
           </Button>
@@ -358,7 +418,6 @@ const Profile: React.FC = () => {
     elo: { label: "Elo", color: "hsl(var(--primary))" },
   };
 
-  // Filter Elo history based on selected filter
   const filterEloHistory = () => {
     if (!stats.eloHistory) return [];
     let filteredHistory = [...stats.eloHistory];
@@ -405,7 +464,6 @@ const Profile: React.FC = () => {
 
   const filteredEloHistory = filterEloHistory();
 
-  // Calculate domain for Y-axis based on highest and lowest Elo values
   const eloValues = filteredEloHistory.map((entry) => entry.elo);
   const minElo =
     eloValues.length > 0
@@ -418,7 +476,6 @@ const Profile: React.FC = () => {
   const padding = Math.round((maxElo - minElo) * 0.1) || 50;
   const yDomain = [minElo - padding, maxElo + padding];
 
-  // Custom tooltip content
   interface CustomTooltipProps {
     active?: boolean;
     payload?: Array<{ value: number }>;
@@ -465,7 +522,6 @@ const Profile: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col md:flex-row gap-4 p-2 sm:p-4 bg-background min-h-[calc(100vh-4rem)]">
-      {/* Left Column: Profile Details */}
       <div className="w-full md:w-1/4 lg:w-1/5 bg-card p-4 border border-border rounded-md shadow max-h-[calc(100vh-4rem)] overflow-y-auto">
         {successMessage && (
           <div className="mb-2 p-2 rounded bg-green-100 text-green-700 text-xs animate-in fade-in duration-300">
@@ -478,13 +534,26 @@ const Profile: React.FC = () => {
           </div>
         )}
         <div className="flex flex-col items-center mb-4">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md hover:shadow-lg transition-shadow">
+          <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md group">
             <img
               src={profile.avatarUrl || defaultAvatar}
               alt="Avatar"
               className="object-cover w-full h-full"
             />
+            <button
+              onClick={() => setIsAvatarModalOpen(true)}
+              className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Edit Avatar"
+            >
+              <ImageIcon className="w-6 h-6 text-white" />
+            </button>
           </div>
+          <AvatarModal
+            isOpen={isAvatarModalOpen}
+            onClose={() => setIsAvatarModalOpen(false)}
+            onSelectAvatar={handleAvatarSelect}
+            currentAvatar={profile.avatarUrl}
+          />
           {editingField === "displayName" ? (
             <form
               onSubmit={(e) => handleSubmit(e, "displayName")}
@@ -583,10 +652,8 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Column: Dashboard */}
       <div className="flex-1 flex flex-col space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Donut Chart */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardContent className="flex-1 p-4">
               {totalMatches === 0 ? (
@@ -659,7 +726,6 @@ const Profile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Elo Trend */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardHeader className="p-3 pb-1 flex-shrink-0">
               <div className="flex flex-wrap justify-between items-center gap-2">
@@ -807,9 +873,7 @@ const Profile: React.FC = () => {
           </Card>
         </div>
 
-        {/* Bottom row: Leaderboard + Recent Debates */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Mini Leaderboard */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardHeader className="p-2 flex-shrink-0">
               <CardTitle className="text-foreground text-base sm:text-lg">
@@ -866,7 +930,6 @@ const Profile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Recent Debates */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardHeader className="p-2 flex-shrink-0">
               <CardTitle className="text-foreground text-base sm:text-lg">

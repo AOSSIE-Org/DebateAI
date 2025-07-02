@@ -5,47 +5,51 @@ import (
 	"log"
 	"time"
 
-	"arguehub/config"
 	"arguehub/db"
 	"arguehub/models"
 	"arguehub/services"
+	"arguehub/config"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // PopulateTestUsers creates test users with Glicko-2 ratings
 func PopulateTestUsers() {
-	collection := db.GetCollection("users")
+	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	collection := db.MongoDatabase.Collection("users")
 	count, _ := collection.CountDocuments(context.Background(), bson.M{})
 
 	if count > 0 {
 		return
 	}
 
-	// Initialize rating system
-	ratingSystem := services.GetRatingSystem()
+	// Initialize rating system (no return value)
+	services.InitRatingService(cfg)
+	ratingSystem := services.GetRatingSystem() // <- add a getter in services package
 
 	testUsers := []models.User{
 		{
 			Email:       "user1@example.com",
 			DisplayName: "DebateMaster",
 			Bio:         "Experienced debater",
-			Rating:      ratingSystem.config.InitialRating,
-			RD:          ratingSystem.config.InitialRD,
-			Volatility:  ratingSystem.config.InitialVol,
+			Rating:      ratingSystem.Config.InitialRating,
+			RD:          ratingSystem.Config.InitialRD,
+			Volatility:  ratingSystem.Config.InitialVol,
 			CreatedAt:   time.Now(),
 		},
 		{
 			Email:       "user2@example.com",
 			DisplayName: "LogicLord",
 			Bio:         "Lover of logical arguments",
-			Rating:      ratingSystem.config.InitialRating,
-			RD:          ratingSystem.config.InitialRD,
-			Volatility:  ratingSystem.config.InitialVol,
+			Rating:      ratingSystem.Config.InitialRating,
+			RD:          ratingSystem.Config.InitialRD,
+			Volatility:  ratingSystem.Config.InitialVol,
 			CreatedAt:   time.Now(),
 		},
-		// Add more test users as needed
 	}
 
 	var documents []interface{}
@@ -53,7 +57,7 @@ func PopulateTestUsers() {
 		documents = append(documents, user)
 	}
 
-	_, err := collection.InsertMany(context.Background(), documents)
+	_, err = collection.InsertMany(context.Background(), documents)
 	if err != nil {
 		log.Printf("Failed to insert test users: %v", err)
 	} else {

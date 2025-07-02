@@ -49,7 +49,7 @@ func DefaultConfig() *Config {
 
 // Glicko2 implements the rating system
 type Glicko2 struct {
-	config *Config
+	Config *Config
 }
 
 // New creates a Glicko-2 rating system with configuration
@@ -57,15 +57,15 @@ func New(config *Config) *Glicko2 {
 	if config == nil {
 		config = DefaultConfig()
 	}
-	return &Glicko2{config: config}
+	return &Glicko2{Config: config}
 }
 
 // NewPlayer creates a new player with initial ratings
 func (g *Glicko2) NewPlayer() *Player {
 	return &Player{
-		Rating:     g.config.InitialRating,
-		RD:         g.config.InitialRD,
-		Volatility: g.config.InitialVol,
+		Rating:     g.Config.InitialRating,
+		RD:         g.Config.InitialRD,
+		Volatility: g.Config.InitialVol,
 		LastUpdate: time.Now(),
 	}
 }
@@ -106,24 +106,24 @@ func (g *Glicko2) updateTimeRD(p *Player, currentTime time.Time) {
 	}
 	
 	secPassed := currentTime.Sub(p.LastUpdate).Seconds()
-	periods := secPassed / g.config.RatingPeriodSec
+	periods := secPassed / g.Config.RatingPeriodSec
 	
 	if periods > 0 {
 		rdSq := p.RD * p.RD
 		volSq := p.Volatility * p.Volatility
 		newRD := math.Sqrt(rdSq + volSq*periods)
-		p.RD = math.Min(newRD, g.config.MaxRD)
+		p.RD = math.Min(newRD, g.Config.MaxRD)
 	}
 }
 
 // scaleToGlicko2 converts to internal Glicko-2 scale
 func (g *Glicko2) scaleToGlicko2(rating, rd float64) (float64, float64) {
-	return (rating - g.config.InitialRating) / scale, rd / scale
+	return (rating - g.Config.InitialRating) / scale, rd / scale
 }
 
 // scaleFromGlicko2 converts from internal scale to original
 func (g *Glicko2) scaleFromGlicko2(mu, phi float64) (float64, float64) {
-	return mu*scale + g.config.InitialRating, phi * scale
+	return mu*scale + g.Config.InitialRating, phi * scale
 }
 
 // calculateUpdate performs core rating calculations
@@ -168,7 +168,7 @@ func (g *Glicko2) updateVolatility(sigma, phi, v, delta float64) float64 {
 		ex := math.Exp(x)
 		num := ex * (deltaSq - phiSq - v - ex)
 		denom := 2 * math.Pow(phiSq+v+ex, 2)
-		return num/denom - (x-a)/(g.config.Tau*g.config.Tau)
+		return num/denom - (x-a)/(g.Config.Tau*g.Config.Tau)
 	}
 	
 	// Newton-Raphson iteration

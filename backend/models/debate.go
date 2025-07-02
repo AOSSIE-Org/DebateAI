@@ -10,7 +10,7 @@ import (
 type Debate struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	UserID      primitive.ObjectID `bson:"userId" json:"userId"`
-	UserEmail   string             `bson:"userEmail" json:"userEmail"`
+	Email   string             `bson:"email" json:"email"`
 	OpponentID  primitive.ObjectID `bson:"opponentId,omitempty" json:"opponentId,omitempty"`
 	OpponentEmail string           `bson:"opponentEmail,omitempty" json:"opponentEmail,omitempty"`
 	Topic       string             `bson:"topic" json:"topic"`

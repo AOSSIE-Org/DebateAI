@@ -20,7 +20,8 @@ export const updateProfile = async (
   bio: string,
   twitter?: string,
   instagram?: string,
-  linkedin?: string
+  linkedin?: string,
+  avatarUrl?: string
 ) => {
   const response = await fetch(`${baseURL}/user/updateprofile`, {
     method: "PUT",
@@ -28,7 +29,7 @@ export const updateProfile = async (
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin }),
+    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin,avatarUrl }),
   });
   if (!response.ok) {
     throw new Error("Failed to update profile");

@@ -75,7 +75,7 @@ func GoogleLogin(ctx *gin.Context) {
 			Email:      email,
 			Password:   "", // No password for Google users
 			Nickname:   nickname,
-			EloRating:  1200,
+			Rating:  1200,
 			IsVerified: true, // Google-verified emails are trusted
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
@@ -144,7 +144,7 @@ func SignUp(ctx *gin.Context) {
 		Email:            request.Email,
 		Password:         string(hashedPassword),
 		Nickname:         utils.ExtractNameFromEmail(request.Email),
-		EloRating:        1200,
+		Rating:        1200,
 		IsVerified:       false,
 		VerificationCode: verificationCode,
 		CreatedAt:        time.Now(),

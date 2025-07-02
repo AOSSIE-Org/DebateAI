@@ -1,11 +1,12 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"time"
 
-	"arguehub/models"
 	"arguehub/services"
+	"arguehub/db"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -56,7 +57,7 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 	debate.Result = request.Outcome
 
 	// Save debate record
-	collection := db.GetCollection("debates")
+	collection := db.MongoDatabase.Collection("debates")
 	_, err = collection.InsertOne(context.Background(), debate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save debate record"})

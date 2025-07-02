@@ -6,7 +6,11 @@ import { sendDebateMessage, judgeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 
-type Message = { sender: "User" | "Bot" | "Judge"; text: string; phase: string };
+type Message = {
+  sender: "User" | "Bot" | "Judge";
+  text: string;
+  phase: string;
+};
 
 type DebateProps = {
   userId: string;
@@ -16,6 +20,12 @@ type DebateProps = {
   stance: string;
   phaseTimings: { name: string; time: number }[];
   debateId: string;
+  user: {
+    email: string;
+    displayName: string;
+    avatarUrl: string;
+    eloRating: number;
+  };
 };
 
 type DebateState = {
@@ -30,27 +40,92 @@ type DebateState = {
 };
 
 type JudgmentData = {
-  opening_statement: { user: { score: number; reason: string }; bot: { score: number; reason: string } };
-  cross_examination: { user: { score: number; reason: string }; bot: { score: number; reason: string } };
-  answers: { user: { score: number; reason: string }; bot: { score: number; reason: string } };
-  closing: { user: { score: number; reason: string }; bot: { score: number; reason: string } };
+  opening_statement: {
+    user: { score: number; reason: string };
+    bot: { score: number; reason: string };
+  };
+  cross_examination: {
+    user: { score: number; reason: string };
+    bot: { score: number; reason: string };
+  };
+  answers: {
+    user: { score: number; reason: string };
+    bot: { score: number; reason: string };
+  };
+  closing: {
+    user: { score: number; reason: string };
+    bot: { score: number; reason: string };
+  };
   total: { user: number; bot: number };
-  verdict: { winner: string; reason: string; congratulations: string; opponent_analysis: string };
+  verdict: {
+    winner: string;
+    reason: string;
+    congratulations: string;
+    opponent_analysis: string;
+  };
 };
 
 const bots = [
-  { name: "Rookie Rick", level: "Easy", desc: "A beginner who stumbles over logic.", avatar: "https://avatar.iran.liara.run/public/26" },
-  { name: "Casual Casey", level: "Easy", desc: "Friendly but not too sharp.", avatar: "https://avatar.iran.liara.run/public/22" },
-  { name: "Moderate Mike", level: "Medium", desc: "Balanced and reasonable.", avatar: "https://avatar.iran.liara.run/public/38" },
-  { name: "Sassy Sarah", level: "Medium", desc: "Witty with decent arguments.", avatar: "https://avatar.iran.liara.run/public/78" },
-  { name: "Innovative Iris", level: "Medium", desc: "A creative thinker", avatar: "https://avatar.iran.liara.run/public/72" },
-  { name: "Tough Tony", level: "Hard", desc: "Logical and relentless.", avatar: "https://avatar.iran.liara.run/public/37" },
-  { name: "Expert Emma", level: "Hard", desc: "Master of evidence and rhetoric.", avatar: "https://avatar.iran.liara.run/public/90" },
-  { name: "Grand Greg", level: "Expert", desc: "Unbeatable debate titan.", avatar: "https://avatar.iran.liara.run/public/45" },
+  {
+    name: "Rookie Rick",
+    level: "Easy",
+    desc: "A beginner who stumbles over logic.",
+    avatar: "https://avatar.iran.liara.run/public/26",
+  },
+  {
+    name: "Casual Casey",
+    level: "Easy",
+    desc: "Friendly but not too sharp.",
+    avatar: "https://avatar.iran.liara.run/public/22",
+  },
+  {
+    name: "Moderate Mike",
+    level: "Medium",
+    desc: "Balanced and reasonable.",
+    avatar: "https://avatar.iran.liara.run/public/38",
+  },
+  {
+    name: "Sassy Sarah",
+    level: "Medium",
+    desc: "Witty with decent arguments.",
+    avatar: "https://avatar.iran.liara.run/public/78",
+  },
+  {
+    name: "Innovative Iris",
+    level: "Medium",
+    desc: "A creative thinker",
+    avatar: "https://avatar.iran.liara.run/public/72",
+  },
+  {
+    name: "Tough Tony",
+    level: "Hard",
+    desc: "Logical and relentless.",
+    avatar: "https://avatar.iran.liara.run/public/37",
+  },
+  {
+    name: "Expert Emma",
+    level: "Hard",
+    desc: "Master of evidence and rhetoric.",
+    avatar: "https://avatar.iran.liara.run/public/90",
+  },
+  {
+    name: "Grand Greg",
+    level: "Expert",
+    desc: "Unbeatable debate titan.",
+    avatar: "https://avatar.iran.liara.run/public/45",
+  },
 ];
 
-const phaseSequences = [["For", "Against"], ["For", "Against", "Against", "For"], ["For", "Against"]];
-const turnTypes = [["statement", "statement"], ["question", "answer", "question", "answer"], ["statement", "statement"]];
+const phaseSequences = [
+  ["For", "Against"],
+  ["For", "Against", "Against", "For"],
+  ["For", "Against"],
+];
+const turnTypes = [
+  ["statement", "statement"],
+  ["question", "answer", "question", "answer"],
+  ["statement", "statement"],
+];
 
 const extractJSON = (response: string): string => {
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
@@ -82,7 +157,11 @@ const DebateRoom: React.FC = () => {
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
-  const [popup, setPopup] = useState<{ show: boolean; message: string; isJudging?: boolean }>({ show: false, message: "" });
+  const [popup, setPopup] = useState<{
+    show: boolean;
+    message: string;
+    isJudging?: boolean;
+  }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [showJudgment, setShowJudgment] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
@@ -92,28 +171,27 @@ const DebateRoom: React.FC = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const bot = bots.find((b) => b.name === debateData.botName) || bots[0];
-  const userAvatar = "https://avatar.iran.liara.run/public/10";
 
   const [isMuted, setIsMuted] = useState(false);
 
   const toggleMute = () => {
     setIsMuted((prev) => !prev);
     if (!isMuted) {
-      window.speechSynthesis.cancel(); // Stop ongoing speech when muting
+      window.speechSynthesis.cancel();
     }
   };
 
-  // Initialize SpeechRecognition with debug logging
+  // Initialize SpeechRecognition
   useEffect(() => {
     if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = "en-US";
 
       recognitionRef.current.onresult = (event) => {
-        console.log("Speech recognition result received:", event.results);
         let newFinalTranscript = "";
         let newInterimTranscript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -124,11 +202,12 @@ const DebateRoom: React.FC = () => {
             newInterimTranscript = result[0].transcript;
           }
         }
-        console.log("Final Transcript:", newFinalTranscript);
-        console.log("Interim Transcript:", newInterimTranscript);
-
         if (newFinalTranscript) {
-          setFinalInput((prev) => (prev ? prev + " " + newFinalTranscript.trim() : newFinalTranscript.trim()));
+          setFinalInput((prev) =>
+            prev
+              ? prev + " " + newFinalTranscript.trim()
+              : newFinalTranscript.trim()
+          );
           setInterimInput("");
         } else {
           setInterimInput(newInterimTranscript);
@@ -136,15 +215,12 @@ const DebateRoom: React.FC = () => {
       };
 
       recognitionRef.current.onend = () => {
-        console.log("Speech recognition ended");
         setIsRecognizing(false);
       };
       recognitionRef.current.onerror = (event) => {
         console.error("Speech recognition error:", event.error);
         setIsRecognizing(false);
       };
-    } else {
-      console.warn("Speech Recognition not supported in this browser.");
     }
 
     return () => {
@@ -155,7 +231,6 @@ const DebateRoom: React.FC = () => {
   // Start/Stop Speech Recognition
   const startRecognition = () => {
     if (recognitionRef.current && !isRecognizing) {
-      console.log("Starting speech recognition...");
       recognitionRef.current.start();
       setIsRecognizing(true);
     }
@@ -163,17 +238,16 @@ const DebateRoom: React.FC = () => {
 
   const stopRecognition = () => {
     if (recognitionRef.current && isRecognizing) {
-      console.log("Stopping speech recognition...");
       recognitionRef.current.stop();
       setIsRecognizing(false);
     }
   };
 
-  // Text-to-Speech Function with Promise
+  // Text-to-Speech
   const speak = (text: string): Promise<void> => {
     return new Promise((resolve) => {
       if ("speechSynthesis" in window && !isMuted) {
-        window.speechSynthesis.cancel(); // Clear any ongoing speech
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
         utterance.onend = () => resolve();
@@ -185,7 +259,6 @@ const DebateRoom: React.FC = () => {
     });
   };
 
-  // Cleanup Speech Synthesis on Unmount
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
@@ -205,7 +278,8 @@ const DebateRoom: React.FC = () => {
   useEffect(() => {
     if (!state.userStance) {
       const stanceNormalized =
-        debateData.stance.toLowerCase() === "for" || debateData.stance.toLowerCase() === "against"
+        debateData.stance.toLowerCase() === "for" ||
+        debateData.stance.toLowerCase() === "against"
           ? debateData.stance.toLowerCase() === "for"
             ? "For"
             : "Against"
@@ -226,10 +300,8 @@ const DebateRoom: React.FC = () => {
           if (prev.timer <= 1) {
             clearInterval(timerRef.current!);
             if (!prev.isBotTurn) {
-              // User's turn is up, send the message
               sendMessage();
             } else {
-              // Bot's turn is up, just advance
               advanceTurn(prev);
             }
             return { ...prev, timer: 0 };
@@ -248,7 +320,12 @@ const DebateRoom: React.FC = () => {
       botTurnRef.current = true;
       handleBotTurn();
     }
-  }, [state.isBotTurn, state.currentPhase, state.phaseStep, state.isDebateEnded]);
+  }, [
+    state.isBotTurn,
+    state.currentPhase,
+    state.phaseStep,
+    state.isDebateEnded,
+  ]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -272,7 +349,8 @@ const DebateRoom: React.FC = () => {
     if (currentState.phaseStep + 1 < currentSequence.length) {
       const nextStep = currentState.phaseStep + 1;
       const nextStance = currentSequence[nextStep];
-      const nextEntity = currentState.userStance === nextStance ? "User" : "Bot";
+      const nextEntity =
+        currentState.userStance === nextStance ? "User" : "Bot";
       setState((prev) => ({
         ...prev,
         phaseStep: nextStep,
@@ -283,7 +361,9 @@ const DebateRoom: React.FC = () => {
       const newPhase = currentState.currentPhase + 1;
       setPopup({
         show: true,
-        message: `${phases[currentState.currentPhase].name} completed. Next: ${phases[newPhase].name} - ${getPhaseInstructions(newPhase)}`,
+        message: `${phases[currentState.currentPhase].name} completed. Next: ${
+          phases[newPhase].name
+        } - ${getPhaseInstructions(newPhase)}`,
       });
       setTimeout(() => {
         setPopup({ show: false, message: "" });
@@ -291,7 +371,8 @@ const DebateRoom: React.FC = () => {
           ...prevState,
           currentPhase: newPhase,
           phaseStep: 0,
-          isBotTurn: prevState.userStance === phaseSequences[newPhase][0] ? false : true,
+          isBotTurn:
+            prevState.userStance === phaseSequences[newPhase][0] ? false : true,
           timer: phases[newPhase].time,
         }));
       }, 4000);
@@ -341,7 +422,9 @@ const DebateRoom: React.FC = () => {
         context = "Ask a clear and concise question challenging your opponent.";
       } else if (turnType === "answer") {
         const lastMessage = state.messages[state.messages.length - 1];
-        context = lastMessage ? `Answer this question: ${lastMessage.text}` : "Provide your answer";
+        context = lastMessage
+          ? `Answer this question: ${lastMessage.text}`
+          : "Provide your answer";
       }
 
       const { response } = await sendDebateMessage({
@@ -400,12 +483,29 @@ const DebateRoom: React.FC = () => {
     } catch (error) {
       console.error("Judging error:", error);
       setJudgmentData({
-        opening_statement: { user: { score: 0, reason: "Error" }, bot: { score: 0, reason: "Error" } },
-        cross_examination: { user: { score: 0, reason: "Error" }, bot: { score: 0, reason: "Error" } },
-        answers: { user: { score: 0, reason: "Error" }, bot: { score: 0, reason: "Error" } },
-        closing: { user: { score: 0, reason: "Error" }, bot: { score: 0, reason: "Error" } },
+        opening_statement: {
+          user: { score: 0, reason: "Error" },
+          bot: { score: 0, reason: "Error" },
+        },
+        cross_examination: {
+          user: { score: 0, reason: "Error" },
+          bot: { score: 0, reason: "Error" },
+        },
+        answers: {
+          user: { score: 0, reason: "Error" },
+          bot: { score: 0, reason: "Error" },
+        },
+        closing: {
+          user: { score: 0, reason: "Error" },
+          bot: { score: 0, reason: "Error" },
+        },
         total: { user: 0, bot: 0 },
-        verdict: { winner: "None", reason: "Judgment failed", congratulations: "", opponent_analysis: "" },
+        verdict: {
+          winner: "None",
+          reason: "Judgment failed",
+          congratulations: "",
+          opponent_analysis: "",
+        },
       });
       setPopup({ show: false, message: "" });
       setShowJudgment(true);
@@ -413,9 +513,15 @@ const DebateRoom: React.FC = () => {
   };
 
   const formatTime = (seconds: number) => {
-    const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+    const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60)
+      .toString()
+      .padStart(2, "0")}`;
     return (
-      <span className={`font-mono ${seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"}`}>
+      <span
+        className={`font-mono ${
+          seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
+        }`}
+      >
         {timeStr}
       </span>
     );
@@ -426,8 +532,13 @@ const DebateRoom: React.FC = () => {
     return (
       <div className="space-y-4">
         {phaseMessages.map((msg, idx) => (
-          <div key={idx} className="p-3 bg-gray-50 rounded-lg shadow-sm text-gray-800 break-words">
-            <span className="text-xs text-gray-500 block mb-1">{msg.phase}</span>
+          <div
+            key={idx}
+            className="p-3 bg-gray-50 rounded-lg shadow-sm text-gray-800 break-words"
+          >
+            <span className="text-xs text-gray-500 block mb-1">
+              {msg.phase}
+            </span>
             {msg.text}
           </div>
         ))}
@@ -443,34 +554,46 @@ const DebateRoom: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
       <div className="w-full max-w-5xl mx-auto py-2">
-  <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
-    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-      Debate: {debateData.topic}
-    </h1>
-    <p className="mt-2 text-sm text-gray-700">
-      Phase: <span className="font-medium">{phases[state.currentPhase]?.name || "Finished"}</span> | Current Turn:{" "}
-      <span className="font-semibold text-orange-600">
-        {currentEntity === "User" ? "You" : debateData.botName} to{" "}
-        {currentTurnType === "statement" ? "make a statement" : currentTurnType === "question" ? "ask a question" : "answer"}
-      </span>
-  </p>
-  </div>
-</div>
+        <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+            Debate: {debateData.topic}
+          </h1>
+          <p className="mt-2 text-sm text-gray-700">
+            Phase:{" "}
+            <span className="font-medium">
+              {phases[state.currentPhase]?.name || "Finished"}
+            </span>{" "}
+            | Current Turn:{" "}
+            <span className="font-semibold text-orange-600">
+              {currentEntity === "User" ? "You" : debateData.botName} to{" "}
+              {currentTurnType === "statement"
+                ? "make a statement"
+                : currentTurnType === "question"
+                ? "ask a question"
+                : "answer"}
+            </span>
+          </p>
+        </div>
+      </div>
 
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 border border-orange-200">
             {popup.isJudging ? (
-              <div className="fixed inset-0 flex flex-col items-center justify-center bg-black bg-opacity-50 z-50">
-              <div className="bg-white rounded-lg p-8 flex flex-col items-center shadow-lg">
+              <div className="flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-primary mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-800">{popup.message}</h2>
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {popup.message}
+                </h2>
               </div>
-            </div>
             ) : (
               <>
-                <h3 className="text-xl font-bold text-orange-600 mb-2">Phase Transition</h3>
-                <p className="text-gray-700 text-center text-sm">{popup.message}</p>
+                <h3 className="text-xl font-bold text-orange-600 mb-2">
+                  Phase Transition
+                </h3>
+                <p className="text-gray-700 text-center text-sm">
+                  {popup.message}
+                </p>
               </>
             )}
           </div>
@@ -480,7 +603,7 @@ const DebateRoom: React.FC = () => {
       {showJudgment && judgmentData && (
         <JudgmentPopup
           judgment={judgmentData}
-          userAvatar={userAvatar}
+          userAvatar={debateData.user.avatarUrl}
           botAvatar={bot.avatar}
           botName={debateData.botName}
           userStance={state.userStance}
@@ -490,31 +613,48 @@ const DebateRoom: React.FC = () => {
         />
       )}
 
-      <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
+      <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3 mt-6">
         {/* Bot Section */}
         <div
-          className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""} bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${
+            state.isBotTurn ? "animate-glow" : ""
+          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
-              <img src={bot.avatar} alt={debateData.botName} className="w-full h-full rounded-full border border-orange-400 object-cover" />
+              <img
+                src={bot.avatar}
+                alt={debateData.botName}
+                className="w-full h-full rounded-full border border-orange-400 object-cover"
+              />
             </div>
             <div className="flex flex-col">
-              <div className="text-sm font-medium text-gray-800">{debateData.botName}</div>
+              <div className="text-sm font-medium text-gray-800">
+                {debateData.botName}
+              </div>
               <div className="text-xs text-gray-500">{bot.level}</div>
               <div className="text-xs text-gray-500">{bot.desc}</div>
             </div>
             <Button
               onClick={toggleMute}
-              className={`ml-auto ${isMuted ? "bg-red-500" : "bg-green-500"} text-white rounded-md px-2 py-1 text-xs`}
+              className={`ml-auto ${
+                isMuted ? "bg-red-500" : "bg-green-500"
+              } text-white rounded-md px-2 py-1 text-xs`}
             >
               {isMuted ? "Unmute" : "Mute"}
             </Button>
           </div>
           <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-sm font-semibold text-orange-600 mb-1">Stance: {state.botStance}</p>
+            <p className="text-sm font-semibold text-orange-600 mb-1">
+              Stance: {state.botStance}
+            </p>
             <p className="text-xs mb-1">
-              Time: {formatTime(state.isBotTurn ? state.timer : phases[state.currentPhase]?.time || 0)}
+              Time:{" "}
+              {formatTime(
+                state.isBotTurn
+                  ? state.timer
+                  : phases[state.currentPhase]?.time || 0
+              )}
             </p>
             {renderPhaseMessages("Bot")}
           </div>
@@ -522,29 +662,54 @@ const DebateRoom: React.FC = () => {
 
         {/* User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${!state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""} bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${
+            !state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
+          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
-              <img src={userAvatar} alt="You" className="w-full h-full rounded-full border border-orange-400 object-cover" />
+              <img
+                src={debateData.user.avatarUrl}
+                alt={debateData.user.displayName}
+                className="w-full h-full rounded-full border border-orange-400 object-cover"
+              />
             </div>
             <div className="flex flex-col">
-              <div className="text-sm font-medium text-gray-800">You</div>
-              <div className="text-xs text-gray-500">Debater</div>
+              <div className="text-sm font-medium text-gray-800">
+                {debateData.user.displayName}
+              </div>
+              <div className="text-xs text-gray-500">
+                Elo: {debateData.user.eloRating}
+              </div>
               <div className="text-xs text-gray-500">Ready to argue!</div>
             </div>
           </div>
           <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-sm font-semibold text-orange-600 mb-1">Stance: {state.userStance}</p>
-            <p className="text-xs mb-1">
-              Time: {formatTime(!state.isBotTurn ? state.timer : phases[state.currentPhase]?.time || 0)}
+            <p className="text-sm font-semibold text-orange-600 mb-1">
+              Stance: {state.userStance}
             </p>
-            <div className="flex-1 overflow-y-auto">{renderPhaseMessages("User")}</div>
+            <p className="text-xs mb-1">
+              Time:{" "}
+              {formatTime(
+                !state.isBotTurn
+                  ? state.timer
+                  : phases[state.currentPhase]?.time || 0
+              )}
+            </p>
+            <div className="flex-1 overflow-y-auto">
+              {renderPhaseMessages("User")}
+            </div>
             {!state.isDebateEnded && (
               <div className="mt-3 flex gap-2 items-center">
                 <Input
-                  value={isRecognizing ? finalInput + (interimInput ? " " + interimInput : "") : finalInput}
-                  onChange={(e) => !isRecognizing && setFinalInput(e.target.value)}
+                  value={
+                    isRecognizing
+                      ? finalInput + (interimInput ? " " + interimInput : "")
+                      : finalInput
+                  }
+                  onChange={(e) =>
+                    !isRecognizing && setFinalInput(e.target.value)
+                  }
                   readOnly={isRecognizing}
                   disabled={state.isBotTurn || state.timer === 0}
                   placeholder={
@@ -561,7 +726,11 @@ const DebateRoom: React.FC = () => {
                   disabled={state.isBotTurn || state.timer === 0}
                   className="bg-blue-500 hover:bg-blue-600 text-white rounded-md p-2"
                 >
-                  {isRecognizing ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  {isRecognizing ? (
+                    <MicOff className="w-5 h-5" />
+                  ) : (
+                    <Mic className="w-5 h-5" />
+                  )}
                 </Button>
                 <Button
                   onClick={sendMessage}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "../components/ui/separator";
 import { createDebate } from "@/services/vsbot";
+import { getProfile } from "@/services/profileService";
+import { getAuthToken } from "@/utils/auth";
 
 // Bot type definition
 interface Bot {
@@ -22,7 +24,7 @@ interface Bot {
   rating: number;
 }
 
-// Bot definitions (now combined)
+// Bot definitions
 const allBots: Bot[] = [
   // Classic bots
   {
@@ -208,6 +210,13 @@ const BotSelection: React.FC = () => {
   const [phaseTimings, setPhaseTimings] =
     useState<{ name: string; time: number }[]>(defaultPhaseTimings);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [user, setUser] = useState<{
+    email: string;
+    displayName: string;
+    avatarUrl: string;
+    eloRating: number;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -215,6 +224,30 @@ const BotSelection: React.FC = () => {
   const selectedBotObj = selectedBot
     ? allBots.find((b) => b.name === selectedBot)
     : null;
+
+  // Fetch user profile when component mounts
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const token = getAuthToken();
+      if (!token) {
+        setError("No authentication token found");
+        return;
+      }
+      try {
+        const response = await getProfile(token);
+        setUser({
+          email: response.profile.email,
+          displayName: response.profile.displayName,
+          avatarUrl: response.profile.avatarUrl,
+          eloRating: response.profile.eloRating,
+        });
+      } catch (err) {
+        setError("Failed to load user profile");
+        console.error(err);
+      }
+    };
+    fetchUserData();
+  }, []);
 
   // Difficulty levels with counts, sorted by difficulty
   const levels = [
@@ -256,14 +289,21 @@ const BotSelection: React.FC = () => {
   };
 
   const startDebate = async () => {
-    if (!selectedBot || !effectiveTopic) return;
+    if (!selectedBot || !effectiveTopic) {
+      setError("Please select a bot and a topic");
+      return;
+    }
 
     const bot = allBots.find((b) => b.name === selectedBot);
-    if (!bot) return;
+    if (!bot) {
+      setError("Selected bot not found");
+      return;
+    }
 
     const finalStance =
       stance === "random" ? (Math.random() < 0.5 ? "for" : "against") : stance;
 
+    // Build payload
     const debatePayload = {
       botName: bot.name,
       botLevel: bot.level,
@@ -276,11 +316,22 @@ const BotSelection: React.FC = () => {
     try {
       setIsLoading(true);
       const data = await createDebate(debatePayload);
-      navigate(`/debate/${data.debateId}`, {
-        state: { ...data, phaseTimings, stance: finalStance },
-      });
+      const state = {
+        ...data,
+        phaseTimings,
+        stance: finalStance,
+        user: user || {
+          email: "",
+          firstName: "Guest",
+          lastName: "",
+          avatarUrl: "https://api.dicebear.com/9.x/big-ears/svg?seed=Guest",
+          eloRating: 1500,
+        },
+      };
+      navigate(`/debate/${data.debateId}`, { state });
     } catch (error) {
       console.error("Error starting debate:", error);
+      setError("Failed to start debate");
     } finally {
       setIsLoading(false);
     }
@@ -298,6 +349,7 @@ const BotSelection: React.FC = () => {
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Select a bot and set up your debate challenge.
           </p>
+          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
         </div>
 
         {/* Main Content Grid */}
@@ -504,7 +556,7 @@ const BotSelection: React.FC = () => {
 
               <Button
                 onClick={startDebate}
-                disabled={!selectedBot || !effectiveTopic}
+                disabled={!selectedBot || !effectiveTopic || isLoading}
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-md transition-colors shadow-md"
               >
                 Start Debate 🚀
