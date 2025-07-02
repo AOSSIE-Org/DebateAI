@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -12,12 +14,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"fmt"
 )
 
+// Calculate new Elo ratings using float64
+func calculateEloRating(ratingA, ratingB float64, scoreA float64) (newRatingA, newRatingB float64) {
+	const K = 32.0
+	expectedA := 1.0 / (1.0 + math.Pow(10, (ratingB-ratingA)/400.0))
+	expectedB := 1.0 - expectedA
+	scoreB := 1.0 - scoreA
+
+	newRatingA = ratingA + K*(scoreA-expectedA)
+	newRatingB = ratingB + K*(scoreB-expectedB)
+	return newRatingA, newRatingB
+}
+
+func extractNameFromEmail(email string) string {
+	for i, char := range email {
+		if char == '@' {
+			return email[:i]
+		}
+	}
+	return email
+}
 
 func GetProfile(c *gin.Context) {
 	email := c.GetString("email")
@@ -29,131 +48,98 @@ func GetProfile(c *gin.Context) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Fetch user profile
 	var user models.User
 	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Not found", "message": "User not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": fmt.Sprintf("Failed to fetch user: %v", err)})
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": fmt.Sprintf("Failed to fetch user: %v", err)})
 		return
 	}
 
-	// Avatar fallback
-	profileAvatarURL := user.AvatarURL
 	displayName := user.DisplayName
-	if profileAvatarURL == "" {
-		if displayName == "" {
-			displayName = extractNameFromEmail(user.Email)
-		}
-		profileAvatarURL = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + displayName
-	}
 	if displayName == "" {
-		displayName = "Steve"
+		displayName = extractNameFromEmail(user.Email)
+	}
+	avatar := user.AvatarURL
+	if avatar == "" {
+		avatar = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + displayName
 	}
 
-	// Fetch top leaderboard
-	leaderboardCursor, err := db.MongoDatabase.Collection("users").Find(
+	// Leaderboard top 5
+	cursor, err := db.MongoDatabase.Collection("users").Find(
 		dbCtx,
 		bson.M{},
 		options.Find().SetSort(bson.D{{"eloRating", -1}}).SetLimit(5),
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": fmt.Sprintf("Failed to fetch leaderboard: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": "Failed to fetch leaderboard"})
 		return
 	}
-	defer leaderboardCursor.Close(dbCtx)
+	defer cursor.Close(dbCtx)
 
-	var leaderboard []struct {
+	type LeaderboardEntry struct {
 		Rank        int    `json:"rank"`
 		Name        string `json:"name"`
 		Score       int    `json:"score"`
 		AvatarUrl   string `json:"avatarUrl"`
 		CurrentUser bool   `json:"currentUser"`
 	}
+	var leaderboard []LeaderboardEntry
 	rank := 1
-	for leaderboardCursor.Next(dbCtx) {
-		var lbUser models.User
-		if err := leaderboardCursor.Decode(&lbUser); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": fmt.Sprintf("Failed to decode leaderboard user: %v", err)})
-			return
+	for cursor.Next(dbCtx) {
+		var u models.User
+		if err := cursor.Decode(&u); err != nil {
+			continue
 		}
-		lbName := lbUser.DisplayName
-		if lbName == "" {
-			lbName = extractNameFromEmail(lbUser.Email)
+		name := u.DisplayName
+		if name == "" {
+			name = extractNameFromEmail(u.Email)
 		}
-		lbAvatar := lbUser.AvatarURL
-		if lbAvatar == "" {
-			lbAvatar = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + lbName
+		url := u.AvatarURL
+		if url == "" {
+			url = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + name
 		}
-		leaderboard = append(leaderboard, struct {
-			Rank        int    `json:"rank"`
-			Name        string `json:"name"`
-			Score       int    `json:"score"`
-			AvatarUrl   string `json:"avatarUrl"`
-			CurrentUser bool   `json:"currentUser"`
-		}{rank, lbName, lbUser.EloRating, lbAvatar, lbUser.Email == email})
+		leaderboard = append(leaderboard, LeaderboardEntry{
+			Rank:        rank,
+			Name:        name,
+			Score:       int(u.Rating),
+			AvatarUrl:   url,
+			CurrentUser: u.Email == email,
+		})
 		rank++
 	}
 
-	// Fetch user's debate history
-	debatesCursor, err := db.MongoDatabase.Collection("debates").Find(
+	// Debate history
+	debateCursor, err := db.MongoDatabase.Collection("debates").Find(
 		dbCtx,
 		bson.M{"email": email},
 		options.Find().SetSort(bson.D{{"date", 1}}),
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": fmt.Sprintf("Failed to fetch debates: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch debates"})
 		return
 	}
-	defer debatesCursor.Close(dbCtx)
+	defer debateCursor.Close(dbCtx)
 
 	type DebateDoc struct {
-		Topic     string    `bson:"topic"`
-		Result    string    `bson:"result"`
-		EloChange int       `bson:"eloChange"`
-		EloRating int       `bson:"eloRating"` 
-		Date      time.Time `bson:"date"`
+		Topic        string    `bson:"topic"`
+		Result       string    `bson:"result"`
+		RatingChange float64   `bson:"eloChange"`
+		Rating       float64   `bson:"eloRating"`
+		Date         time.Time `bson:"date"`
 	}
 
-	var debateDocs []DebateDoc
-	if err := debatesCursor.All(dbCtx, &debateDocs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "message": fmt.Sprintf("Failed to decode debates: %v", err)})
-		return
-	}
-
-	// Process debates
 	var wins, losses, draws int
-	var eloHistory []struct {
-		Elo  int       `json:"elo"`
-		Date time.Time `json:"date"`
-	}
-	var debateHistory []struct {
-		Topic     string `json:"topic"`
-		Result    string `json:"result"`
-		EloChange int    `json:"eloChange"`
-	}
+	var eloHistory []gin.H
+	var debateHistory []gin.H
 
-	for _, doc := range debateDocs {
-		eloHistory = append(eloHistory, struct {
-			Elo  int       `json:"elo"`
-			Date time.Time `json:"date"`
-		}{
-			Elo:  doc.EloRating,
-			Date: doc.Date,
-		})
+	for debateCursor.Next(dbCtx) {
+		var doc DebateDoc
+		if err := debateCursor.Decode(&doc); err != nil {
+			continue
+		}
 
-		debateHistory = append(debateHistory, struct {
-			Topic     string `json:"topic"`
-			Result    string `json:"result"`
-			EloChange int    `json:"eloChange"`
-		}{
-			Topic:     doc.Topic,
-			Result:    doc.Result,
-			EloChange: doc.EloChange,
-		})
+		eloHistory = append(eloHistory, gin.H{"elo": int(doc.Rating), "date": doc.Date})
+		debateHistory = append(debateHistory, gin.H{"topic": doc.Topic, "result": doc.Result, "eloChange": int(doc.RatingChange)})
 
 		switch doc.Result {
 		case "win":
@@ -165,17 +151,16 @@ func GetProfile(c *gin.Context) {
 		}
 	}
 
-	// Final response
-	response := gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"profile": gin.H{
 			"displayName": displayName,
 			"email":       user.Email,
 			"bio":         user.Bio,
-			"eloRating":   user.EloRating,
+			"eloRating":   int(user.Rating),
 			"twitter":     user.Twitter,
 			"instagram":   user.Instagram,
 			"linkedin":    user.LinkedIn,
-			"avatarUrl":   profileAvatarURL,
+			"avatarUrl":   avatar,
 		},
 		"leaderboard": leaderboard,
 		"stats": gin.H{
@@ -185,16 +170,13 @@ func GetProfile(c *gin.Context) {
 			"eloHistory":    eloHistory,
 			"debateHistory": debateHistory,
 		},
-	}
-	c.JSON(http.StatusOK, response)
+	})
 }
-
-
 
 func UpdateProfile(ctx *gin.Context) {
 	email := ctx.GetString("email")
 	if email == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "message": "Missing user email in context"})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
@@ -206,46 +188,30 @@ func UpdateProfile(ctx *gin.Context) {
 		LinkedIn    string `json:"linkedin"`
 	}
 	if err := ctx.ShouldBindJSON(&updateData); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "message": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid body"})
 		return
 	}
 
-	// Trim whitespace from input fields
-	updateData.DisplayName = strings.TrimSpace(updateData.DisplayName)
-	updateData.Bio = strings.TrimSpace(updateData.Bio)
-	updateData.Twitter = strings.TrimSpace(updateData.Twitter)
-	updateData.Instagram = strings.TrimSpace(updateData.Instagram)
-	updateData.LinkedIn = strings.TrimSpace(updateData.LinkedIn)
+	update := bson.M{"$set": bson.M{
+		"displayName": strings.TrimSpace(updateData.DisplayName),
+		"bio":         strings.TrimSpace(updateData.Bio),
+		"twitter":     strings.TrimSpace(updateData.Twitter),
+		"instagram":   strings.TrimSpace(updateData.Instagram),
+		"linkedin":    strings.TrimSpace(updateData.LinkedIn),
+		"updatedAt":   time.Now(),
+	}}
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	filter := bson.M{"email": email}
-	update := bson.M{
-		"$set": bson.M{
-			"displayName": updateData.DisplayName,
-			"bio":         updateData.Bio,
-			"twitter":     updateData.Twitter,
-			"instagram":   updateData.Instagram,
-			"linkedin":    updateData.LinkedIn,
-			"updatedAt":   time.Now(),
-		},
-	}
-	result, err := db.MongoDatabase.Collection("users").UpdateOne(dbCtx, filter, update)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "message": "Failed to update profile"})
+	result, err := db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": email}, update)
+	if err != nil || result.MatchedCount == 0 {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
-
-	if result.MatchedCount == 0 {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "Not found", "message": "User not found"})
-		return
-	}
-
 	ctx.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
 }
 
-// UpdateEloAfterDebate updates Elo ratings for winner and loser
 func UpdateEloAfterDebate(ctx *gin.Context) {
 	var req struct {
 		WinnerID string `json:"winnerId"`
@@ -253,93 +219,50 @@ func UpdateEloAfterDebate(ctx *gin.Context) {
 		Topic    string `json:"topic"`
 	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "message": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	winnerObjID, err := primitive.ObjectIDFromHex(req.WinnerID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid winnerId"})
-		return
-	}
-	loserObjID, err := primitive.ObjectIDFromHex(req.LoserID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid loserId"})
-		return
-	}
+	winnerID, _ := primitive.ObjectIDFromHex(req.WinnerID)
+	loserID, _ := primitive.ObjectIDFromHex(req.LoserID)
 
 	var winner, loser models.User
-	if err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": winnerObjID}).Decode(&winner); err != nil {
-		if err == mongo.ErrNoDocuments {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "Winner not found"})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching winner from DB"})
-		}
-		return
-	}
+	_ = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": winnerID}).Decode(&winner)
+	_ = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": loserID}).Decode(&loser)
 
-	if err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": loserObjID}).Decode(&loser); err != nil {
-		if err == mongo.ErrNoDocuments {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "Loser not found"})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching loser from DB"})
-		}
-		return
-	}
+	newWinnerElo, newLoserElo := calculateEloRating(winner.Rating, loser.Rating, 1.0)
 
-	// Calculate new Elo ratings
-	newWinnerElo, newLoserElo := calculateEloRating(winner.EloRating, loser.EloRating, 1.0)
-	winnerEloChange := newWinnerElo - winner.EloRating
-	loserEloChange := newLoserElo - loser.EloRating
+	winnerChange := newWinnerElo - winner.Rating
+	loserChange := newLoserElo - loser.Rating
 
-	// Update user Elo ratings
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": winnerObjID}, bson.M{"$set": bson.M{"eloRating": newWinnerElo}})
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
+	// Update users
+	db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": winnerID}, bson.M{"$set": bson.M{"eloRating": newWinnerElo}})
+	db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": loserID}, bson.M{"$set": bson.M{"eloRating": newLoserElo}})
 
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": loserObjID}, bson.M{"$set": bson.M{"eloRating": newLoserElo}})
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
-
-	// Record debate results
+	// Log debates
 	now := time.Now()
-	winnerDebate := models.Debate{
-		Email:     winner.Email,
-		Topic:     req.Topic,
-		Result:    "win",
-		EloChange: winnerEloChange,
-		Date:      now,
-	}
-	loserDebate := models.Debate{
-		Email:     loser.Email,
-		Topic:     req.Topic,
-		Result:    "loss",
-		EloChange: loserEloChange,
-		Date:      now,
-	}
-
-	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, winnerDebate)
-	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, loserDebate)
+	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
+		"email":     winner.Email,
+		"topic":     req.Topic,
+		"result":    "win",
+		"eloChange": winnerChange,
+		"eloRating": newWinnerElo,
+		"date":      now,
+	})
+	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
+		"email":     loser.Email,
+		"topic":     req.Topic,
+		"result":    "loss",
+		"eloChange": loserChange,
+		"eloRating": newLoserElo,
+		"date":      now,
+	})
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"winnerNewElo": newWinnerElo,
-		"loserNewElo":  newLoserElo,
+		"winnerNewElo": int(newWinnerElo),
+		"loserNewElo":  int(newLoserElo),
 	})
-}
-
-// extractNameFromEmail extracts the name from an email address
-func extractNameFromEmail(email string) string {
-	for i, char := range email {
-		if char == '@' {
-			return email[:i]
-		}
-	}
-	return email
 }

@@ -64,7 +64,7 @@ func CreateRoomHandler(c *gin.Context) {
 		ID          string `bson:"_id"`
 		Email       string `bson:"email"`
 		DisplayName string `bson:"displayName"`
-		EloRating   int    `bson:"eloRating"`
+		Rating   int    `bson:"eloRating"`
 	}
 
 	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
@@ -77,7 +77,7 @@ func CreateRoomHandler(c *gin.Context) {
 	creatorParticipant := Participant{
 		ID:       user.ID,
 		Username: user.DisplayName,
-		Elo:      user.EloRating,
+		Elo:      user.Rating,
 	}
 
 	roomID := generateRoomID()

@@ -11,7 +11,7 @@ import (
 )
 
 // PopulateTestUsers inserts sample users into the database
-func PopulateTestUsers() {
+func PopulateTestUsers1() {
 	collection := db.MongoDatabase.Collection("users")
 
 	// Define sample users
@@ -21,7 +21,7 @@ func PopulateTestUsers() {
 			Email:       "alice@example.com",
 			DisplayName: "Alice Johnson",
 			Bio:         "Debate enthusiast",
-			EloRating:   2500,
+			Rating:   2500,
 			CreatedAt:   time.Now(),
 		},
 		{
@@ -29,7 +29,7 @@ func PopulateTestUsers() {
 			Email:       "bob@example.com",
 			DisplayName: "Bob Smith",
 			Bio:         "Argument master",
-			EloRating:   2400,
+			Rating:   2400,
 			CreatedAt:   time.Now(),
 		},
 		{
@@ -37,7 +37,7 @@ func PopulateTestUsers() {
 			Email:       "carol@example.com",
 			DisplayName: "Carol Davis",
 			Bio:         "Wordsmith",
-			EloRating:   2350,
+			Rating:   2350,
 			CreatedAt:   time.Now(),
 		},
 	}

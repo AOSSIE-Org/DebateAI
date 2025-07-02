@@ -46,7 +46,7 @@ func GetLeaderboard(c *gin.Context) {
 		return
 	}
 
-	// Query users sorted by EloRating (descending)
+	// Query users sorted by Rating (descending)
 	collection := db.MongoDatabase.Collection("users")
 	findOptions := options.Find().SetSort(bson.D{{"eloRating", -1}})
 	cursor, err := collection.Find(c, bson.M{}, findOptions)
@@ -83,7 +83,7 @@ func GetLeaderboard(c *gin.Context) {
 			ID:          user.ID.Hex(),
 			Rank:        i + 1,
 			Name:        name,
-			Score:       user.EloRating,
+			Score:       int(user.Rating),
 			AvatarURL:   avatarURL,
 			CurrentUser: isCurrentUser,
 		})
