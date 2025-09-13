@@ -1,0 +1,18 @@
+# Ignore node_modules to avoid copying them to the Docker image
+node_modules
+
+# Ignore git files and directories
+.git
+.gitignore
+
+# Ignore build output (if using Vite's build directory)
+dist
+
+# Ignore local environment files to prevent sensitive data from being copied into the image
+.env
+.env.local
+.env.*.local
+
+# Ignore Dockerfile itself and docker-compose files
+Dockerfile
+docker-compose.yml

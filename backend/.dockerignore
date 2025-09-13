@@ -1,0 +1,22 @@
+# Ignore the vendor directory if using Go modules
+/vendor
+
+# Ignore git files and directories
+.git
+.gitignore
+
+# Ignore the binary if it's present
+*.exe
+*.out
+*.o
+*.a
+
+# Ignore local environment files to prevent sensitive data from being copied into the image
+.env
+.env.local
+.env.*.local
+
+# Ignore Dockerfile itself and docker-compose files
+Dockerfile
+docker-compose.yml
+
