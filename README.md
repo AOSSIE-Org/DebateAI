@@ -202,6 +202,7 @@ git push origin feature-name
 - **Testing**: Test your changes locally before submitting a PR.
 - **Security**: Never commit sensitive information (e.g., API keys or passwords).
 - **Communication**: Be responsive to reviews and update your PRs as requested.
+- **License Compliance**: By contributing to this project, you agree that your contributions will be licensed under the same MIT License that covers the project.
 
 ---
 
@@ -227,6 +228,32 @@ We look forward to your contributions!
 
 ## License
 
-MIT © [AOSSIE](https://aossie.org)
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### What this means for contributors and users:
+
+**For Contributors:**
+- You can freely contribute to this project
+- Your contributions will be licensed under the same MIT License
+- You retain copyright to your contributions while granting the project permission to use them
+
+**For End Users:**
+- You can use this software for any purpose (commercial or non-commercial)
+- You can modify and distribute the software
+- You can create derivative works
+- You must include the original copyright notice and license text in any distribution
+
+**For Commercial Use:**
+- ✅ Commercial use is allowed
+- ✅ Modification is allowed
+- ✅ Distribution is allowed
+- ✅ Private use is allowed
+- ❌ No warranty or liability protection provided
+
+The MIT License is one of the most permissive open-source licenses, making it ideal for educational projects like DebateAI that aim to foster learning and collaboration.
+
+---
+
+**Copyright © 2024 [AOSSIE](https://aossie.org)**
 
 ---
