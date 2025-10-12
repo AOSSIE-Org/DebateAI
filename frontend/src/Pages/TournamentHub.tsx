@@ -1,4 +1,5 @@
-import React, { useState, FormEvent } from 'react';
+// TournamentHub.tsx
+import React, { useState, useEffect, FormEvent } from 'react';
 import { Users, Calendar, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -42,12 +43,23 @@ export default function TournamentPage() {
     },
   ];
 
-  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Simulate API call
+    const timer = setTimeout(() => {
+      setTournaments(initialTournaments);
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleCreate = (e: FormEvent) => {
     e.preventDefault();
@@ -118,12 +130,38 @@ export default function TournamentPage() {
     return avatars;
   };
 
+  if (isLoading) {
+    // Skeleton Loader
+    return (
+      <div className="min-h-screen bg-background text-foreground py-12">
+        <h1 className="text-4xl sm:text-5xl font-extrabold mb-10 text-center text-primary animate-pulse">
+          Tournament Arena
+        </h1>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-card rounded-xl p-6 border border-border animate-pulse">
+                <div className="h-8 bg-muted rounded w-3/4 mb-4"></div>
+                <div className="h-4 bg-muted rounded w-1/2 mb-6"></div>
+                <div className="h-4 bg-muted rounded w-full mb-2"></div>
+                <div className="h-4 bg-muted rounded w-5/6 mb-6"></div>
+                <div className="h-10 bg-muted rounded-md w-full"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Actual Tournament Hub Page
   return (
     <div className="min-h-screen bg-background text-foreground">
       <h1 className="text-4xl sm:text-5xl font-extrabold mb-10 text-center text-primary animate-pulse">
         Tournament Arena
       </h1>
       <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
+        {/* Tournament Cards */}
         <div className="flex-1">
           {tournaments.length === 0 ? (
             <p className="text-center text-muted-foreground text-lg">
@@ -143,7 +181,6 @@ export default function TournamentPage() {
                   <button
                     onClick={() => handleViewBracket(t)}
                     className="flex items-center gap-2 text-primary hover:text-primary/80 transition-all duration-200 mb-3 text-sm font-medium"
-                    aria-label="View Tournament Bracket with Logs"
                   >
                     <Eye className="w-5 h-5" />
                     Spectate
@@ -184,6 +221,8 @@ export default function TournamentPage() {
             </div>
           )}
         </div>
+
+        {/* Create Tournament Form */}
         <div className="w-full lg:w-1/3 space-y-8">
           <div className="bg-popover rounded-lg p-6 border border-border shadow-md">
             <h2 className="text-2xl font-semibold mb-6 text-foreground">Create New Tournament</h2>
