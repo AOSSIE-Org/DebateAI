@@ -181,14 +181,18 @@ const Profile: React.FC = () => {
       }
 
       try {
-        const data = await getProfile(token);
-        setDashboard(data);
+        const response = await getProfile(token);
+        if (response.success && response.data) {
+          setDashboard(response.data);
 
-        // Extract recent debates from profile data
-        if (data.stats && data.stats.recentDebates) {
-          setRecentDebates(data.stats.recentDebates);
+          // Extract recent debates from profile data
+          if (response.data.stats && response.data.stats.recentDebates) {
+            setRecentDebates(response.data.stats.recentDebates);
+          }
+          setDebateStatsLoading(false);
+        } else {
+          setErrorMessage(response.error?.message || "Failed to load dashboard data.");
         }
-        setDebateStatsLoading(false);
       } catch (err) {
         setErrorMessage("Failed to load dashboard data.");
         console.error(err);
@@ -252,7 +256,7 @@ const Profile: React.FC = () => {
       return;
     }
     try {
-      await updateProfile(
+      const response = await updateProfile(
         token,
         dashboard.profile.displayName,
         dashboard.profile.bio,
@@ -261,13 +265,18 @@ const Profile: React.FC = () => {
         dashboard.profile.linkedin,
         dashboard.profile.avatarUrl
       );
-      setSuccessMessage(
-        `${
-          field.charAt(0).toUpperCase() + field.slice(1)
-        } updated successfully!`
-      );
-      setErrorMessage("");
-      setEditingField(null);
+
+      if (response.success) {
+        setSuccessMessage(
+          `${
+            field.charAt(0).toUpperCase() + field.slice(1)
+          } updated successfully!`
+        );
+        setErrorMessage("");
+        setEditingField(null);
+      } else {
+        setErrorMessage(response.error?.message || `Failed to update ${field}.`);
+      }
     } catch (err) {
       setErrorMessage(`Failed to update ${field}.`);
       console.error(err);
@@ -287,7 +296,8 @@ const Profile: React.FC = () => {
         ...dashboard,
         profile: { ...dashboard.profile, avatarUrl },
       });
-      await updateProfile(
+
+      const response = await updateProfile(
         token,
         dashboard.profile.displayName,
         dashboard.profile.bio,
@@ -296,8 +306,21 @@ const Profile: React.FC = () => {
         dashboard.profile.linkedin,
         avatarUrl
       );
-      setSuccessMessage("Avatar updated successfully!");
-      setErrorMessage("");
+
+      if (response.success) {
+        setSuccessMessage("Avatar updated successfully!");
+        setErrorMessage("");
+      } else {
+        setErrorMessage(response.error?.message || "Failed to update avatar.");
+        // Revert state on failure
+        setDashboard({
+          ...dashboard,
+          profile: {
+            ...dashboard.profile,
+            avatarUrl: dashboard.profile.avatarUrl,
+          },
+        });
+      }
     } catch (err) {
       setErrorMessage("Failed to update avatar.");
       console.error(err);
