@@ -17,6 +17,11 @@ var MongoClient *mongo.Client
 var MongoDatabase *mongo.Database
 var DebateVsBotCollection *mongo.Collection
 
+// GetCollection returns a collection by name
+func GetCollection(collectionName string) *mongo.Collection {
+	return MongoDatabase.Collection(collectionName)
+}
+
 // extractDBName parses the database name from the URI, defaulting to "test"
 func extractDBName(uri string) string {
 	u, err := url.Parse(uri)

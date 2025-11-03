@@ -22,6 +22,8 @@ import ChatRoom from './components/ChatRoom';
 import TournamentHub from './Pages/TournamentHub';
 import TournamentDetails from './Pages/TournamentDetails';
 import ProsConsChallenge from './Pages/ProsConsChallenge';
+import TeamBuilder from './Pages/TeamBuilder';
+import TeamDebateRoom from './Pages/TeamDebateRoom';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -60,6 +62,7 @@ function AppRoutes() {
           <Route path='leaderboard' element={<Leaderboard />} />
           <Route path='profile' element={<Profile />} />
           <Route path='about' element={<About />} />
+          <Route path='team-builder' element={<TeamBuilder />} />
           <Route path='game/:userId' element={<DebateApp />} />
           <Route path='bot-selection' element={<BotSelection />} />
           <Route path='/tournaments' element={<TournamentHub />} />
@@ -82,6 +85,7 @@ function AppRoutes() {
         </Route>
         <Route path='/debate/:roomId' element={<DebateRoom />} />
         <Route path='/debate-room/:roomId' element={<OnlineDebateRoom />} />
+        <Route path='/team-debate/:debateId' element={<TeamDebateRoom />} />
         <Route path='/spectator/:roomId' element={<ChatRoom />} />
         <Route path='/speech-test' element={<SpeechTest />} />
       </Route>

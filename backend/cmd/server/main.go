@@ -117,7 +117,17 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 		auth.GET("/coach/pros-cons/topic", routes.GetProsConsTopic)
 		auth.POST("/coach/pros-cons/submit", routes.SubmitProsCons)
+
+		// Team routes
+		routes.SetupTeamRoutes(auth)
+		routes.SetupTeamDebateRoutes(auth)
+		routes.SetupTeamChatRoutes(auth)
+		routes.SetupTeamMatchmakingRoutes(auth)
+		log.Println("Team routes registered")
 	}
+
+	// Team WebSocket handler
+	router.GET("/ws/team", websocket.TeamWebsocketHandler)
 
 	return router
 }

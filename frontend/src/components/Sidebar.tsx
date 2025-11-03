@@ -1,7 +1,14 @@
 // src/components/Sidebar.tsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { MessageSquare, BarChart, User, Info, Trophy } from 'lucide-react';
+import {
+  MessageSquare,
+  BarChart,
+  User,
+  Info,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import debateAiLogo from '@/assets/aossie.png';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -30,6 +37,11 @@ function Sidebar() {
           to='/tournaments'
           label='Tournaments'
           icon={<Trophy className='mr-3 h-4 w-4' />}
+        />
+        <NavItem
+          to='/team-builder'
+          label='Team Debates'
+          icon={<Users className='mr-3 h-4 w-4' />}
         />
         <NavItem
           to='/leaderboard'

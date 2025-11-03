@@ -190,6 +190,7 @@ func GetProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"profile": gin.H{
+			"id":          user.ID.Hex(),
 			"displayName": displayName,
 			"email":       user.Email,
 			"bio":         user.Bio,
