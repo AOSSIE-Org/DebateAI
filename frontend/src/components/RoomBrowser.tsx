@@ -29,13 +29,11 @@ const RoomBrowser: React.FC = () => {
         },
       });
       if (!response.ok) {
-        console.error('Error fetching rooms:', response.statusText);
         setLoading(false);
         return;
       }
       const data = await response.json();
       if (!data || !Array.isArray(data)) {
-        console.warn('Invalid response data for rooms:', data);
         setRooms([]);
         return;
       }
@@ -48,7 +46,6 @@ const RoomBrowser: React.FC = () => {
 
       setRooms(normalizedRooms);
     } catch (error) {
-      console.error('Error fetching rooms:', error);
     } finally {
       setLoading(false);
     }
@@ -79,14 +76,13 @@ const RoomBrowser: React.FC = () => {
       }
       navigate(`/debate-room/${roomId}`);
     } catch (error) {
-      console.error('Error joining match:', error);
       alert('An error occurred while joining the match.');
     }
   };
 
   const handleViewDebate = (roomId: string) => {
-    // Navigate to the chatroom page where the client will then connect to ws://localhost:8080/chat/:roomId
-    navigate(`/spectator/${roomId}`);
+    // Navigate to the View Debate page for spectator mode
+    navigate(`/view-debate/${roomId}`);
   };
 
   const getAverageElo = (participants: Participant[] | null): number => {

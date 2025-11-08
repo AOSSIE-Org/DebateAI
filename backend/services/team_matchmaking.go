@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -15,16 +14,16 @@ import (
 )
 
 var (
-	teamMatchmakingPool map[string]*TeamMatchmakingEntry // teamID -> entry
+	teamMatchmakingPool  map[string]*TeamMatchmakingEntry // teamID -> entry
 	teamMatchmakingMutex sync.RWMutex
 )
 
 type TeamMatchmakingEntry struct {
-	TeamID    primitive.ObjectID
-	Team      models.Team
-	MaxSize   int
+	TeamID     primitive.ObjectID
+	Team       models.Team
+	MaxSize    int
 	AverageElo float64
-	Timestamp time.Time
+	Timestamp  time.Time
 }
 
 // StartTeamMatchmaking adds a team to the matchmaking pool
@@ -51,11 +50,11 @@ func StartTeamMatchmaking(teamID primitive.ObjectID) error {
 	}
 
 	teamMatchmakingPool[teamID.Hex()] = &TeamMatchmakingEntry{
-		TeamID:    teamID,
-		Team:      team,
-		MaxSize:   team.MaxSize,
+		TeamID:     teamID,
+		Team:       team,
+		MaxSize:    team.MaxSize,
 		AverageElo: team.AverageElo,
-		Timestamp: time.Now(),
+		Timestamp:  time.Now(),
 	}
 
 	return nil
@@ -75,20 +74,11 @@ func FindMatchingTeam(lookingTeamID primitive.ObjectID) (*models.Team, error) {
 		return nil, mongo.ErrNoDocuments
 	}
 
-	// Log pool status for debugging
-	log.Printf("Matchmaking pool size: %d, looking team: %s (Elo: %.2f)", 
-		len(teamMatchmakingPool), lookingTeamID.Hex(), lookingEntry.AverageElo)
-
 	// Find teams with matching size and similar elo
 	for teamID, entry := range teamMatchmakingPool {
 		if teamID == lookingTeamID.Hex() {
 			continue
 		}
-
-		// Log each comparison
-		log.Printf("Comparing %s (Elo: %.2f) with %s (Elo: %.2f)", 
-			lookingTeamID.Hex(), lookingEntry.AverageElo,
-			teamID, entry.AverageElo)
 
 		// Check if sizes match
 		if entry.MaxSize == lookingEntry.MaxSize {
@@ -97,17 +87,13 @@ func FindMatchingTeam(lookingTeamID primitive.ObjectID) (*models.Team, error) {
 			if eloDiff < 0 {
 				eloDiff = -eloDiff
 			}
-			
-			log.Printf("Size match: %d, Elo diff: %.2f (threshold: 200)", entry.MaxSize, eloDiff)
-			
+
 			if eloDiff <= 200 {
-				log.Printf("Match found! %s vs %s", lookingTeamID.Hex(), teamID)
 				return &entry.Team, nil
 			}
 		}
 	}
 
-	log.Printf("No match found for team %s", lookingTeamID.Hex())
 	return nil, mongo.ErrNoDocuments
 }
 
@@ -131,4 +117,3 @@ func GetMatchmakingPool() map[string]*TeamMatchmakingEntry {
 	}
 	return teamMatchmakingPool
 }
-

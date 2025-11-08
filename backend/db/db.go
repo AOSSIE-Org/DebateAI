@@ -4,7 +4,6 @@ import (
 	"arguehub/models"
 	"context"
 	"fmt"
-	"log"
 	"net/url"
 	"time"
 
@@ -52,7 +51,6 @@ func ConnectMongoDB(uri string) error {
 
 	MongoClient = client
 	dbName := extractDBName(uri)
-	log.Printf("Using database: %s", dbName)
 
 	MongoDatabase = client.Database(dbName)
 	DebateVsBotCollection = MongoDatabase.Collection("debates_vs_bot")
@@ -63,7 +61,6 @@ func ConnectMongoDB(uri string) error {
 func SaveDebateVsBot(debate models.DebateVsBot) error {
 	_, err := DebateVsBotCollection.InsertOne(context.Background(), debate)
 	if err != nil {
-		log.Printf("Error saving debate: %v", err)
 		return err
 	}
 	return nil
@@ -75,7 +72,6 @@ func UpdateDebateVsBotOutcome(userId, outcome string) error {
 	update := bson.M{"$set": bson.M{"outcome": outcome}}
 	_, err := DebateVsBotCollection.UpdateOne(context.Background(), filter, update, nil)
 	if err != nil {
-		log.Printf("Error updating debate outcome: %v", err)
 		return err
 	}
 	return nil
@@ -85,7 +81,7 @@ func UpdateDebateVsBotOutcome(userId, outcome string) error {
 func GetLatestDebateVsBot(email string) (*models.DebateVsBot, error) {
 	filter := bson.M{"email": email}
 	opts := options.FindOne().SetSort(bson.M{"createdAt": -1})
-	
+
 	var debate models.DebateVsBot
 	err := DebateVsBotCollection.FindOne(context.Background(), filter, opts).Decode(&debate)
 	if err != nil {

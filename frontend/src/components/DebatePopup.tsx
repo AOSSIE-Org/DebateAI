@@ -45,7 +45,6 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
       navigate(`/debate-room/${room.id}`);
       onClose();
     } catch (error) {
-      console.error('Error creating room:', error);
       alert('Error creating room.');
     }
   };

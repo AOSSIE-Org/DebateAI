@@ -34,7 +34,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
-      console.warn('Google Sign-In script not loaded');
       return;
     }
 
@@ -137,7 +136,6 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
-      console.warn('Google Sign-In script not loaded');
       return;
     }
 

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -20,19 +19,23 @@ import (
 
 // SubmitTranscriptsRequest represents the request to submit debate transcripts
 type SubmitTranscriptsRequest struct {
-	RoomID      string            `json:"roomId" binding:"required"`
-	Role        string            `json:"role" binding:"required,oneof=for against"`
-	Transcripts map[string]string `json:"transcripts" binding:"required"`
+	RoomID              string            `json:"roomId" binding:"required"`
+	Role                string            `json:"role" binding:"required"`
+	Transcripts         map[string]string `json:"transcripts" binding:"required"`
+	OpponentRole        string            `json:"opponentRole"`
+	OpponentID          string            `json:"opponentId"`
+	OpponentEmail       string            `json:"opponentEmail"`
+	OpponentTranscripts map[string]string `json:"opponentTranscripts"`
 }
 
 // SaveTranscriptRequest represents the request to save a debate transcript
 type SaveTranscriptRequest struct {
-	DebateType  string                    `json:"debateType" binding:"required"`
-	Topic       string                    `json:"topic" binding:"required"`
-	Opponent    string                    `json:"opponent" binding:"required"`
-	Result      string                    `json:"result"`
-	Messages    []models.Message          `json:"messages"`
-	Transcripts map[string]string         `json:"transcripts,omitempty"`
+	DebateType  string            `json:"debateType" binding:"required"`
+	Topic       string            `json:"topic" binding:"required"`
+	Opponent    string            `json:"opponent" binding:"required"`
+	Result      string            `json:"result"`
+	Messages    []models.Message  `json:"messages"`
+	Transcripts map[string]string `json:"transcripts,omitempty"`
 }
 
 // SubmitTranscripts handles the submission of debate transcripts
@@ -56,7 +59,17 @@ func SubmitTranscripts(c *gin.Context) {
 		return
 	}
 
-	result, err := services.SubmitTranscripts(req.RoomID, req.Role, email, req.Transcripts)
+	result, err := services.SubmitTranscripts(
+		req.RoomID,
+		req.Role,
+		email,
+		req.Transcripts,
+		req.OpponentRole,
+		req.OpponentID,
+		req.OpponentEmail,
+		req.OpponentTranscripts,
+	)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -93,7 +106,6 @@ func SaveDebateTranscriptHandler(c *gin.Context) {
 		return
 	}
 
-	
 	err = services.SaveDebateTranscript(
 		userID,
 		email,
@@ -106,12 +118,10 @@ func SaveDebateTranscriptHandler(c *gin.Context) {
 	)
 
 	if err != nil {
-		log.Printf("Failed to save transcript: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to save transcript"})
 		return
 	}
 
-	log.Printf("Successfully saved transcript for user %s", userID.Hex())
 	c.JSON(200, gin.H{"message": "Transcript saved successfully"})
 }
 
@@ -139,14 +149,11 @@ func GetUserTranscriptsHandler(c *gin.Context) {
 
 	transcripts, err := services.GetUserDebateTranscripts(userID)
 	if err != nil {
-		log.Printf("Failed to get transcripts: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to retrieve transcripts"})
 		return
 	}
 
-	log.Printf("Retrieved %d transcripts for user %s", len(transcripts), userID.Hex())
 	for i, transcript := range transcripts {
-		log.Printf("Transcript %d: ID=%s, Topic=%s", i, transcript.ID.Hex(), transcript.Topic)
 	}
 
 	c.JSON(200, gin.H{"transcripts": transcripts})
@@ -182,10 +189,8 @@ func GetTranscriptByIDHandler(c *gin.Context) {
 	}
 
 	// Convert transcript ID to ObjectID
-	log.Printf("GetTranscriptByID: Attempting to convert transcript ID: %s", transcriptID)
 	transcriptObjectID, err := primitive.ObjectIDFromHex(transcriptID)
 	if err != nil {
-		log.Printf("GetTranscriptByID: Failed to convert transcript ID '%s' to ObjectID: %v", transcriptID, err)
 		c.JSON(400, gin.H{"error": "Invalid transcript ID format", "details": err.Error(), "received_id": transcriptID})
 		return
 	}
@@ -196,7 +201,6 @@ func GetTranscriptByIDHandler(c *gin.Context) {
 			c.JSON(404, gin.H{"error": "Transcript not found"})
 			return
 		}
-		log.Printf("Failed to get transcript: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to retrieve transcript"})
 		return
 	}
@@ -234,10 +238,8 @@ func DeleteTranscriptHandler(c *gin.Context) {
 	}
 
 	// Convert transcript ID to ObjectID
-	log.Printf("DeleteTranscript: Attempting to convert transcript ID: %s", transcriptID)
 	transcriptObjectID, err := primitive.ObjectIDFromHex(transcriptID)
 	if err != nil {
-		log.Printf("DeleteTranscript: Failed to convert transcript ID '%s' to ObjectID: %v", transcriptID, err)
 		c.JSON(400, gin.H{"error": "Invalid transcript ID format", "details": err.Error(), "received_id": transcriptID})
 		return
 	}
@@ -248,7 +250,6 @@ func DeleteTranscriptHandler(c *gin.Context) {
 			c.JSON(404, gin.H{"error": "Transcript not found"})
 			return
 		}
-		log.Printf("Failed to delete transcript: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to delete transcript"})
 		return
 	}
@@ -259,9 +260,9 @@ func DeleteTranscriptHandler(c *gin.Context) {
 // CreateTestTranscriptHandler creates a test transcript for debugging
 func CreateTestTranscriptHandler(c *gin.Context) {
 	if env := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV"))); env == "prod" || env == "production" {
-       c.JSON(403, gin.H{"error": "Not available"})
-       return
-   }
+		c.JSON(403, gin.H{"error": "Not available"})
+		return
+	}
 	token := c.GetHeader("Authorization")
 	if token == "" {
 		c.JSON(401, gin.H{"error": "Authorization token required"})
@@ -302,21 +303,19 @@ func CreateTestTranscriptHandler(c *gin.Context) {
 	)
 
 	if err != nil {
-		log.Printf("Failed to save test transcript: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to save test transcript"})
 		return
 	}
 
-	log.Printf("Successfully created test transcript for user %s", userID.Hex())
 	c.JSON(200, gin.H{"message": "Test transcript created successfully"})
 }
 
 // CreateTestBotDebateHandler creates a test bot debate transcript for debugging
 func CreateTestBotDebateHandler(c *gin.Context) {
 	if env := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV"))); env == "prod" || env == "production" {
-       c.JSON(403, gin.H{"error": "Not available"})
-       return
-   }
+		c.JSON(403, gin.H{"error": "Not available"})
+		return
+	}
 	token := c.GetHeader("Authorization")
 	if token == "" {
 		c.JSON(401, gin.H{"error": "Authorization token required"})
@@ -362,12 +361,10 @@ func CreateTestBotDebateHandler(c *gin.Context) {
 	)
 
 	if err != nil {
-		log.Printf("Failed to save test bot debate transcript: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to save test bot debate transcript"})
 		return
 	}
 
-	log.Printf("Successfully created test bot debate transcript for user %s", userID.Hex())
 	c.JSON(200, gin.H{"message": "Test bot debate transcript created successfully"})
 }
 
@@ -395,7 +392,6 @@ func GetDebateStatsHandler(c *gin.Context) {
 
 	stats, err := services.GetDebateStats(userID)
 	if err != nil {
-		log.Printf("Failed to get debate stats: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to retrieve debate stats"})
 		return
 	}
@@ -418,11 +414,8 @@ func UpdatePendingTranscriptsHandler(c *gin.Context) {
 		return
 	}
 
-	log.Printf("User %s requested to update pending transcripts", email)
-
 	err = services.UpdatePendingTranscripts()
 	if err != nil {
-		log.Printf("Failed to update pending transcripts: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to update pending transcripts"})
 		return
 	}
@@ -483,11 +476,11 @@ func UpdateTranscriptResultHandler(c *gin.Context) {
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
-			"result":        req.Result,
-			"updatedAt":     now,
+			"result":         req.Result,
+			"updatedAt":      now,
 			"manualOverride": true,
-			"overriddenBy":  userID,
-			"overriddenAt":  now,
+			"overriddenBy":   userID,
+			"overriddenAt":   now,
 		},
 	}
 
@@ -497,7 +490,6 @@ func UpdateTranscriptResultHandler(c *gin.Context) {
 		update,
 	)
 	if err != nil {
-		log.Printf("Failed to update transcript result: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to update transcript result"})
 		return
 	}

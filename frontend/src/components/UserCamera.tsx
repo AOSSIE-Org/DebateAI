@@ -55,7 +55,6 @@ const UserCamera: React.FC<UserCameraProps> = ({
         // Start recording in intervals of 400ms
         mediaRecorderRef.current.start(100);
       } catch (err) {
-        console.error("Error accessing camera or microphone:", err);
       }
     };
 

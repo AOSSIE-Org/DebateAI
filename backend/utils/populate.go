@@ -2,13 +2,12 @@ package utils
 
 import (
 	"context"
-	"log"
 	"time"
 
+	"arguehub/config"
 	"arguehub/db"
 	"arguehub/models"
 	"arguehub/services"
-	"arguehub/config"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -17,7 +16,7 @@ import (
 func PopulateTestUsers() {
 	cfg, err := config.LoadConfig("./config/config.prod.yml")
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		panic("Failed to load config: " + err.Error())
 	}
 
 	collection := db.MongoDatabase.Collection("users")
@@ -59,8 +58,6 @@ func PopulateTestUsers() {
 
 	_, err = collection.InsertMany(context.Background(), documents)
 	if err != nil {
-		log.Printf("Failed to insert test users: %v", err)
-	} else {
-		log.Println("Inserted test users")
+		return
 	}
 }

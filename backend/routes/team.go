@@ -51,4 +51,3 @@ func SetupTeamMatchmakingRoutes(router *gin.RouterGroup) {
 func SetupTeamChatRoutes(router *gin.RouterGroup) {
 	// Team chat functionality can be added later if needed
 }
-

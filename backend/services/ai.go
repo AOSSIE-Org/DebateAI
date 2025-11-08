@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -134,24 +133,20 @@ func evaluate(chatGPT *ChatGPT, format DebateFormat, content DebateContent) (str
 func main() {
 	rootPath, err := os.Getwd()
 	if err != nil {
-		log.Printf("Error getting the current working directory: %v\n", err)
 		return
 	}
 
 	configPath := filepath.Join(rootPath, "config", "config.prod.yml")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		fmt.Printf("Config file not found: %s\n", configPath)
 		return
 	}
 
 	// Load your configuration (assuming appConfig is defined)
 	cfg, err := appConfig.LoadConfig(configPath)
 	if err != nil {
-		fmt.Printf("Error loading config: %v\n", err)
 		return
 	}
 	if cfg.Openai.GptApiKey == "" {
-		fmt.Println("OpenAI configuration is missing or API key is not set")
 		return
 	}
 
@@ -179,10 +174,7 @@ func main() {
 
 	result, err := evaluate(chatGPT, debateFormat, debateContent)
 	if err != nil {
-		fmt.Printf("Error during evaluation: %v\n", err)
 		return
 	}
 
-	fmt.Println("Evaluation Result:")
-	fmt.Println(result)
 }

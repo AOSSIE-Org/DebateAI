@@ -3,7 +3,6 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -90,11 +89,9 @@ func persistDebateRoom(room *DebateRoom) {
 	defer room.Mutex.Unlock()
 	data, err := json.MarshalIndent(room, "", "  ")
 	if err != nil {
-		log.Println("Error marshaling room data:", err)
 		return
 	}
 	filename := fmt.Sprintf("room_%s.json", room.RoomID)
 	if err := os.WriteFile(filename, data, 0644); err != nil {
-		log.Println("Error writing file:", err)
 	}
 }

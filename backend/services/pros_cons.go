@@ -5,12 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"arguehub/models"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // GenerateDebateTopic generates a debate topic using the Gemini API based on the user's skill level
@@ -34,29 +31,14 @@ Examples:
 	)
 
 	ctx := context.Background()
-	model := geminiClient.GenerativeModel("gemini-1.5-flash")
-
-	// Set safety settings to prevent inappropriate content
-	model.SafetySettings = []*genai.SafetySetting{
-		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockLowAndAbove},
-		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockLowAndAbove},
-		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockLowAndAbove},
-		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockLowAndAbove},
-	}
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil || len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		log.Printf("Failed to generate topic: %v", err)
+	response, err := generateDefaultModelText(ctx, prompt)
+	if err != nil {
 		return getFallbackTopic(skillLevel), nil
 	}
-
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			return strings.TrimSpace(string(text)), nil
-		}
+	if response == "" {
+		return getFallbackTopic(skillLevel), nil
 	}
-
-	return getFallbackTopic(skillLevel), nil
+	return strings.TrimSpace(response), nil
 }
 
 // getFallbackTopic returns a predefined topic based on skill level
@@ -112,54 +94,27 @@ Required Output Format (JSON):
 	)
 
 	ctx := context.Background()
-	model := geminiClient.GenerativeModel("gemini-1.5-flash")
-	model.SafetySettings = []*genai.SafetySetting{
-		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockNone},
-	}
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	response, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
-		log.Printf("Gemini error: %v", err)
 		return models.ProsConsEvaluation{}, err
 	}
-
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	if response == "" {
 		return models.ProsConsEvaluation{}, errors.New("no evaluation returned")
 	}
 
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			cleanedText := strings.TrimSpace(string(text))
-			cleanedText = strings.TrimPrefix(cleanedText, "```json")
-			cleanedText = strings.TrimSuffix(cleanedText, "```")
-			cleanedText = strings.TrimSpace(cleanedText)
-
-			var eval models.ProsConsEvaluation
-			err = json.Unmarshal([]byte(cleanedText), &eval)
-			if err != nil {
-				log.Printf("Failed to parse evaluation JSON: %v. Raw: %s", err, cleanedText)
-				return models.ProsConsEvaluation{}, err
-			}
-
-			// Calculate total score and normalize to 100
-			totalScore := 0
-			for _, pro := range eval.Pros {
-				totalScore += pro.Score
-			}
-			for _, con := range eval.Cons {
-				totalScore += con.Score
-			}
-			// Normalize to 100: (totalScore / maxPossibleScore) * 100
-			// maxPossibleScore = 10 points per argument * 10 arguments (5 pros + 5 cons) = 100
-			// If fewer arguments are submitted, score is scaled proportionally
-			eval.Score = totalScore
-
-			return eval, nil
-		}
+	var eval models.ProsConsEvaluation
+	if err := json.Unmarshal([]byte(response), &eval); err != nil {
+		return models.ProsConsEvaluation{}, err
 	}
 
-	return models.ProsConsEvaluation{}, errors.New("no valid evaluation returned")
+	totalScore := 0
+	for _, pro := range eval.Pros {
+		totalScore += pro.Score
+	}
+	for _, con := range eval.Cons {
+		totalScore += con.Score
+	}
+	eval.Score = totalScore
+
+	return eval, nil
 }

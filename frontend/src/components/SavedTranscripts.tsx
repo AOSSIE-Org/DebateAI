@@ -51,10 +51,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
       setLoading(true);
       setError(null);
       const data = await transcriptService.getUserTranscripts();
-      console.log('Fetched transcripts:', data); // Debug log
       if (data && data.length > 0) {
-        console.log('First transcript ID:', data[0].id); // Debug log
-        console.log('First transcript ID type:', typeof data[0].id); // Debug log
       }
       setTranscripts(data);
     } catch (err) {
@@ -67,8 +64,6 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   };
 
   const handleDeleteTranscript = async (id: string) => {
-    console.log('Attempting to delete transcript with ID:', id); // Debug log
-    console.log('ID type:', typeof id); // Debug log
 
     if (
       !confirm(
@@ -83,7 +78,6 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
       await transcriptService.deleteTranscript(id);
       setTranscripts(transcripts.filter((t) => t.id !== id));
     } catch (err) {
-      console.error('Delete error:', err); // Debug log
       alert(err instanceof Error ? err.message : 'Failed to delete transcript');
     } finally {
       setDeletingId(null);

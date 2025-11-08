@@ -20,11 +20,11 @@ type TokenBucketService struct {
 
 // TokenBucket represents a token bucket for a team member
 type TokenBucket struct {
-	Capacity     int           // Maximum tokens
-	Tokens       int           // Current tokens
-	RefillRate   int           // Tokens per second
-	LastRefill   time.Time     // Last time tokens were refilled
-	Mutex        sync.RWMutex  // Mutex for thread safety
+	Capacity   int          // Maximum tokens
+	Tokens     int          // Current tokens
+	RefillRate int          // Tokens per second
+	LastRefill time.Time    // Last time tokens were refilled
+	Mutex      sync.RWMutex // Mutex for thread safety
 }
 
 // NewTokenBucketService creates a new token bucket service
@@ -64,7 +64,7 @@ func (tbs *TokenBucketService) InitializeTeamBuckets(teamID primitive.ObjectID) 
 // ConsumeToken attempts to consume a token from a team member's bucket
 func (tbs *TokenBucketService) ConsumeToken(teamID, userID primitive.ObjectID) (bool, int) {
 	bucketKey := tbs.getBucketKey(teamID, userID)
-	
+
 	tbs.mutex.RLock()
 	bucket, exists := tbs.buckets[bucketKey]
 	tbs.mutex.RUnlock()
@@ -90,7 +90,7 @@ func (tbs *TokenBucketService) ConsumeToken(teamID, userID primitive.ObjectID) (
 // GetRemainingTokens returns the number of remaining tokens for a team member
 func (tbs *TokenBucketService) GetRemainingTokens(teamID, userID primitive.ObjectID) int {
 	bucketKey := tbs.getBucketKey(teamID, userID)
-	
+
 	tbs.mutex.RLock()
 	bucket, exists := tbs.buckets[bucketKey]
 	tbs.mutex.RUnlock()
@@ -130,7 +130,7 @@ func (tbs *TokenBucketService) getBucketKey(teamID, userID primitive.ObjectID) s
 
 // GetTeamTurnManager manages turns within a team
 type TeamTurnManager struct {
-	currentTurn map[string]primitive.ObjectID // teamID -> current userID
+	currentTurn map[string]primitive.ObjectID   // teamID -> current userID
 	turnOrder   map[string][]primitive.ObjectID // teamID -> ordered list of userIDs
 	mutex       sync.RWMutex
 }
@@ -250,14 +250,13 @@ func (tbs *TokenBucketService) GetTeamSpeakingStatus(teamID primitive.ObjectID, 
 		isCurrentTurn := member.UserID == currentTurn
 
 		status[member.UserID.Hex()] = map[string]interface{}{
-			"userId":           member.UserID,
-			"displayName":      member.DisplayName,
-			"remainingTokens":  remainingTokens,
-			"isCurrentTurn":    isCurrentTurn,
-			"canSpeak":         remainingTokens > 0 && isCurrentTurn,
+			"userId":          member.UserID,
+			"displayName":     member.DisplayName,
+			"remainingTokens": remainingTokens,
+			"isCurrentTurn":   isCurrentTurn,
+			"canSpeak":        remainingTokens > 0 && isCurrentTurn,
 		}
 	}
 
 	return status
 }
-

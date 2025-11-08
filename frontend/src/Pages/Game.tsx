@@ -79,7 +79,6 @@ const Game: React.FC = () => {
       }
 
       case "GAME_RESULT": {
-        console.log(message);
         const { winnerUserId, points, totalPoints, evaluationMessage } =
           JSON.parse(message.content);
         setState((prevState) => ({
@@ -96,7 +95,6 @@ const Game: React.FC = () => {
       }
 
       default:
-        console.warn("Unhandled message type:", message.type);
     }
   };
 
@@ -106,10 +104,7 @@ const Game: React.FC = () => {
     ws.binaryType = "arraybuffer";
     websocketRef.current = ws;
 
-    ws.onopen = () => console.log("WebSocket connection established");
     ws.onmessage = (event) => handleWebSocketMessage(JSON.parse(event.data));
-    ws.onerror = (error) => console.error("WebSocket error:", error);
-    ws.onclose = () => console.log("WebSocket connection closed");
 
     return () => ws.close();
   }, [userId]);

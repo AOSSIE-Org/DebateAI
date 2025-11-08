@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"math"
 	"sync"
 	"time"
@@ -15,25 +14,25 @@ import (
 
 // MatchmakingPool represents a user in the matchmaking queue
 type MatchmakingPool struct {
-	UserID       string    `json:"userId" bson:"userId"`
-	Username     string    `json:"username" bson:"username"`
-	Elo          int       `json:"elo" bson:"elo"`
-	MinElo       int       `json:"minElo" bson:"minElo"`
-	MaxElo       int       `json:"maxElo" bson:"maxElo"`
-	JoinedAt     time.Time `json:"joinedAt" bson:"joinedAt"`
-	LastActivity time.Time `json:"lastActivity" bson:"lastActivity"`
-	StartedMatchmaking bool `json:"startedMatchmaking" bson:"startedMatchmaking"`
+	UserID             string    `json:"userId" bson:"userId"`
+	Username           string    `json:"username" bson:"username"`
+	Elo                int       `json:"elo" bson:"elo"`
+	MinElo             int       `json:"minElo" bson:"minElo"`
+	MaxElo             int       `json:"maxElo" bson:"maxElo"`
+	JoinedAt           time.Time `json:"joinedAt" bson:"joinedAt"`
+	LastActivity       time.Time `json:"lastActivity" bson:"lastActivity"`
+	StartedMatchmaking bool      `json:"startedMatchmaking" bson:"startedMatchmaking"`
 }
 
 // MatchmakingService handles the matchmaking logic
 type MatchmakingService struct {
-	pool map[string]*MatchmakingPool
+	pool  map[string]*MatchmakingPool
 	mutex sync.RWMutex
 }
 
 var (
 	matchmakingService *MatchmakingService
-	once sync.Once
+	once               sync.Once
 )
 
 // GetMatchmakingService returns the singleton matchmaking service
@@ -59,18 +58,17 @@ func (ms *MatchmakingService) AddToPool(userID, username string, elo int) error 
 	maxElo := elo + eloTolerance
 
 	poolEntry := &MatchmakingPool{
-		UserID:       userID,
-		Username:     username,
-		Elo:          elo,
-		MinElo:       minElo,
-		MaxElo:       maxElo,
-		JoinedAt:     time.Now(),
-		LastActivity: time.Now(),
+		UserID:             userID,
+		Username:           username,
+		Elo:                elo,
+		MinElo:             minElo,
+		MaxElo:             maxElo,
+		JoinedAt:           time.Now(),
+		LastActivity:       time.Now(),
 		StartedMatchmaking: false, // Default to false
 	}
 
 	ms.pool[userID] = poolEntry
-	log.Printf("User %s (Elo: %d) added to matchmaking pool (not started yet)", username, elo)
 	return nil
 }
 
@@ -78,13 +76,12 @@ func (ms *MatchmakingService) AddToPool(userID, username string, elo int) error 
 func (ms *MatchmakingService) StartMatchmaking(userID string) error {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	
+
 	if poolEntry, exists := ms.pool[userID]; exists {
 		poolEntry.StartedMatchmaking = true
 		poolEntry.JoinedAt = time.Now() // Reset join time when actually starting
 		poolEntry.LastActivity = time.Now()
-		log.Printf("User %s started matchmaking", poolEntry.Username)
-		
+
 		// Try to find a match immediately
 		go ms.findMatch(userID)
 		return nil
@@ -96,10 +93,9 @@ func (ms *MatchmakingService) StartMatchmaking(userID string) error {
 func (ms *MatchmakingService) RemoveFromPool(userID string) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	
+
 	if _, exists := ms.pool[userID]; exists {
 		delete(ms.pool, userID)
-		log.Printf("User %s removed from matchmaking pool", userID)
 	}
 }
 
@@ -107,7 +103,7 @@ func (ms *MatchmakingService) RemoveFromPool(userID string) {
 func (ms *MatchmakingService) UpdateActivity(userID string) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	
+
 	if poolEntry, exists := ms.pool[userID]; exists {
 		poolEntry.LastActivity = time.Now()
 	}
@@ -117,7 +113,7 @@ func (ms *MatchmakingService) UpdateActivity(userID string) {
 func (ms *MatchmakingService) GetPool() []MatchmakingPool {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
-	
+
 	pool := make([]MatchmakingPool, 0, len(ms.pool))
 	for _, entry := range ms.pool {
 		if entry.StartedMatchmaking { // Only include users who have started matchmaking
@@ -151,10 +147,10 @@ func (ms *MatchmakingService) findMatch(userID string) {
 			// Calculate match quality score (lower is better)
 			eloDiff := math.Abs(float64(user.Elo - opponent.Elo))
 			waitTime := time.Since(opponent.JoinedAt).Seconds()
-			
+
 			// Score based on Elo difference and wait time
 			score := eloDiff - (waitTime * 0.1) // Prefer closer Elo, but consider wait time
-			
+
 			if bestMatch == nil || score < bestScore {
 				bestMatch = opponent
 				bestScore = score
@@ -176,59 +172,54 @@ func (ms *MatchmakingService) findMatch(userID string) {
 
 // createRoomForMatch creates a room for two matched users
 func (ms *MatchmakingService) createRoomForMatch(user1, user2 *MatchmakingPool) {
-    // Use atomic operation to create room and remove users from pool
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-    roomID := generateRoomID() // Generate room ID (see ID strategy comment below)
-    
-    // If DB is not initialized, skip persistence but still complete the match.
-    if db.MongoDatabase == nil {
-        log.Printf("MongoDatabase is nil; skipping room persistence for %s vs %s", user1.UserID, user2.UserID)
-        ms.RemoveFromPool(user1.UserID)
-        ms.RemoveFromPool(user2.UserID)
-        if roomCreatedCallback != nil {
-            roomCreatedCallback(roomID, []string{user1.UserID, user2.UserID})
-        }
-        log.Printf("Room %s created (in-memory only) for users %s and %s", roomID, user1.UserID, user2.UserID)
-        return
-    }
-    roomCollection := db.MongoDatabase.Collection("rooms")
-    
-    // Create room with both participants
-    room := bson.M{
-        "_id":       roomID,
-        "type":      "public",
-        "participants": []bson.M{
-            {
-                "id":       user1.UserID,
-                "username": user1.Username,
-                "elo":      user1.Elo,
-            },
-            {
-                "id":       user2.UserID,
-                "username": user2.Username,
-                "elo":      user2.Elo,
-            },
-        },
-        "createdAt": time.Now(),
-        "status":    "waiting", // waiting, active, completed
-    }
-    // Insert the room directly
-    _, err := roomCollection.InsertOne(ctx, room)
-    if err != nil {
-        log.Printf("Failed to persist room %s: %v (continuing with match)", roomID, err)
-    }
-    // Remove both users from the pool
-    ms.RemoveFromPool(user1.UserID)
-    ms.RemoveFromPool(user2.UserID)
-    log.Printf("Created room %s for users %s (Elo: %d) and %s (Elo: %d)", 
-        roomID, user1.Username, user1.Elo, user2.Username, user2.Elo)
-    // Broadcast room creation to WebSocket clients
-    participantUserIDs := []string{user1.UserID, user2.UserID}
-    if roomCreatedCallback != nil {
-        roomCreatedCallback(roomID, participantUserIDs)
-    }
-    log.Printf("Room %s created successfully for users %s and %s", roomID, user1.UserID, user2.UserID)
+	// Use atomic operation to create room and remove users from pool
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	roomID := generateRoomID() // Generate room ID (see ID strategy comment below)
+
+	// If DB is not initialized, skip persistence but still complete the match.
+	if db.MongoDatabase == nil {
+		ms.RemoveFromPool(user1.UserID)
+		ms.RemoveFromPool(user2.UserID)
+		if roomCreatedCallback != nil {
+			roomCreatedCallback(roomID, []string{user1.UserID, user2.UserID})
+		}
+		return
+	}
+	roomCollection := db.MongoDatabase.Collection("rooms")
+
+	// Create room with both participants
+	room := bson.M{
+		"_id":  roomID,
+		"type": "public",
+		"participants": []bson.M{
+			{
+				"id":       user1.UserID,
+				"username": user1.Username,
+				"elo":      user1.Elo,
+			},
+			{
+				"id":       user2.UserID,
+				"username": user2.Username,
+				"elo":      user2.Elo,
+			},
+		},
+		"createdAt": time.Now(),
+		"status":    "waiting", // waiting, active, completed
+	}
+	// Insert the room directly
+	_, err := roomCollection.InsertOne(ctx, room)
+	if err != nil {
+		return
+	}
+	// Remove both users from the pool
+	ms.RemoveFromPool(user1.UserID)
+	ms.RemoveFromPool(user2.UserID)
+	// Broadcast room creation to WebSocket clients
+	participantUserIDs := []string{user1.UserID, user2.UserID}
+	if roomCreatedCallback != nil {
+		roomCreatedCallback(roomID, participantUserIDs)
+	}
 }
 
 // cleanupInactiveUsers removes users who have been inactive for too long
@@ -243,7 +234,6 @@ func (ms *MatchmakingService) cleanupInactiveUsers() {
 			// Remove users inactive for more than 5 minutes
 			if now.Sub(poolEntry.LastActivity) > 5*time.Minute {
 				delete(ms.pool, userID)
-				log.Printf("Removed inactive user %s from matchmaking pool", userID)
 			}
 		}
 		ms.mutex.Unlock()

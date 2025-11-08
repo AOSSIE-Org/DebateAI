@@ -69,7 +69,6 @@ package websocket
 // 	defer room.Mutex.Unlock()
 // 	for userID, conn := range room.Users {
 // 		if err := sendMessage(conn, messageType, data); err != nil {
-// 			log.Printf("Error broadcasting to user %s: %v", userID, err)
 // 			conn.Close()
 // 			delete(room.Users, userID)
 // 		}
@@ -120,7 +119,6 @@ package websocket
 
 // 	for userID, conn := range room.Users {
 // 		if err := sendMessage(conn, PingMessage, nil); err != nil {
-// 			log.Printf("Connection lost for user %s, removing from room", userID)
 // 			conn.Close()
 // 			delete(room.Users, userID)
 // 		}
@@ -138,26 +136,20 @@ package websocket
 
 // 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 // 	if err != nil {
-// 		log.Println("Error upgrading WebSocket:", err)
 // 		return
 // 	}
 // 	defer conn.Close()
 
 // 	userID := ctx.Query("userId")
 // 	if userID == "" {
-// 		log.Println("Missing userId in query parameters")
 // 		return
 // 	}
-
-// 	log.Printf("WebSocket connection established for userId: %s", userID)
 
 // 	room, err := createOrJoinRoom(userID, conn)
 // 	if err != nil {
-// 		log.Println("Error joining room:", err)
 // 		return
 // 	}
 
-// 	log.Println("Waiting for another user to join...")
 // 	for {
 // 		room.Mutex.Lock()
 // 		if len(room.Users) == 2 && !room.DebateStarted {
@@ -169,8 +161,6 @@ package websocket
 // 		time.Sleep(1 * time.Second)
 // 	}
 
-// 	log.Println("Two users connected. Starting debate.")
-
 // 	startDebate(room)
 
 // 	closeConnectionsAndExpireRoom(room)
@@ -180,7 +170,6 @@ package websocket
 // 	broadcastMessage(room, MessageTypeDebateStart, nil)
 
 // 	for _, section := range room.DebateFmt.Sections {
-// 		log.Printf("Section: %s", section.Name)
 // 		broadcastMessage(room, MessageTypeSectionStart, structs.CurrentStatus{Section: section.Name})
 
 // 		for userID, conn := range room.Users {
@@ -227,7 +216,6 @@ package websocket
 
 // 				transcript, err := generateTranscript(mediaFilePath)
 // 				if err != nil {
-// 					log.Printf("Error generating transcript for user %s: %v", userID, err)
 // 					continue
 // 				}
 
@@ -307,7 +295,6 @@ package websocket
 // 	defer room.Mutex.Unlock()
 
 // 	for userID, conn := range room.Users {
-// 		log.Printf("Closing connection for user: %s", userID)
 // 		conn.Close()
 // 		delete(room.Users, userID)
 // 	}
@@ -317,7 +304,6 @@ package websocket
 // 	for roomID, r := range rooms {
 // 		if r == room {
 // 			delete(rooms, roomID)
-// 			log.Printf("Room %s expired and removed", roomID)
 // 			break
 // 		}
 // 	}
@@ -336,7 +322,6 @@ package websocket
 
 // 	file, err := os.Create(tempFilename)
 // 	if err != nil {
-// 		log.Printf("Error creating file for user %s: %v", userID, err)
 // 		mediaFileChan <- ""
 // 		return
 // 	}
@@ -344,10 +329,8 @@ package websocket
 // 		file.Close()
 // 		err = os.Rename(tempFilename, finalFilename)
 // 		if err != nil {
-// 			log.Printf("Error renaming file for user %s: %v", userID, err)
 // 			mediaFileChan <- ""
 // 		} else {
-// 			log.Printf("Media saved for user %s in section %s", userID, sectionName)
 // 			mediaFileChan <- finalFilename
 // 		}
 // 	}()
@@ -358,16 +341,13 @@ package websocket
 // 		room.Mutex.Unlock()
 
 // 		if !active {
-// 			log.Printf("Turn ended for user %s. Stopping media collection.", userID)
 // 			break
 // 		}
 
 // 		messageType, data, err := conn.ReadMessage()
 // 		if err != nil {
 // 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-// 				log.Printf("Connection closed for user %s", userID)
 // 			} else {
-// 				log.Printf("Error reading chunk for user %s: %v", userID, err)
 // 			}
 // 			break
 // 		}
@@ -375,7 +355,6 @@ package websocket
 // 		if messageType == websocket.BinaryMessage {
 // 			_, err = file.Write(data)
 // 			if err != nil {
-// 				log.Printf("Error writing chunk for user %s: %v", userID, err)
 // 				break
 // 			}
 // 		}
@@ -383,7 +362,6 @@ package websocket
 
 // 	err = file.Sync()
 // 	if err != nil {
-// 		log.Printf("Error syncing file for user %s: %v", userID, err)
 // 		mediaFileChan <- ""
 // 	}
 // }

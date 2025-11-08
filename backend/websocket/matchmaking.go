@@ -1,23 +1,23 @@
 package websocket
 
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "log"
-    "net/http"
-    "sync"
-    "time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"sync"
+	"time"
 
-    "arguehub/db"
-    "arguehub/services"
-    "arguehub/utils"
+	"arguehub/db"
+	"arguehub/services"
+	"arguehub/utils"
 
-    "github.com/gin-gonic/gin"
-    "github.com/gorilla/websocket"
-    "go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive" 
-    "go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var matchmakingUpgrader = websocket.Upgrader{
@@ -58,27 +58,20 @@ type MatchmakingMessage struct {
 
 // MatchmakingHandler handles WebSocket connections for matchmaking
 func MatchmakingHandler(c *gin.Context) {
-	log.Printf("WebSocket connection attempt to /ws/matchmaking")
-	
+
 	// Get token from query parameter
 	token := c.Query("token")
 	if token == "" {
-		log.Printf("No token provided in WebSocket connection")
 		c.String(http.StatusUnauthorized, "No token provided")
 		return
 	}
-	
-	log.Printf("Token received, validating...")
 
 	// Validate token and get user information
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
 	if err != nil || !valid || email == "" {
-		log.Printf("Invalid token in WebSocket connection: %v, email: %s", err, email)
 		c.String(http.StatusUnauthorized, "Invalid token")
 		return
 	}
-	
-	log.Printf("Token validated successfully for user: %s", email)
 
 	// Get user details from database
 	userCollection := db.MongoDatabase.Collection("users")
@@ -87,14 +80,13 @@ func MatchmakingHandler(c *gin.Context) {
 
 	var user struct {
 		ID          primitive.ObjectID `bson:"_id"`
-		Email       string  `bson:"email"`
-		DisplayName string  `bson:"displayName"`
-		Rating      float64 `bson:"rating"`
+		Email       string             `bson:"email"`
+		DisplayName string             `bson:"displayName"`
+		Rating      float64            `bson:"rating"`
 	}
 
 	err = userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		log.Printf("User not found in database: %v", err)
 		c.String(http.StatusNotFound, "User not found")
 		return
 	}
@@ -108,7 +100,6 @@ func MatchmakingHandler(c *gin.Context) {
 	// Upgrade the connection to WebSocket
 	conn, err := matchmakingUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
 		return
 	}
 
@@ -130,7 +121,6 @@ func MatchmakingHandler(c *gin.Context) {
 	matchmakingService := services.GetMatchmakingService()
 	err = matchmakingService.AddToPool(user.ID.Hex(), user.DisplayName, userRating)
 	if err != nil {
-		log.Printf("Failed to add user to matchmaking pool: %v", err)
 		c.String(http.StatusInternalServerError, "Failed to join matchmaking")
 		return
 	}
@@ -153,7 +143,7 @@ func (c *MatchmakingClient) readPump() {
 		matchmakingRoom.mutex.Lock()
 		delete(matchmakingRoom.clients, c)
 		matchmakingRoom.mutex.Unlock()
-		
+
 		// Remove user from matchmaking pool
 		matchmakingService := services.GetMatchmakingService()
 		matchmakingService.RemoveFromPool(c.userID)
@@ -171,7 +161,6 @@ func (c *MatchmakingClient) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket read error: %v", err)
 			}
 			break
 		}
@@ -179,7 +168,6 @@ func (c *MatchmakingClient) readPump() {
 		// Parse message
 		var msg MatchmakingMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Printf("Failed to parse message: %v", err)
 			continue
 		}
 
@@ -190,14 +178,13 @@ func (c *MatchmakingClient) readPump() {
 			matchmakingService := services.GetMatchmakingService()
 			err := matchmakingService.StartMatchmaking(c.userID)
 			if err != nil {
-				log.Printf("Failed to start matchmaking for user %s: %v", c.userID, err)
 				c.send <- []byte(fmt.Sprintf(`{"type":"error","error":"Failed to start matchmaking: %v"}`, err))
 			} else {
 				// Send confirmation to user
 				c.send <- []byte(`{"type":"matchmaking_started"}`)
 				sendPoolStatus()
 			}
-			
+
 		case "leave_pool":
 			// User wants to leave matchmaking pool
 			matchmakingService := services.GetMatchmakingService()
@@ -205,12 +192,12 @@ func (c *MatchmakingClient) readPump() {
 			// Send confirmation to user
 			c.send <- []byte(`{"type":"matchmaking_stopped"}`)
 			sendPoolStatus()
-			
+
 		case "update_activity":
 			// Update user activity
 			matchmakingService := services.GetMatchmakingService()
 			matchmakingService.UpdateActivity(c.userID)
-			
+
 		case "get_pool":
 			// Send current pool status
 			sendPoolStatus()
@@ -260,7 +247,6 @@ func sendPoolStatus() {
 
 	poolData, err := json.Marshal(pool)
 	if err != nil {
-		log.Printf("Failed to marshal pool data: %v", err)
 		return
 	}
 
@@ -271,7 +257,6 @@ func sendPoolStatus() {
 
 	messageData, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("Failed to marshal message: %v", err)
 		return
 	}
 
@@ -296,7 +281,6 @@ func BroadcastRoomCreated(roomID string, participantUserIDs []string) {
 
 	messageData, err := json.Marshal(message)
 	if err != nil {
-		log.Printf("Failed to marshal room created message: %v", err)
 		return
 	}
 
@@ -322,26 +306,24 @@ func BroadcastRoomCreated(roomID string, participantUserIDs []string) {
 func WatchForNewRooms() {
 	// Wait a moment to ensure MongoDB client is initialized
 	time.Sleep(2 * time.Second)
-	
+
 	// Check if MongoDB database is available
 	if db.MongoDatabase == nil {
-		log.Printf("MongoDB database not available, skipping room watching")
 		return
 	}
-	
+
 	roomCollection := db.MongoDatabase.Collection("rooms")
-	
+
 	// Create a change stream to watch for new rooms
 	pipeline := []bson.M{
 		{"$match": bson.M{
 			"operationType": "insert",
 		}},
 	}
-	
+
 	opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
 	changeStream, err := roomCollection.Watch(context.Background(), pipeline, opts)
 	if err != nil {
-		log.Printf("Failed to create change stream: %v", err)
 		return
 	}
 	defer changeStream.Close(context.Background())
@@ -349,7 +331,6 @@ func WatchForNewRooms() {
 	for changeStream.Next(context.Background()) {
 		var changeEvent bson.M
 		if err := changeStream.Decode(&changeEvent); err != nil {
-			log.Printf("Failed to decode change event: %v", err)
 			continue
 		}
 

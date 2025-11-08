@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"encoding/json"
-	"log"
 	"time"
 
 	"arguehub/db"
@@ -14,43 +13,43 @@ import (
 )
 
 type TeamDebateClient struct {
-	conn       *websocket.Conn
-	send       chan []byte
-	debateID   primitive.ObjectID
-	teamID     primitive.ObjectID
-	userID     primitive.ObjectID
-	isTeam1    bool
+	conn     *websocket.Conn
+	send     chan []byte
+	debateID primitive.ObjectID
+	teamID   primitive.ObjectID
+	userID   primitive.ObjectID
+	isTeam1  bool
 }
 
 type TeamDebateHub struct {
-	debates   map[primitive.ObjectID]*TeamDebateRoom
-	register  chan *TeamDebateClient
+	debates    map[primitive.ObjectID]*TeamDebateRoom
+	register   chan *TeamDebateClient
 	unregister chan *TeamDebateClient
-	broadcast chan TeamDebateMessage
+	broadcast  chan TeamDebateMessage
 }
 
 type TeamDebateRoom struct {
-	debate    models.TeamDebate
+	debate       models.TeamDebate
 	team1Clients map[*TeamDebateClient]bool
 	team2Clients map[*TeamDebateClient]bool
 }
 
 type TeamDebateMessage struct {
-	Type    string `json:"type"` // "message", "turn", "join", "leave"
-	DebateID string `json:"debateId,omitempty"`
-	TeamID   string `json:"teamId,omitempty"`
-	UserID   string `json:"userId,omitempty"`
-	Email    string `json:"email,omitempty"`
-	DisplayName string `json:"displayName,omitempty"`
-	Message  string `json:"message,omitempty"`
-	Data     interface{} `json:"data,omitempty"`
+	Type        string      `json:"type"` // "message", "turn", "join", "leave"
+	DebateID    string      `json:"debateId,omitempty"`
+	TeamID      string      `json:"teamId,omitempty"`
+	UserID      string      `json:"userId,omitempty"`
+	Email       string      `json:"email,omitempty"`
+	DisplayName string      `json:"displayName,omitempty"`
+	Message     string      `json:"message,omitempty"`
+	Data        interface{} `json:"data,omitempty"`
 }
 
 var teamDebateHub = &TeamDebateHub{
-	debates:      make(map[primitive.ObjectID]*TeamDebateRoom),
-	register:     make(chan *TeamDebateClient),
-	unregister:   make(chan *TeamDebateClient),
-	broadcast:    make(chan TeamDebateMessage, 256),
+	debates:    make(map[primitive.ObjectID]*TeamDebateRoom),
+	register:   make(chan *TeamDebateClient),
+	unregister: make(chan *TeamDebateClient),
+	broadcast:  make(chan TeamDebateMessage, 256),
 }
 
 func TeamDebateHubRun() {
@@ -65,7 +64,7 @@ func TeamDebateHubRun() {
 				err := collection.FindOne(nil, bson.M{"_id": client.debateID}).Decode(&debate)
 				if err == nil {
 					room = &TeamDebateRoom{
-						debate: debate,
+						debate:       debate,
 						team1Clients: make(map[*TeamDebateClient]bool),
 						team2Clients: make(map[*TeamDebateClient]bool),
 					}
@@ -82,8 +81,8 @@ func TeamDebateHubRun() {
 
 				// Send current debate state to new client
 				room.broadcastToTeam(client, TeamDebateMessage{
-					Type:    "state",
-					Data:    room.debate,
+					Type: "state",
+					Data: room.debate,
 				})
 			}
 
@@ -99,8 +98,8 @@ func TeamDebateHubRun() {
 
 				// Notify others of disconnect
 				broadcast := TeamDebateMessage{
-					Type:    "leave",
-					UserID:  client.userID.Hex(),
+					Type:   "leave",
+					UserID: client.userID.Hex(),
 				}
 				room.broadcast(broadcast)
 			}
@@ -161,14 +160,12 @@ func (c *TeamDebateClient) readPump() {
 		_, messageBytes, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
 			}
 			break
 		}
 
 		var message TeamDebateMessage
 		if err := json.Unmarshal(messageBytes, &message); err != nil {
-			log.Printf("Error unmarshaling message: %v", err)
 			continue
 		}
 
@@ -199,7 +196,6 @@ func (c *TeamDebateClient) readPump() {
 
 			_, err := collection.InsertOne(nil, msg)
 			if err != nil {
-				log.Printf("Error storing message: %v", err)
 			}
 
 			// Broadcast to all clients in debate
@@ -247,4 +243,3 @@ func (c *TeamDebateClient) writePump() {
 		}
 	}
 }
-

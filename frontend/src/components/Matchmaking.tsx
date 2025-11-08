@@ -40,7 +40,6 @@ const Matchmaking: React.FC = () => {
     }
 
     if (!user) {
-      console.log('No user found, redirecting to login');
       navigate('/login');
       return;
     }
@@ -48,7 +47,6 @@ const Matchmaking: React.FC = () => {
     // Get token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
-      console.log('No token found, redirecting to login');
       navigate('/login');
       return;
     }
@@ -58,7 +56,6 @@ const Matchmaking: React.FC = () => {
       return;
     }
 
-    console.log('Connecting to WebSocket with token: present');
 
     // Connect to WebSocket with authentication token
     const ws = new WebSocket(
@@ -68,10 +65,6 @@ const Matchmaking: React.FC = () => {
 
     ws.onopen = () => {
       setIsConnected(true);
-      console.log('✅ Connected to matchmaking WebSocket');
-      console.log('WebSocket readyState:', ws.readyState);
-      console.log('wsRef.current is set:', !!wsRef.current);
-      console.log('wsRef.current === ws:', wsRef.current === ws);
     };
 
     ws.onmessage = (event) => {
@@ -99,41 +92,34 @@ const Matchmaking: React.FC = () => {
           case 'room_created':
             if (message.roomId) {
               // Navigate to the created room
-              console.log('Room created, navigating to:', message.roomId);
               ws.close(); // Close connection before navigating
               navigate(`/debate-room/${message.roomId}`);
             }
             break;
 
           case 'matchmaking_started':
-            console.log('Matchmaking started for user');
             setIsInPool(true);
             setWaitTime(0);
             break;
 
           case 'matchmaking_stopped':
-            console.log('Matchmaking stopped for user');
             setIsInPool(false);
             setWaitTime(0);
             break;
 
           case 'error':
-            console.error('Matchmaking error:', message.error);
             alert(`Matchmaking error: ${message.error}`);
             break;
 
           default:
-            console.log('Received message:', message);
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
       }
     };
 
     ws.onclose = (event) => {
       setIsConnected(false);
       setIsInPool(false);
-      console.log(
         '🔌 Disconnected from matchmaking WebSocket:',
         event.code,
         event.reason
@@ -142,51 +128,38 @@ const Matchmaking: React.FC = () => {
     };
 
     ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
       setIsConnected(false);
     };
 
     return () => {
       if (wsRef.current) {
-        console.log('Cleaning up WebSocket connection');
         wsRef.current.close();
       }
     };
   }, [navigate, user?.id, user?.displayName, isLoading]);
 
   const joinPool = () => {
-    console.log('=== joinPool called ===');
-    console.log('isConnected state:', isConnected);
-    console.log('wsRef.current exists:', !!wsRef.current);
-    console.log('WebSocket readyState:', wsRef.current?.readyState);
 
     // Try to send regardless of state tracking, since state might be delayed
     if (!wsRef.current) {
-      console.error('WebSocket reference is null');
       alert('Connection not available. Please refresh the page and try again.');
       return;
     }
 
     const readyState = wsRef.current.readyState;
-    console.log('Current readyState:', readyState);
-    console.log('WebSocket.OPEN constant:', WebSocket.OPEN);
 
     if (readyState === WebSocket.OPEN) {
       try {
         const message = JSON.stringify({ type: 'join_pool' });
         wsRef.current.send(message);
-        console.log('✅ Sent join_pool message successfully');
       } catch (error) {
-        console.error('Error sending join_pool message:', error);
         alert('Failed to send matchmaking request. Please try again.');
       }
     } else if (readyState === WebSocket.CONNECTING) {
-      console.log('WebSocket is still connecting, waiting...');
       // Wait a bit and try again
       setTimeout(() => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: 'join_pool' }));
-          console.log('✅ Sent join_pool message after waiting');
         } else {
           alert(
             'Connection is taking too long. Please check your internet connection and try again.'
@@ -194,7 +167,6 @@ const Matchmaking: React.FC = () => {
         }
       }, 1000);
     } else {
-      console.error('WebSocket is not in a ready state:', readyState);
       alert(
         'Connection is not ready. Please ensure the green indicator is showing.'
       );
@@ -202,16 +174,13 @@ const Matchmaking: React.FC = () => {
   };
 
   const leavePool = () => {
-    console.log('leavePool called');
     if (
       wsRef.current &&
       (wsRef.current.readyState === WebSocket.OPEN || isConnected)
     ) {
       try {
         wsRef.current.send(JSON.stringify({ type: 'leave_pool' }));
-        console.log('Sent leave_pool message');
       } catch (error) {
-        console.error('Error sending leave_pool message:', error);
       }
     }
   };

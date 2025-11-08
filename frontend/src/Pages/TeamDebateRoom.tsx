@@ -137,7 +137,6 @@ const TeamDebateRoom: React.FC = () => {
   
   // Debug: Log user state
   useEffect(() => {
-    console.log("[TeamDebateRoom] User state:", {
       userFromAtom: user?.id,
       userFromHook: userFromHook?.id,
       currentUser: currentUser?.id,
@@ -264,7 +263,6 @@ const TeamDebateRoom: React.FC = () => {
       // Allow proceeding if we have a token, even if user isn't fully loaded yet
       // The debate API will use the token for authentication
       if (!debateId || (!token && !currentUser?.id)) {
-        console.log("[TeamDebateRoom] Waiting for user/token...", { 
           debateId, 
           userId: currentUser?.id,
           hasToken: !!token,
@@ -290,7 +288,6 @@ const TeamDebateRoom: React.FC = () => {
           (member: TeamMember) => member.userId === userId
         );
 
-        console.log("[TeamDebateRoom] Determining user team:", {
           userId: userId,
           currentUser: currentUser?.id,
           userFromAtom: user?.id,
@@ -312,7 +309,6 @@ const TeamDebateRoom: React.FC = () => {
           const team2Stance = debateData.team2Stance === "for" ? "for" : "against";
           setLocalRole(team1Stance);
           setPeerRole(team2Stance);
-          console.log("[TeamDebateRoom] User is Team1. My Team:", debateData.team1Name, "Stance:", team1Stance, "Opponent:", debateData.team2Name, "Stance:", team2Stance);
         } else if (userTeam2) {
           setIsTeam1(false);
           setMyTeamId(debateData.team2Id);
@@ -325,14 +321,11 @@ const TeamDebateRoom: React.FC = () => {
           const team2Stance = debateData.team2Stance === "for" ? "for" : "against";
           setLocalRole(team2Stance);
           setPeerRole(team1Stance);
-          console.log("[TeamDebateRoom] User is Team2. My Team:", debateData.team2Name, "Stance:", team2Stance, "Opponent:", debateData.team1Name, "Stance:", team1Stance);
         } else {
-          console.error("[TeamDebateRoom] ERROR: User is not in either team!");
         }
 
         setIsLoading(false);
       } catch (error) {
-        console.error("Failed to fetch debate:", error);
         setIsLoading(false);
       }
     };
@@ -382,14 +375,12 @@ const TeamDebateRoom: React.FC = () => {
   useEffect(() => {
     const token = getAuthToken();
     if (!token || !debateId) {
-      console.log("[TeamDebateRoom] Waiting for token or debateId before connecting WebSocket...", {
         hasToken: !!token,
         debateId
       });
       return;
     }
 
-    console.log("[TeamDebateRoom] Initializing WebSocket connection...", {
       debateId,
       userId: currentUser?.id
     });
@@ -400,14 +391,12 @@ const TeamDebateRoom: React.FC = () => {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("Team debate WebSocket connected");
       ws.send(JSON.stringify({ type: "join" }));
       getMedia();
     };
 
     ws.onmessage = async (event) => {
       const data: WSMessage = JSON.parse(event.data);
-      console.log("Received WebSocket message:", data);
 
       switch (data.type) {
         case "stateSync":
@@ -418,9 +407,7 @@ const TeamDebateRoom: React.FC = () => {
             const backendPhase = data.phase as DebatePhase;
             // Don't allow stateSync to reset phase back to Setup if debate has started
             if (debateStartedRef.current && backendPhase === DebatePhase.Setup) {
-              console.log('⚠️ stateSync tried to reset phase to Setup, but debate has started - ignoring');
             } else {
-              console.log(`stateSync: updating phase from ${debatePhase} to ${backendPhase}`);
               setDebatePhase(backendPhase);
               // If backend says phase is not Setup, mark debate as started
               if (backendPhase !== DebatePhase.Setup) {
@@ -558,18 +545,15 @@ const TeamDebateRoom: React.FC = () => {
             if (isFromMyTeam) {
               // This role selection is from my team
               setLocalRole(data.role as DebateRole);
-              console.log(`Role selection from my team (${messageTeamId}): ${data.role}`);
             } else {
               // This role selection is from opponent team
               setPeerRole(data.role as DebateRole);
-              console.log(`Role selection from opponent team (${messageTeamId}): ${data.role}`);
             }
           }
           break;
         case "countdownStart":
           // Backend is starting countdown - show it to all users
           const countdownValue = (data as any).countdown || 3;
-          console.log('✓✓✓ COUNTDOWN STARTED FROM BACKEND:', countdownValue);
           setCountdown(countdownValue);
           // Hide setup popup when countdown starts
           setShowSetupPopup(false);
@@ -577,19 +561,8 @@ const TeamDebateRoom: React.FC = () => {
         case "checkStart":
           // Ignore checkStart messages from backend (we shouldn't receive them)
           // This is sent by frontend to backend, not the other way around
-          console.log('Received checkStart message (ignoring - this is from us)');
           break;
         case "ready":
-          console.log("=== READY MESSAGE RECEIVED ===");
-          console.log("Received ready message:", data);
-          console.log("Current user:", currentUser?.id);
-          console.log("Message userId:", data.userId);
-          console.log("Message teamId:", data.teamId);
-          console.log("Message assignedToTeam:", (data as any).assignedToTeam);
-          console.log("isTeam1:", isTeam1);
-          console.log("myTeamId:", myTeamId);
-          console.log("Team1Ready:", data.team1Ready, "Team2Ready:", data.team2Ready);
-          console.log("Team1MembersCount:", data.team1MembersCount, "Team2MembersCount:", data.team2MembersCount);
           
           // CRITICAL: Verify the ready status is assigned to the correct team
           const messageTeamId = data.teamId;
@@ -600,11 +573,8 @@ const TeamDebateRoom: React.FC = () => {
           if (data.userId === currentUser?.id && data.ready !== undefined) {
             // Verify team assignment matches
             if (assignedTeam && assignedTeam !== (isTeam1 ? "Team1" : "Team2")) {
-              console.error(`❌ CRITICAL ERROR: Ready status assigned to wrong team! User ${data.userId} is ${isTeam1 ? "Team1" : "Team2"} but assigned to ${assignedTeam}`);
             } else if (messageTeamId && expectedTeamId && messageTeamId !== expectedTeamId) {
-              console.error(`❌ WARNING: TeamId mismatch! Expected ${expectedTeamId}, got ${messageTeamId}`);
             } else {
-              console.log(`✓ Updating localReady to ${data.ready} for user ${data.userId}`);
               setLocalReady(data.ready);
             }
           }
@@ -616,11 +586,9 @@ const TeamDebateRoom: React.FC = () => {
           
           // Update team ready counts - these are the ACTUAL counts from backend
           if (data.team1Ready !== undefined) {
-            console.log(`Updating team1ReadyCount to ${data.team1Ready}`);
             setTeam1ReadyCount(data.team1Ready);
           }
           if (data.team2Ready !== undefined) {
-            console.log(`Updating team2ReadyCount to ${data.team2Ready}`);
             setTeam2ReadyCount(data.team2Ready);
           }
           // CRITICAL: Update member counts from ready message
@@ -629,17 +597,12 @@ const TeamDebateRoom: React.FC = () => {
           const team2Count = data.team2MembersCount ?? (data as any).team2MembersCount;
           
           if (team1Count !== undefined && team1Count !== null) {
-            console.log(`✓ Updating team1MembersCount to ${team1Count}`);
             setTeam1MembersCount(team1Count);
           } else {
-            console.warn(`⚠️ team1MembersCount is undefined in ready message. Raw data:`, data);
-            console.warn(`⚠️ Full message keys:`, Object.keys(data));
           }
           if (team2Count !== undefined && team2Count !== null) {
-            console.log(`✓ Updating team2MembersCount to ${team2Count}`);
             setTeam2MembersCount(team2Count);
           } else {
-            console.warn(`⚠️ team2MembersCount is undefined in ready message. Raw data:`, data);
           }
           
           // Display what we're showing to the user
@@ -651,33 +614,22 @@ const TeamDebateRoom: React.FC = () => {
           const oppReadyCount = isTeam1 ? (data.team2Ready ?? dataAny.team2Ready) : (data.team1Ready ?? dataAny.team1Ready);
           const oppTeamTotal = isTeam1 ? (data.team2MembersCount ?? dataAny.team2MembersCount) : (data.team1MembersCount ?? dataAny.team1MembersCount);
           
-          console.log(`[Display] isTeam1=${isTeam1}, myTeamName=${myTeamName}`);
-          console.log(`[Display] My Team (${myTeamName}) Ready: ${myTeamReadyCount}/${myTeamTotal}`);
-          console.log(`[Display] Opponent Team (${opponentTeamName}) Ready: ${oppReadyCount}/${oppTeamTotal}`);
-          console.log(`[Display] Backend counts - Team1Ready=${data.team1Ready}, Team2Ready=${data.team2Ready}`);
-          console.log(`[Display] Raw data - team1MembersCount=${data.team1MembersCount}, team2MembersCount=${data.team2MembersCount}`);
-          console.log(`[Display] Full ready message data:`, JSON.stringify(data));
           
           // Validation: Ensure we're showing the right team
           if (data.userId === currentUser?.id && assignedTeam) {
             const expectedTeamForUser = isTeam1 ? "Team1" : "Team2";
             if (assignedTeam !== expectedTeamForUser) {
-              console.error(`❌ CRITICAL: User ${currentUser?.id} is ${isTeam1 ? "Team1" : "Team2"} but ready assigned to ${assignedTeam}!`);
             } else {
-              console.log(`✓ Validation passed: User is ${expectedTeamForUser} and ready assigned to ${assignedTeam}`);
             }
           }
           
           // Update peer ready status (whether all opponent team members are ready)
           const allOppReady = oppReadyCount === oppTeamTotal && oppTeamTotal > 0;
           setPeerReady(allOppReady);
-          console.log("=== END READY MESSAGE ===");
           break;
         case "phaseChange":
           if (data.phase) {
             const newPhase = data.phase as DebatePhase;
-            console.log(`✓✓✓ RECEIVED PHASE CHANGE: ${newPhase} (previous: ${debatePhase})`);
-            console.log(`Phase change data:`, data);
             
             // Ensure we accept the phase change
             setDebatePhase(newPhase);
@@ -687,12 +639,9 @@ const TeamDebateRoom: React.FC = () => {
               debateStartedRef.current = true; // Mark debate as started - prevent popup from reopening
               setShowSetupPopup(false);
               setCountdown(null);
-              console.log('✓ Debate phase changed to:', newPhase, '- closing setup popup permanently');
             } else {
-              console.log('⚠️ Phase change to Setup - debate not started');
             }
           } else {
-            console.warn('⚠️ Phase change message received but phase is undefined:', data);
           }
           break;
         case "speechText":
@@ -743,8 +692,6 @@ const TeamDebateRoom: React.FC = () => {
       }
     };
 
-    ws.onerror = (err) => console.error("WebSocket error:", err);
-    ws.onclose = () => console.log("WebSocket closed");
 
     const getMedia = async () => {
       try {
@@ -764,7 +711,6 @@ const TeamDebateRoom: React.FC = () => {
         setMediaError(
           "Failed to access camera/microphone. Please check permissions."
         );
-        console.error("Media error:", err);
       }
     };
 
@@ -867,7 +813,6 @@ const TeamDebateRoom: React.FC = () => {
                 try {
                   recognitionRef.current.start();
       } catch (error) {
-                  console.error("Error restarting speech recognition:", error);
                 }
               }
             }, 100);
@@ -876,7 +821,6 @@ const TeamDebateRoom: React.FC = () => {
 
         recognition.onerror = (event: Event) => {
           setIsListening(false);
-          console.error("Speech recognition error:", event);
         };
       } else {
         setSpeechError("Speech recognition not supported in this browser");
@@ -906,7 +850,6 @@ const TeamDebateRoom: React.FC = () => {
     try {
       recognitionRef.current.start();
     } catch (error) {
-      console.error("Error starting speech recognition:", error);
     }
   }, [isListening, debatePhase]);
 
@@ -915,7 +858,6 @@ const TeamDebateRoom: React.FC = () => {
       try {
         recognitionRef.current.stop();
       } catch (error) {
-        console.error("Error stopping speech recognition:", error);
       }
     }
   }, [isListening]);
@@ -1017,7 +959,6 @@ const TeamDebateRoom: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error("Failed to submit transcripts:", error);
       setPopup({
         show: false,
         message: "Error occurred while judging. Please try again.",
@@ -1048,13 +989,11 @@ const TeamDebateRoom: React.FC = () => {
   const toggleReady = () => {
     const newReadyState = !localReady;
     setLocalReady(newReadyState);
-    console.log(`Toggling ready to ${newReadyState} for user ${currentUser?.id}`);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({ type: "ready", ready: newReadyState })
       );
     } else {
-      console.error("WebSocket is not open, cannot send ready message");
     }
   };
 
@@ -1069,7 +1008,6 @@ const TeamDebateRoom: React.FC = () => {
     const allOpponentReady = oppTeamReadyCount === oppTeamTotal && oppTeamTotal > 0;
     const allReady = allMyTeamReady && allOpponentReady;
     
-    console.log('Ready check:', {
       myTeamReadyCount,
       myTeamTotal,
       allMyTeamReady,
@@ -1098,7 +1036,6 @@ const TeamDebateRoom: React.FC = () => {
       // All ready - close popup and start countdown
       setShowSetupPopup(false);
       if (countdown === null) {
-        console.log('🚀 All teams ready! Starting countdown...');
         setCountdown(3);
         
         // Also notify backend (for synchronization)
@@ -1106,7 +1043,6 @@ const TeamDebateRoom: React.FC = () => {
           try {
             wsRef.current.send(JSON.stringify({ type: "checkStart" }));
           } catch (error) {
-            console.error('Failed to send checkStart:', error);
           }
         }
       }
@@ -1126,8 +1062,6 @@ const TeamDebateRoom: React.FC = () => {
       return () => clearTimeout(timer);
     } else if (countdown === 0) {
       // Countdown finished - start the debate by transitioning to OpeningFor
-      console.log('✓✓✓ COUNTDOWN FINISHED! Starting debate at OpeningFor phase');
-      console.log('Current phase before change:', debatePhase);
       
       // Mark debate as started FIRST to prevent popup from reopening
       debateStartedRef.current = true;
@@ -1137,16 +1071,13 @@ const TeamDebateRoom: React.FC = () => {
       
       // Change phase to OpeningFor
       const newPhase = DebatePhase.OpeningFor;
-      console.log('Setting debate phase to:', newPhase);
       setDebatePhase(newPhase);
       
       // Send phase change to backend
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         const phaseChangeMessage = JSON.stringify({ type: "phaseChange", phase: DebatePhase.OpeningFor });
-        console.log('Sending phase change to backend:', phaseChangeMessage);
         wsRef.current.send(phaseChangeMessage);
       } else {
-        console.error('❌ WebSocket not open, cannot send phase change');
       }
       
       // Note: debatePhase state won't update immediately due to React batching
@@ -1177,7 +1108,6 @@ const TeamDebateRoom: React.FC = () => {
   // Debug: Log user state for troubleshooting
   useEffect(() => {
     if (hasAuthToken && !currentUser?.id) {
-      console.log("[TeamDebateRoom] Has token but no user ID:", {
         hasToken: hasAuthToken,
         currentUser,
         userFromAtom: user,
@@ -1462,6 +1392,7 @@ const TeamDebateRoom: React.FC = () => {
           judgment={judgmentData}
           forRole={localRole === "for" ? "Your Team" : "Opponent Team"}
           againstRole={localRole === "against" ? "Your Team" : "Opponent Team"}
+          localRole={localRole ?? null}
           onClose={() => setShowJudgment(false)}
         />
       )}
@@ -1650,7 +1581,6 @@ const TeamDebateRoom: React.FC = () => {
           <SpeechTranscripts
             transcripts={speechTranscripts}
             currentPhase={debatePhase}
-            liveTranscript={currentTranscript}
           />
         </div>
       )}

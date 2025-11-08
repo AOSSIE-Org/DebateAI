@@ -43,7 +43,6 @@ export const useUser = () => {
             });
           }
         } catch (error) {
-          console.error('Failed to fetch user data:', error);
         }
       }
     };

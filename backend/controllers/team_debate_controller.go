@@ -19,7 +19,7 @@ func CreateTeamDebate(c *gin.Context) {
 	var req struct {
 		Team1ID primitive.ObjectID `json:"team1Id" binding:"required"`
 		Team2ID primitive.ObjectID `json:"team2Id" binding:"required"`
-		Topic   string            `json:"topic" binding:"required"`
+		Topic   string             `json:"topic" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -131,7 +131,7 @@ func GetActiveTeamDebate(c *gin.Context) {
 		},
 		"status": "active",
 	}).Decode(&debate)
-	
+
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"hasActiveDebate": false})
 		return

@@ -50,6 +50,11 @@ type JudgmentData = {
   };
 };
 
+type RatingSummary = {
+  for: { rating: number; change: number };
+  against: { rating: number; change: number };
+};
+
 // Define user details interface
 interface UserDetails {
   id: string;
@@ -57,6 +62,7 @@ interface UserDetails {
   elo: number;
   avatarUrl?: string;
   displayName?: string;
+  email?: string;
 }
 
 // Define WebSocket message structure
@@ -115,6 +121,9 @@ const OnlineDebateRoom: React.FC = () => {
   const [localUser, setLocalUser] = useState<UserDetails | null>(null);
   const [opponentUser, setOpponentUser] = useState<UserDetails | null>(null);
   const [roomParticipants, setRoomParticipants] = useState<UserDetails[]>([]);
+  const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
+
+  const isRoomOwner = Boolean(roomOwnerId && currentUser?.id === roomOwnerId);
 
   // Refs for WebSocket, PeerConnection, and media elements
   const wsRef = useRef<WebSocket | null>(null);
@@ -125,6 +134,8 @@ const OnlineDebateRoom: React.FC = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const judgePollRef = useRef<NodeJS.Timeout | null>(null);
+  const submissionStartedRef = useRef(false);
 
   // State for debate setup and signaling
   const [topic, setTopic] = useState("");
@@ -151,19 +162,21 @@ const OnlineDebateRoom: React.FC = () => {
   const [timer, setTimer] = useState<number>(0);
 
   // Audio recording state
-  const [isRecording, setIsRecording] = useState(false);
+  const [, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
     null
   );
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [isManualRecording, setIsManualRecording] = useState(false);
 
   // Speech recognition state
   const [isListening, setIsListening] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [, setCurrentTranscript] = useState("");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const retryCountRef = useRef<number>(0);
+  const manualRecordingRef = useRef(false);
 
   // Popup and countdown state
   const [showSetupPopup, setShowSetupPopup] = useState(true);
@@ -192,6 +205,7 @@ const OnlineDebateRoom: React.FC = () => {
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [showJudgment, setShowJudgment] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
 
   // Ordered list of debate phases
   const phaseOrder: DebatePhase[] = [
@@ -215,16 +229,106 @@ const OnlineDebateRoom: React.FC = () => {
       ? "against"
       : null);
 
+  const startJudgmentPolling = (role: DebateRole) => {
+    const token = getAuthToken();
+    if (!token) {
+      setPopup({
+        show: true,
+        message: "Session expired. Please sign in again.",
+        isJudging: false,
+      });
+      submissionStartedRef.current = false;
+      return;
+    }
+
+    if (judgePollRef.current) {
+      return;
+    }
+
+    judgePollRef.current = setInterval(async () => {
+      try {
+        const pollResponse = await fetch(
+          `http://localhost:1313/submit-transcripts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ roomId, role, transcripts: {} }),
+          }
+        );
+
+        if (!pollResponse.ok) {
+          if (pollResponse.status === 401) {
+            setPopup({
+              show: true,
+              message: "Session expired. Please sign in again.",
+              isJudging: false,
+            });
+          }
+          if (judgePollRef.current) {
+            clearInterval(judgePollRef.current);
+            judgePollRef.current = null;
+          }
+          submissionStartedRef.current = false;
+          return;
+        }
+
+        const pollData = await pollResponse.json();
+        if (pollData.ratingSummary) {
+          setRatingSummary(pollData.ratingSummary as RatingSummary);
+        }
+        if (
+          pollData.message === "Debate judged" ||
+          pollData.message === "Debate already judged"
+        ) {
+          if (judgePollRef.current) {
+            clearInterval(judgePollRef.current);
+            judgePollRef.current = null;
+          }
+          const jsonString = extractJSON(pollData.result);
+          const judgment: JudgmentData = JSON.parse(jsonString);
+          setJudgmentData(judgment);
+          setPopup({ show: false, message: "" });
+          setShowJudgment(true);
+          submissionStartedRef.current = false;
+        }
+      } catch (error) {
+        if (judgePollRef.current) {
+          clearInterval(judgePollRef.current);
+          judgePollRef.current = null;
+        }
+        submissionStartedRef.current = false;
+        setPopup({
+          show: true,
+          message:
+            "Error occurred while retrieving judgment. Please try again.",
+          isJudging: false,
+        });
+      }
+    }, 2000);
+  };
+
   // Function to send transcripts to backend
   const sendTranscriptsToBackend = async (
     roomId: string,
     role: DebateRole,
-    transcripts: { [key in DebatePhase]?: string }
+    transcripts: { [key in DebatePhase]?: string },
+    opponentRole: DebateRole,
+    opponentId: string | null,
+    opponentEmail: string | null,
+    opponentTranscripts: { [key in DebatePhase]?: string }
   ) => {
+    if (!isRoomOwner) {
+      return null;
+    }
+
     const token = getAuthToken();
     if (!token) {
       throw new Error("No auth token found. Please sign in again.");
     }
+
     try {
       const response = await fetch(`http://localhost:1313/submit-transcripts`, {
         method: "POST",
@@ -236,48 +340,41 @@ const OnlineDebateRoom: React.FC = () => {
           roomId,
           role,
           transcripts,
+          opponentRole,
+          opponentId,
+          opponentEmail,
+          opponentTranscripts,
         }),
       });
+
       if (!response.ok) {
+        if (response.status === 401) {
+          setPopup({
+            show: true,
+            message: "Session expired. Please sign in again.",
+            isJudging: false,
+          });
+        }
         throw new Error(
           `Failed to send transcripts: ${response.status} ${response.statusText}`
         );
       }
+
       const result = await response.json();
-      console.log(`Response from backend for ${role}:`, result);
+      if (result.ratingSummary) {
+        setRatingSummary(result.ratingSummary as RatingSummary);
+      }
 
       if (result.message === "Waiting for opponent submission") {
-        // Poll for the result periodically until judgment is available
-        const pollResult = async () => {
-          const pollInterval = setInterval(async () => {
-            const pollResponse = await fetch(
-              `http://localhost:1313/submit-transcripts`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ roomId, role, transcripts: {} }), // Empty transcripts to just check result
-              }
-            );
-            const pollData = await pollResponse.json();
-            if (
-              pollData.message === "Debate judged" ||
-              pollData.message === "Debate already judged"
-            ) {
-              clearInterval(pollInterval);
-              const jsonString = extractJSON(pollData.result);
-              const judgment: JudgmentData = JSON.parse(jsonString);
-              setJudgmentData(judgment);
-              setPopup({ show: false, message: "" });
-              setShowJudgment(true);
-            }
-          }, 2000); // Poll every 2 seconds
-        };
-        pollResult();
-        return null; // Return null to indicate waiting
-      } else if (
+        if (judgePollRef.current) {
+          clearInterval(judgePollRef.current);
+          judgePollRef.current = null;
+        }
+        startJudgmentPolling(role);
+        return null;
+      }
+
+      if (
         result.message === "Debate judged" ||
         result.message === "Debate already judged"
       ) {
@@ -286,15 +383,23 @@ const OnlineDebateRoom: React.FC = () => {
         return judgment;
       }
     } catch (error) {
-      console.error(`Error submitting transcripts for ${role}:`, error);
+      if (judgePollRef.current) {
+        clearInterval(judgePollRef.current);
+        judgePollRef.current = null;
+      }
       throw error;
     }
+
+    return null;
   };
 
   // Log message history, collect transcripts, and send to backend
-  const logMessageHistory = async () => {
+  const logMessageHistory = useCallback(async () => {
+    if (submissionStartedRef.current) {
+      return;
+    }
+
     if (!localRole) {
-      console.log("Cannot log message history: localRole is not defined yet.");
       setPopup({
         show: true,
         message: "Please select a role before the debate ends.",
@@ -303,33 +408,65 @@ const OnlineDebateRoom: React.FC = () => {
       return;
     }
 
-    console.log(`logMessageHistory called for role: ${localRole}`);
-    console.log("Debate Message History:");
-    const debateTranscripts: { [key in DebatePhase]?: string } = {};
+    if (!isRoomOwner) {
+      submissionStartedRef.current = true;
+      setPopup({
+        show: true,
+        message: "Waiting for debate judgment...",
+        isJudging: true,
+      });
+      startJudgmentPolling(localRole);
+      return;
+    }
 
-    const phasesForRole =
-      localRole === "for"
-        ? [
-            DebatePhase.OpeningFor,
-            DebatePhase.CrossForQuestion,
-            DebatePhase.CrossForAnswer,
-            DebatePhase.ClosingFor,
-          ]
-        : [
-            DebatePhase.OpeningAgainst,
-            DebatePhase.CrossAgainstAnswer,
-            DebatePhase.CrossAgainstQuestion,
-            DebatePhase.ClosingAgainst,
-          ];
+    submissionStartedRef.current = true;
 
-    phasesForRole.forEach((phase) => {
-      const transcript =
-        localStorage.getItem(`${roomId}_${phase}_${localRole}`) ||
-        "No response";
-      debateTranscripts[phase] = transcript;
-    });
-    console.log(`Collected transcripts for ${localRole}:`, debateTranscripts);
+    const gatherTranscriptsForRole = (role: DebateRole) => {
+      const rolePhases =
+        role === "for"
+          ? [
+              DebatePhase.OpeningFor,
+              DebatePhase.CrossForQuestion,
+              DebatePhase.CrossForAnswer,
+              DebatePhase.ClosingFor,
+            ]
+          : [
+              DebatePhase.OpeningAgainst,
+              DebatePhase.CrossAgainstAnswer,
+              DebatePhase.CrossAgainstQuestion,
+              DebatePhase.ClosingAgainst,
+            ];
 
+      return rolePhases.reduce(
+        (acc, phase) => {
+          const storageKey = `${roomId}_${phase}_${role}`;
+          const stored = storageKey ? localStorage.getItem(storageKey) : null;
+          const fromState = speechTranscripts[phase] ?? "";
+          const combined =
+            (typeof fromState === "string" && fromState.trim().length > 0
+              ? fromState
+              : stored || "") || "";
+          acc[phase] = combined.trim().length > 0 ? combined : "No response";
+          return acc;
+        },
+        {} as { [key in DebatePhase]?: string }
+      );
+    };
+
+    const ownerTranscripts = gatherTranscriptsForRole(localRole);
+    const opponentRole: DebateRole = localRole === "for" ? "against" : "for";
+    const opponentTranscripts = gatherTranscriptsForRole(opponentRole);
+
+    const opponentDetails =
+      opponentUser ||
+      roomParticipants.find((participant) => participant.id !== currentUser?.id) ||
+      null;
+
+    const opponentId = opponentDetails?.id ?? null;
+    const opponentEmail =
+      (opponentDetails as UserDetails & { email?: string })?.email ?? null;
+
+    setRatingSummary(null);
     setPopup({
       show: true,
       message: "Submitting transcripts and awaiting judgment...",
@@ -338,34 +475,49 @@ const OnlineDebateRoom: React.FC = () => {
 
     if (roomId && localRole) {
       try {
-        console.log(`Sending transcripts to backend for ${localRole}`);
         const judgment = await sendTranscriptsToBackend(
           roomId,
           localRole,
-          debateTranscripts
+          ownerTranscripts,
+          opponentRole,
+          opponentId,
+          opponentEmail,
+          opponentTranscripts
         );
         if (judgment) {
           setJudgmentData(judgment);
           setPopup({ show: false, message: "" });
           setShowJudgment(true);
-        } // If null, polling is already handling the wait
+        } else {
+          // Let manual judging kick in later
+          submissionStartedRef.current = false;
+        }
       } catch (error) {
-        console.error(
           `Failed to send transcripts to backend for ${localRole}:`,
           error
         );
+        submissionStartedRef.current = false;
         setPopup({
           show: false,
           message: "Error occurred while judging. Please try again.",
         });
       }
     } else {
-      console.log(
+      submissionStartedRef.current = false;
         `Cannot send transcripts. roomId: ${roomId}, localRole: ${localRole}`
       );
       setPopup({ show: false, message: "" });
     }
-  };
+  }, [
+    localRole,
+    roomId,
+    isRoomOwner,
+    speechTranscripts,
+    opponentUser,
+    roomParticipants,
+    currentUser,
+    sendTranscriptsToBackend,
+  ]);
 
   // Set timer based on phase duration
   useEffect(() => {
@@ -391,7 +543,6 @@ const OnlineDebateRoom: React.FC = () => {
                 `${roomId}_${debatePhase}_${localRole}`,
                 existingTranscript
               );
-              console.log(
                 `Timer expired for ${localRole} in ${debatePhase}. Transcript saved:`,
                 existingTranscript
               );
@@ -427,11 +578,12 @@ const OnlineDebateRoom: React.FC = () => {
       });
 
       if (response.ok) {
-        console.log("Room created successfully");
+        if (currentUser?.id) {
+          setRoomOwnerId(currentUser.id);
+        }
         return true;
       }
     } catch (error) {
-      console.error("Failed to create room:", error);
     }
     return false;
   };
@@ -453,56 +605,90 @@ const OnlineDebateRoom: React.FC = () => {
       );
 
       if (response.ok) {
-        const participants = await response.json();
-        console.log("Fetched participants:", participants);
-        console.log("Current user:", currentUser);
+        const data = await response.json();
+        const participants: UserDetails[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.participants)
+          ? data.participants
+          : [];
+        const ownerIdFromServer: string | null = Array.isArray(data)
+          ? null
+          : data?.ownerId ?? null;
+
         setRoomParticipants(participants);
+
+        setRoomOwnerId((prev) => {
+          if (ownerIdFromServer) {
+            return ownerIdFromServer;
+          }
+          const fallbackOwner = participants.length > 0 ? participants[0].id : null;
+          if (!fallbackOwner) {
+            return prev;
+          }
+          return prev === fallbackOwner ? prev : fallbackOwner;
+        });
 
         // Set local and opponent user details
         if (currentUser && participants.length >= 1) {
-          console.log("Current user ID:", currentUser.id);
-          console.log("All participants:", participants);
 
           const localParticipant = participants.find(
-            (p: UserDetails) => p.id === currentUser.id
+            (p: UserDetails) =>
+              p.id === currentUser.id || p.email === currentUser.email
           );
           const opponentParticipant = participants.find(
-            (p: UserDetails) => p.id !== currentUser.id
+            (p: UserDetails) =>
+              (p.id !== currentUser.id || !p.id) &&
+              p.email !== currentUser.email
           );
 
-          console.log("Local participant:", localParticipant);
-          console.log("Opponent participant:", opponentParticipant);
 
           if (localParticipant) {
             const localUserData = {
               ...localParticipant,
-              avatarUrl: currentUser.avatarUrl || localParticipant.avatarUrl,
+              avatarUrl:
+                currentUser.avatarUrl ||
+                localParticipant.avatarUrl ||
+                "https://avatar.iran.liara.run/public/40",
               displayName:
-                currentUser.displayName || localParticipant.displayName,
+                currentUser.displayName ||
+                localParticipant.displayName ||
+                currentUser.email ||
+                "You",
             };
-            console.log("Setting local user:", localUserData);
             setLocalUser(localUserData);
+            localStorage.setItem("userAvatar", localUserData.avatarUrl || "");
           } else {
-            console.log("Local participant not found, using current user data");
             // Fallback to current user data if not found in participants
-            setLocalUser({
+            const fallbackLocal: UserDetails = {
               id: currentUser.id || "unknown",
               username: currentUser.displayName || "User",
               displayName: currentUser.displayName || "User",
               elo: currentUser.rating || 1500,
-              avatarUrl: currentUser.avatarUrl,
-            });
+              avatarUrl:
+                currentUser.avatarUrl ||
+                "https://avatar.iran.liara.run/public/40",
+              email: currentUser.email || "",
+            };
+            setLocalUser(fallbackLocal);
+            localStorage.setItem("userAvatar", fallbackLocal.avatarUrl || "");
           }
 
           if (opponentParticipant) {
-            console.log("Setting opponent user:", opponentParticipant);
-            setOpponentUser(opponentParticipant);
+            const opponentData = {
+              ...opponentParticipant,
+              avatarUrl:
+                opponentParticipant.avatarUrl ||
+                "https://avatar.iran.liara.run/public/31",
+            };
+            setOpponentUser(opponentData);
+            localStorage.setItem(
+              "opponentAvatar",
+              opponentData.avatarUrl || ""
+            );
           } else {
-            console.log("Opponent participant not found");
             setOpponentUser(null);
           }
         } else {
-          console.log("No current user or insufficient participants");
           // Fallback to current user data
           if (currentUser) {
             setLocalUser({
@@ -515,7 +701,6 @@ const OnlineDebateRoom: React.FC = () => {
           }
         }
       } else {
-        console.log(
           "API response not ok:",
           response.status,
           response.statusText
@@ -523,7 +708,6 @@ const OnlineDebateRoom: React.FC = () => {
 
         // If room not found (404), it might still be being created
         if (response.status === 404 && retryCount < 5) {
-          console.log(
             `Room not found, might still be creating. Retry ${
               retryCount + 1
             }/5 in 2 seconds...`
@@ -551,8 +735,8 @@ const OnlineDebateRoom: React.FC = () => {
               "https://avatar.iran.liara.run/public/40",
             displayName: currentUser.displayName || "You",
           };
-          console.log("Setting fallback local user:", fallbackLocalUser);
           setLocalUser(fallbackLocalUser);
+          setRoomOwnerId((prev) => prev ?? currentUser.id ?? null);
 
           const fallbackOpponentUser = {
             id: "opponent",
@@ -561,12 +745,10 @@ const OnlineDebateRoom: React.FC = () => {
             avatarUrl: "https://avatar.iran.liara.run/public/31",
             displayName: "Opponent",
           };
-          console.log("Setting fallback opponent user:", fallbackOpponentUser);
           setOpponentUser(fallbackOpponentUser);
         }
       }
     } catch (error) {
-      console.error("Failed to fetch room participants:", error);
       // Fallback: use current user as local user and create a placeholder opponent
       if (currentUser) {
         const errorFallbackLocalUser = {
@@ -576,11 +758,11 @@ const OnlineDebateRoom: React.FC = () => {
           avatarUrl: currentUser.avatarUrl,
           displayName: currentUser.displayName,
         };
-        console.log(
           "Setting error fallback local user:",
           errorFallbackLocalUser
         );
         setLocalUser(errorFallbackLocalUser);
+        setRoomOwnerId((prev) => prev ?? currentUser.id ?? null);
 
         const errorFallbackOpponentUser = {
           id: "opponent",
@@ -589,7 +771,6 @@ const OnlineDebateRoom: React.FC = () => {
           avatarUrl: "https://avatar.iran.liara.run/public/31",
           displayName: "Opponent",
         };
-        console.log(
           "Setting error fallback opponent user:",
           errorFallbackOpponentUser
         );
@@ -611,7 +792,6 @@ const OnlineDebateRoom: React.FC = () => {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
       ws.send(JSON.stringify({ type: "join", room: roomId }));
       // Wait a bit before fetching participants to ensure room is fully created
       setTimeout(() => {
@@ -622,14 +802,11 @@ const OnlineDebateRoom: React.FC = () => {
 
     ws.onmessage = async (event) => {
       const data: WSMessage = JSON.parse(event.data);
-      console.log("Received WebSocket message:", data);
       switch (data.type) {
         case "topicChange":
-          console.log("Received topic change:", data.topic);
           if (data.topic !== undefined) setTopic(data.topic);
           break;
         case "roleSelection":
-          console.log("Received role selection:", data.role);
           if (data.role) setPeerRole(data.role);
           break;
         case "ready":
@@ -637,7 +814,6 @@ const OnlineDebateRoom: React.FC = () => {
           break;
         case "phaseChange":
           if (data.phase) {
-            console.log(
               `Received phase change to ${data.phase}. Local role: ${localRole}`
             );
             setDebatePhase(data.phase);
@@ -667,7 +843,6 @@ const OnlineDebateRoom: React.FC = () => {
           break;
         case "speechText":
           if (data.userId && data.speechText) {
-            console.log("Received speech text from backend:", data);
             // Store speech text in transcripts for the specified phase
             const targetPhase = data.phase || debatePhase;
             setSpeechTranscripts((prev) => {
@@ -676,7 +851,6 @@ const OnlineDebateRoom: React.FC = () => {
                 [targetPhase]:
                   (prev[targetPhase] || "") + " " + data.speechText,
               };
-              console.log("Updated speech transcripts:", updated);
               return updated;
             });
           }
@@ -702,22 +876,22 @@ const OnlineDebateRoom: React.FC = () => {
           break;
         case "roomParticipants":
           if (data.roomParticipants) {
-            console.log(
               "Received room participants update:",
               data.roomParticipants
             );
             setRoomParticipants(data.roomParticipants);
             // Update local and opponent user details when participants change
             if (currentUser && data.roomParticipants.length >= 1) {
-              const localParticipant = data.roomParticipants.find(
-                (p: UserDetails) => p.id === currentUser.id
-              );
-              const opponentParticipant = data.roomParticipants.find(
-                (p: UserDetails) => p.id !== currentUser.id
-              );
+          const localParticipant = data.roomParticipants.find(
+            (p: UserDetails) =>
+              p.id === currentUser.id || p.email === currentUser.email
+          );
+          const opponentParticipant = data.roomParticipants.find(
+            (p: UserDetails) =>
+              (p.id && p.id !== currentUser.id) ||
+              (!p.id && p.email && p.email !== currentUser.email)
+          );
 
-              console.log("WS - Local participant:", localParticipant);
-              console.log("WS - Opponent participant:", opponentParticipant);
 
               if (localParticipant) {
                 setLocalUser({
@@ -741,8 +915,12 @@ const OnlineDebateRoom: React.FC = () => {
               }
 
               if (opponentParticipant) {
-                console.log("WS - Setting opponent user:", opponentParticipant);
-                setOpponentUser(opponentParticipant);
+                setOpponentUser({
+                  ...opponentParticipant,
+                  avatarUrl:
+                    opponentParticipant.avatarUrl ||
+                    "https://avatar.iran.liara.run/public/31",
+                });
               } else {
                 setOpponentUser(null);
               }
@@ -768,8 +946,6 @@ const OnlineDebateRoom: React.FC = () => {
       }
     };
 
-    ws.onerror = (err) => console.error("WebSocket error:", err);
-    ws.onclose = () => console.log("WebSocket closed");
 
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -800,7 +976,6 @@ const OnlineDebateRoom: React.FC = () => {
         setMediaError(
           "Failed to access camera/microphone. Please check permissions."
         );
-        console.error("Media error:", err);
       }
     };
 
@@ -817,13 +992,11 @@ const OnlineDebateRoom: React.FC = () => {
       localVideoRef.current.srcObject = localStream;
       localVideoRef.current
         .play()
-        .catch((err) => console.error("Error playing local video:", err));
     }
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
       remoteVideoRef.current
         .play()
-        .catch((err) => console.error("Error playing remote video:", err));
     }
   }, [localStream, remoteStream]);
 
@@ -905,7 +1078,6 @@ const OnlineDebateRoom: React.FC = () => {
 
         setMediaRecorder(recorder);
       } catch (error) {
-        console.error("Error initializing audio:", error);
         if (error instanceof Error) {
           if (error.name === "NotAllowedError") {
             setAudioError(
@@ -1036,7 +1208,6 @@ const OnlineDebateRoom: React.FC = () => {
                 try {
                   recognitionRef.current.start();
                 } catch (error) {
-                  console.error("Error restarting speech recognition:", error);
                 }
               }
             }, 100);
@@ -1055,7 +1226,6 @@ const OnlineDebateRoom: React.FC = () => {
               break;
             case "network":
               // Network errors are often temporary, try to restart silently
-              console.warn(
                 "Speech recognition network error, attempting to restart..."
               );
               if (retryCountRef.current < 3) {
@@ -1072,7 +1242,6 @@ const OnlineDebateRoom: React.FC = () => {
                     try {
                       recognitionRef.current.start();
                     } catch (error) {
-                      console.error(
                         "Failed to restart after network error:",
                         error
                       );
@@ -1080,7 +1249,6 @@ const OnlineDebateRoom: React.FC = () => {
                   }
                 }, 2000); // Wait 2 seconds before retrying
               } else {
-                console.error("Max retry attempts reached for network error");
                 setSpeechError(
                   "Speech recognition temporarily unavailable. Please try again later."
                 );
@@ -1098,7 +1266,6 @@ const OnlineDebateRoom: React.FC = () => {
               break;
             default:
               // For other errors, show a brief message and try to restart
-              console.warn(`Speech recognition error: ${errorEvent.error}`);
               if (retryCountRef.current < 2) {
                 // Limit retries to 2 for other errors
                 retryCountRef.current += 1;
@@ -1117,12 +1284,10 @@ const OnlineDebateRoom: React.FC = () => {
                     try {
                       recognitionRef.current.start();
                     } catch (error) {
-                      console.error("Failed to restart after error:", error);
                     }
                   }
                 }, 3000); // Wait 3 seconds before retrying
               } else {
-                console.error(
                   "Max retry attempts reached for speech recognition error"
                 );
                 setSpeechError(
@@ -1168,7 +1333,6 @@ const OnlineDebateRoom: React.FC = () => {
         monitorAudioLevel(); // Start audio level monitoring
         setAudioError(null);
       } catch (error) {
-        console.error("Error starting recording:", error);
         setAudioError("Failed to start audio recording");
       }
     }
@@ -1182,7 +1346,6 @@ const OnlineDebateRoom: React.FC = () => {
           cancelAnimationFrame(animationRef.current);
         }
       } catch (error) {
-        console.error("Error stopping recording:", error);
       }
     }
   }, [mediaRecorder]);
@@ -1202,14 +1365,12 @@ const OnlineDebateRoom: React.FC = () => {
     try {
       recognitionRef.current.start();
     } catch (error) {
-      console.error("Error starting speech recognition:", error);
       // If start fails, try to reinitialize after a short delay
       setTimeout(() => {
         if (recognitionRef.current) {
           try {
             recognitionRef.current.start();
           } catch (retryError) {
-            console.error(
               "Failed to restart speech recognition after retry:",
               retryError
             );
@@ -1231,16 +1392,70 @@ const OnlineDebateRoom: React.FC = () => {
     }
   }, [isListening]);
 
+  const handleStartSpeaking = useCallback(() => {
+    const canSpeakNow =
+      isMyTurn &&
+      debatePhase !== DebatePhase.Setup &&
+      debatePhase !== DebatePhase.Finished &&
+      !isAutoMuted;
+
+    if (!canSpeakNow || isManualRecording) {
+      return;
+    }
+
+    if (!mediaRecorder) {
+      setSpeechError("Microphone not ready yet. Please wait a moment.");
+      return;
+    }
+
+    setSpeechError(null);
+    manualRecordingRef.current = true;
+    setIsManualRecording(true);
+    startAudioRecording();
+    startSpeechRecognition();
+  }, [
+    isMyTurn,
+    debatePhase,
+    isAutoMuted,
+    isManualRecording,
+    mediaRecorder,
+    setIsManualRecording,
+    startAudioRecording,
+    startSpeechRecognition,
+  ]);
+
+  const handleStopSpeaking = useCallback(() => {
+    if (!isManualRecording) {
+      return;
+    }
+
+    manualRecordingRef.current = false;
+    stopAudioRecording();
+    stopSpeechRecognition();
+    setIsManualRecording(false);
+  }, [isManualRecording, stopAudioRecording, stopSpeechRecognition]);
+
+  useEffect(() => {
+    if (!manualRecordingRef.current) {
+      return;
+    }
+
+    const canStillSpeak =
+      isMyTurn &&
+      debatePhase !== DebatePhase.Setup &&
+      debatePhase !== DebatePhase.Finished &&
+      !isAutoMuted;
+
+    if (!canStillSpeak) {
+      handleStopSpeaking();
+    }
+  }, [isMyTurn, debatePhase, isAutoMuted, handleStopSpeaking]);
+
   // Auto start/stop recording and speech recognition based on turn
   useEffect(() => {
     if (!mediaRecorder || audioError) return;
 
-    if (
-      isMyTurn &&
-      debatePhase !== DebatePhase.Setup &&
-      debatePhase !== DebatePhase.Finished &&
-      !isAutoMuted
-    ) {
+    if (isManualRecording) {
       startAudioRecording();
       startSpeechRecognition();
     } else {
@@ -1253,9 +1468,7 @@ const OnlineDebateRoom: React.FC = () => {
       stopSpeechRecognition();
     };
   }, [
-    isMyTurn,
-    debatePhase,
-    isAutoMuted,
+    isManualRecording,
     mediaRecorder,
     audioError,
     startAudioRecording,
@@ -1283,9 +1496,7 @@ const OnlineDebateRoom: React.FC = () => {
           audio: true,
         });
         stream.getTracks().forEach((track) => track.stop());
-        console.log("Microphone permission granted");
       } catch (error) {
-        console.error("Microphone permission denied:", error);
       }
     };
     checkPermission();
@@ -1294,12 +1505,10 @@ const OnlineDebateRoom: React.FC = () => {
   // Handle phase completion
   const handlePhaseDone = () => {
     const currentIndex = phaseOrder.indexOf(debatePhase);
-    console.log(
       `handlePhaseDone called for ${localRole}. Current phase: ${debatePhase}, Index: ${currentIndex}`
     );
     if (currentIndex >= 0 && currentIndex < phaseOrder.length - 1) {
       const nextPhase = phaseOrder[currentIndex + 1];
-      console.log(
         `Transitioning to next phase: ${nextPhase} for role: ${localRole}`
       );
       setDebatePhase(nextPhase);
@@ -1307,13 +1516,11 @@ const OnlineDebateRoom: React.FC = () => {
         JSON.stringify({ type: "phaseChange", phase: nextPhase })
       );
     } else if (!localRole || !peerRole) {
-      console.log("Cannot finish debate: Both roles must be selected.");
       setPopup({
         show: true,
         message: "Both debaters must select roles to finish the debate.",
       });
     } else {
-      console.log(`Debate finished for ${localRole}`);
     }
   };
 
@@ -1322,7 +1529,14 @@ const OnlineDebateRoom: React.FC = () => {
     if (debatePhase === DebatePhase.Finished && localRole) {
       logMessageHistory();
     }
-  }, [debatePhase, localRole]);
+  }, [debatePhase, localRole, logMessageHistory]);
+
+  // Reset submissionStartedRef whenever phase moves away from Finished.
+  useEffect(() => {
+    if (debatePhase !== DebatePhase.Finished) {
+      submissionStartedRef.current = false;
+    }
+  }, [debatePhase]);
 
   // Handlers for user actions
   const handleTopicChange = (
@@ -1331,7 +1545,6 @@ const OnlineDebateRoom: React.FC = () => {
     const newTopic = e.target.value;
     setTopic(newTopic);
     const message = JSON.stringify({ type: "topicChange", topic: newTopic });
-    console.log("Sending topic change message:", message);
     wsRef.current?.send(message);
   };
 
@@ -1344,9 +1557,7 @@ const OnlineDebateRoom: React.FC = () => {
     }
     setLocalRole(role);
     const message = JSON.stringify({ type: "roleSelection", role });
-    console.log("Sending role selection message:", message);
     wsRef.current?.send(message);
-    console.log(`Role selected: ${role}`);
   };
 
   const toggleReady = () => {
@@ -1355,7 +1566,6 @@ const OnlineDebateRoom: React.FC = () => {
     wsRef.current?.send(
       JSON.stringify({ type: "ready", ready: newReadyState })
     );
-    console.log(`Ready toggled to ${newReadyState} for ${localRole}`);
   };
 
   // Manage setup popup visibility
@@ -1363,7 +1573,6 @@ const OnlineDebateRoom: React.FC = () => {
     if (localReady && peerReady) {
       setShowSetupPopup(false);
       setCountdown(3);
-      console.log(`Both ready. Starting countdown for ${localRole}`);
     } else {
       setShowSetupPopup(true);
     }
@@ -1379,7 +1588,6 @@ const OnlineDebateRoom: React.FC = () => {
       wsRef.current?.send(
         JSON.stringify({ type: "phaseChange", phase: DebatePhase.OpeningFor })
       );
-      console.log(
         `Countdown finished. Starting debate at ${DebatePhase.OpeningFor} for ${localRole}`
       );
       if (localRole === "for") {
@@ -1391,7 +1599,6 @@ const OnlineDebateRoom: React.FC = () => {
           .then((offer) =>
             wsRef.current?.send(JSON.stringify({ type: "offer", offer }))
           )
-          .catch((err) => console.error("Error creating offer:", err));
       }
     }
   }, [countdown, localRole]);
@@ -1403,16 +1610,17 @@ const OnlineDebateRoom: React.FC = () => {
 
   // Debug user state changes
   useEffect(() => {
-    console.log("Current user state:", currentUser);
   }, [currentUser]);
 
   useEffect(() => {
-    console.log("Local user state:", localUser);
   }, [localUser]);
 
   useEffect(() => {
-    console.log("Opponent user state:", opponentUser);
   }, [opponentUser]);
+
+  useEffect(() => {
+    manualRecordingRef.current = isManualRecording;
+  }, [isManualRecording]);
 
   const formatTime = (seconds: number) => {
     const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60)
@@ -1428,6 +1636,23 @@ const OnlineDebateRoom: React.FC = () => {
       </span>
     );
   };
+
+  const speakingStatusMessage = isManualRecording
+    ? "Recording & speech recognition active."
+    : isMyTurn &&
+      debatePhase !== DebatePhase.Setup &&
+      debatePhase !== DebatePhase.Finished &&
+      !isAutoMuted
+    ? "Click start when you're ready to speak."
+    : isAutoMuted
+    ? "Auto-muted while the opponent is speaking."
+    : "Waiting for your turn...";
+
+  const canStartSpeaking =
+    isMyTurn &&
+    debatePhase !== DebatePhase.Setup &&
+    debatePhase !== DebatePhase.Finished &&
+    !isAutoMuted;
 
   // Render UI
   return (
@@ -1671,8 +1896,14 @@ const OnlineDebateRoom: React.FC = () => {
       {showJudgment && judgmentData && (
         <JudgmentPopup
           judgment={judgmentData}
-          forRole={localRole === "for" ? "You" : "Opponent"}
-          againstRole={localRole === "against" ? "You" : "Opponent"}
+          forRole={localRole === "for" ? "You" : opponentUser?.displayName || "Opponent"}
+          againstRole={localRole === "against" ? "You" : opponentUser?.displayName || "Opponent"}
+          localRole={localRole ?? null}
+          localDisplayName={localUser?.displayName || localUser?.username || currentUser?.displayName || currentUser?.username || "You"}
+          localAvatarUrl={localUser?.avatarUrl || currentUser?.avatarUrl || null}
+          opponentDisplayName={opponentUser?.displayName || opponentUser?.username || "Opponent"}
+          opponentAvatarUrl={opponentUser?.avatarUrl || null}
+          ratingSummary={ratingSummary}
           onClose={() => setShowJudgment(false)}
         />
       )}
@@ -1723,33 +1954,27 @@ const OnlineDebateRoom: React.FC = () => {
               playsInline
               className="w-full h-80 object-cover"
             />
-            {/* Audio and Speech Status */}
-            <div className="mt-3 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-sm text-gray-600 mb-2">
-                  {isRecording && isListening ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      Recording & Speech Recognition Active
-                    </div>
-                  ) : isMyTurn &&
-                    debatePhase !== DebatePhase.Setup &&
-                    debatePhase !== DebatePhase.Finished &&
-                    !isAutoMuted ? (
-                    <div className="text-blue-600">
-                      Will start automatically on your turn
-                    </div>
-                  ) : (
-                    "Inactive"
-                  )}
-                </div>
-
-                {speechError && (
-                  <div className="text-sm text-red-600 p-2 bg-red-50 rounded mb-2">
-                    Speech Error: {speechError}
-                  </div>
-                )}
+            {/* Speaking Controls */}
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <Button
+                onClick={
+                  isManualRecording ? handleStopSpeaking : handleStartSpeaking
+                }
+                variant={isManualRecording ? "destructive" : "default"}
+                size="sm"
+                disabled={!isManualRecording && !canStartSpeaking}
+                className="px-4"
+              >
+                {isManualRecording ? "Stop Speaking" : "Start Speaking"}
+              </Button>
+              <div className="text-sm text-gray-600 text-center">
+                {speakingStatusMessage}
               </div>
+              {speechError && (
+                <div className="text-sm text-red-600 p-2 bg-red-50 rounded w-full text-center">
+                  {speechError}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1809,7 +2034,6 @@ const OnlineDebateRoom: React.FC = () => {
           <SpeechTranscripts
             transcripts={speechTranscripts}
             currentPhase={debatePhase}
-            liveTranscript={currentTranscript}
           />
         </div>
       )}

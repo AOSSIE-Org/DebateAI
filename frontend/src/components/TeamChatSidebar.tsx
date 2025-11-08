@@ -43,7 +43,6 @@ const TeamChatSidebar: React.FC<TeamChatSidebarProps> = ({
     if (!ws) return;
 
     ws.onopen = () => {
-      console.log('Team chat WebSocket connected');
       setIsConnected(true);
       ws.send(JSON.stringify({ type: 'join', room: teamId }));
     };
@@ -65,12 +64,10 @@ const TeamChatSidebar: React.FC<TeamChatSidebarProps> = ({
     };
 
     ws.onclose = () => {
-      console.log('Team chat WebSocket disconnected');
       setIsConnected(false);
     };
 
     ws.onerror = (error) => {
-      console.error('Team chat WebSocket error:', error);
       setIsConnected(false);
     };
 

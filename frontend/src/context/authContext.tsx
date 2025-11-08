@@ -96,7 +96,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     } catch (error) {
-      console.log('error', error);
       logout();
     }
   }, [setUser]);
@@ -277,7 +276,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         createdAt: data.user?.createdAt || new Date().toISOString(),
         updatedAt: data.user?.updatedAt || new Date().toISOString(),
       });
-      console.log('User after Google login:', data.user);
       navigate('/');
     } catch (error) {
       handleError(error);

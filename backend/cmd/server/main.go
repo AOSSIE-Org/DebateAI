@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"os"
 	"strconv"
 
 	"arguehub/config"
 	"arguehub/db"
+	"arguehub/internal/debate"
 	"arguehub/middlewares"
 	"arguehub/routes"
 	"arguehub/services"
@@ -21,19 +21,29 @@ func main() {
 	// Load the configuration from the specified YAML file
 	cfg, err := config.LoadConfig("./config/config.prod.yml")
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		panic("Failed to load config: " + err.Error())
 	}
 
-		services.InitDebateVsBotService(cfg)
+	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
-	
+
 	// Connect to MongoDB using the URI from the configuration
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
+		panic("Failed to connect to MongoDB: " + err.Error())
 	}
-	log.Println("Connected to MongoDB")
-	
+
+	// Connect to Redis if configured
+	if cfg.Redis.URL != "" {
+		redisURL := cfg.Redis.URL
+		if redisURL == "" {
+			redisURL = "localhost:6379"
+		}
+		if err := debate.InitRedis(redisURL, cfg.Redis.Password, cfg.Redis.DB); err != nil {
+			panic("Failed to initialize Redis: " + err.Error())
+		}
+	}
+
 	// Start the room watching service for matchmaking after DB connection
 	go websocket.WatchForNewRooms()
 
@@ -49,10 +59,9 @@ func main() {
 	// Set up the Gin router and configure routes
 	router := setupRouter(cfg)
 	port := strconv.Itoa(cfg.Server.Port)
-	log.Printf("Server starting on port %s", port)
 
 	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		panic("Failed to start server: " + err.Error())
 	}
 }
 
@@ -80,7 +89,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
-	
+
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
 
@@ -94,7 +103,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
-		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler) 
+		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 		routes.SetupDebateVsBotRoutes(auth)
 
 		// WebSocket signaling endpoint (handles auth internally)
@@ -102,8 +111,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 		// Set up transcript routes
 		routes.SetupTranscriptRoutes(auth)
-		log.Println("Transcript routes registered")
-		
+
 		auth.GET("/coach/strengthen-argument/weak-statement", routes.GetWeakStatement)
 		auth.POST("/coach/strengthen-argument/evaluate", routes.EvaluateStrengthenedArgument)
 
@@ -123,11 +131,13 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		routes.SetupTeamDebateRoutes(auth)
 		routes.SetupTeamChatRoutes(auth)
 		routes.SetupTeamMatchmakingRoutes(auth)
-		log.Println("Team routes registered")
 	}
 
 	// Team WebSocket handler
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
+
+	// Debate spectator WebSocket handler (no auth required for anonymous spectators)
+	router.GET("/ws/debate/:debateID", DebateWebsocketHandler)
 
 	return router
 }

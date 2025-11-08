@@ -73,7 +73,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
       try {
         const result: any = await getActiveTeamDebate(team.id);
         if (result.hasActiveDebate && result.debateId) {
-          console.log('[TeamMatchmaking] Active debate found:', result.debateId);
           // Store debate ID and show notification instead of auto-redirecting
           if (activeDebateId !== result.debateId) {
             setActiveDebateId(result.debateId);
@@ -88,7 +87,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
         }
       } catch (error) {
         // No active debate or error - this is normal
-        console.log('[TeamMatchmaking] No active debate for team');
         if (activeDebateId) {
           setActiveDebateId(null);
           setShowDebateNotification(false);
@@ -115,7 +113,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
             setMatchedTeam(status.team);
           }
         } catch (error) {
-          console.error('Failed to check matchmaking status:', error);
         }
       }, 3000); // Check every 3 seconds
 
@@ -160,7 +157,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
       const topic = 'Should AI be regulated?'; // Could be dynamic
       const debate = await createTeamDebate(team.id, matchedTeam.id, topic);
 
-      console.log('[TeamMatchmaking] Debate created:', debate.id);
       
       // Set the active debate ID - notification will show for all team members
       setActiveDebateId(debate.id);
@@ -185,7 +181,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   };
 
   // Debug logging
-  console.log('[TeamMatchmaking] Captain check:', {
     isCaptain,
     'team.captainId': team.captainId,
     'user.id': user?.id,
@@ -232,7 +227,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
 
   // Only show matchmaking controls to captain
   if (!isCaptain) {
-    console.log('[TeamMatchmaking] User is not captain, showing notification only');
     return debateNotification;
   }
 

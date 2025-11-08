@@ -47,6 +47,11 @@ type Config struct {
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
 	}
+	Redis struct {
+		URL      string `yaml:"url"`
+		Password string `yaml:"password"`
+		DB       int    `yaml:"db"`
+	}
 }
 
 // LoadConfig reads the configuration file

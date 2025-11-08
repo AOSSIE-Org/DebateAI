@@ -75,23 +75,23 @@ func (g *Glicko2) NewPlayer() *Player {
 func (g *Glicko2) UpdateMatch(p1, p2 *Player, outcome float64, matchTime time.Time) {
 	// Ensure valid outcome
 	outcome = math.Max(0, math.Min(1, outcome))
-	
+
 	// Update RDs for time decay
 	g.updateTimeRD(p1, matchTime)
 	g.updateTimeRD(p2, matchTime)
-	
+
 	// Convert to Glicko-2 scale
 	mu1, phi1 := g.scaleToGlicko2(p1.Rating, p1.RD)
 	mu2, phi2 := g.scaleToGlicko2(p2.Rating, p2.RD)
-	
+
 	// Update both players
 	newMu1, newPhi1, newSigma1 := g.calculateUpdate(mu1, phi1, p1.Volatility, mu2, phi2, outcome)
 	newMu2, newPhi2, newSigma2 := g.calculateUpdate(mu2, phi2, p2.Volatility, mu1, phi1, 1-outcome)
-	
+
 	// Convert back to original scale
 	p1.Rating, p1.RD = g.scaleFromGlicko2(newMu1, newPhi1)
 	p2.Rating, p2.RD = g.scaleFromGlicko2(newMu2, newPhi2)
-	
+
 	// Update volatility and timestamp
 	p1.Volatility = newSigma1
 	p2.Volatility = newSigma2
@@ -104,10 +104,10 @@ func (g *Glicko2) updateTimeRD(p *Player, currentTime time.Time) {
 	if p.LastUpdate.IsZero() {
 		return
 	}
-	
+
 	secPassed := currentTime.Sub(p.LastUpdate).Seconds()
 	periods := secPassed / g.Config.RatingPeriodSec
-	
+
 	if periods > 0 {
 		rdSq := p.RD * p.RD
 		volSq := p.Volatility * p.Volatility
@@ -132,22 +132,22 @@ func (g *Glicko2) calculateUpdate(
 	oppMu, oppPhi float64,
 	outcome float64,
 ) (newMu, newPhi, newSigma float64) {
-	
+
 	// Step 1: Calculate variance and delta
 	gVal := gFunc(oppPhi)
 	e := eFunc(mu, oppMu, oppPhi)
-	
+
 	v := 1.0 / (gVal * gVal * e * (1 - e))
 	delta := v * gVal * (outcome - e)
-	
+
 	// Step 2: Update volatility
 	newSigma = g.updateVolatility(sigma, phi, v, delta)
-	
+
 	// Step 3: Update RD and rating
 	phiStar := math.Sqrt(phi*phi + newSigma*newSigma)
 	newPhi = 1.0 / math.Sqrt(1.0/(phiStar*phiStar)+1.0/v)
 	newMu = mu + newPhi*newPhi*gVal*(outcome-e)
-	
+
 	return newMu, newPhi, newSigma
 }
 
@@ -156,13 +156,13 @@ func (g *Glicko2) updateVolatility(sigma, phi, v, delta float64) float64 {
 	a := math.Log(sigma * sigma)
 	deltaSq := delta * delta
 	phiSq := phi * phi
-	
+
 	// Initialize variables
 	x := a
 	if deltaSq > phiSq+v {
 		x = math.Log(deltaSq - phiSq - v)
 	}
-	
+
 	// Define function f(x) to solve
 	f := func(x float64) float64 {
 		ex := math.Exp(x)
@@ -170,26 +170,26 @@ func (g *Glicko2) updateVolatility(sigma, phi, v, delta float64) float64 {
 		denom := 2 * math.Pow(phiSq+v+ex, 2)
 		return num/denom - (x-a)/(g.Config.Tau*g.Config.Tau)
 	}
-	
+
 	// Newton-Raphson iteration
 	for i := 0; i < maxIterations; i++ {
 		fx := f(x)
 		if math.Abs(fx) < convergenceTolerance {
 			break
 		}
-		
+
 		// Numerical derivative
 		h := 0.001
 		fxph := f(x + h)
 		df := (fxph - fx) / h
-		
+
 		if math.Abs(df) < convergenceTolerance {
 			break
 		}
-		
+
 		x = x - fx/df
 	}
-	
+
 	return math.Exp(x / 2)
 }
 

@@ -108,7 +108,6 @@ const TeamBuilder: React.FC = () => {
       const teams = await getAvailableTeams();
       setAvailableTeams(teams || []);
     } catch (error) {
-      console.error("Failed to fetch available teams:", error);
       setAvailableTeams([]);
     }
   }, []);
@@ -119,7 +118,6 @@ const TeamBuilder: React.FC = () => {
       const teams = await getUserTeams();
       setUserTeams(teams || []);
     } catch (error) {
-      console.error("Failed to fetch user teams:", error);
       setUserTeams([]);
     }
   }, []);
@@ -156,7 +154,6 @@ const TeamBuilder: React.FC = () => {
       setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
       setError((error as Error).message || "Failed to create team");
-      console.error("Failed to create team:", error);
     } finally {
       setIsCreating(false);
     }
@@ -171,7 +168,6 @@ const TeamBuilder: React.FC = () => {
       setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
       setError((error as Error).message || "Failed to join team");
-      console.error("Failed to join team:", error);
       setTimeout(() => setError(""), 5000);
     }
   };
@@ -195,7 +191,6 @@ const TeamBuilder: React.FC = () => {
 
       setIsMemberProfileOpen(true);
     } catch (error) {
-      console.error("Failed to load member profile:", error);
     }
   };
 
