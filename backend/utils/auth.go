@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"time"
 
@@ -29,7 +30,7 @@ func SetJWTSecret(secret string) {
 
 func getJWTSecret() string {
 	if jwtSecret == "" {
-		panic("JWT secret is not set in config")
+		log.Fatal("JWT secret is not set in config")
 	}
 	return jwtSecret
 }

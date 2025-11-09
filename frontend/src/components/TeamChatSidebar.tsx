@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Send, Users } from 'lucide-react';
 
 interface ChatMessage {
@@ -42,10 +41,21 @@ const TeamChatSidebar: React.FC<TeamChatSidebarProps> = ({
   useEffect(() => {
     if (!ws) return;
 
+    const sendJoin = () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'join', room: teamId }));
+      }
+    };
+
     ws.onopen = () => {
       setIsConnected(true);
-      ws.send(JSON.stringify({ type: 'join', room: teamId }));
+      sendJoin();
     };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      setIsConnected(true);
+      sendJoin();
+    }
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -68,6 +78,7 @@ const TeamChatSidebar: React.FC<TeamChatSidebarProps> = ({
     };
 
     ws.onerror = (error) => {
+      console.error('TeamChatSidebar WebSocket error', error);
       setIsConnected(false);
     };
 

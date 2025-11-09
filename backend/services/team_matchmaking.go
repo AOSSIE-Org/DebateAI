@@ -115,5 +115,9 @@ func GetMatchmakingPool() map[string]*TeamMatchmakingEntry {
 	if teamMatchmakingPool == nil {
 		return make(map[string]*TeamMatchmakingEntry)
 	}
-	return teamMatchmakingPool
+	snapshot := make(map[string]*TeamMatchmakingEntry, len(teamMatchmakingPool))
+	for id, entry := range teamMatchmakingPool {
+		snapshot[id] = entry
+	}
+	return snapshot
 }

@@ -5,14 +5,23 @@ function getAuthToken(): string {
   return localStorage.getItem("token") || "";
 }
 
+export interface TeamDebateMember {
+  userId: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string;
+  elo: number;
+  joinedAt: string;
+}
+
 export interface TeamDebate {
   id: string;
   team1Id: string;
   team2Id: string;
   team1Name: string;
   team2Name: string;
-  team1Members: any[];
-  team2Members: any[];
+  team1Members: TeamDebateMember[];
+  team2Members: TeamDebateMember[];
   topic: string;
   team1Stance: string;
   team2Stance: string;
@@ -114,7 +123,22 @@ export const leaveMatchmaking = async (teamId: string): Promise<void> => {
   }
 };
 
-export const getMatchmakingPool = async (): Promise<any> => {
+export interface MatchmakingPoolTeam {
+  teamId: string;
+  teamName: string;
+  captainId: string;
+  maxSize: number;
+  averageElo: number;
+  membersCount: number;
+  timestamp: string;
+}
+
+export interface MatchmakingPoolResponse {
+  poolSize: number;
+  teams: MatchmakingPoolTeam[];
+}
+
+export const getMatchmakingPool = async (): Promise<MatchmakingPoolResponse> => {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/matchmaking/pool`, {
     headers: {
@@ -126,10 +150,29 @@ export const getMatchmakingPool = async (): Promise<any> => {
     throw new Error("Failed to get matchmaking pool");
   }
 
-  return response.json();
+  const data: MatchmakingPoolResponse = await response.json();
+  return data;
 };
 
-export const getMatchmakingStatus = async (teamId: string): Promise<any> => {
+export interface MatchmakingStatusResponse {
+  matched: boolean;
+  team?: {
+    id: string;
+    name: string;
+    captainId: string;
+    captainEmail: string;
+    members: TeamDebateMember[];
+    maxSize: number;
+    averageElo: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+  matchId?: string;
+}
+
+export const getMatchmakingStatus = async (
+  teamId: string
+): Promise<MatchmakingStatusResponse> => {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/matchmaking/${teamId}/status`, {
     headers: {
@@ -141,6 +184,7 @@ export const getMatchmakingStatus = async (teamId: string): Promise<any> => {
     throw new Error("Failed to get matchmaking status");
   }
 
-  return response.json();
+  const data: MatchmakingStatusResponse = await response.json();
+  return data;
 };
 

@@ -56,6 +56,7 @@ export class SpeechRecognitionTest {
     // ✅ Fix typing issue with type assertion
     this.recognition.onerror = (event: Event) => {
       const err = event as unknown as SpeechRecognitionErrorEvent;
+      console.error('Speech recognition error', err.error, err.message);
     };
   }
 

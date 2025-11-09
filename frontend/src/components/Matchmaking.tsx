@@ -120,6 +120,7 @@ const Matchmaking: React.FC = () => {
     ws.onclose = (event) => {
       setIsConnected(false);
       setIsInPool(false);
+      console.warn(
         '🔌 Disconnected from matchmaking WebSocket:',
         event.code,
         event.reason
@@ -128,6 +129,7 @@ const Matchmaking: React.FC = () => {
     };
 
     ws.onerror = (error) => {
+      console.error('Matchmaking WebSocket error', error);
       setIsConnected(false);
     };
 

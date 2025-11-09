@@ -58,11 +58,22 @@ func (ps *PollStore) GetPollState(debateID string) (map[string]map[string]int64,
 		return nil, nil, fmt.Errorf("Redis client not available")
 	}
 
-	// Get all poll keys for this debate
 	pattern := fmt.Sprintf("debate:%s:poll:*:counts", debateID)
-	keys, err := ps.rdb.Keys(ps.ctx, pattern).Result()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get poll keys: %w", err)
+	var (
+		cursor uint64
+		keys   []string
+	)
+
+	for {
+		batch, nextCursor, err := ps.rdb.Scan(ps.ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to scan poll keys: %w", err)
+		}
+		keys = append(keys, batch...)
+		if nextCursor == 0 {
+			break
+		}
+		cursor = nextCursor
 	}
 
 	pollState := make(map[string]map[string]int64)

@@ -36,6 +36,7 @@ type Client struct {
 	UserID       string
 	Username     string
 	Email        string
+	IsSpectator  bool
 	IsTyping     bool
 	IsSpeaking   bool
 	PartialText  string
@@ -169,10 +170,15 @@ func WebsocketHandler(c *gin.Context) {
 	// Allow spectators to connect even if room has 2 debaters
 	isSpectator := c.Query("spectator") == "true"
 	room.Mutex.Lock()
-	currentClientCount := len(room.Clients)
+	currentDebaters := 0
+	for _, existing := range room.Clients {
+		if !existing.IsSpectator {
+			currentDebaters++
+		}
+	}
 	// Limit debaters to 2, but allow unlimited spectators
 	maxDebaters := 2
-	if !isSpectator && currentClientCount >= maxDebaters {
+	if !isSpectator && currentDebaters >= maxDebaters {
 		room.Mutex.Unlock()
 		conn.Close()
 		return
@@ -188,6 +194,7 @@ func WebsocketHandler(c *gin.Context) {
 		UserID:       userID,
 		Username:     username,
 		Email:        email,
+		IsSpectator:  isSpectator,
 		IsTyping:     false,
 		IsSpeaking:   false,
 		PartialText:  "",

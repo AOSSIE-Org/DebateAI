@@ -100,6 +100,7 @@ const ChatRoom = () => {
     };
 
     wsRef.current.onerror = (error: Event) => {
+      console.error('ChatRoom WebSocket error', error);
     };
   };
 

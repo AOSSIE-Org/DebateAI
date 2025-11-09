@@ -1,12 +1,18 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+
 	"arguehub/config"
 	"arguehub/services"
 )
 
 func main() {
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	configPath := flag.String("config", "./config/config.test.yml", "path to config file")
+	flag.Parse()
+
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		panic("failed to load config: " + err.Error())
 	}
@@ -24,5 +30,7 @@ func main() {
 		"closingAgainst":       "In closing, the proposal ignores key risks. The safer choice is to reject it.",
 	}
 
-	services.JudgeDebateHumanVsHuman(sample)
+	result := services.JudgeDebateHumanVsHuman(sample)
+	fmt.Println("Judgment Result:")
+	fmt.Println(result)
 }

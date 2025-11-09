@@ -110,8 +110,18 @@ func SubmitTranscripts(
 		if errFor == nil && errAgainst == nil {
 			// Check if transcripts have already been saved for this room to prevent duplicates
 			var existingTranscript models.SavedDebateTranscript
+			judgeResponse := make(map[string]interface{})
+			topic := ""
+			if err := json.Unmarshal([]byte(result), &judgeResponse); err == nil {
+				if value, ok := judgeResponse["topic"].(string); ok {
+					topic = strings.TrimSpace(value)
+				}
+			}
+			if topic == "" {
+				topic = resolveDebateTopic(ctx, roomID, forSubmission, againstSubmission)
+			}
 			err = savedTranscriptsCollection.FindOne(ctx, bson.M{
-				"topic": "User vs User Debate",
+				"topic": topic,
 				"$or": []bson.M{
 					{"userId": forUser.ID, "opponent": againstUser.Email},
 					{"userId": againstUser.ID, "opponent": forUser.Email},
@@ -163,8 +173,8 @@ func SubmitTranscripts(
 					}
 				}
 
-				// Extract topic from transcripts (you might need to adjust this based on your data structure)
-				topic := "User vs User Debate"
+				// Determine the actual debate topic
+				topic := resolveDebateTopic(ctx, roomID, forSubmission, againstSubmission)
 
 				// Save transcript for "for" user
 				err = SaveDebateTranscript(
@@ -331,6 +341,56 @@ func mergeTranscripts(forTranscripts, againstTranscripts map[string]string) map[
 		merged[phase] = transcript
 	}
 	return merged
+}
+
+func resolveDebateTopic(ctx context.Context, roomID string, forSubmission, againstSubmission models.DebateTranscript) string {
+	if topic := extractTopicFromTranscripts(forSubmission.Transcripts); topic != "" {
+		return topic
+	}
+	if topic := extractTopicFromTranscripts(againstSubmission.Transcripts); topic != "" {
+		return topic
+	}
+	if topic := lookupRoomTopic(ctx, roomID); topic != "" {
+		return topic
+	}
+	return "User vs User Debate"
+}
+
+func extractTopicFromTranscripts(transcripts map[string]string) string {
+	for key, value := range transcripts {
+		if strings.Contains(strings.ToLower(key), "topic") {
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" && !strings.EqualFold(trimmed, "no response") {
+				return trimmed
+			}
+		}
+	}
+	return ""
+}
+
+func lookupRoomTopic(ctx context.Context, roomID string) string {
+	if db.MongoClient == nil {
+		return ""
+	}
+
+	var database = db.MongoDatabase
+	if database == nil {
+		database = db.MongoClient.Database("DebateAI")
+	}
+
+	var room struct {
+		Topic        string `bson:"topic"`
+		CurrentTopic string `bson:"currentTopic"`
+	}
+	if err := database.Collection("rooms").FindOne(ctx, bson.M{"_id": roomID}).Decode(&room); err == nil {
+		if topic := strings.TrimSpace(room.Topic); topic != "" {
+			return topic
+		}
+		if topic := strings.TrimSpace(room.CurrentTopic); topic != "" {
+			return topic
+		}
+	}
+	return ""
 }
 
 func JudgeDebateHumanVsHuman(merged map[string]string) string {

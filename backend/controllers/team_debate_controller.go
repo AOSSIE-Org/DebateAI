@@ -44,6 +44,11 @@ func CreateTeamDebate(c *gin.Context) {
 		return
 	}
 
+	if req.Team1ID == req.Team2ID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot create a debate with the same team on both sides"})
+		return
+	}
+
 	// Determine stances
 	var team1Stance, team2Stance string
 	stances := []string{"for", "against"}

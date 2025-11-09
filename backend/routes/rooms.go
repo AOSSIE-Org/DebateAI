@@ -144,6 +144,12 @@ func JoinRoomHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
+	}
+
 	var user struct {
 		ID          primitive.ObjectID `bson:"_id"`
 		Email       string             `bson:"email"`
@@ -152,7 +158,7 @@ func JoinRoomHandler(c *gin.Context) {
 		AvatarURL   string             `bson:"avatarUrl"`
 	}
 
-	err := userCollection.FindOne(ctx, bson.M{"email": email.(string)}).Decode(&user)
+	err := userCollection.FindOne(ctx, bson.M{"email": emailStr}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -213,10 +219,16 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	}
 
 	// Get user ID from email
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
+	}
+
 	var user struct {
 		ID primitive.ObjectID `bson:"_id"`
 	}
-	err = userCollection.FindOne(ctx, bson.M{"email": email.(string)}).Decode(&user)
+	err = userCollection.FindOne(ctx, bson.M{"email": emailStr}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -236,6 +248,39 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 		return
 	}
 
+	// Prepare email list for batch lookup
+	emailSet := make(map[string]struct{})
+	for _, participant := range room.Participants {
+		if participant.Email != "" {
+			emailSet[participant.Email] = struct{}{}
+		}
+	}
+
+	emailList := make([]string, 0, len(emailSet))
+	for addr := range emailSet {
+		emailList = append(emailList, addr)
+	}
+
+	type userDetails struct {
+		Email       string  `bson:"email"`
+		DisplayName string  `bson:"displayName"`
+		Rating      float64 `bson:"rating"`
+		AvatarURL   string  `bson:"avatarUrl"`
+	}
+	userMap := make(map[string]userDetails, len(emailList))
+
+	if len(emailList) > 0 {
+		cursor, err := userCollection.Find(ctx, bson.M{"email": bson.M{"$in": emailList}})
+		if err == nil {
+			var users []userDetails
+			if err := cursor.All(ctx, &users); err == nil {
+				for _, u := range users {
+					userMap[u.Email] = u
+				}
+			}
+		}
+	}
+
 	// Get full user details for each participant
 	var participantsWithDetails []gin.H
 
@@ -246,21 +291,18 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 		}
 
 		displayName := participant.Username
+		elo := participant.Elo
+
 		if participant.Email != "" {
-			var user struct {
-				DisplayName string  `bson:"displayName"`
-				Rating      float64 `bson:"rating"`
-				AvatarURL   string  `bson:"avatarUrl"`
-			}
-			if err := userCollection.FindOne(ctx, bson.M{"email": participant.Email}).Decode(&user); err == nil {
-				if user.DisplayName != "" {
-					displayName = user.DisplayName
+			if details, found := userMap[participant.Email]; found {
+				if details.DisplayName != "" {
+					displayName = details.DisplayName
 				}
-				if user.AvatarURL != "" {
-					avatarURL = user.AvatarURL
+				if details.AvatarURL != "" {
+					avatarURL = details.AvatarURL
 				}
-				if user.Rating != 0 {
-					participant.Elo = int(math.Round(user.Rating))
+				if details.Rating != 0 {
+					elo = int(math.Round(details.Rating))
 				}
 			}
 		}
@@ -269,9 +311,8 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 			"id":          participant.ID,
 			"username":    displayName,
 			"displayName": displayName,
-			"elo":         participant.Elo,
+			"elo":         elo,
 			"avatarUrl":   avatarURL,
-			"email":       participant.Email,
 		})
 	}
 

@@ -26,15 +26,15 @@ interface Team {
   averageElo: number;
 }
 
-interface User {
-  id: string;
-  email: string;
-  displayName: string;
+interface MinimalUser {
+  id?: string | { $oid?: string };
+  email?: string;
+  displayName?: string;
 }
 
 interface TeamMatchmakingProps {
   team: Team;
-  user: User;
+  user: MinimalUser | null;
 }
 
 const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
@@ -48,7 +48,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   // Check if current user is captain
   // Handle both string comparison and potential ObjectID structures
   const isCaptain = React.useMemo(() => {
-    if (!user || !team) return false;
+    if (!user?.id || !team) return false;
     
     // Convert captainId to string if it's an object (for backwards compatibility)
     const captainIdStr = typeof team.captainId === 'string' 
@@ -56,9 +56,12 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
       : (team.captainId as any)?.$oid || String(team.captainId);
     
     // Convert user.id to string if needed
-    const userIdStr = typeof user.id === 'string'
-      ? user.id
-      : (user.id as any)?.$oid || String(user.id);
+    const rawUserId = user.id;
+    const userIdStr = typeof rawUserId === 'string'
+      ? rawUserId
+      : (rawUserId as any)?.$oid || '';
+
+    if (!userIdStr) return false;
     
     // Check both ID and email
     return captainIdStr === userIdStr || team.captainEmail === user?.email;
@@ -110,7 +113,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
         try {
           const status = await getMatchmakingStatus(team.id);
           if (status.matched) {
-            setMatchedTeam(status.team);
+            setMatchedTeam(status.team ?? null);
           }
         } catch (error) {
         }
@@ -181,6 +184,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   };
 
   // Debug logging
+  console.debug({
     isCaptain,
     'team.captainId': team.captainId,
     'user.id': user?.id,
@@ -189,7 +193,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
     hasJoined,
     matchedTeam: !!matchedTeam,
     isTeamFull,
-    isSearching
+    isSearching,
   });
 
   // Show debate notification for ALL team members (not just captain)

@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAtom } from 'jotai';
-import { useDebateWS } from '../hooks/useDebateWS';
-import { ReactionBar } from '../components/ReactionBar';
-import { AnonymousQA } from '../components/AnonymousQA';
+import React, { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAtom } from "jotai";
+import { useDebateWS } from "../hooks/useDebateWS";
+import { ReactionBar } from "../components/ReactionBar";
+import { AnonymousQA } from "../components/AnonymousQA";
 import {
   debateIdAtom,
   pollStateAtom,
@@ -11,15 +11,27 @@ import {
   reactionsAtom,
   wsStatusAtom,
   presenceAtom,
-} from '../atoms/debateAtoms';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { getAuthToken } from '../utils/auth';
+} from "../atoms/debateAtoms";
+import { Button } from "../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { getAuthToken } from "../utils/auth";
+
+type RoomParticipant = {
+  id: string;
+  displayName: string;
+  avatarUrl?: string;
+  role?: "for" | "against" | string;
+};
 
 export const ViewDebate: React.FC = () => {
   const { debateID } = useParams<{ debateID: string }>();
   const navigate = useNavigate();
-  const [debateId, setDebateId] = useAtom(debateIdAtom);
+  const [, setDebateId] = useAtom(debateIdAtom);
   const [pollState] = useAtom(pollStateAtom);
   const [questions] = useAtom(questionsAtom);
   const [reactions] = useAtom(reactionsAtom);
@@ -32,7 +44,10 @@ export const ViewDebate: React.FC = () => {
   const video2Ref = useRef<HTMLVideoElement>(null);
   const [remoteStream1, setRemoteStream1] = useState<MediaStream | null>(null);
   const [remoteStream2, setRemoteStream2] = useState<MediaStream | null>(null);
-  const [participants, setParticipants] = useState<Array<{ id: string; displayName: string; avatarUrl?: string; role?: string }>>([]);
+  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
+  const remoteStream1Ref = useRef<MediaStream | null>(null);
+  const remoteStream2Ref = useRef<MediaStream | null>(null);
+  const participantsRef = useRef<RoomParticipant[]>([]);
   const roomWsRef = useRef<WebSocket | null>(null);
   const pc1Ref = useRef<RTCPeerConnection | null>(null);
   const pc2Ref = useRef<RTCPeerConnection | null>(null);
@@ -48,6 +63,18 @@ export const ViewDebate: React.FC = () => {
     }
   }, [debateID, setDebateId]);
 
+  useEffect(() => {
+    remoteStream1Ref.current = remoteStream1;
+  }, [remoteStream1]);
+
+  useEffect(() => {
+    remoteStream2Ref.current = remoteStream2;
+  }, [remoteStream2]);
+
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+
   // Connect to room WebSocket to receive video streams
   useEffect(() => {
     if (!debateID) return;
@@ -57,75 +84,106 @@ export const ViewDebate: React.FC = () => {
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_API_URL?.replace(/^https?:\/\//, '') || 'localhost:1313';
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host =
+      import.meta.env.VITE_API_URL?.replace(/^https?:\/\//, "") ||
+      "localhost:1313";
     const wsUrl = `${protocol}//${host}/ws?room=${debateID}&token=${token}&spectator=true`;
     const ws = new WebSocket(wsUrl);
     roomWsRef.current = ws;
 
     const pc1 = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
     const pc2 = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
     pc1Ref.current = pc1;
     pc2Ref.current = pc2;
 
     pc1.ontrack = (event) => {
       if (event.streams[0]) {
+        remoteStream1Ref.current = event.streams[0];
         setRemoteStream1(event.streams[0]);
       }
     };
 
     pc2.ontrack = (event) => {
       if (event.streams[0]) {
+        remoteStream2Ref.current = event.streams[0];
         setRemoteStream2(event.streams[0]);
       }
     };
 
     pc1.onicecandidate = (event) => {
-      if (event.candidate && ws.readyState === WebSocket.OPEN && pc1UserIdRef.current) {
-        ws.send(JSON.stringify({
-          type: 'candidate',
-          candidate: event.candidate,
-          userId: pc1UserIdRef.current,
-          connectionId: pc1ConnectionIdRef.current || undefined // Include connectionId if available
-        }));
+      if (
+        event.candidate &&
+        ws.readyState === WebSocket.OPEN &&
+        pc1UserIdRef.current
+      ) {
+        ws.send(
+          JSON.stringify({
+            type: "candidate",
+            candidate: event.candidate,
+            userId: pc1UserIdRef.current,
+            connectionId: pc1ConnectionIdRef.current || undefined, // Include connectionId if available
+          })
+        );
       }
     };
 
     pc2.onicecandidate = (event) => {
-      if (event.candidate && ws.readyState === WebSocket.OPEN && pc2UserIdRef.current) {
-        ws.send(JSON.stringify({
-          type: 'candidate',
-          candidate: event.candidate,
-          userId: pc2UserIdRef.current,
-          connectionId: pc2ConnectionIdRef.current || undefined // Include connectionId if available
-        }));
+      if (
+        event.candidate &&
+        ws.readyState === WebSocket.OPEN &&
+        pc2UserIdRef.current
+      ) {
+        ws.send(
+          JSON.stringify({
+            type: "candidate",
+            candidate: event.candidate,
+            userId: pc2UserIdRef.current,
+            connectionId: pc2ConnectionIdRef.current || undefined, // Include connectionId if available
+          })
+        );
       }
     };
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'join', room: debateID }));
+      ws.send(JSON.stringify({ type: "join", room: debateID }));
     };
 
     ws.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data);
-        
-        if (data.type === 'roomParticipants' && data.roomParticipants) {
-          const debatersOnly = data.roomParticipants.filter((p: any) => p.role && (p.role === 'for' || p.role === 'against'));
+
+        if (
+          data.type === "roomParticipants" &&
+          Array.isArray(data.roomParticipants)
+        ) {
+          const roomParticipants = data.roomParticipants as RoomParticipant[];
+          const debatersOnly = roomParticipants.filter(
+            (participant) =>
+              participant.role === "for" || participant.role === "against"
+          );
+          participantsRef.current = debatersOnly;
           setParticipants(debatersOnly);
-          
-          // If we have 2 debaters and no streams yet, request offers
-          if (debatersOnly.length === 2 && !remoteStream1 && !remoteStream2) {
+
+          if (
+            debatersOnly.length === 2 &&
+            !remoteStream1Ref.current &&
+            !remoteStream2Ref.current
+          ) {
             // Generate a unique request ID for this spectator
-            const requestId = `spectator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            ws.send(JSON.stringify({ type: 'requestOffer', requestId }));
+            const requestId = `spectator_${Date.now()}_${Math.random()
+              .toString(36)
+              .substr(2, 9)}`;
+            ws.send(JSON.stringify({ type: "requestOffer", requestId }));
           }
-        } else if (data.type === 'offer' && data.userId && data.offer) {
-          const debaterIndex = participants.findIndex((p: any) => p.id === data.userId);
+        } else if (data.type === "offer" && data.userId && data.offer) {
+          const debaterIndex = participantsRef.current.findIndex(
+            (participant) => participant.id === data.userId
+          );
           let pc: RTCPeerConnection | null = null;
           if (debaterIndex === 0) {
             pc = pc1;
@@ -134,7 +192,7 @@ export const ViewDebate: React.FC = () => {
           } else {
             pc = pc1;
           }
-          
+
           if (pc && data.offer) {
             try {
               if (pc === pc1) {
@@ -144,24 +202,30 @@ export const ViewDebate: React.FC = () => {
                 pc2UserIdRef.current = data.userId;
                 pc2ConnectionIdRef.current = data.connectionId || null;
               }
-              
-              await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+              await pc.setRemoteDescription(
+                new RTCSessionDescription(data.offer)
+              );
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
               // Include connectionId if provided (for spectator connections)
-              ws.send(JSON.stringify({ 
-                type: 'answer', 
-                answer, 
-                targetUserId: data.userId, 
-                userId: data.userId,
-                connectionId: data.connectionId // Include connectionId if provided
-              }));
+              ws.send(
+                JSON.stringify({
+                  type: "answer",
+                  answer,
+                  targetUserId: data.userId,
+                  userId: data.userId,
+                  connectionId: data.connectionId, // Include connectionId if provided
+                })
+              );
             } catch (error) {
-              // Error handling offer
+              console.error("Error handling offer", error);
             }
           }
-        } else if (data.type === 'candidate' && data.userId) {
-          const debaterIndex = participants.findIndex((p: any) => p.id === data.userId);
+        } else if (data.type === "candidate" && data.userId) {
+          const debaterIndex = participantsRef.current.findIndex(
+            (participant) => participant.id === data.userId
+          );
           let pc: RTCPeerConnection | null = null;
           if (debaterIndex === 0) {
             pc = pc1;
@@ -170,17 +234,17 @@ export const ViewDebate: React.FC = () => {
           } else {
             pc = pc1;
           }
-          
+
           if (pc && data.candidate) {
             try {
               await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (error) {
-              // Error adding ICE candidate
+              console.error("Error adding ICE candidate", error);
             }
           }
         }
       } catch (error) {
-        // Error handling WebSocket message
+        console.error("Error processing debate room message", error);
       }
     };
 
@@ -216,7 +280,7 @@ export const ViewDebate: React.FC = () => {
       timestamp: Date.now(),
     };
 
-    sendMessage('vote', payload);
+    sendMessage("vote", payload);
   };
 
   if (!debateID) {
@@ -239,8 +303,8 @@ export const ViewDebate: React.FC = () => {
               Debate #{debateID.slice(0, 8)}
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Status: {wsStatus === 'connected' ? 'Connected' : 'Connecting...'} •{' '}
-              {presence} spectator{presence !== 1 ? 's' : ''} online
+              Status: {wsStatus === "connected" ? "Connected" : "Connecting..."}{" "}
+              • {presence} spectator{presence !== 1 ? "s" : ""} online
             </p>
           </div>
           <Button onClick={() => navigate(-1)} variant="outline">
@@ -265,20 +329,24 @@ export const ViewDebate: React.FC = () => {
                       ref={video1Ref}
                       autoPlay
                       playsInline
-                      muted
                       className="w-full h-full object-cover"
                     />
                     {!remoteStream1 && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
                         <div className="text-center text-white">
-                          <p className="text-sm">{participants[0]?.displayName || 'Debater 1'}</p>
-                          <p className="text-xs text-gray-400 mt-1">Waiting for video...</p>
+                          <p className="text-sm">
+                            {participants[0]?.displayName || "Debater 1"}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Waiting for video...
+                          </p>
                         </div>
                       </div>
                     )}
                     {participants[0] && (
                       <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                        {participants[0].displayName} {participants[0].role && `(${participants[0].role})`}
+                        {participants[0].displayName}{" "}
+                        {participants[0].role && `(${participants[0].role})`}
                       </div>
                     )}
                   </div>
@@ -289,20 +357,24 @@ export const ViewDebate: React.FC = () => {
                       ref={video2Ref}
                       autoPlay
                       playsInline
-                      muted
                       className="w-full h-full object-cover"
                     />
                     {!remoteStream2 && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
                         <div className="text-center text-white">
-                          <p className="text-sm">{participants[1]?.displayName || 'Debater 2'}</p>
-                          <p className="text-xs text-gray-400 mt-1">Waiting for video...</p>
+                          <p className="text-sm">
+                            {participants[1]?.displayName || "Debater 2"}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Waiting for video...
+                          </p>
                         </div>
                       </div>
                     )}
                     {participants[1] && (
                       <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                        {participants[1].displayName} {participants[1].role && `(${participants[1].role})`}
+                        {participants[1].displayName}{" "}
+                        {participants[1].role && `(${participants[1].role})`}
                       </div>
                     )}
                   </div>
@@ -327,13 +399,19 @@ export const ViewDebate: React.FC = () => {
                   </p>
                 ) : (
                   Object.entries(pollState).map(([pollId, options]) => (
-                    <div key={pollId} className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div
+                      key={pollId}
+                      className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    >
                       <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">
                         Poll: {pollId.slice(0, 8)}
                       </h3>
                       <div className="space-y-2">
                         {Object.entries(options).map(([option, count]) => (
-                          <div key={option} className="flex items-center justify-between">
+                          <div
+                            key={option}
+                            className="flex items-center justify-between"
+                          >
                             <Button
                               onClick={() => handleVote(pollId, option)}
                               variant="outline"
@@ -399,14 +477,16 @@ export const ViewDebate: React.FC = () => {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Status:
+                    </span>
                     <span
                       className={`font-semibold ${
-                        wsStatus === 'connected'
-                          ? 'text-green-600 dark:text-green-400'
-                          : wsStatus === 'connecting'
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-red-600 dark:text-red-400'
+                        wsStatus === "connected"
+                          ? "text-green-600 dark:text-green-400"
+                          : wsStatus === "connecting"
+                          ? "text-yellow-600 dark:text-yellow-400"
+                          : "text-red-600 dark:text-red-400"
                       }`}
                     >
                       {wsStatus}
@@ -442,4 +522,3 @@ export const ViewDebate: React.FC = () => {
 };
 
 export default ViewDebate;
-

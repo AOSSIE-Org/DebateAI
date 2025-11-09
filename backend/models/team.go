@@ -118,7 +118,12 @@ func (td TeamDebate) MarshalJSON() ([]byte, error) {
 		ID:            td.ID.Hex(),
 		Team1ID:       td.Team1ID.Hex(),
 		Team2ID:       td.Team2ID.Hex(),
-		CurrentUserID: td.CurrentUserID.Hex(),
+		CurrentUserID: func() string {
+			if td.CurrentUserID.IsZero() {
+				return ""
+			}
+			return td.CurrentUserID.Hex()
+		}(),
 		Alias:         (*Alias)(&td),
 	})
 }

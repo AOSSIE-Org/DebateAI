@@ -107,6 +107,9 @@ const MatchLogs: React.FC = () => {
       : log.match.includes("Semifinal")
       ? "Semifinal"
       : "Final";
+    const isFirstRoundMatch3 = log.match.startsWith(
+      "First Round Match 3: Ayaan Khanna vs Vivaan Sharma"
+    );
     let winner = "";
     if (log.score && log.score.total) {
       const [score1, score2] = log.score.total.split("-").map(Number);
@@ -114,7 +117,7 @@ const MatchLogs: React.FC = () => {
       else if (score2 > score1) winner = player2;
       else
         winner =
-          stage === ("First Round Match 3" as any)
+          log.match === "First Round Match 3: Ayaan Khanna vs Vivaan Sharma"
             ? "Ayaan Khanna (Tiebreaker)"
             : "";
     }
@@ -123,6 +126,7 @@ const MatchLogs: React.FC = () => {
       player2,
       stage,
       winner,
+      isFirstRoundMatch3,
     };
   };
 
@@ -131,7 +135,8 @@ const MatchLogs: React.FC = () => {
       <h2 className="text-2xl font-bold text-foreground mb-6">Match Logs</h2>
       <div className="space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto scrollbar-hide">
         {[...logs].reverse().map((log, index) => {
-          const { player1, player2, stage, winner } = getMatchDetails(log);
+          const { player1, player2, stage, winner, isFirstRoundMatch3 } =
+            getMatchDetails(log);
           return (
             <div
               key={index}
@@ -219,7 +224,7 @@ const MatchLogs: React.FC = () => {
                     {log.score?.total.split("-")[1]}
                   </span>
                 </div>
-                {stage === "First Round Match 3" && (
+                {isFirstRoundMatch3 && (
                   <p className="text-xs text-muted-foreground mt-2">
                     * Ayaan Khanna advanced via tiebreaker
                   </p>
