@@ -153,9 +153,6 @@ func GetUserTranscriptsHandler(c *gin.Context) {
 		return
 	}
 
-	for i, transcript := range transcripts {
-	}
-
 	c.JSON(200, gin.H{"transcripts": transcripts})
 }
 
@@ -413,6 +410,8 @@ func UpdatePendingTranscriptsHandler(c *gin.Context) {
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return
 	}
+
+	_ = email
 
 	err = services.UpdatePendingTranscripts()
 	if err != nil {

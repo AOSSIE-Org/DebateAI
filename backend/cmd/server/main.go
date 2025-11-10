@@ -123,9 +123,6 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 		// Chat functionality is now handled by the main WebSocket handler
 
-		auth.GET("/coach/pros-cons/topic", routes.GetProsConsTopic)
-		auth.POST("/coach/pros-cons/submit", routes.SubmitProsCons)
-
 		// Team routes
 		routes.SetupTeamRoutes(auth)
 		routes.SetupTeamDebateRoutes(auth)

@@ -123,7 +123,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 	}
 
 	// Get user details from database
-	userID, username, err := getUserDetails(email)
+	userID, username, _, _, err := getUserDetails(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user details"})
 		return
@@ -525,7 +525,6 @@ func handleTeamLiveTranscript(room *TeamRoom, conn *websocket.Conn, message Team
 func handleTeamPhaseChange(room *TeamRoom, conn *websocket.Conn, message TeamMessage, roomKey string) {
 	// Update room state
 	room.Mutex.Lock()
-	oldPhase := room.CurrentPhase
 	if message.Phase != "" {
 		room.CurrentPhase = message.Phase
 	} else {

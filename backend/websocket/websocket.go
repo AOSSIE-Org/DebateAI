@@ -3,7 +3,9 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,7 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"strings"
 )
 
 var upgrader = websocket.Upgrader{
@@ -36,6 +37,8 @@ type Client struct {
 	UserID       string
 	Username     string
 	Email        string
+	AvatarURL    string
+	Elo          int
 	IsSpectator  bool
 	IsTyping     bool
 	IsSpeaking   bool
@@ -142,7 +145,7 @@ func WebsocketHandler(c *gin.Context) {
 	}
 
 	// Get user details from database
-	userID, username, err := getUserDetails(email)
+	userID, username, avatarURL, rating, err := getUserDetails(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user details"})
 		return
@@ -155,9 +158,6 @@ func WebsocketHandler(c *gin.Context) {
 	} else {
 	}
 	room := rooms[roomID]
-	room.Mutex.Lock()
-	currentClients := len(room.Clients)
-	room.Mutex.Unlock()
 	roomsMutex.Unlock()
 
 	// Upgrade the connection.
@@ -188,12 +188,21 @@ func WebsocketHandler(c *gin.Context) {
 	}
 	room.Mutex.Unlock()
 
+	if avatarURL == "" {
+		avatarURL = "https://avatar.iran.liara.run/public/31"
+	}
+	if rating == 0 {
+		rating = 1500
+	}
+
 	// Create client instance
 	client := &Client{
 		Conn:         conn,
 		UserID:       userID,
 		Username:     username,
 		Email:        email,
+		AvatarURL:    avatarURL,
+		Elo:          rating,
 		IsSpectator:  isSpectator,
 		IsTyping:     false,
 		IsSpeaking:   false,
@@ -218,6 +227,8 @@ func WebsocketHandler(c *gin.Context) {
 			"displayName": c.Username,
 			"email":       c.Email,
 			"role":        c.Role,
+			"avatarUrl":   c.AvatarURL,
+			"elo":         c.Elo,
 		})
 	}
 	room.Mutex.Unlock()
@@ -229,9 +240,49 @@ func WebsocketHandler(c *gin.Context) {
 	}
 	client.SafeWriteJSON(participantsMsg)
 
+	// Send existing participants' detailed info to the new client
+	for connRef, existing := range room.Clients {
+		payload := map[string]interface{}{
+			"id":          existing.UserID,
+			"username":    existing.Username,
+			"displayName": existing.Username,
+			"email":       existing.Email,
+			"avatarUrl":   existing.AvatarURL,
+			"elo":         existing.Elo,
+		}
+		detailMessage := map[string]interface{}{
+			"type":        "userDetails",
+			"userDetails": payload,
+		}
+
+		if connRef == conn {
+			// Already sent this client's participant data; ensure they have their own detail payload too
+			client.SafeWriteJSON(detailMessage)
+		} else {
+			// Send existing participant info to the new client
+			client.SafeWriteJSON(detailMessage)
+		}
+	}
+
+	// Prepare detailed payload for the new client to broadcast to others
+	userDetailsPayload := map[string]interface{}{
+		"id":          client.UserID,
+		"username":    client.Username,
+		"displayName": client.Username,
+		"email":       client.Email,
+		"avatarUrl":   client.AvatarURL,
+		"elo":         client.Elo,
+	}
+
+	userDetailsMessage := map[string]interface{}{
+		"type":        "userDetails",
+		"userDetails": userDetailsPayload,
+	}
+
 	// Broadcast new participant to other clients
 	recipientCount := 0
 	for _, r := range snapshotRecipients(room, conn) {
+		r.SafeWriteJSON(userDetailsMessage)
 		r.SafeWriteJSON(participantsMsg)
 		recipientCount++
 	}
@@ -253,6 +304,8 @@ func WebsocketHandler(c *gin.Context) {
 					"displayName": c.Username,
 					"email":       c.Email,
 					"role":        c.Role,
+					"avatarUrl":   c.AvatarURL,
+					"elo":         c.Elo,
 				})
 			}
 
@@ -551,7 +604,7 @@ func handleUnmuteRequest(room *Room, conn *websocket.Conn, message Message, clie
 }
 
 // getUserDetails fetches user details from database
-func getUserDetails(email string) (string, string, error) {
+func getUserDetails(email string) (string, string, string, int, error) {
 	// Query user document using email
 	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -561,12 +614,15 @@ func getUserDetails(email string) (string, string, error) {
 		ID          primitive.ObjectID `bson:"_id"`
 		Email       string             `bson:"email"`
 		DisplayName string             `bson:"displayName"`
+		AvatarURL   string             `bson:"avatarUrl"`
+		Rating      float64            `bson:"rating"`
 	}
 
 	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		return "", "", err
+		return "", "", "", 0, err
 	}
 
-	return user.ID.Hex(), user.DisplayName, nil
+	rating := int(math.Round(user.Rating))
+	return user.ID.Hex(), user.DisplayName, user.AvatarURL, rating, nil
 }

@@ -395,10 +395,8 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 	// Broadcast directly to all connected clients
 	hub.mu.RLock()
 	room, exists := hub.debates[client.debateID]
-	clientCount := 0
 	if exists {
 		room.mu.RLock()
-		clientCount = len(room.clients)
 		for _, c := range room.clients {
 			if err := c.WriteJSON(questionEvent); err != nil {
 			}

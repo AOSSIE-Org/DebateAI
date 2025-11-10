@@ -101,14 +101,14 @@ interface WSMessage {
 
 // Define phase durations in seconds
 const phaseDurations: { [key in DebatePhase]?: number } = {
-  [DebatePhase.OpeningFor]: 60,
-  [DebatePhase.OpeningAgainst]: 60,
+  [DebatePhase.OpeningFor]: 30,
+  [DebatePhase.OpeningAgainst]: 30,
   [DebatePhase.CrossForQuestion]: 30,
   [DebatePhase.CrossAgainstAnswer]: 30,
   [DebatePhase.CrossAgainstQuestion]: 30,
   [DebatePhase.CrossForAnswer]: 30,
-  [DebatePhase.ClosingFor]: 45,
-  [DebatePhase.ClosingAgainst]: 45,
+  [DebatePhase.ClosingFor]: 30,
+  [DebatePhase.ClosingAgainst]: 30,
 };
 
 // Function to extract JSON from response
@@ -189,7 +189,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [isListening, setIsListening] = useState(false);
   const [, setCurrentTranscript] = useState("");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [, setSpeechError] = useState<string | null>(null);
   const retryCountRef = useRef<number>(0);
   const manualRecordingRef = useRef(false);
 
@@ -803,15 +803,6 @@ const OnlineDebateRoom = (): JSX.Element => {
             };
             setLocalUser(fallbackLocalUser);
             setRoomOwnerId((prev) => prev ?? currentUser.id ?? null);
-
-            const fallbackOpponentUser = {
-              id: "opponent",
-              username: "Opponent",
-              elo: 1500,
-              avatarUrl: "https://avatar.iran.liara.run/public/31",
-              displayName: "Opponent",
-            };
-            setOpponentUser(fallbackOpponentUser);
           }
         }
       } catch (error) {
@@ -831,19 +822,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           );
           setLocalUser(errorFallbackLocalUser);
           setRoomOwnerId((prev) => prev ?? currentUser.id ?? null);
-
-          const errorFallbackOpponentUser = {
-            id: "opponent",
-            username: "Opponent",
-            elo: 1500,
-            avatarUrl: "https://avatar.iran.liara.run/public/31",
-            displayName: "Opponent",
-          };
-          console.warn(
-            "Setting error fallback opponent user:",
-            errorFallbackOpponentUser
-          );
-          setOpponentUser(errorFallbackOpponentUser);
         }
       } finally {
         setIsLoading(false);
@@ -2068,11 +2046,6 @@ const OnlineDebateRoom = (): JSX.Element => {
               <div className="text-sm text-gray-600 text-center">
                 {speakingStatusMessage}
               </div>
-              {speechError && (
-                <div className="text-sm text-red-600 p-2 bg-red-50 rounded w-full text-center">
-                  {speechError}
-                </div>
-              )}
             </div>
           </div>
         </div>
