@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"arguehub/models"
@@ -33,6 +34,7 @@ Examples:
 	ctx := context.Background()
 	response, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
+		log.Printf("Failed to generate topic: %v", err)
 		return getFallbackTopic(skillLevel), nil
 	}
 	if response == "" {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Table,
   TableHeader,
@@ -11,9 +11,22 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { FaCrown, FaMedal, FaChessQueen } from "react-icons/fa";
+import {
+  FaCrown,
+  FaMedal,
+  FaChessQueen,
+  FaRobot,
+  FaTrophy,
+} from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { fetchLeaderboardData } from "@/services/leaderboardService";
+import {
+  fetchGamificationLeaderboard,
+  createGamificationWebSocket,
+  GamificationEvent,
+} from "@/services/gamificationService";
+import BadgeUnlocked from "@/components/BadgeUnlocked";
+import { useUser } from "@/hooks/useUser";
 
 interface Debater {
   id: string;
@@ -22,6 +35,7 @@ interface Debater {
   avatarUrl: string;
   name: string;
   score: number;
+  rating: number;
 }
 
 interface Stat {
@@ -55,22 +69,46 @@ const mapIcon = (icon: string) => {
   }
 };
 
+type SortCategory = "score" | "rating" | null;
+
 const Leaderboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(5);
   const [debaters, setDebaters] = useState<Debater[]>([]);
   const [stats, setStats] = useState<Stat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [badgeUnlocked, setBadgeUnlocked] = useState<{
+    badgeName: string;
+    isOpen: boolean;
+  }>({
+    badgeName: "",
+    isOpen: false,
+  });
+  const [sortCategory, setSortCategory] = useState<SortCategory>("score");
+  const wsRef = useRef<WebSocket | null>(null);
+  const { user } = useUser();
 
+  // Load initial leaderboard data
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem("token");
         if (!token) return;
-        const data: LeaderboardData = await fetchLeaderboardData(token);
-        setDebaters(data.debaters);
-        setStats(data.stats);
+
+        // Try to fetch from gamification endpoint first, fallback to old endpoint
+        try {
+          const data = await fetchGamificationLeaderboard(token);
+          setDebaters(data.debaters);
+          // Keep stats from old endpoint for now
+          const oldData: LeaderboardData = await fetchLeaderboardData(token);
+          setStats(oldData.stats);
+        } catch {
+          // Fallback to old endpoint
+          const data: LeaderboardData = await fetchLeaderboardData(token);
+          setDebaters(data.debaters);
+          setStats(data.stats);
+        }
       } catch {
         setError("Failed to load leaderboard data. Please try again later.");
       } finally {
@@ -81,21 +119,135 @@ const Leaderboard: React.FC = () => {
     loadData();
   }, []);
 
-  const currentUserIndex = debaters.findIndex((debater) => debater.currentUser);
+  // Set up WebSocket connection for live updates
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token || !user) return;
+
+    // Clean up existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    const ws = createGamificationWebSocket(
+      token,
+      (event: GamificationEvent) => {
+        console.log("Gamification event received:", event);
+
+        if (event.type === "badge_awarded" && event.badgeName) {
+          // Show badge unlock notification if it's for the current user
+          setDebaters((currentDebaters) => {
+            const currentUserDebater = currentDebaters.find(
+              (d) => d.currentUser
+            );
+            if (
+              event.userId === currentUserDebater?.id ||
+              event.userId === user?.id
+            ) {
+              setBadgeUnlocked({
+                badgeName: event.badgeName!,
+                isOpen: true,
+              });
+            }
+            return currentDebaters;
+          });
+        }
+
+        if (event.type === "score_updated") {
+          // Update the leaderboard when scores change
+          setDebaters((prevDebaters) => {
+            const updated = [...prevDebaters];
+            const index = updated.findIndex((d) => d.id === event.userId);
+
+            if (index !== -1 && event.newScore !== undefined) {
+              updated[index] = {
+                ...updated[index],
+                score: event.newScore,
+              };
+            }
+
+            return updated;
+          });
+
+          // Reload full leaderboard periodically to ensure accuracy
+          const reloadTimer = setTimeout(async () => {
+            try {
+              const token = localStorage.getItem("token");
+              if (token) {
+                const data = await fetchGamificationLeaderboard(token);
+                setDebaters(data.debaters);
+              }
+            } catch (err) {
+              console.error("Error reloading leaderboard:", err);
+            }
+          }, 2000);
+
+          return () => clearTimeout(reloadTimer);
+        }
+      },
+      (error) => {
+        console.error("WebSocket error:", error);
+      },
+      () => {
+        console.log("WebSocket closed");
+      }
+    );
+
+    wsRef.current = ws;
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [user]);
+
+  // Sort debaters based on selected category
+  const sortedDebaters = React.useMemo(() => {
+    const sorted = [...debaters];
+    if (sortCategory) {
+      sorted.sort((a, b) => {
+        if (sortCategory === "score") {
+          return b.score - a.score; // Descending order
+        } else {
+          return b.rating - a.rating; // Descending order
+        }
+      });
+    }
+    // Update ranks after sorting
+    sorted.forEach((debater, index) => {
+      debater.rank = index + 1;
+    });
+    return sorted;
+  }, [debaters, sortCategory]);
+
+  const currentUserIndex = sortedDebaters.findIndex(
+    (debater) => debater.currentUser
+  );
 
   const getVisibleDebaters = () => {
-    if (!debaters.length) return [];
-    const initialList = debaters
+    if (!sortedDebaters.length) return [];
+    const initialList = sortedDebaters
       .filter((debater, index) => !debater.currentUser || index < visibleCount)
       .slice(0, visibleCount);
     if (currentUserIndex !== -1 && currentUserIndex >= visibleCount) {
-      return [...initialList.slice(0, -1), debaters[currentUserIndex]];
+      return [...initialList.slice(0, -1), sortedDebaters[currentUserIndex]];
     }
     return initialList;
   };
 
+  const handleSortCategory = (category: SortCategory) => {
+    // If clicking the same category, toggle to null (no sort) or keep it
+    if (sortCategory === category) {
+      setSortCategory(null);
+    } else {
+      setSortCategory(category);
+    }
+  };
+
   const showMore = () =>
-    setVisibleCount((prev) => Math.min(prev + 5, debaters.length));
+    setVisibleCount((prev) => Math.min(prev + 5, sortedDebaters.length));
 
   const visibleDebaters = getVisibleDebaters();
 
@@ -111,6 +263,11 @@ const Leaderboard: React.FC = () => {
 
   return (
     <div className="p-6 bg-background text-foreground">
+      <BadgeUnlocked
+        badgeName={badgeUnlocked.badgeName}
+        isOpen={badgeUnlocked.isOpen}
+        onClose={() => setBadgeUnlocked({ badgeName: "", isOpen: false })}
+      />
       <div className="max-w-7xl mx-auto">
         <p className="text-center text-muted-foreground mb-8 text-lg">
           Hone your skills and see how you stack up against top debaters! 🏆
@@ -128,8 +285,29 @@ const Leaderboard: React.FC = () => {
                     <TableHead className="text-muted-foreground pl-6">
                       Debater
                     </TableHead>
-                    <TableHead className="text-right text-muted-foreground pr-6">
-                      Score
+                    <TableHead
+                      className="text-right text-muted-foreground pr-6 cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => handleSortCategory("score")}
+                    >
+                      <div className="flex items-center justify-end gap-2">
+                        <FaRobot className="w-4 h-4" />
+                        <span>VS BOT</span>
+                        {sortCategory === "score" && (
+                          <span className="text-xs">↓</span>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="text-right text-muted-foreground pr-6 cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => handleSortCategory("rating")}
+                    >
+                      <div className="flex items-center justify-end gap-2">
+                        <FaTrophy className="w-4 h-4" />
+                        <span>ELO RATING</span>
+                        {sortCategory === "rating" && (
+                          <span className="text-xs">↓</span>
+                        )}
+                      </div>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -187,13 +365,21 @@ const Leaderboard: React.FC = () => {
                           <div className="w-2 h-2 rounded-full bg-green-500" />
                         </div>
                       </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <div className="flex items-center justify-end space-x-2">
+                          <span className="font-semibold text-foreground">
+                            {debater.rating}
+                          </span>
+                          <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </Card>
 
-            {visibleCount < debaters.length && (
+            {visibleCount < sortedDebaters.length && (
               <div className="mt-6 flex justify-center">
                 <Button
                   onClick={showMore}
@@ -227,9 +413,6 @@ const Leaderboard: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                (Data fetched from backend)
-              </p>
             </div>
           </div>
         </div>

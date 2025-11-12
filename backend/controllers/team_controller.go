@@ -2,7 +2,8 @@ package controllers
 
 import (
 	"context"
-	"math/rand"
+	cryptoRand "crypto/rand"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -21,7 +22,14 @@ func generateTeamCode() string {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, 6)
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		n, err := cryptoRand.Int(cryptoRand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// Fallback to time-based selection if cryptographic random fails
+			idx := (time.Now().UnixNano() + int64(i)) % int64(len(charset))
+			b[i] = charset[int(idx)]
+			continue
+		}
+		b[i] = charset[n.Int64()]
 	}
 	return string(b)
 }
@@ -202,6 +210,10 @@ func CreateTeam(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "You are already in a team. Leave your current team before creating a new one."})
 		return
 	}
+	if err != nil && err != mongo.ErrNoDocuments {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify existing team membership"})
+		return
+	}
 
 	// Set captain information
 	team.CaptainID = userID.(primitive.ObjectID)
@@ -332,6 +344,16 @@ func JoinTeam(c *gin.Context) {
 	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&team)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+		return
+	}
+
+	capacity := team.MaxSize
+	if capacity <= 0 {
+		capacity = 4
+	}
+
+	if len(team.Members) >= capacity {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team is already full"})
 		return
 	}
 
@@ -591,7 +613,12 @@ func GetTeamMemberProfile(c *gin.Context) {
 func GetAvailableTeams(c *gin.Context) {
 	collection := db.GetCollection("teams")
 	cursor, err := collection.Find(context.Background(), bson.M{
-		"$expr": bson.M{"$lt": []interface{}{bson.M{"$size": "$members"}, 4}}, // Teams with less than 4 members
+		"$expr": bson.M{
+			"$lt": bson.A{
+				bson.M{"$size": "$members"},
+				"$maxSize",
+			},
+		},
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve teams"})

@@ -27,4 +27,9 @@ type User struct {
 	ResetPasswordCode string             `bson:"resetPasswordCode,omitempty"`
 	CreatedAt         time.Time          `bson:"createdAt"`
 	UpdatedAt         time.Time          `bson:"updatedAt"`
+	// Gamification fields
+	Score             int                `bson:"score" json:"score"` // Total gamification score
+	Badges            []string           `bson:"badges,omitempty" json:"badges,omitempty"` // List of badge names earned
+	CurrentStreak     int                `bson:"currentStreak" json:"currentStreak"` // Current daily streak
+	LastActivityDate  time.Time          `bson:"lastActivityDate,omitempty" json:"lastActivityDate,omitempty"` // Last activity date for streak calculation
 }

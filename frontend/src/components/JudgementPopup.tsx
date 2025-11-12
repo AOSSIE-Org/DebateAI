@@ -133,62 +133,64 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
     localStorage.getItem('opponentAvatar') ||
     'https://avatar.iran.liara.run/public/31';
 
-  const isUserBotFormat = 'user' in judgment.opening_statement;
-  const defaultForName = forRole || 'For Debater';
-  const defaultAgainstName = againstRole || 'Against Debater';
-  const resolvedLocalName = localDisplayName || userName;
-  const resolvedOpponentName = opponentDisplayName || 'Opponent';
-  const derivedLocalAvatar = localAvatarUrl || localAvatar;
-  const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
+const isUserBotFormat = 'user' in judgment.opening_statement;
 
-  const resolvedForName = isUserBotFormat
-    ? defaultForName
-    : localRole === 'for'
-    ? resolvedLocalName
-    : localRole === 'against'
-    ? resolvedOpponentName
-    : defaultForName;
+const defaultForName = forRole || 'For Debater';
+const defaultAgainstName = againstRole || 'Against Debater';
+const resolvedLocalName = localDisplayName || userName;
+const resolvedOpponentName = opponentDisplayName || 'Opponent';
+const derivedLocalAvatar = localAvatarUrl || localAvatar;
+const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
 
-  const resolvedAgainstName = isUserBotFormat
-    ? defaultAgainstName
-    : localRole === 'against'
-    ? resolvedLocalName
-    : localRole === 'for'
-    ? resolvedOpponentName
-    : defaultAgainstName;
+const resolvedForName = isUserBotFormat
+  ? defaultForName
+  : localRole === 'for'
+  ? resolvedLocalName
+  : localRole === 'against'
+  ? resolvedOpponentName
+  : defaultForName;
 
-  const player1Name = isUserBotFormat ? userName : resolvedForName;
-  const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
-  const player1Stance = isUserBotFormat ? userStance : 'For';
-  const player2Stance = isUserBotFormat ? botStance : 'Against';
+const resolvedAgainstName = isUserBotFormat
+  ? defaultAgainstName
+  : localRole === 'against'
+  ? resolvedLocalName
+  : localRole === 'for'
+  ? resolvedOpponentName
+  : defaultAgainstName;
 
-  const resolvedForAvatar = isUserBotFormat
-    ? userAvatar
-    : localRole === 'for'
-    ? derivedLocalAvatar
-    : localRole === 'against'
-    ? derivedOpponentAvatar
-    : derivedOpponentAvatar || derivedLocalAvatar;
+const player1Name = isUserBotFormat ? userName : resolvedForName;
+const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
+const player1Stance = isUserBotFormat ? userStance : 'For';
+const player2Stance = isUserBotFormat ? botStance : 'Against';
 
-  const resolvedAgainstAvatar = isUserBotFormat
-    ? botAvatar
-    : localRole === 'against'
-    ? derivedLocalAvatar
-    : localRole === 'for'
-    ? derivedOpponentAvatar
-    : derivedLocalAvatar || derivedOpponentAvatar;
+const resolvedForAvatar = isUserBotFormat
+  ? userAvatar
+  : localRole === 'for'
+  ? derivedLocalAvatar
+  : localRole === 'against'
+  ? derivedOpponentAvatar
+  : derivedLocalAvatar || derivedOpponentAvatar;
 
-  const player1Avatar = resolvedForAvatar || localAvatar;
-  const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
+const resolvedAgainstAvatar = isUserBotFormat
+  ? botAvatar
+  : localRole === 'against'
+  ? derivedLocalAvatar
+  : localRole === 'for'
+  ? derivedOpponentAvatar
+  : derivedOpponentAvatar || derivedLocalAvatar;
 
-  const formatChange = (value: number) =>
-    `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
-  const formatRating = (value: number) => value.toFixed(2);
+const player1Avatar = resolvedForAvatar || localAvatar;
+const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
+const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
 
-  const player1RatingSummary =
-    !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
-  const player2RatingSummary =
-    !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
+const formatChange = (value: number) =>
+  `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+const formatRating = (value: number) => value.toFixed(2);
+
+const player1RatingSummary =
+  !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
+const player2RatingSummary =
+  !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
 
   const handleGoHome = () => {
     navigate('/startdebate');
@@ -347,7 +349,7 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
                   {player1Stance}
                 </span>
               </p>
-              {/* <p className="text-xs text-gray-500">Debater</p> */}
+              <p className='text-xs text-gray-500'>Debater</p>
             </div>
           </div>
           <div className='flex items-center space-x-4 bg-gray-50 p-4 rounded-lg shadow-sm w-1/2 ml-2'>
@@ -363,6 +365,9 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
                 <span className='font-semibold text-orange-500'>
                   {player2Stance}
                 </span>
+              </p>
+              <p className='text-xs text-gray-500'>
+                {player2Desc || 'Debater'}
               </p>
             </div>
           </div>

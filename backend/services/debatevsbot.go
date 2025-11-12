@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -444,6 +445,7 @@ Provide ONLY the JSON output without any additional text.`,
 	text, err := generateDefaultModelText(ctx, prompt)
 	if err != nil || text == "" {
 		if err != nil {
+			log.Printf("Gemini error: %v", err)
 		}
 		return "Unable to judge."
 	}

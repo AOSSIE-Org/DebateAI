@@ -35,6 +35,11 @@ func getJWTSecret() string {
 	return jwtSecret
 }
 
+// GetJWTSecret returns the JWT secret (public function for use in other packages)
+func GetJWTSecret() string {
+	return getJWTSecret()
+}
+
 // ExtractNameFromEmail extracts the username before '@'
 func ExtractNameFromEmail(email string) string {
 	re := regexp.MustCompile(`^([^@]+)`)

@@ -84,6 +84,9 @@ func GoogleLogin(ctx *gin.Context) {
 			LastRatingUpdate: now,
 			AvatarURL:        avatarURL,
 			IsVerified:       true,
+			Score:            0, // Initialize gamification score
+			Badges:           []string{}, // Initialize badges array
+			CurrentStreak:    0, // Initialize streak
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
@@ -168,6 +171,9 @@ func SignUp(ctx *gin.Context) {
 		Password:         string(hashedPassword),
 		IsVerified:       false,
 		VerificationCode: verificationCode,
+		Score:            0, // Initialize gamification score
+		Badges:           []string{}, // Initialize badges array
+		CurrentStreak:    0, // Initialize streak
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
