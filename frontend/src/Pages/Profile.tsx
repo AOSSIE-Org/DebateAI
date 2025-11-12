@@ -74,6 +74,8 @@ import { getAuthToken } from "@/utils/auth";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
+import ProfileHover from "../components/ProfileHover";
+import { useUser } from "../hooks/useUser";
 import {
   transcriptService,
   SavedDebateTranscript,
@@ -612,6 +614,141 @@ const Profile: React.FC = () => {
     }
   };
 
+  // Followers and Following Section Component
+  const FollowersFollowingSection: React.FC = () => {
+    const { user } = useUser();
+    const [followers, setFollowers] = useState<any[]>([]);
+    const [following, setFollowing] = useState<any[]>([]);
+    const [loadingFollowers, setLoadingFollowers] = useState(false);
+    const [loadingFollowing, setLoadingFollowing] = useState(false);
+    const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+
+    useEffect(() => {
+      if (user?.id) {
+        fetchFollowers();
+        fetchFollowing();
+      }
+    }, [user?.id]);
+
+    const fetchFollowers = async () => {
+      if (!user?.id) return;
+      setLoadingFollowers(true);
+      try {
+        const token = getAuthToken();
+        const response = await fetch(`${baseURL}/users/${user.id}/followers`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFollowers(data.followers || []);
+        }
+      } catch (err) {
+        console.error('Error fetching followers:', err);
+      } finally {
+        setLoadingFollowers(false);
+      }
+    };
+
+    const fetchFollowing = async () => {
+      if (!user?.id) return;
+      setLoadingFollowing(true);
+      try {
+        const token = getAuthToken();
+        const response = await fetch(`${baseURL}/users/${user.id}/following`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFollowing(data.following || []);
+        }
+      } catch (err) {
+        console.error('Error fetching following:', err);
+      } finally {
+        setLoadingFollowing(false);
+      }
+    };
+
+    return (
+      <div className="space-y-3">
+        <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+          Connections
+        </h3>
+        
+        {/* Followers Section */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <Users className="w-3 h-3" />
+            <span>Followers ({followers.length})</span>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
+            {loadingFollowers ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Loading...
+              </div>
+            ) : followers.length === 0 ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                No followers yet
+              </div>
+            ) : (
+              followers.map((follower: any) => (
+                <ProfileHover key={follower.id || follower._id} userId={follower.id || follower._id}>
+                  <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
+                    <img
+                      src={follower.avatarUrl || defaultAvatar}
+                      alt={follower.displayName || 'User'}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                    <span className="text-xs truncate">
+                      {follower.displayName || follower.email || 'User'}
+                    </span>
+                  </div>
+                </ProfileHover>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Following Section */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <Users className="w-3 h-3" />
+            <span>Following ({following.length})</span>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
+            {loadingFollowing ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Loading...
+              </div>
+            ) : following.length === 0 ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Not following anyone yet
+              </div>
+            ) : (
+              following.map((followed: any) => (
+                <ProfileHover key={followed.id || followed._id} userId={followed.id || followed._id}>
+                  <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
+                    <img
+                      src={followed.avatarUrl || defaultAvatar}
+                      alt={followed.displayName || 'User'}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                    <span className="text-xs truncate">
+                      {followed.displayName || followed.email || 'User'}
+                    </span>
+                  </div>
+                </ProfileHover>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col md:flex-row gap-4 p-2 sm:p-4 bg-background min-h-[calc(100vh-4rem)]">
       <div className="w-full md:w-1/4 lg:w-1/5 bg-card p-4 border border-border rounded-md shadow max-h-[calc(100vh-4rem)] overflow-y-auto">
@@ -742,6 +879,8 @@ const Profile: React.FC = () => {
           </h3>
           {renderBioField()}
         </div>
+        <Separator className="my-2" />
+        <FollowersFollowingSection />
       </div>
 
       <div className="flex-1 flex flex-col space-y-4">

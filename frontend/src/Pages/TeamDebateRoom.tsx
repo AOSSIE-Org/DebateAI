@@ -194,6 +194,21 @@ const TeamDebateRoom: React.FC = () => {
     setIsCameraOn((prev) => !prev);
   }, []);
 
+  const toggleCamera = useCallback(() => {
+    if (!localStreamRef.current) {
+      return;
+    }
+    const [videoTrack] = localStreamRef.current.getVideoTracks();
+    if (!videoTrack) {
+      return;
+    }
+    setIsCameraOn((prev) => {
+      const next = !prev;
+      videoTrack.enabled = next;
+      return next;
+    });
+  }, []);
+
   // Timer state
   const [timer, setTimer] = useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -549,7 +564,7 @@ const TeamDebateRoom: React.FC = () => {
         case "topicChange":
           if (data.topic !== undefined) setTopic(data.topic);
           break;
-        case "roleSelection":
+        case "roleSelection": {
           if (data.role && data.teamId) {
             // Determine if this is from our team or opponent team based on teamId
             const messageTeamId = data.teamId;
@@ -564,18 +579,40 @@ const TeamDebateRoom: React.FC = () => {
             }
           }
           break;
-        case "countdownStart":
+        }
+        case "countdownStart": {
           // Backend is starting countdown - show it to all users
           const countdownValue = (data as any).countdown || 3;
           setCountdown(countdownValue);
           // Hide setup popup when countdown starts
           setShowSetupPopup(false);
           break;
+        }
         case "checkStart":
           // Ignore checkStart messages from backend (we shouldn't receive them)
           // This is sent by frontend to backend, not the other way around
           break;
-        case "ready":
+        case "ready": {
+          console.log("=== READY MESSAGE RECEIVED ===");
+          console.log("Received ready message:", data);
+          console.log("Current user:", currentUser?.id);
+          console.log("Message userId:", data.userId);
+          console.log("Message teamId:", data.teamId);
+          console.log("Message assignedToTeam:", (data as any).assignedToTeam);
+          console.log("isTeam1:", isTeam1);
+          console.log("myTeamId:", myTeamId);
+          console.log(
+            "Team1Ready:",
+            data.team1Ready,
+            "Team2Ready:",
+            data.team2Ready
+          );
+          console.log(
+            "Team1MembersCount:",
+            data.team1MembersCount,
+            "Team2MembersCount:",
+            data.team2MembersCount
+          );
           
           // CRITICAL: Verify the ready status is assigned to the correct team
           const messageTeamId = data.teamId;
@@ -646,6 +683,7 @@ const TeamDebateRoom: React.FC = () => {
           const allOppReady = oppReadyCount === oppTeamTotal && oppTeamTotal > 0;
           setPeerReady(allOppReady);
           break;
+        }
         case "phaseChange":
           if (data.phase) {
             const newPhase = data.phase as DebatePhase;

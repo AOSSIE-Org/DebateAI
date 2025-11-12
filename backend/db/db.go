@@ -10,11 +10,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/redis/go-redis/v9"
 )
 
 var MongoClient *mongo.Client
 var MongoDatabase *mongo.Database
 var DebateVsBotCollection *mongo.Collection
+var RedisClient *redis.Client
 
 // GetCollection returns a collection by name
 func GetCollection(collectionName string) *mongo.Collection {
@@ -91,4 +93,25 @@ func GetLatestDebateVsBot(email string) (*models.DebateVsBot, error) {
 		return nil, err
 	}
 	return &debate, nil
+}
+
+// ConnectRedis establishes a connection to Redis
+func ConnectRedis(addr, password string, db int) error {
+	RedisClient = redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: password,
+		DB:       db,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Test the connection with a ping
+	_, err := RedisClient.Ping(ctx).Result()
+	if err != nil {
+		return fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+
+	log.Println("Connected to Redis")
+	return nil
 }

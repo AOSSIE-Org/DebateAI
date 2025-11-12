@@ -5,7 +5,9 @@ import (
 	"arguehub/db"
 	"arguehub/models"
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -41,6 +43,20 @@ func AuthMiddleware(configPath string) gin.HandlerFunc {
 
 		claims, err := validateJWT(tokenParts[1], cfg.JWT.Secret)
 		if err != nil {
+			log.Printf("JWT validation failed for path %s: %v", c.Request.URL.Path, err)
+			log.Printf("Current server time: %s", time.Now().Format(time.RFC3339))
+			// Try to decode token to see expiration time even if invalid
+			if token, decodeErr := jwt.Parse(tokenParts[1], nil); decodeErr == nil {
+				if mapClaims, ok := token.Claims.(jwt.MapClaims); ok {
+					if exp, exists := mapClaims["exp"]; exists {
+						if expFloat, ok := exp.(float64); ok {
+							expTime := time.Unix(int64(expFloat), 0)
+							log.Printf("Token expiration time: %s (Unix: %.0f)", expTime.Format(time.RFC3339), expFloat)
+							log.Printf("Time until expiration: %v", time.Until(expTime))
+						}
+					}
+				}
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token", "message": err.Error()})
 			c.Abort()
 			return
@@ -77,17 +93,41 @@ func AuthMiddleware(configPath string) gin.HandlerFunc {
 }
 
 func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	// Use ParseWithClaims to get better error messages
+	claims := jwt.MapClaims{}
+	
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(secret), nil
 	})
+	
 	if err != nil {
-		return nil, err
+		// In jwt/v5, check for specific error types
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return nil, fmt.Errorf("token is expired")
+		}
+		if errors.Is(err, jwt.ErrTokenNotValidYet) {
+			return nil, fmt.Errorf("token is not valid yet")
+		}
+		if errors.Is(err, jwt.ErrTokenMalformed) {
+			return nil, fmt.Errorf("token is malformed")
+		}
+		// Check error message for additional context
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "expired") || strings.Contains(errMsg, "exp") {
+			return nil, fmt.Errorf("token is expired")
+		}
+		return nil, fmt.Errorf("token validation failed: %v", err)
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
+	
+	if !token.Valid {
+		return nil, fmt.Errorf("token is invalid")
 	}
-	return nil, fmt.Errorf("invalid token")
+	
+	// Log successful validation for debugging
+	log.Printf("JWT validation successful - Email: %v, Exp: %v", claims["sub"], claims["exp"])
+	
+	return claims, nil
 }

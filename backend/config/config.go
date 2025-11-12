@@ -31,6 +31,12 @@ type Config struct {
 		URI string `yaml:"uri"`
 	} `yaml:"database"`
 
+	Redis struct {
+		Addr     string `yaml:"addr"`
+		Password string `yaml:"password"`
+		DB       int    `yaml:"db"`
+	} `yaml:"redis"`
+
 	JWT struct {
 		Secret string `yaml:"secret"`
 		Expiry int    `yaml:"expiry"`

@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"strings"
 	"time"
 
@@ -9,8 +11,10 @@ import (
 	"arguehub/models"
 	"arguehub/services"
 	"arguehub/utils"
+	"arguehub/websocket"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -274,7 +278,216 @@ func JudgeDebate(c *gin.Context) {
 		nil,
 	)
 
+	// Update gamification (score, badges, streaks) after bot debate
+	log.Printf("About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",
+		userID.Hex(), resultStatus, latestDebate.Topic)
+
+	// Call synchronously but with recover to prevent panics from crashing the request
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in updateGamificationAfterBotDebate: %v", r)
+			}
+		}()
+		updateGamificationAfterBotDebate(userID, resultStatus, latestDebate.Topic)
+	}()
+
 	c.JSON(200, JudgeResponse{
 		Result: result,
 	})
+}
+
+// updateGamificationAfterBotDebate updates user score, checks for badges, and updates streaks after a bot debate
+func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, topic string) {
+	// Add recover to catch any panics
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic recovered in updateGamificationAfterBotDebate: %v", r)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	log.Printf("Starting gamification update for user %s, result: %s", userID.Hex(), resultStatus)
+
+	// Check if database is initialized
+	if db.MongoDatabase == nil {
+		log.Printf("ERROR: MongoDatabase is nil! Cannot update gamification.")
+		return
+	}
+
+	userCollection := db.MongoDatabase.Collection("users")
+	log.Printf("User collection retrieved, attempting to find user %s", userID.Hex())
+
+	// Get current user to check existing badges and score
+	var user models.User
+	err := userCollection.FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
+	if err != nil {
+		log.Printf("ERROR: Failed to get user for gamification update: %v (userID: %s)", err, userID.Hex())
+		return
+	}
+
+	log.Printf("Successfully retrieved user: %s (email: %s)", userID.Hex(), user.Email)
+	log.Printf("Current user score: %d, badges: %v", user.Score, user.Badges)
+
+	if user.Score < 0 {
+		user.Score = 0
+	}
+
+	// Calculate points based on result
+	var pointsToAdd int
+	var action string
+	switch resultStatus {
+	case "win":
+		pointsToAdd = 50 // Points for winning against bot
+		action = "debate_win"
+	case "loss":
+		pointsToAdd = 10 // Participation points
+		action = "debate_loss"
+	case "draw":
+		pointsToAdd = 25 // Points for draw
+		action = "debate_complete"
+	default:
+		pointsToAdd = 10 // Default participation points
+		action = "debate_complete"
+	}
+
+	log.Printf("Adding %d points for result: %s", pointsToAdd, resultStatus)
+
+	update := bson.M{
+		"$inc": bson.M{"score": pointsToAdd},
+		"$set": bson.M{"updatedAt": time.Now()},
+	}
+
+	updateResult, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+	if err != nil {
+		log.Printf("Error updating score with UpdateOne: %v", err)
+		return
+	}
+
+	if updateResult.MatchedCount == 0 {
+		log.Printf("User not found for score update: %s", userID.Hex())
+		return
+	}
+
+	var updatedUser models.User
+	err = userCollection.FindOne(ctx, bson.M{"_id": userID}).Decode(&updatedUser)
+	if err != nil {
+		log.Printf("Error fetching updated user: %v", err)
+		return
+	}
+
+	log.Printf("Successfully updated score. New score: %d (was %d, added %d)",
+		updatedUser.Score, user.Score, pointsToAdd)
+
+	scoreCollection := db.MongoDatabase.Collection("score_updates")
+	scoreUpdate := models.ScoreUpdate{
+		ID:        primitive.NewObjectID(),
+		UserID:    userID,
+		Points:    pointsToAdd,
+		Action:    action,
+		CreatedAt: time.Now(),
+		Metadata: map[string]interface{}{
+			"debateType": "user_vs_bot",
+			"topic":      topic,
+			"result":     resultStatus,
+		},
+	}
+	if _, err := scoreCollection.InsertOne(ctx, scoreUpdate); err != nil {
+		log.Printf("Error saving score update record: %v", err)
+	}
+
+	hasBadge := make(map[string]bool)
+	for _, badge := range updatedUser.Badges {
+		hasBadge[badge] = true
+	}
+
+	if resultStatus == "win" && !hasBadge["FirstWin"] {
+		badgeUpdate := bson.M{"$addToSet": bson.M{"badges": "FirstWin"}}
+		userCollection.UpdateOne(ctx, bson.M{"_id": userID}, badgeUpdate)
+
+		updatedUser.Badges = append(updatedUser.Badges, "FirstWin")
+		hasBadge["FirstWin"] = true
+
+		badgeCollection := db.MongoDatabase.Collection("user_badges")
+		userBadge := models.UserBadge{
+			ID:        primitive.NewObjectID(),
+			UserID:    userID,
+			BadgeName: "FirstWin",
+			EarnedAt:  time.Now(),
+			Metadata: map[string]interface{}{
+				"debateType": "user_vs_bot",
+				"topic":      topic,
+			},
+		}
+		badgeCollection.InsertOne(ctx, userBadge)
+
+		websocket.BroadcastGamificationEvent(models.GamificationEvent{
+			Type:      "badge_awarded",
+			UserID:    userID.Hex(),
+			BadgeName: "FirstWin",
+			Timestamp: time.Now(),
+		})
+		log.Printf("Awarded FirstWin badge to user %s", userID.Hex())
+	}
+
+	checkAndAwardAutomaticBadges(ctx, userID, updatedUser)
+
+	websocket.BroadcastGamificationEvent(models.GamificationEvent{
+		Type:      "score_updated",
+		UserID:    userID.Hex(),
+		Points:    pointsToAdd,
+		NewScore:  updatedUser.Score,
+		Action:    action,
+		Timestamp: time.Now(),
+	})
+
+	log.Printf("Updated gamification for user %s: +%d points (new score: %d), result: %s",
+		userID.Hex(), pointsToAdd, updatedUser.Score, resultStatus)
+}
+
+// checkAndAwardAutomaticBadges checks if user qualifies for automatic badges
+func checkAndAwardAutomaticBadges(ctx context.Context, userID primitive.ObjectID, user models.User) {
+	userCollection := db.MongoDatabase.Collection("users")
+	hasBadge := make(map[string]bool)
+	for _, badge := range user.Badges {
+		hasBadge[badge] = true
+	}
+
+	if user.Score >= 10 && !hasBadge["Novice"] {
+		update := bson.M{"$addToSet": bson.M{"badges": "Novice"}}
+		userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+
+		websocket.BroadcastGamificationEvent(models.GamificationEvent{
+			Type:      "badge_awarded",
+			UserID:    userID.Hex(),
+			BadgeName: "Novice",
+			Timestamp: time.Now(),
+		})
+	}
+
+	if user.CurrentStreak >= 5 && !hasBadge["Streak5"] {
+		update := bson.M{"$addToSet": bson.M{"badges": "Streak5"}}
+		userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+
+		websocket.BroadcastGamificationEvent(models.GamificationEvent{
+			Type:      "badge_awarded",
+			UserID:    userID.Hex(),
+			BadgeName: "Streak5",
+			Timestamp: time.Now(),
+		})
+	}
+
+	if user.Score >= 500 && !hasBadge["FactMaster"] {
+		update := bson.M{"$addToSet": bson.M{"badges": "FactMaster"}}
+		userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+
+		websocket.BroadcastGamificationEvent(models.GamificationEvent{
+			Type:      "badge_awarded",
+			UserID:    userID.Hex(),
+			BadgeName: "FactMaster",
+			Timestamp: time.Now(),
+		})
+	}
 }

@@ -22,7 +22,15 @@ func generateModelText(ctx context.Context, modelName, prompt string) (string, e
 	if geminiClient == nil {
 		return "", errors.New("gemini client not initialized")
 	}
-	resp, err := geminiClient.Models.GenerateContent(ctx, modelName, genai.Text(prompt), nil)
+	model := geminiClient.GenerativeModel(modelName)
+	model.SafetySettings = []*genai.SafetySetting{
+		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockNone},
+		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockNone},
+		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockNone},
+		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockNone},
+	}
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		return "", err
 	}

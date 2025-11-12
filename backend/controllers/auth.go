@@ -533,13 +533,25 @@ func VerifyToken(ctx *gin.Context) {
 
 // Helper function to generate JWT
 func generateJWT(email, secret string, expiryMinutes int) (string, error) {
+	now := time.Now()
+	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
+	
+	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", email, now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
+	
 	claims := jwt.MapClaims{
 		"sub": email,
-		"exp": time.Now().Add(time.Minute * time.Duration(expiryMinutes)).Unix(),
-		"iat": time.Now().Unix(),
+		"exp": expirationTime.Unix(),
+		"iat": now.Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	signedToken, err := token.SignedString([]byte(secret))
+	if err != nil {
+		log.Printf("JWT signing error: %v", err)
+		return "", err
+	}
+	
+	log.Printf("JWT Generated successfully - Expiration Unix: %d", expirationTime.Unix())
+	return signedToken, nil
 }
 
 // Helper function to validate JWT

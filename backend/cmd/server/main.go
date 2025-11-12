@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"strconv"
 
@@ -32,6 +33,13 @@ func main() {
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
 		panic("Failed to connect to MongoDB: " + err.Error())
 	}
+	log.Println("Connected to MongoDB")
+
+	// Initialize Casbin RBAC
+	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
+		log.Fatalf("Failed to initialize Casbin: %v", err)
+	}
+	log.Println("Casbin RBAC initialized")
 
 	// Connect to Redis if configured
 	if cfg.Redis.URL != "" {
@@ -40,10 +48,14 @@ func main() {
 			redisURL = "localhost:6379"
 		}
 		if err := debate.InitRedis(redisURL, cfg.Redis.Password, cfg.Redis.DB); err != nil {
-			panic("Failed to initialize Redis: " + err.Error())
+			log.Printf("⚠️ Warning: Failed to initialize Redis: %v", err)
+			log.Printf("⚠️ Some realtime features will be unavailable until Redis is reachable")
+		} else {
+			log.Println("Connected to Redis")
 		}
+	} else {
+		log.Println("Redis URL not configured; continuing without Redis-backed features")
 	}
-
 	// Start the room watching service for matchmaking after DB connection
 	go websocket.WatchForNewRooms()
 
@@ -95,6 +107,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// WebSocket routes (handle auth internally)
 	router.GET("/ws/matchmaking", websocket.MatchmakingHandler)
+	router.GET("/ws/gamification", websocket.GamificationWebSocketHandler)
 
 	// Protected routes (JWT auth)
 	auth := router.Group("/")
@@ -104,6 +117,12 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
+
+		// Gamification routes
+		auth.POST("/api/award-badge", routes.AwardBadgeRouteHandler)
+		auth.POST("/api/update-score", routes.UpdateScoreRouteHandler)
+		auth.GET("/api/leaderboard", routes.GetGamificationLeaderboardRouteHandler)
+
 		routes.SetupDebateVsBotRoutes(auth)
 
 		// WebSocket signaling endpoint (handles auth internally)
@@ -128,10 +147,19 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		routes.SetupTeamDebateRoutes(auth)
 		routes.SetupTeamChatRoutes(auth)
 		routes.SetupTeamMatchmakingRoutes(auth)
+		log.Println("Team routes registered")
+
+		// Community routes
+		routes.SetupCommunityRoutes(auth)
+		log.Println("Community routes registered")
 	}
 
 	// Team WebSocket handler
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
+
+	// Admin routes
+	routes.SetupAdminRoutes(router, "./config/config.prod.yml")
+	log.Println("Admin routes registered")
 
 	// Debate spectator WebSocket handler (no auth required for anonymous spectators)
 	router.GET("/ws/debate/:debateID", DebateWebsocketHandler)

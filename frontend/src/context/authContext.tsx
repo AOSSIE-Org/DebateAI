@@ -60,7 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         headers: { Authorization: `Bearer ${storedToken}` },
       });
 
-      if (!response.ok) throw new Error('Token expired or invalid');
+      if (!response.ok) {
+        // Token is expired or invalid - clear it and redirect to login
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+        navigate('/login');
+        return;
+      }
       setToken(storedToken);
 
       // Fetch user data to populate userAtom

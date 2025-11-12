@@ -504,14 +504,32 @@ const DebateRoom: React.FC = () => {
         phase: phases[state.currentPhase].name,
       };
 
-      setState((prev) => ({
-        ...prev,
-        messages: [...prev.messages, botMessage],
-      }));
-
-      setNextTurnPending(true);
+      setState((prev) => {
+        const updatedState = {
+          ...prev,
+          messages: [...prev.messages, botMessage],
+        };
+        setTimeout(() => {
+          advanceTurn(updatedState);
+        }, 100);
+        return updatedState;
+      });
     } catch (error) {
-      setNextTurnPending(true);
+      console.error("Bot error:", error);
+      setState((prev) => {
+        const errorMessage: Message = {
+          sender: "Bot",
+          text: "I encountered an error. Please continue.",
+          phase: phases[prev.currentPhase].name,
+        };
+        const updatedState = {
+          ...prev,
+          messages: [...prev.messages, errorMessage],
+          isBotTurn: false,
+        };
+        advanceTurn(updatedState);
+        return updatedState;
+      });
     } finally {
       botTurnRef.current = false;
     }
