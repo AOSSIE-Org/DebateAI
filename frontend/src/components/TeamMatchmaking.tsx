@@ -183,19 +183,6 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
     setShowDebateNotification(false);
   };
 
-  // Debug logging
-  console.debug({
-    isCaptain,
-    'team.captainId': team.captainId,
-    'user.id': user?.id,
-    'team.captainEmail': team.captainEmail,
-    'user.email': user?.email,
-    hasJoined,
-    matchedTeam: !!matchedTeam,
-    isTeamFull,
-    isSearching,
-  });
-
   // Show debate notification for ALL team members (not just captain)
   const debateNotification = showDebateNotification && activeDebateId ? (
     <Card className='mb-6 border-green-500 bg-green-50'>

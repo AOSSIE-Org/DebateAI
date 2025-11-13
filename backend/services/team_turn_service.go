@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -10,6 +11,11 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+const (
+	defaultTokenBucketCapacity   = 10
+	defaultTokenBucketRefillRate = 1
 )
 
 // TokenBucketService manages fair speech time distribution using token bucket algorithm
@@ -39,7 +45,9 @@ func (tbs *TokenBucketService) InitializeTeamBuckets(teamID primitive.ObjectID) 
 	// Get team members
 	collection := db.GetCollection("teams")
 	var team models.Team
-	err := collection.FindOne(context.Background(), bson.M{"_id": teamID}).Decode(&team)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, bson.M{"_id": teamID}).Decode(&team)
 	if err != nil {
 		return err
 	}
@@ -47,13 +55,28 @@ func (tbs *TokenBucketService) InitializeTeamBuckets(teamID primitive.ObjectID) 
 	tbs.mutex.Lock()
 	defer tbs.mutex.Unlock()
 
+	if tbs.buckets == nil {
+		tbs.buckets = make(map[string]*TokenBucket)
+	}
+
 	// Initialize bucket for each team member
 	for _, member := range team.Members {
 		bucketKey := tbs.getBucketKey(teamID, member.UserID)
+		if existing, ok := tbs.buckets[bucketKey]; ok {
+			existing.Mutex.Lock()
+			existing.Capacity = defaultTokenBucketCapacity
+			existing.RefillRate = defaultTokenBucketRefillRate
+			if existing.Tokens > defaultTokenBucketCapacity {
+				existing.Tokens = defaultTokenBucketCapacity
+			}
+			existing.Mutex.Unlock()
+			continue
+		}
+
 		tbs.buckets[bucketKey] = &TokenBucket{
-			Capacity:   10, // 10 tokens = 10 seconds of speaking time
-			Tokens:     10, // Start with full bucket
-			RefillRate: 1,  // 1 token per second
+			Capacity:   defaultTokenBucketCapacity,   // tokens = seconds of speaking time
+			Tokens:     defaultTokenBucketCapacity,   // start with full bucket
+			RefillRate: defaultTokenBucketRefillRate, // tokens per second
 			LastRefill: time.Now(),
 		}
 	}
@@ -99,8 +122,8 @@ func (tbs *TokenBucketService) GetRemainingTokens(teamID, userID primitive.Objec
 		return 0
 	}
 
-	bucket.Mutex.RLock()
-	defer bucket.Mutex.RUnlock()
+	bucket.Mutex.Lock()
+	defer bucket.Mutex.Unlock()
 
 	// Refill tokens based on time elapsed
 	tbs.refillTokens(bucket)
@@ -148,7 +171,9 @@ func (ttm *TeamTurnManager) InitializeTeamTurns(teamID primitive.ObjectID) error
 	// Get team members
 	collection := db.GetCollection("teams")
 	var team models.Team
-	err := collection.FindOne(context.Background(), bson.M{"_id": teamID}).Decode(&team)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, bson.M{"_id": teamID}).Decode(&team)
 	if err != nil {
 		return err
 	}
@@ -160,6 +185,10 @@ func (ttm *TeamTurnManager) InitializeTeamTurns(teamID primitive.ObjectID) error
 	var userIDs []primitive.ObjectID
 	for _, member := range team.Members {
 		userIDs = append(userIDs, member.UserID)
+	}
+
+	if len(userIDs) == 0 {
+		return fmt.Errorf("team %s has no members", teamID.Hex())
 	}
 
 	teamIDStr := teamID.Hex()
@@ -227,19 +256,30 @@ func (tbs *TokenBucketService) CanUserSpeak(teamID, userID primitive.ObjectID, t
 		return false
 	}
 
-	// Check if user has tokens
-	canConsume, _ := tbs.ConsumeToken(teamID, userID)
-	return canConsume
+	// Check if user has tokens without consuming
+	return tbs.GetRemainingTokens(teamID, userID) > 0
+}
+
+// TryConsumeForSpeaking attempts to consume a token if it's the user's turn
+func (tbs *TokenBucketService) TryConsumeForSpeaking(teamID, userID primitive.ObjectID, ttm *TeamTurnManager) (bool, int) {
+	// Ensure it's still the user's turn before consuming
+	if ttm.GetCurrentTurn(teamID) != userID {
+		return false, 0
+	}
+
+	return tbs.ConsumeToken(teamID, userID)
 }
 
 // GetTeamSpeakingStatus returns the speaking status for all team members
-func (tbs *TokenBucketService) GetTeamSpeakingStatus(teamID primitive.ObjectID, ttm *TeamTurnManager) map[string]interface{} {
+func (tbs *TokenBucketService) GetTeamSpeakingStatus(teamID primitive.ObjectID, ttm *TeamTurnManager) (map[string]interface{}, error) {
 	// Get team members
 	collection := db.GetCollection("teams")
 	var team models.Team
-	err := collection.FindOne(context.Background(), bson.M{"_id": teamID}).Decode(&team)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, bson.M{"_id": teamID}).Decode(&team)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	status := make(map[string]interface{})
@@ -258,5 +298,5 @@ func (tbs *TokenBucketService) GetTeamSpeakingStatus(teamID primitive.ObjectID, 
 		}
 	}
 
-	return status
+	return status, nil
 }

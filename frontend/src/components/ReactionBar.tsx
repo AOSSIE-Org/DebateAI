@@ -56,7 +56,10 @@ export const ReactionBar: React.FC = () => {
 
   const handleReaction = (emoji: string) => {
     const storedHash =
-      spectatorHash || localStorage.getItem('spectatorHash') || '';
+      spectatorHash ||
+      localStorage.getItem('spectatorHash') ||
+      localStorage.getItem('spectatorId') ||
+      '';
     if (!debateId || !storedHash) return;
 
     const payload = {

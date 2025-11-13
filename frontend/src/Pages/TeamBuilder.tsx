@@ -631,9 +631,18 @@ const TeamBuilder: React.FC = () => {
                       </div>
 
                       {/* Team Matchmaking */}
-                      <div className="mt-4">
-                        <TeamMatchmaking team={team} user={user} />
-                      </div>
+                      {user && user.id && (
+                        <div className="mt-4">
+                          <TeamMatchmaking
+                            team={team}
+                            user={{
+                              id: user.id,
+                              email: user.email ?? "",
+                              displayName: user.displayName ?? user.email ?? "",
+                            }}
+                          />
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-2">
                         {(team.members || []).map((member: TeamMember) => (

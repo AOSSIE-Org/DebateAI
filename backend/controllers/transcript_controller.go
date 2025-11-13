@@ -48,7 +48,7 @@ func SubmitTranscripts(c *gin.Context) {
 
 	token = strings.TrimPrefix(token, "Bearer ")
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
-	if err != nil || !valid {
+ 	if err != nil || !valid || email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}
@@ -405,7 +405,7 @@ func UpdatePendingTranscriptsHandler(c *gin.Context) {
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
-	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	valid, _, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
 	if err != nil || !valid {
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return

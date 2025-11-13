@@ -291,6 +291,8 @@ func readPump(client *SpectatorClient, hub *DebateHub) {
 			handleQuestion(client, clientMsg.Payload)
 		case "reaction":
 			handleReaction(client, clientMsg.Payload)
+		case "createPoll", "create_poll":
+			handleCreatePoll(client, clientMsg.Payload)
 		default:
 		}
 	}
@@ -463,12 +465,113 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 	}
 }
 
+// handleCreatePoll handles a poll creation request
+func handleCreatePoll(client *SpectatorClient, payloadBytes []byte) {
+	var payload debate.CreatePollPayload
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		return
+	}
+
+	payload.SpectatorHash = client.spectatorHash
+	payload.Timestamp = time.Now().Unix()
+
+	store := debate.NewPollStore()
+	if store == nil {
+		return
+	}
+
+	pollID, err := store.CreatePoll(client.debateID, payload.PollID, payload.Question, payload.Options)
+	if err != nil {
+		return
+	}
+
+	// Load current snapshot for counts/metadata
+	snapshot, err := loadPollSnapshot(client.debateID)
+	if err != nil {
+		// Even if snapshot fails, continue with created event
+	}
+
+	// Determine created poll data for event
+	var createdPoll map[string]interface{}
+	if snapshot != nil {
+		if payloadMap, ok := snapshot["payload"].(map[string]interface{}); ok {
+			if pollsRaw, ok := payloadMap["polls"].([]interface{}); ok {
+				for _, p := range pollsRaw {
+					if pollObj, ok := p.(map[string]interface{}); ok {
+						if id, ok := pollObj["pollId"].(string); ok && id == pollID {
+							createdPoll = pollObj
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if createdPoll == nil {
+		// Fallback payload
+		createdPoll = map[string]interface{}{
+			"pollId":   pollID,
+			"question": payload.Question,
+			"options":  payload.Options,
+			"counts":   map[string]int64{},
+			"voters":   int64(0),
+		}
+	}
+
+	createdEvent := map[string]interface{}{
+		"type":      "poll_created",
+		"payload":   createdPoll,
+		"timestamp": payload.Timestamp,
+	}
+
+	hub := GetDebateHub()
+	hub.mu.RLock()
+	room, exists := hub.debates[client.debateID]
+	if exists {
+		room.mu.RLock()
+		for _, c := range room.clients {
+			c.WriteJSON(createdEvent)
+			if snapshot != nil {
+				c.WriteJSON(snapshot)
+			}
+		}
+		room.mu.RUnlock()
+	}
+	hub.mu.RUnlock()
+
+	// Publish event for persistence
+	eventPayload := debate.PollCreatedPayload{
+		PollID:    pollID,
+		Question:  payload.Question,
+		Options:   payload.Options,
+		Timestamp: payload.Timestamp,
+	}
+	event, err := debate.NewEvent("poll_created", eventPayload)
+	if err == nil {
+		debate.PublishEvent(client.debateID, event)
+	}
+}
+
 // loadPollSnapshot loads the current poll state from Redis
 func loadPollSnapshot(debateID string) (map[string]interface{}, error) {
 	store := debate.NewPollStore()
-	pollState, votersCount, err := store.GetPollState(debateID)
+	pollState, votersCount, metadata, err := store.GetPollState(debateID)
 	if err != nil {
 		return nil, err
+	}
+
+	polls := make([]map[string]interface{}, 0, len(pollState))
+	for pollID, counts := range pollState {
+		meta := metadata[pollID]
+		poll := map[string]interface{}{
+			"pollId":   pollID,
+			"question": meta.Question,
+			"options":  meta.Options,
+			"counts":   counts,
+			"voters":   votersCount[pollID],
+		}
+		polls = append(polls, poll)
 	}
 
 	snapshot := map[string]interface{}{
@@ -476,6 +579,7 @@ func loadPollSnapshot(debateID string) (map[string]interface{}, error) {
 		"payload": map[string]interface{}{
 			"pollState":   pollState,
 			"votersCount": votersCount,
+			"polls":       polls,
 		},
 		"timestamp": time.Now().Unix(),
 	}

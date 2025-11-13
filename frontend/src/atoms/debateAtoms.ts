@@ -6,8 +6,16 @@ export const wsAtom = atom<WebSocket | null>(null);
 // Debate ID atom
 export const debateIdAtom = atom<string | null>(null);
 
-// Poll state atom: { pollId: { optionA: 0, optionB: 0 } }
-export const pollStateAtom = atom<Record<string, Record<string, number>>>({});
+export interface PollInfo {
+  pollId: string;
+  question: string;
+  options: string[];
+  counts: Record<string, number>;
+  voters: number;
+}
+
+// Poll state atom: pollId -> poll info
+export const pollStateAtom = atom<Record<string, PollInfo>>({});
 
 // User spectator ID atom (generated once and stored)
 export const spectatorIdAtom = atom<string>(() => {
@@ -35,7 +43,7 @@ export const spectatorHashAtom = atom<string>(() => {
   if (typeof window === 'undefined') return '';
   const stored = localStorage.getItem('spectatorHash');
   if (stored) return stored;
-  
+
   // Generate hash from spectator ID
   let spectatorId = localStorage.getItem('spectatorId');
   if (!spectatorId) {

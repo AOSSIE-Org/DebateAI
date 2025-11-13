@@ -12,6 +12,15 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { useUser } from "@/hooks/useUser";
 import { getAuthToken } from "@/utils/auth";
+import ReconnectingWebSocket from "reconnecting-websocket";
+import { useAtom } from "jotai";
+import {
+  presenceAtom,
+  questionsAtom,
+  pollStateAtom,
+  PollInfo,
+} from "@/atoms/debateAtoms";
+import { useDebateWS } from "@/hooks/useDebateWS";
 
 // Define debate phases as an enum
 enum DebatePhase {
@@ -97,6 +106,15 @@ interface WSMessage {
   currentTurn?: string;
   speechText?: string;
   liveTranscript?: string;
+  requestId?: string;
+  connectionId?: string;
+  targetUserId?: string;
+  spectatorCount?: number;
+  spectator?: {
+    connectionId: string;
+    spectatorUserId?: string;
+    spectatorDisplayName?: string;
+  };
 }
 
 // Define phase durations in seconds
@@ -122,6 +140,20 @@ const extractJSON = (response: string): string => {
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
   const { user: currentUser } = useUser();
+  const currentUserId = currentUser?.id ?? null;
+  useDebateWS(roomId ?? null);
+  const [audienceQuestions] = useAtom(questionsAtom);
+  const [spectatorPresence] = useAtom(presenceAtom);
+  const [pollState] = useAtom(pollStateAtom);
+  const recentQuestions = useMemo(
+    () =>
+      audienceQuestions
+        .slice()
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10),
+    [audienceQuestions]
+  );
+  const audiencePolls = useMemo(() => Object.values(pollState), [pollState]);
 
   // User state management
   const [localUser, setLocalUser] = useState<UserDetails | null>(null);
@@ -129,11 +161,22 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [roomParticipants, setRoomParticipants] = useState<UserDetails[]>([]);
   const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
 
-  const isRoomOwner = Boolean(roomOwnerId && currentUser?.id === roomOwnerId);
+  const isRoomOwner = Boolean(roomOwnerId && currentUserId === roomOwnerId);
 
   // Refs for WebSocket, PeerConnection, and media elements
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const spectatorPCsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const spectatorOfferQueueRef = useRef<
+    { connectionId: string; requestId?: string }[]
+  >([]);
+  const spectatorPendingCandidatesRef = useRef<
+    Map<string, RTCIceCandidateInit[]>
+  >(new Map());
+  const spectatorBaseIdRef = useRef<Map<string, Set<string>>>(new Map());
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const localRoleRef = useRef<DebateRole | null>(null);
+  const currentUserIdRef = useRef<string | null>(currentUserId);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -192,6 +235,202 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [, setSpeechError] = useState<string | null>(null);
   const retryCountRef = useRef<number>(0);
   const manualRecordingRef = useRef(false);
+
+  const cleanupSpectatorConnection = useCallback((connectionId: string) => {
+    const pc = spectatorPCsRef.current.get(connectionId);
+    if (pc) {
+      try {
+        pc.close();
+      } catch {
+        // Ignore close errors
+      }
+      spectatorPCsRef.current.delete(connectionId);
+      spectatorPendingCandidatesRef.current.delete(connectionId);
+    }
+    spectatorBaseIdRef.current.forEach((set, baseId) => {
+      if (set.has(connectionId)) {
+        set.delete(connectionId);
+        if (set.size === 0) {
+          spectatorBaseIdRef.current.delete(baseId);
+        }
+      }
+    });
+  }, []);
+
+  const cleanupSpectatorConnectionsByBase = useCallback(
+    (baseConnectionId: string) => {
+      const connectionIdsToCleanup: string[] = [];
+      spectatorPCsRef.current.forEach((_, key) => {
+        if (
+          key === baseConnectionId ||
+          key.startsWith(`${baseConnectionId}:`)
+        ) {
+          connectionIdsToCleanup.push(key);
+        }
+      });
+
+      connectionIdsToCleanup.forEach((id) => cleanupSpectatorConnection(id));
+      spectatorBaseIdRef.current.delete(baseConnectionId);
+      spectatorOfferQueueRef.current = spectatorOfferQueueRef.current.filter(
+        (queued) => queued.connectionId !== baseConnectionId
+      );
+    },
+    [cleanupSpectatorConnection]
+  );
+
+  useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
+
+  useEffect(() => {
+    localRoleRef.current = localRole;
+  }, [localRole]);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  const startSpectatorOffer = useCallback(
+    async (baseConnectionId: string, requestId?: string) => {
+      const ws = wsRef.current;
+      const stream = localStreamRef.current;
+      const userId = currentUserIdRef.current;
+      const role = localRoleRef.current;
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      if (!stream || !userId) {
+        return;
+      }
+
+      const normalizedBaseId =
+        baseConnectionId && baseConnectionId.length > 0
+          ? baseConnectionId
+          : `spectator-${Math.random().toString(36).slice(2)}`;
+      const connectionId = `${normalizedBaseId}:${userId}`;
+
+      if (spectatorPCsRef.current.has(connectionId)) {
+        cleanupSpectatorConnection(connectionId);
+      }
+
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      });
+      spectatorPCsRef.current.set(connectionId, pc);
+      spectatorPendingCandidatesRef.current.set(connectionId, []);
+      const existingSet =
+        spectatorBaseIdRef.current.get(normalizedBaseId) ?? new Set<string>();
+      existingSet.add(connectionId);
+      spectatorBaseIdRef.current.set(normalizedBaseId, existingSet);
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(
+            JSON.stringify({
+              type: "candidate",
+              candidate: event.candidate,
+              userId,
+              connectionId,
+            })
+          );
+        }
+      };
+
+      const handleConnectionStateChange = () => {
+        const state = pc.connectionState ?? pc.iceConnectionState;
+        if (
+          state === "failed" ||
+          state === "disconnected" ||
+          state === "closed"
+        ) {
+          cleanupSpectatorConnection(connectionId);
+        }
+      };
+
+      pc.oniceconnectionstatechange = handleConnectionStateChange;
+      pc.onconnectionstatechange = handleConnectionStateChange;
+
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        ws.send(
+          JSON.stringify({
+            type: "offer",
+            offer,
+            userId,
+            connectionId,
+            requestId,
+            role,
+          })
+        );
+      } catch (error) {
+        cleanupSpectatorConnection(connectionId);
+      }
+    },
+    [cleanupSpectatorConnection]
+  );
+
+  const flushSpectatorOfferQueue = useCallback(() => {
+    const streamReady = Boolean(localStreamRef.current);
+    const userReady = Boolean(currentUserIdRef.current);
+    const wsReady =
+      wsRef.current && wsRef.current.readyState === WebSocket.OPEN;
+
+    if (!streamReady || !userReady || !wsReady) {
+      return;
+    }
+
+    const queue = spectatorOfferQueueRef.current;
+    if (queue.length === 0) {
+      return;
+    }
+
+    spectatorOfferQueueRef.current = [];
+    queue.forEach(({ connectionId, requestId }) => {
+      startSpectatorOffer(connectionId, requestId);
+    });
+  }, [startSpectatorOffer]);
+
+  const queueSpectatorOffer = useCallback(
+    (connectionId: string, requestId?: string) => {
+      if (!connectionId) {
+        const generatedId =
+          typeof window !== "undefined" && window.crypto?.randomUUID
+            ? window.crypto.randomUUID()
+            : `spectator-${Math.random().toString(36).slice(2)}`;
+        connectionId = generatedId;
+      }
+
+      spectatorOfferQueueRef.current = spectatorOfferQueueRef.current.filter(
+        (queued) => queued.connectionId !== connectionId
+      );
+      spectatorOfferQueueRef.current.push({ connectionId, requestId });
+      flushSpectatorOfferQueue();
+    },
+    [flushSpectatorOfferQueue]
+  );
+
+  const processSpectatorOfferRequest = useCallback(
+    (message: WSMessage) => {
+      const connectionId = message.connectionId ?? "";
+      queueSpectatorOffer(connectionId, message.requestId);
+    },
+    [queueSpectatorOffer]
+  );
+
+  useEffect(() => {
+    flushSpectatorOfferQueue();
+  }, [localStream, currentUserId, flushSpectatorOfferQueue]);
+
+  useEffect(() => {
+    flushSpectatorOfferQueue();
+  }, [localRole, flushSpectatorOfferQueue]);
 
   // Popup and countdown state
   const [showSetupPopup, setShowSetupPopup] = useState(true);
@@ -845,21 +1084,27 @@ const OnlineDebateRoom = (): JSX.Element => {
     const token = getAuthToken();
     if (!token || !roomId) return;
 
-    const ws = new WebSocket(
-      `ws://localhost:1313/ws?room=${roomId}&token=${token}`
-    );
-    wsRef.current = ws;
+    const wsUrl = `ws://localhost:1313/ws?room=${roomId}&token=${token}`;
+    const rws = new ReconnectingWebSocket(wsUrl, [], {
+      connectionTimeout: 4000,
+      maxRetries: Infinity,
+      maxReconnectionDelay: 10000,
+      minReconnectionDelay: 1000,
+      reconnectionDelayGrowFactor: 1.3,
+    });
+    wsRef.current = rws;
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "join", room: roomId }));
+    rws.onopen = () => {
+      rws.send(JSON.stringify({ type: "join", room: roomId }));
       // Wait a bit before fetching participants to ensure room is fully created
       setTimeout(() => {
         fetchRoomParticipants();
       }, 1000);
       getMedia();
+      flushSpectatorOfferQueue();
     };
 
-    ws.onmessage = async (event) => {
+    rws.onmessage = async (event) => {
       const data: WSMessage = JSON.parse(event.data);
       switch (data.type) {
         case "topicChange":
@@ -987,8 +1232,28 @@ const OnlineDebateRoom = (): JSX.Element => {
             }
           }
           break;
+        case "spectatorJoined":
+          if (data.spectator?.connectionId) {
+            queueSpectatorOffer(
+              data.spectator.connectionId,
+              data.spectator.connectionId
+            );
+          }
+          break;
+        case "spectatorLeft":
+          if (data.spectator?.connectionId) {
+            cleanupSpectatorConnectionsByBase(data.spectator.connectionId);
+          }
+          break;
+        case "requestOffer":
+          await processSpectatorOfferRequest(data);
+          break;
         case "offer":
-          if (pcRef.current) {
+          if (data.connectionId) {
+            // Offers from spectators are not expected for debaters
+            break;
+          }
+          if (pcRef.current && data.offer) {
             await pcRef.current.setRemoteDescription(data.offer!);
             const answer = await pcRef.current.createAnswer();
             await pcRef.current.setLocalDescription(answer);
@@ -996,12 +1261,73 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           break;
         case "answer":
-          if (pcRef.current)
-            await pcRef.current.setRemoteDescription(data.answer!);
+          if (data.connectionId && data.targetUserId === currentUserId) {
+            const spectatorPc = data.connectionId
+              ? spectatorPCsRef.current.get(data.connectionId)
+              : null;
+            if (spectatorPc && data.answer) {
+              try {
+                await spectatorPc.setRemoteDescription(data.answer);
+                const pending = spectatorPendingCandidatesRef.current.get(
+                  data.connectionId
+                );
+                if (pending && pending.length > 0) {
+                  for (const candidate of pending) {
+                    try {
+                      await spectatorPc.addIceCandidate(candidate);
+                    } catch (err) {}
+                  }
+                  spectatorPendingCandidatesRef.current.delete(
+                    data.connectionId
+                  );
+                }
+              } catch {
+                cleanupSpectatorConnection(data.connectionId);
+              }
+            }
+          } else if (
+            data.connectionId &&
+            data.targetUserId &&
+            data.targetUserId !== currentUserId
+          ) {
+            // Spectator answer meant for the other debater; ignore.
+          } else if (pcRef.current && data.answer) {
+            await pcRef.current.setRemoteDescription(data.answer);
+          }
           break;
         case "candidate":
-          if (pcRef.current)
-            await pcRef.current.addIceCandidate(data.candidate!);
+          if (data.connectionId) {
+            if (data.userId && data.userId !== currentUserId) {
+              // Candidate is intended for the other debater's copy of this spectator connection.
+              break;
+            }
+            const spectatorPc = spectatorPCsRef.current.get(data.connectionId);
+            if (spectatorPc && data.candidate) {
+              try {
+                if (
+                  spectatorPc.remoteDescription &&
+                  spectatorPc.remoteDescription.type
+                ) {
+                  await spectatorPc.addIceCandidate(data.candidate);
+                } else {
+                  const queue =
+                    spectatorPendingCandidatesRef.current.get(
+                      data.connectionId
+                    ) ?? [];
+                  queue.push(data.candidate);
+                  spectatorPendingCandidatesRef.current.set(
+                    data.connectionId,
+                    queue
+                  );
+                }
+              } catch (err) {
+                cleanupSpectatorConnection(data.connectionId);
+              }
+            } else if (!spectatorPc) {
+            }
+          } else if (pcRef.current && data.candidate) {
+            await pcRef.current.addIceCandidate(data.candidate);
+          }
           break;
       }
     };
@@ -1031,6 +1357,7 @@ const OnlineDebateRoom = (): JSX.Element => {
         });
         setLocalStream(stream);
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        flushSpectatorOfferQueue();
       } catch (err) {
         setMediaError(
           "Failed to access camera/microphone. Please check permissions."
@@ -1040,11 +1367,32 @@ const OnlineDebateRoom = (): JSX.Element => {
     };
 
     return () => {
-      if (localStream) localStream.getTracks().forEach((track) => track.stop());
-      ws.close();
+      const activeLocalStream = localStreamRef.current;
+      if (activeLocalStream) {
+        activeLocalStream.getTracks().forEach((track) => track.stop());
+      }
+      spectatorPCsRef.current.forEach((spectatorPc) => {
+        try {
+          spectatorPc.close();
+        } catch {
+          // Ignore close errors
+        }
+      });
+      spectatorPCsRef.current.clear();
+      rws.close();
       pc.close();
     };
-  }, [roomId]);
+  }, [
+    cleanupSpectatorConnection,
+    flushSpectatorOfferQueue,
+    processSpectatorOfferRequest,
+    queueSpectatorOffer,
+    roomId,
+  ]);
+
+  useEffect(() => {
+    flushSpectatorOfferQueue();
+  }, [flushSpectatorOfferQueue]);
 
   // Attach streams to video elements
   useEffect(() => {
@@ -1663,13 +2011,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     // Clear any audio-related state if needed
   }, [debatePhase]);
 
-  // Debug user state changes
-  useEffect(() => {}, [currentUser]);
-
-  useEffect(() => {}, [localUser]);
-
-  useEffect(() => {}, [opponentUser]);
-
   useEffect(() => {
     manualRecordingRef.current = isManualRecording;
   }, [isManualRecording]);
@@ -1724,7 +2065,8 @@ const OnlineDebateRoom = (): JSX.Element => {
             Phase: <span className="font-medium">{debatePhase}</span> |
             Participants:{" "}
             <span className="font-medium">{roomParticipants.length}/2</span> |
-            Current Turn:{" "}
+            Spectators: <span className="font-medium">{spectatorPresence}</span>{" "}
+            | Current Turn:{" "}
             <span className="font-semibold text-orange-600">
               {isMyTurn ? "You" : "Opponent"} to{" "}
               {debatePhase.includes("Question")
@@ -2108,6 +2450,95 @@ const OnlineDebateRoom = (): JSX.Element => {
           />
         </div>
       )}
+
+      <div className="w-full max-w-5xl mx-auto mt-4 grid gap-4 md:grid-cols-2">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            Audience Polls
+          </h3>
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {audiencePolls.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No polls in progress. Spectators can launch polls from the
+                viewer portal.
+              </p>
+            ) : (
+              audiencePolls.map((poll: PollInfo) => {
+                const totalVotes = poll.options.reduce(
+                  (acc, option) => acc + (poll.counts[option] || 0),
+                  0
+                );
+                return (
+                  <div
+                    key={poll.pollId}
+                    className="border border-gray-100 bg-gray-50 rounded-md p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {poll.question || `Poll ${poll.pollId.slice(0, 8)}`}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {totalVotes} vote{totalVotes === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {poll.options.map((option) => {
+                        const count = poll.counts[option] || 0;
+                        return (
+                          <div
+                            key={option}
+                            className="flex items-center justify-between text-xs text-gray-600"
+                          >
+                            <span>{option}</span>
+                            <span className="font-semibold text-gray-700">
+                              {count}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            Audience Comments
+          </h3>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {recentQuestions.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No comments yet. Spectators can submit questions from the viewer
+                panel.
+              </p>
+            ) : (
+              recentQuestions.map((question) => (
+                <div
+                  key={question.qId}
+                  className="rounded border border-gray-100 bg-gray-50 px-3 py-2"
+                >
+                  <p className="text-sm text-gray-800">{question.text}</p>
+                  <span className="text-xs text-gray-500">
+                    {new Date(question.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="w-full max-w-5xl mx-auto mt-2 bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-gray-700">
+            Total spectators currently watching
+          </span>
+          <span className="text-lg font-semibold text-orange-600">
+            {spectatorPresence}
+          </span>
+        </div>
+      </div>
 
       {/* Media Error Display */}
       {mediaError && (

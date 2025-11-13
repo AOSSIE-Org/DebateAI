@@ -21,6 +21,23 @@ type VotePayload struct {
 	Timestamp     int64  `json:"timestamp"`
 }
 
+// CreatePollPayload represents a create poll request payload
+type CreatePollPayload struct {
+	PollID        string   `json:"pollId,omitempty"`
+	Question      string   `json:"question"`
+	Options       []string `json:"options"`
+	SpectatorHash string   `json:"spectatorHash,omitempty"`
+	Timestamp     int64    `json:"timestamp,omitempty"`
+}
+
+// PollCreatedPayload represents a poll created event payload
+type PollCreatedPayload struct {
+	PollID    string   `json:"pollId"`
+	Question  string   `json:"question"`
+	Options   []string `json:"options"`
+	Timestamp int64    `json:"timestamp"`
+}
+
 // QuestionPayload represents a question event payload
 type QuestionPayload struct {
 	QID           string `json:"qId"`
