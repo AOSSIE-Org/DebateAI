@@ -1,5 +1,5 @@
 // TournamentHub.tsx
-import React, { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Users, Calendar, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
