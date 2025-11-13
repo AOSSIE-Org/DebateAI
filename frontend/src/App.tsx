@@ -2,6 +2,8 @@ import { useContext } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/authContext';
 import { ThemeProvider } from './context/theme-provider';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { RouteErrorBoundary } from './components/ErrorBoundary';
 // Pages
 import Home from './Pages/Home';
 import Authentication from './Pages/Authentication';
@@ -52,45 +54,182 @@ function AppRoutes() {
       <Route
         path='/'
         element={
-          isAuthenticated ? <Navigate to='/startDebate' replace /> : <Home />
+          <RouteErrorBoundary>
+            {isAuthenticated ? <Navigate to='/startDebate' replace /> : <Home />}
+          </RouteErrorBoundary>
         }
       />
-      <Route path='/auth' element={<Authentication />} />
+      <Route 
+        path='/auth' 
+        element={
+          <RouteErrorBoundary>
+            <Authentication />
+          </RouteErrorBoundary>
+        } 
+      />
       {/* Protected routes with layout */}
       <Route element={<ProtectedRoute />}>
-        <Route path='/' element={<Layout />}>
-          <Route path='startDebate' element={<StartDebate />} />
-          <Route path='leaderboard' element={<Leaderboard />} />
-          <Route path='profile' element={<Profile />} />
-          <Route path='about' element={<About />} />
-          <Route path='team-builder' element={<TeamBuilder />} />
-          <Route path='game/:userId' element={<DebateApp />} />
-          <Route path='bot-selection' element={<BotSelection />} />
-          <Route path='/tournaments' element={<TournamentHub />} />
-          <Route path='/coach' element={<CoachPage />} />
+        <Route 
+          path='/' 
+          element={
+            <RouteErrorBoundary>
+              <Layout />
+            </RouteErrorBoundary>
+          }
+        >
+          <Route 
+            path='startDebate' 
+            element={
+              <RouteErrorBoundary>
+                <StartDebate />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='leaderboard' 
+            element={
+              <RouteErrorBoundary>
+                <Leaderboard />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='profile' 
+            element={
+              <RouteErrorBoundary>
+                <Profile />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='about' 
+            element={
+              <RouteErrorBoundary>
+                <About />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='team-builder' 
+            element={
+              <RouteErrorBoundary>
+                <TeamBuilder />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='game/:userId' 
+            element={
+              <RouteErrorBoundary>
+                <DebateApp />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='bot-selection' 
+            element={
+              <RouteErrorBoundary>
+                <BotSelection />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='/tournaments' 
+            element={
+              <RouteErrorBoundary>
+                <TournamentHub />
+              </RouteErrorBoundary>
+            } 
+          />
+          <Route 
+            path='/coach' 
+            element={
+              <RouteErrorBoundary>
+                <CoachPage />
+              </RouteErrorBoundary>
+            } 
+          />
           <Route
             path='/tournament/:id/bracket'
-            element={<TournamentDetails />}
+            element={
+              <RouteErrorBoundary>
+                <TournamentDetails />
+              </RouteErrorBoundary>
+            }
           />
           <Route
             path='coach/strengthen-argument'
-            element={<StrengthenArgument />}
+            element={
+              <RouteErrorBoundary>
+                <StrengthenArgument />
+              </RouteErrorBoundary>
+            }
           />
-          <Route path='/coach' element={<CoachPage />} />
-          <Route
-            path='coach/strengthen-argument'
-            element={<StrengthenArgument />}
-          />{' '}
-          {/* Add this route */}
-          <Route path='coach/pros-cons' element={<ProsConsChallenge />} />
+          <Route 
+            path='coach/pros-cons' 
+            element={
+              <RouteErrorBoundary>
+                <ProsConsChallenge />
+              </RouteErrorBoundary>
+            } 
+          />
         </Route>
-        <Route path='/debate/:roomId' element={<DebateRoom />} />
-        <Route path='/debate-room/:roomId' element={<OnlineDebateRoom />} />
-        <Route path='/team-debate/:debateId' element={<TeamDebateRoom />} />
-        <Route path='/spectator/:roomId' element={<ChatRoom />} />
-        <Route path='/debate/:debateID/view' element={<ViewDebate />} />
-        <Route path='/view-debate/:debateID' element={<ViewDebate />} />
-        <Route path='/speech-test' element={<SpeechTest />} />
+        <Route 
+          path='/debate/:roomId' 
+          element={
+            <RouteErrorBoundary>
+              <DebateRoom />
+            </RouteErrorBoundary>
+          } 
+        />
+        <Route 
+          path='/debate-room/:roomId' 
+          element={
+            <RouteErrorBoundary>
+              <OnlineDebateRoom />
+            </RouteErrorBoundary>
+          } 
+        />
+        <Route 
+          path='/team-debate/:debateId' 
+          element={
+            <RouteErrorBoundary>
+              <TeamDebateRoom />
+            </RouteErrorBoundary>
+          } 
+        />
+        <Route 
+          path='/spectator/:roomId' 
+          element={
+            <RouteErrorBoundary>
+              <ChatRoom />
+            </RouteErrorBoundary>
+          } 
+        />
+        <Route 
+          path='/debate/:debateID/view' 
+          element={
+            <RouteErrorBoundary>
+              <ViewDebate />
+            </RouteErrorBoundary>
+          } 
+        />
+        <Route 
+          path='/view-debate/:debateID' 
+          element={
+            <RouteErrorBoundary>
+              <ViewDebate />
+            </RouteErrorBoundary>
+          } 
+        />
+        <Route 
+          path='/speech-test' 
+          element={
+            <RouteErrorBoundary>
+              <SpeechTest />
+            </RouteErrorBoundary>
+          } 
+        />
       </Route>
       {/* Redirect unknown routes */}
       <Route path='*' element={<Navigate to='/' replace />} />
