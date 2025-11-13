@@ -250,39 +250,44 @@ const DebateRoom: React.FC = () => {
     if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = "en-US";
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = "en-US";
 
-      recognitionRef.current.onresult = (event) => {
-        let newFinalTranscript = "";
-        let newInterimTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            newFinalTranscript += result[0].transcript + " ";
-          } else {
-            newInterimTranscript = result[0].transcript;
+        recognitionRef.current.onresult = (event) => {
+          let newFinalTranscript = "";
+          let newInterimTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              newFinalTranscript += result[0].transcript + " ";
+            } else {
+              newInterimTranscript = result[0].transcript;
+            }
           }
-        }
-        if (newFinalTranscript) {
-          setFinalInput((prev) =>
-            prev
-              ? prev + " " + newFinalTranscript.trim()
-              : newFinalTranscript.trim()
-          );
-          setInterimInput("");
-        } else {
-          setInterimInput(newInterimTranscript);
-        }
-      };
+          if (newFinalTranscript) {
+            setFinalInput((prev) =>
+              prev
+                ? prev + " " + newFinalTranscript.trim()
+                : newFinalTranscript.trim()
+            );
+            setInterimInput("");
+          } else {
+            setInterimInput(newInterimTranscript);
+          }
+        };
 
-      recognitionRef.current.onend = () => setIsRecognizing(false);
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        setIsRecognizing(false);
-      };
+        recognitionRef.current.onend = () => setIsRecognizing(false);
+        recognitionRef.current.onerror = (event: Event) => {
+          console.error(
+            "Speech recognition error:",
+            (event as ErrorEvent).error || event
+          );
+          setIsRecognizing(false);
+        };
+      }
     }
 
     return () => {

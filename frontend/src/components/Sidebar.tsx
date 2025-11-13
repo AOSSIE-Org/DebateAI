@@ -1,14 +1,7 @@
 // src/components/Sidebar.tsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-  MessageSquare,
-  BarChart,
-  User,
-  Info,
-  Trophy,
-  Users,
-} from 'lucide-react';
+import { MessageSquare, BarChart, User, Info, Trophy } from 'lucide-react';
 import debateAiLogo from '@/assets/aossie.png';
 import { ThemeToggle } from './ThemeToggle';
 

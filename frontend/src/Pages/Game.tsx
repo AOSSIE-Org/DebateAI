@@ -12,11 +12,11 @@ const Game: React.FC = () => {
     loading: true,
     gameEnded: false,
     gameResult: {
-      isReady:false,
+      isReady: false,
       isWinner: false,
       points: false,
       totalPoints: 0,
-      evaluationMessage: "no data"
+      evaluationMessage: "no data",
     },
     isTurn: false,
     turnDuration: 0,
@@ -26,7 +26,7 @@ const Game: React.FC = () => {
     ] as ChatMessage[],
     transcriptStatus: {
       loading: false,
-      isUser: false
+      isUser: false,
     },
   });
 
@@ -50,7 +50,11 @@ const Game: React.FC = () => {
         break;
       }
       case "TURN_END":
-        setState((prevState) => ({ ...prevState, isTurn: false, turnDuration: 0, }));
+        setState((prevState) => ({
+          ...prevState,
+          isTurn: false,
+          turnDuration: 0,
+        }));
         break;
       case "CHAT_MESSAGE": {
         const { sender, message: chatMessage } = JSON.parse(message.content);
@@ -61,7 +65,7 @@ const Game: React.FC = () => {
         setState((prevState) => ({
           ...prevState,
           messages: [...prevState.messages, newMessage],
-          transcriptStatus: { ...prevState.transcriptStatus, loading: false }
+          transcriptStatus: { ...prevState.transcriptStatus, loading: false },
         }));
         break;
       }
@@ -69,24 +73,25 @@ const Game: React.FC = () => {
         const { sender } = JSON.parse(message.content);
         setState((prevState) => ({
           ...prevState,
-          transcriptStatus: { loading: true, isUser: sender === userId } //transcript is getting generated
+          transcriptStatus: { loading: true, isUser: sender === userId }, //transcript is getting generated
         }));
         break;
       }
 
       case "GAME_RESULT": {
         console.log(message);
-        const {winnerUserId, points, totalPoints, evaluationMessage} = JSON.parse(message.content);
-        setState((prevState)=>({
+        const { winnerUserId, points, totalPoints, evaluationMessage } =
+          JSON.parse(message.content);
+        setState((prevState) => ({
           ...prevState,
           gameResult: {
             isReady: true,
-            isWinner: winnerUserId==userId,
+            isWinner: winnerUserId == userId,
             points: points,
             totalPoints: totalPoints,
-            evaluationMessage: evaluationMessage
-          }
-        }))
+            evaluationMessage: evaluationMessage,
+          },
+        }));
         break;
       }
 
@@ -96,7 +101,6 @@ const Game: React.FC = () => {
   };
 
   useEffect(() => {
-    const userDetails = `${import.meta.env.VITE_BASE_URL/getUserDetail}`;
     const wsURL = `${import.meta.env.VITE_BASE_URL}/ws?userId=${userId}`;
     const ws = new WebSocket(wsURL);
     ws.binaryType = "arraybuffer";
@@ -110,7 +114,6 @@ const Game: React.FC = () => {
     return () => ws.close();
   }, [userId]);
 
-  
   const renderGameContent = () => (
     <div className="w-screen h-screen flex justify-center items-center">
       {state.loading ? (
@@ -162,10 +165,17 @@ const Game: React.FC = () => {
             cameraOn={state.cameraOn}
             micOn={state.micOn}
             setCameraOn={(value) =>
-              setState((prev) => ({ ...prev, cameraOn: value }))
+              setState((prev) => ({
+                ...prev,
+                cameraOn:
+                  typeof value === "function" ? value(prev.cameraOn) : value,
+              }))
             }
             setMicOn={(value) =>
-              setState((prev) => ({ ...prev, micOn: value }))
+              setState((prev) => ({
+                ...prev,
+                micOn: typeof value === "function" ? value(prev.micOn) : value,
+              }))
             }
             isTurn={state.isTurn}
             turnDuration={state.turnDuration}
@@ -176,11 +186,16 @@ const Game: React.FC = () => {
         <Chatbox
           messages={state.messages}
           transcriptStatus={state.transcriptStatus}
+          onSendMessage={() => {}}
+          onTypingChange={() => {}}
+          onSpeakingChange={() => {}}
+          typingIndicators={[]}
+          isMyTurn={true}
+          disabled={true}
         />
       </div>
     </div>
   );
-  
 
   return renderGameContent();
 };

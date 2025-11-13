@@ -81,7 +81,8 @@ type Message struct {
 	// New fields for automatic muting
 	IsMuted     bool   `json:"isMuted,omitempty"`
 	CurrentTurn string `json:"currentTurn,omitempty"` // "for" or "against"
-	SpeechText  string `json:"speechText,omitempty"`  // Converted speech to text
+	SpeechText     string `json:"speechText,omitempty"`     // Converted speech to text
+	LiveTranscript string `json:"liveTranscript,omitempty"` // Live/interim transcript
 }
 
 type TypingIndicator struct {
@@ -228,6 +229,8 @@ func WebsocketHandler(c *gin.Context) {
 			handleSpeakingIndicator(room, conn, message, client, roomID)
 		case "speechText":
 			handleSpeechText(room, conn, message, client, roomID)
+		case "liveTranscript":
+			handleLiveTranscript(room, conn, message, client, roomID)
 		case "phaseChange":
 			handlePhaseChange(room, conn, message, roomID)
 		case "topicChange":
@@ -338,6 +341,24 @@ func handleSpeechText(room *Room, conn *websocket.Conn, message Message, client 
 			"userId":     client.UserID,
 			"username":   client.Username,
 			"speechText": client.SpeechText,
+			"phase":      message.Phase,
+		}
+		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("WebSocket write error in room %s: %v", roomID, err)
+		}
+	}
+}
+
+// handleLiveTranscript handles live/interim transcript updates
+func handleLiveTranscript(room *Room, conn *websocket.Conn, message Message, client *Client, roomID string) {
+	// Broadcast live transcript to other clients
+	for _, r := range snapshotRecipients(room, conn) {
+		response := map[string]interface{}{
+			"type":           "liveTranscript",
+			"userId":         client.UserID,
+			"username":       client.Username,
+			"liveTranscript": message.LiveTranscript,
+			"phase":          message.Phase,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
 			log.Printf("WebSocket write error in room %s: %v", roomID, err)

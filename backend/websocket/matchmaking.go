@@ -190,13 +190,19 @@ func (c *MatchmakingClient) readPump() {
 			err := matchmakingService.StartMatchmaking(c.userID)
 			if err != nil {
 				log.Printf("Failed to start matchmaking for user %s: %v", c.userID, err)
+				c.send <- []byte(fmt.Sprintf(`{"type":"error","error":"Failed to start matchmaking: %v"}`, err))
+			} else {
+				// Send confirmation to user
+				c.send <- []byte(`{"type":"matchmaking_started"}`)
+				sendPoolStatus()
 			}
-			sendPoolStatus()
 			
 		case "leave_pool":
 			// User wants to leave matchmaking pool
 			matchmakingService := services.GetMatchmakingService()
 			matchmakingService.RemoveFromPool(c.userID)
+			// Send confirmation to user
+			c.send <- []byte(`{"type":"matchmaking_stopped"}`)
 			sendPoolStatus()
 			
 		case "update_activity":

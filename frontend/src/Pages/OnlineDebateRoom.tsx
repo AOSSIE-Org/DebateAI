@@ -84,6 +84,7 @@ interface WSMessage {
   isMuted?: boolean;
   currentTurn?: string;
   speechText?: string;
+  liveTranscript?: string;
 }
 
 // Define phase durations in seconds
@@ -151,7 +152,6 @@ const OnlineDebateRoom: React.FC = () => {
 
   // Audio recording state
   const [isRecording, setIsRecording] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
     null
   );
@@ -161,9 +161,9 @@ const OnlineDebateRoom: React.FC = () => {
   // Speech recognition state
   const [isListening, setIsListening] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState("");
-  const [speechError, setSpeechError] = useState<string | null>(null);
-  const [debugMode, setDebugMode] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const retryCountRef = useRef<number>(0);
 
   // Popup and countdown state
   const [showSetupPopup, setShowSetupPopup] = useState(true);
@@ -459,7 +459,7 @@ const OnlineDebateRoom: React.FC = () => {
         setRoomParticipants(participants);
 
         // Set local and opponent user details
-        if (currentUser && participants.length === 2) {
+        if (currentUser && participants.length >= 1) {
           console.log("Current user ID:", currentUser.id);
           console.log("All participants:", participants);
 
@@ -483,20 +483,36 @@ const OnlineDebateRoom: React.FC = () => {
             console.log("Setting local user:", localUserData);
             setLocalUser(localUserData);
           } else {
-            console.log("Local participant not found!");
+            console.log("Local participant not found, using current user data");
+            // Fallback to current user data if not found in participants
+            setLocalUser({
+              id: currentUser.id || "unknown",
+              username: currentUser.displayName || "User",
+              displayName: currentUser.displayName || "User",
+              elo: currentUser.rating || 1500,
+              avatarUrl: currentUser.avatarUrl,
+            });
           }
 
           if (opponentParticipant) {
             console.log("Setting opponent user:", opponentParticipant);
             setOpponentUser(opponentParticipant);
           } else {
-            console.log("Opponent participant not found!");
+            console.log("Opponent participant not found");
+            setOpponentUser(null);
           }
         } else {
-          console.log("Not enough participants or no current user:", {
-            currentUser: !!currentUser,
-            participantsLength: participants.length,
-          });
+          console.log("No current user or insufficient participants");
+          // Fallback to current user data
+          if (currentUser) {
+            setLocalUser({
+              id: currentUser.id || "unknown",
+              username: currentUser.displayName || "User",
+              displayName: currentUser.displayName || "User",
+              elo: currentUser.rating || 1500,
+              avatarUrl: currentUser.avatarUrl,
+            });
+          }
         }
       } else {
         console.log(
@@ -597,7 +613,10 @@ const OnlineDebateRoom: React.FC = () => {
     ws.onopen = () => {
       console.log("WebSocket connected");
       ws.send(JSON.stringify({ type: "join", room: roomId }));
-      fetchRoomParticipants();
+      // Wait a bit before fetching participants to ensure room is fully created
+      setTimeout(() => {
+        fetchRoomParticipants();
+      }, 1000);
       getMedia();
     };
 
@@ -649,16 +668,27 @@ const OnlineDebateRoom: React.FC = () => {
         case "speechText":
           if (data.userId && data.speechText) {
             console.log("Received speech text from backend:", data);
-            // Store speech text in transcripts for the current phase
+            // Store speech text in transcripts for the specified phase
+            const targetPhase = data.phase || debatePhase;
             setSpeechTranscripts((prev) => {
               const updated = {
                 ...prev,
-                [debatePhase]:
-                  (prev[debatePhase] || "") + " " + data.speechText,
+                [targetPhase]:
+                  (prev[targetPhase] || "") + " " + data.speechText,
               };
               console.log("Updated speech transcripts:", updated);
               return updated;
             });
+          }
+          break;
+        case "liveTranscript":
+          if (
+            data.userId &&
+            data.liveTranscript &&
+            data.userId !== currentUser?.id
+          ) {
+            // Only update if it's from the opponent
+            setCurrentTranscript(data.liveTranscript);
           }
           break;
         case "userDetails":
@@ -678,7 +708,7 @@ const OnlineDebateRoom: React.FC = () => {
             );
             setRoomParticipants(data.roomParticipants);
             // Update local and opponent user details when participants change
-            if (currentUser && data.roomParticipants.length === 2) {
+            if (currentUser && data.roomParticipants.length >= 1) {
               const localParticipant = data.roomParticipants.find(
                 (p: UserDetails) => p.id === currentUser.id
               );
@@ -697,11 +727,24 @@ const OnlineDebateRoom: React.FC = () => {
                   displayName:
                     currentUser.displayName || localParticipant.displayName,
                 });
+              } else {
+                // Fallback to current user data
+                setLocalUser({
+                  id: currentUser.id || "unknown",
+                  username:
+                    currentUser.displayName || currentUser.email || "User",
+                  displayName:
+                    currentUser.displayName || currentUser.email || "User",
+                  elo: currentUser.rating || 1500,
+                  avatarUrl: currentUser.avatarUrl,
+                });
               }
 
               if (opponentParticipant) {
                 console.log("WS - Setting opponent user:", opponentParticipant);
                 setOpponentUser(opponentParticipant);
+              } else {
+                setOpponentUser(null);
               }
             }
           }
@@ -828,10 +871,6 @@ const OnlineDebateRoom: React.FC = () => {
 
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0 && isMyTurn && localRole) {
-            // Here you could send audio data to backend for processing
-            // For now, we'll just indicate that audio is being captured
-            console.log("Audio data captured:", event.data.size, "bytes");
-
             // Send indicator that user is speaking
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(
@@ -846,12 +885,10 @@ const OnlineDebateRoom: React.FC = () => {
         };
 
         recorder.onstart = () => {
-          console.log("Audio recording started");
           setIsRecording(true);
         };
 
         recorder.onstop = () => {
-          console.log("Audio recording stopped");
           setIsRecording(false);
 
           // Send indicator that user stopped speaking
@@ -867,8 +904,6 @@ const OnlineDebateRoom: React.FC = () => {
         };
 
         setMediaRecorder(recorder);
-
-        console.log("Audio system initialized successfully");
       } catch (error) {
         console.error("Error initializing audio:", error);
         if (error instanceof Error) {
@@ -925,9 +960,9 @@ const OnlineDebateRoom: React.FC = () => {
         recognition.maxAlternatives = 3;
 
         recognition.onstart = () => {
-          console.log("Speech recognition started for phase:", debatePhase);
           setIsListening(true);
           setSpeechError(null);
+          retryCountRef.current = 0; // Reset retry count on successful start
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -943,23 +978,50 @@ const OnlineDebateRoom: React.FC = () => {
             }
           }
 
-          if (finalTranscript) {
+          if (finalTranscript.trim()) {
             // Add final transcript to current phase
             setSpeechTranscripts((prev) => ({
               ...prev,
-              [debatePhase]: (prev[debatePhase] || "") + " " + finalTranscript,
+              [debatePhase]: (
+                (prev[debatePhase] || "") +
+                " " +
+                finalTranscript
+              ).trim(),
             }));
             setCurrentTranscript("");
-            console.log("Final transcript:", finalTranscript);
+
+            // Send transcript to backend
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(
+                JSON.stringify({
+                  type: "speechText",
+                  userId: currentUser?.id,
+                  username: currentUser?.displayName,
+                  speechText: finalTranscript,
+                  phase: debatePhase,
+                })
+              );
+            }
           }
           if (interimTranscript) {
             setCurrentTranscript(interimTranscript);
-            console.log("Interim transcript:", interimTranscript);
+
+            // Send live transcript to opponent
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(
+                JSON.stringify({
+                  type: "liveTranscript",
+                  userId: currentUser?.id,
+                  username: currentUser?.displayName,
+                  liveTranscript: interimTranscript,
+                  phase: debatePhase,
+                })
+              );
+            }
           }
         };
 
         recognition.onend = () => {
-          console.log("Speech recognition ended");
           setIsListening(false);
 
           // Restart speech recognition if it's still the user's turn
@@ -973,7 +1035,6 @@ const OnlineDebateRoom: React.FC = () => {
               if (recognitionRef.current) {
                 try {
                   recognitionRef.current.start();
-                  console.log("Speech recognition restarted automatically");
                 } catch (error) {
                   console.error("Error restarting speech recognition:", error);
                 }
@@ -984,12 +1045,92 @@ const OnlineDebateRoom: React.FC = () => {
 
         recognition.onerror = (event: Event) => {
           const errorEvent = event as unknown as { error: string };
-          console.error("Speech recognition error:", errorEvent.error);
           setIsListening(false);
-          setSpeechError(`Speech recognition error: ${errorEvent.error}`);
-        };
 
-        console.log("Speech recognition initialized");
+          // Handle different types of errors
+          switch (errorEvent.error) {
+            case "no-speech":
+            case "aborted":
+              // These are normal, don't show error
+              break;
+            case "network":
+              // Network errors are often temporary, try to restart silently
+              console.warn(
+                "Speech recognition network error, attempting to restart..."
+              );
+              if (retryCountRef.current < 3) {
+                // Limit retries to 3
+                retryCountRef.current += 1;
+                setTimeout(() => {
+                  if (
+                    recognitionRef.current &&
+                    isMyTurn &&
+                    debatePhase !== DebatePhase.Setup &&
+                    debatePhase !== DebatePhase.Finished &&
+                    !isAutoMuted
+                  ) {
+                    try {
+                      recognitionRef.current.start();
+                    } catch (error) {
+                      console.error(
+                        "Failed to restart after network error:",
+                        error
+                      );
+                    }
+                  }
+                }, 2000); // Wait 2 seconds before retrying
+              } else {
+                console.error("Max retry attempts reached for network error");
+                setSpeechError(
+                  "Speech recognition temporarily unavailable. Please try again later."
+                );
+              }
+              break;
+            case "not-allowed":
+              setSpeechError(
+                "Microphone access denied. Please allow microphone access and refresh the page."
+              );
+              break;
+            case "service-not-allowed":
+              setSpeechError(
+                "Speech recognition service not available. Please check your internet connection."
+              );
+              break;
+            default:
+              // For other errors, show a brief message and try to restart
+              console.warn(`Speech recognition error: ${errorEvent.error}`);
+              if (retryCountRef.current < 2) {
+                // Limit retries to 2 for other errors
+                retryCountRef.current += 1;
+                setSpeechError(
+                  `Speech recognition temporarily unavailable. Retrying...`
+                );
+                setTimeout(() => {
+                  setSpeechError(null);
+                  if (
+                    recognitionRef.current &&
+                    isMyTurn &&
+                    debatePhase !== DebatePhase.Setup &&
+                    debatePhase !== DebatePhase.Finished &&
+                    !isAutoMuted
+                  ) {
+                    try {
+                      recognitionRef.current.start();
+                    } catch (error) {
+                      console.error("Failed to restart after error:", error);
+                    }
+                  }
+                }, 3000); // Wait 3 seconds before retrying
+              } else {
+                console.error(
+                  "Max retry attempts reached for speech recognition error"
+                );
+                setSpeechError(
+                  `Speech recognition error: ${errorEvent.error}. Please try again later.`
+                );
+              }
+          }
+        };
       } else {
         setSpeechError("Speech recognition not supported in this browser");
       }
@@ -1011,12 +1152,9 @@ const OnlineDebateRoom: React.FC = () => {
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
     analyserRef.current.getByteFrequencyData(dataArray);
 
-    // Calculate average volume
-    const average =
-      dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-    const normalizedLevel = Math.min(average / 128, 1); // Normalize to 0-1
-
-    setAudioLevel(normalizedLevel);
+    // Calculate average volume (not used since we removed audio level display)
+    // const average =
+    //   dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
 
     // Continue monitoring
     animationRef.current = requestAnimationFrame(monitorAudioLevel);
@@ -1043,7 +1181,6 @@ const OnlineDebateRoom: React.FC = () => {
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
         }
-        setAudioLevel(0);
       } catch (error) {
         console.error("Error stopping recording:", error);
       }
@@ -1052,42 +1189,47 @@ const OnlineDebateRoom: React.FC = () => {
 
   // Start/stop speech recognition based on turn
   const startSpeechRecognition = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start();
-        console.log(
-          "Speech recognition started for turn in phase:",
-          debatePhase
-        );
-      } catch (error) {
-        console.error("Error starting speech recognition:", error);
-        setSpeechError("Failed to start speech recognition");
-      }
-    } else {
-      console.log("Cannot start speech recognition:", {
-        hasRecognition: !!recognitionRef.current,
-        isListening,
-        phase: debatePhase,
-      });
+    if (
+      !recognitionRef.current ||
+      isListening ||
+      debatePhase === DebatePhase.Setup ||
+      debatePhase === DebatePhase.Finished ||
+      isAutoMuted
+    ) {
+      return;
     }
-  }, [isListening, debatePhase]);
+
+    try {
+      recognitionRef.current.start();
+    } catch (error) {
+      console.error("Error starting speech recognition:", error);
+      // If start fails, try to reinitialize after a short delay
+      setTimeout(() => {
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch (retryError) {
+            console.error(
+              "Failed to restart speech recognition after retry:",
+              retryError
+            );
+            setSpeechError("Failed to start speech recognition");
+          }
+        }
+      }, 1000);
+    }
+  }, [isListening, debatePhase, isAutoMuted]);
 
   const stopSpeechRecognition = useCallback(() => {
     if (recognitionRef.current && isListening) {
       try {
         recognitionRef.current.stop();
-        console.log("Speech recognition stopped for phase:", debatePhase);
-      } catch (error) {
-        console.error("Error stopping speech recognition:", error);
+        retryCountRef.current = 0; // Reset retry count when manually stopping
+      } catch {
+        // Error already handled by onerror callback
       }
-    } else {
-      console.log("Cannot stop speech recognition:", {
-        hasRecognition: !!recognitionRef.current,
-        isListening,
-        phase: debatePhase,
-      });
     }
-  }, [isListening, debatePhase]);
+  }, [isListening]);
 
   // Auto start/stop recording and speech recognition based on turn
   useEffect(() => {
@@ -1124,8 +1266,14 @@ const OnlineDebateRoom: React.FC = () => {
 
   // Clear audio level when phase changes
   useEffect(() => {
-    setAudioLevel(0);
+    // Phase changed, reset retry count for speech recognition
+    retryCountRef.current = 0;
   }, [debatePhase]);
+
+  // Reset retry count when turn changes
+  useEffect(() => {
+    retryCountRef.current = 0;
+  }, [isMyTurn]);
 
   // Check microphone permissions on component mount
   useEffect(() => {
@@ -1251,7 +1399,6 @@ const OnlineDebateRoom: React.FC = () => {
   // Clear input fields on phase change
   useEffect(() => {
     // Clear any audio-related state if needed
-    setAudioLevel(0);
   }, [debatePhase]);
 
   // Debug user state changes
@@ -1602,133 +1749,8 @@ const OnlineDebateRoom: React.FC = () => {
                     Speech Error: {speechError}
                   </div>
                 )}
-
-                {/* Live Transcript Display */}
-                {currentTranscript && (
-                  <div className="text-sm text-gray-700 p-2 bg-blue-50 rounded mb-2">
-                    <div className="font-medium">Live transcript:</div>
-                    <div className="italic text-blue-600">
-                      {currentTranscript}
-                    </div>
-                  </div>
-                )}
-
-                {/* Current Phase Transcript */}
-                {speechTranscripts[debatePhase] && (
-                  <div className="text-sm text-gray-700 p-2 bg-green-50 rounded mb-2">
-                    <div className="font-medium">Current phase transcript:</div>
-                    <div className="text-green-700">
-                      {speechTranscripts[debatePhase]}
-                    </div>
-                  </div>
-                )}
-
-                {/* Debug Information */}
-                {debugMode && (
-                  <div className="text-sm text-gray-700 p-2 bg-yellow-50 rounded mb-2">
-                    <div className="font-medium">Debug Info:</div>
-                    <div className="text-xs">
-                      <div>Phase: {debatePhase}</div>
-                      <div>Is My Turn: {isMyTurn ? "Yes" : "No"}</div>
-                      <div>Is Listening: {isListening ? "Yes" : "No"}</div>
-                      <div>Is Recording: {isRecording ? "Yes" : "No"}</div>
-                      <div>Auto Muted: {isAutoMuted ? "Yes" : "No"}</div>
-                      <div>
-                        Has Recognition: {recognitionRef.current ? "Yes" : "No"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Manual Start Button */}
-                {isMyTurn &&
-                  debatePhase !== DebatePhase.Setup &&
-                  debatePhase !== DebatePhase.Finished &&
-                  !isAutoMuted &&
-                  !isRecording && (
-                    <Button
-                      onClick={startAudioRecording}
-                      className="bg-green-500 hover:bg-green-600 text-white text-sm px-4 py-2 rounded"
-                    >
-                      Start Recording
-                    </Button>
-                  )}
-
-                {/* Stop Button */}
-                {isRecording && (
-                  <Button
-                    onClick={stopAudioRecording}
-                    className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded"
-                  >
-                    Stop Recording
-                  </Button>
-                )}
-
-                {/* Manual Speech Recognition Toggle */}
-                {isMyTurn &&
-                  debatePhase !== DebatePhase.Setup &&
-                  debatePhase !== DebatePhase.Finished &&
-                  !isAutoMuted && (
-                    <div className="mt-2 space-y-2">
-                      {!isListening ? (
-                        <Button
-                          onClick={startSpeechRecognition}
-                          className="bg-purple-500 hover:bg-purple-600 text-white text-sm px-4 py-2 rounded"
-                        >
-                          Start Speech Recognition
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={stopSpeechRecognition}
-                          className="bg-purple-500 hover:bg-purple-600 text-white text-sm px-4 py-2 rounded"
-                        >
-                          Stop Speech Recognition
-                        </Button>
-                      )}
-
-                      {/* Debug Toggle */}
-                      <Button
-                        onClick={() => setDebugMode(!debugMode)}
-                        className="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded"
-                      >
-                        {debugMode ? "Hide Debug" : "Show Debug"}
-                      </Button>
-                    </div>
-                  )}
               </div>
             </div>
-
-            {/* Audio Recording Status */}
-            {(isRecording || audioError) && (
-              <div className="mt-3 p-3 bg-gray-50 rounded">
-                <div className="text-sm font-medium text-gray-700 mb-2">
-                  Audio Status:
-                </div>
-                {audioError && (
-                  <div className="text-sm text-red-600 p-2 bg-red-50 rounded mb-2">
-                    Error: {audioError}
-                  </div>
-                )}
-                {isRecording && (
-                  <div className="space-y-2">
-                    <div className="text-sm text-green-600 p-2 bg-green-50 rounded flex items-center">
-                      <div className="w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></div>
-                      Recording audio...
-                    </div>
-                    {/* Audio Level Visualizer */}
-                    <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-green-500 h-full transition-all duration-100"
-                        style={{ width: `${audioLevel * 100}%` }}
-                      ></div>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Audio Level: {Math.round(audioLevel * 100)}%
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -1787,6 +1809,7 @@ const OnlineDebateRoom: React.FC = () => {
           <SpeechTranscripts
             transcripts={speechTranscripts}
             currentPhase={debatePhase}
+            liveTranscript={currentTranscript}
           />
         </div>
       )}
