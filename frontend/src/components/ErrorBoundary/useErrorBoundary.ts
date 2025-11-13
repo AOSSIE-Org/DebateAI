@@ -28,13 +28,15 @@ export function useErrorBoundary() {
   }, []);
 
   // Function to handle async errors safely
-  const handleAsyncError = useCallback((asyncFn: () => Promise<any>) => {
-    return async () => {
+  const handleAsyncError = useCallback(<T>(asyncFn: () => Promise<T>) => {
+    return async (): Promise<T | undefined> => {
       try {
-        await asyncFn();
+        const result = await asyncFn();
+        return result;
       } catch (error) {
         console.error('Async error caught:', error);
         throwError(error instanceof Error ? error : new Error(String(error)));
+        return undefined; // This line won't be reached due to throwError, but satisfies TypeScript
       }
     };
   }, [throwError]);
