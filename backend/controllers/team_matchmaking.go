@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"arguehub/db"
 	"arguehub/models"
@@ -32,7 +33,9 @@ func JoinMatchmaking(c *gin.Context) {
 	// Get team
 	collection := db.GetCollection("teams")
 	var team models.Team
-	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&team)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&team)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
 		return
@@ -85,14 +88,16 @@ func LeaveMatchmaking(c *gin.Context) {
 
 	collection := db.GetCollection("teams")
 	var team models.Team
-	if err := collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&team); err != nil {
+	ctxLeave, cancelLeave := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancelLeave()
+	if err := collection.FindOne(ctxLeave, bson.M{"_id": objectID}).Decode(&team); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
 		return
 	}
 
 	userObjectID, ok := userID.(primitive.ObjectID)
 	if !ok || team.CaptainID != userObjectID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the captain can remove the team from matchmaking"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the captain can leave matchmaking"})
 		return
 	}
 

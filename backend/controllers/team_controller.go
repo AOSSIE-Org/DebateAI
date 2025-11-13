@@ -340,6 +340,10 @@ func JoinTeam(c *gin.Context) {
 	for _, member := range team.Members {
 		totalElo += member.Elo
 	}
+	if len(team.Members) >= team.MaxSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team is already full"})
+		return
+	}
 	totalElo += newMember.Elo
 	newAverageElo := totalElo / float64(len(team.Members)+1)
 
@@ -591,7 +595,12 @@ func GetTeamMemberProfile(c *gin.Context) {
 func GetAvailableTeams(c *gin.Context) {
 	collection := db.GetCollection("teams")
 	cursor, err := collection.Find(context.Background(), bson.M{
-		"$expr": bson.M{"$lt": []interface{}{bson.M{"$size": "$members"}, 4}}, // Teams with less than 4 members
+		"$expr": bson.M{
+		"$lt": []interface{}{
+			bson.M{"$size": "$members"},
+			"$maxSize",
+		},
+	},
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve teams"})

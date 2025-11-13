@@ -99,8 +99,8 @@ func (tbs *TokenBucketService) GetRemainingTokens(teamID, userID primitive.Objec
 		return 0
 	}
 
-	bucket.Mutex.RLock()
-	defer bucket.Mutex.RUnlock()
+	bucket.Mutex.Lock()
+	defer bucket.Mutex.Unlock()
 
 	// Refill tokens based on time elapsed
 	tbs.refillTokens(bucket)

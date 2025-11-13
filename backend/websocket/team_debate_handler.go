@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -61,7 +62,7 @@ func TeamDebateHubRun() {
 				// Load debate from database
 				collection := db.GetCollection("team_debates")
 				var debate models.TeamDebate
-				err := collection.FindOne(nil, bson.M{"_id": client.debateID}).Decode(&debate)
+				err := collection.FindOne(context.Background(), bson.M{"_id": client.debateID}).Decode(&debate)
 				if err == nil {
 					room = &TeamDebateRoom{
 						debate:       debate,
@@ -79,7 +80,6 @@ func TeamDebateHubRun() {
 					room.team2Clients[client] = true
 				}
 
-				// Send current debate state to new client
 				room.broadcastToTeam(client, TeamDebateMessage{
 					Type: "state",
 					Data: room.debate,
@@ -194,7 +194,7 @@ func (c *TeamDebateClient) readPump() {
 				Timestamp:   time.Now(),
 			}
 
-			_, err := collection.InsertOne(nil, msg)
+			_, err := collection.InsertOne(context.Background(), msg)
 			if err != nil {
 			}
 

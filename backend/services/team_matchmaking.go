@@ -31,7 +31,9 @@ func StartTeamMatchmaking(teamID primitive.ObjectID) error {
 	// Get team details
 	collection := db.GetCollection("teams")
 	var team models.Team
-	err := collection.FindOne(context.Background(), bson.M{"_id": teamID}).Decode(&team)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, bson.M{"_id": teamID}).Decode(&team)
 	if err != nil {
 		return err
 	}
@@ -66,7 +68,7 @@ func FindMatchingTeam(lookingTeamID primitive.ObjectID) (*models.Team, error) {
 	defer teamMatchmakingMutex.RUnlock()
 
 	if teamMatchmakingPool == nil {
-		teamMatchmakingPool = make(map[string]*TeamMatchmakingEntry)
+		return nil, mongo.ErrNoDocuments
 	}
 
 	lookingEntry, exists := teamMatchmakingPool[lookingTeamID.Hex()]
@@ -116,8 +118,9 @@ func GetMatchmakingPool() map[string]*TeamMatchmakingEntry {
 		return make(map[string]*TeamMatchmakingEntry)
 	}
 	snapshot := make(map[string]*TeamMatchmakingEntry, len(teamMatchmakingPool))
-	for id, entry := range teamMatchmakingPool {
-		snapshot[id] = entry
+	for teamID, entry := range teamMatchmakingPool {
+		clone := *entry
+		snapshot[teamID] = &clone
 	}
 	return snapshot
 }

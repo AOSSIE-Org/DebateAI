@@ -1,5 +1,8 @@
+import { Team } from "./teamService";
+
 // Team debate service for API calls
-const API_BASE_URL = "http://localhost:1313";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:1313";
 
 function getAuthToken(): string {
   return localStorage.getItem("token") || "";
@@ -34,6 +37,13 @@ export interface TeamDebate {
   team2Elo: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ActiveDebateSummary {
+  hasActiveDebate: boolean;
+  debateId?: string;
+  topic?: string;
+  status?: string;
 }
 
 // Create a team debate
@@ -77,7 +87,9 @@ export const getTeamDebate = async (debateId: string): Promise<TeamDebate> => {
 };
 
 // Get active debate for a team
-export const getActiveTeamDebate = async (teamId: string): Promise<TeamDebate> => {
+export const getActiveTeamDebate = async (
+  teamId: string
+): Promise<ActiveDebateSummary> => {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/team-debates/team/${teamId}/active`, {
     headers: {
@@ -156,17 +168,7 @@ export const getMatchmakingPool = async (): Promise<MatchmakingPoolResponse> => 
 
 export interface MatchmakingStatusResponse {
   matched: boolean;
-  team?: {
-    id: string;
-    name: string;
-    captainId: string;
-    captainEmail: string;
-    members: TeamDebateMember[];
-    maxSize: number;
-    averageElo: number;
-    createdAt: string;
-    updatedAt: string;
-  };
+  team?: Team;
   matchId?: string;
 }
 
