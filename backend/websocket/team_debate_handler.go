@@ -7,6 +7,7 @@ import (
 	"arguehub/db"
 	"arguehub/models"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -243,3 +244,33 @@ func (c *TeamDebateClient) writePump() {
 		}
 	}
 }
+func TeamDebateWebsocketHandler(c *gin.Context) {
+    debateIDHex := c.Param("debateID")
+    teamIDHex := c.Query("teamId")
+    userIDHex := c.Query("userId")
+    isTeam1 := c.Query("isTeam1") == "true"
+
+    debateID, _ := primitive.ObjectIDFromHex(debateIDHex)
+    teamID, _ := primitive.ObjectIDFromHex(teamIDHex)
+    userID, _ := primitive.ObjectIDFromHex(userIDHex)
+
+    conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+    if err != nil {
+        return
+    }
+
+    client := &TeamDebateClient{
+        conn:     conn,
+        send:     make(chan []byte, 256),
+        debateID: debateID,
+        teamID:   teamID,
+        userID:   userID,
+        isTeam1:  isTeam1,
+    }
+
+    teamDebateHub.register <- client
+
+    go client.writePump()
+    go client.readPump()
+}
+
