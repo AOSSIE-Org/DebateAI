@@ -16,6 +16,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	
+
 )
 
 func main() {
@@ -146,7 +148,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	log.Println("Admin routes registered")
 
 	// Debate spectator WebSocket handler (no auth required for anonymous spectators)
-	router.GET("/ws/debate/:debateID", DebateWebsocketHandler)
+	router.GET("/ws/debate/:debateID", websocket.TeamDebateWebsocketHandler)
+
 
 	return router
 }

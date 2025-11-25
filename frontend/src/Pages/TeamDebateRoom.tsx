@@ -916,25 +916,6 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [isListening]);
 
-  const toggleCamera = useCallback(() => {
-    const stream = localStreamRef.current;
-    if (!stream) {
-      console.warn("[TeamDebateRoom] toggleCamera called without local stream");
-      return;
-    }
-
-    const [videoTrack] = stream.getVideoTracks();
-    if (!videoTrack) {
-      console.warn("[TeamDebateRoom] No video track available to toggle");
-      return;
-    }
-
-    setIsCameraOn((prev) => {
-      const next = !prev;
-      videoTrack.enabled = next;
-      return next;
-    });
-  }, []);
 
   // Auto start/stop speech recognition based on turn
   useEffect(() => {
