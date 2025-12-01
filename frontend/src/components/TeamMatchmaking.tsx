@@ -8,9 +8,11 @@ import {
   getMatchmakingStatus,
   createTeamDebate,
   getActiveTeamDebate,
+  ActiveDebateSummary,
 } from '@/services/teamDebateService';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaUsers, FaClock, FaCheckCircle } from 'react-icons/fa';
+import type { User as AppUser } from '@/types/user';
 
 interface Team {
   id: string;
@@ -26,15 +28,11 @@ interface Team {
   averageElo: number;
 }
 
-interface MinimalUser {
-  id?: string | { $oid?: string };
-  email?: string;
-  displayName?: string;
-}
+type BasicUser = Pick<AppUser, 'id' | 'email' | 'displayName'>;
 
 interface TeamMatchmakingProps {
   team: Team;
-  user: MinimalUser | null;
+  user: BasicUser | null;
 }
 
 const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
@@ -74,7 +72,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   useEffect(() => {
     const checkActiveDebate = async () => {
       try {
-        const result: any = await getActiveTeamDebate(team.id);
+        const result: ActiveDebateSummary = await getActiveTeamDebate(team.id);
         if (result.hasActiveDebate && result.debateId) {
           // Store debate ID and show notification instead of auto-redirecting
           if (activeDebateId !== result.debateId) {

@@ -1,6 +1,6 @@
-// Team debate service for API calls
 import { Team } from "./teamService";
 
+// Team debate service for API calls
 const API_BASE_URL =
   (import.meta.env.VITE_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
   window.location.origin;
@@ -38,6 +38,13 @@ export interface TeamDebate {
   team2Elo: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ActiveDebateSummary {
+  hasActiveDebate: boolean;
+  debateId?: string;
+  topic?: string;
+  status?: string;
 }
 
 export interface TeamMatchmakingPoolEntry {
@@ -102,7 +109,9 @@ export const getTeamDebate = async (debateId: string): Promise<TeamDebate> => {
 };
 
 // Get active debate for a team
-export const getActiveTeamDebate = async (teamId: string): Promise<TeamDebate> => {
+export const getActiveTeamDebate = async (
+  teamId: string
+): Promise<ActiveDebateSummary> => {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/team-debates/team/${teamId}/active`, {
     headers: {

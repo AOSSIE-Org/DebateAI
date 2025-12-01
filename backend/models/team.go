@@ -108,22 +108,22 @@ type TeamChatMessage struct {
 // MarshalJSON customizes JSON serialization for TeamDebate to convert ObjectIDs to hex strings
 func (td TeamDebate) MarshalJSON() ([]byte, error) {
 	type Alias TeamDebate
+	var currentUserHex *string
+	if !td.CurrentUserID.IsZero() {
+		hex := td.CurrentUserID.Hex()
+		currentUserHex = &hex
+	}
 	return json.Marshal(&struct {
-		ID            string `json:"id,omitempty"`
-		Team1ID       string `json:"team1Id"`
-		Team2ID       string `json:"team2Id"`
-		CurrentUserID string `json:"currentUserId,omitempty"`
+		ID            string  `json:"id,omitempty"`
+		Team1ID       string  `json:"team1Id"`
+		Team2ID       string  `json:"team2Id"`
+		CurrentUserID *string `json:"currentUserId,omitempty"`
 		*Alias
 	}{
 		ID:            td.ID.Hex(),
 		Team1ID:       td.Team1ID.Hex(),
 		Team2ID:       td.Team2ID.Hex(),
-		CurrentUserID: func() string {
-			if td.CurrentUserID.IsZero() {
-				return ""
-			}
-			return td.CurrentUserID.Hex()
-		}(),
+		CurrentUserID: currentUserHex,
 		Alias:         (*Alias)(&td),
 	})
 }

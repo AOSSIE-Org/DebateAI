@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func AuthMiddleware(configPath string) gin.HandlerFunc {
@@ -62,10 +63,16 @@ func AuthMiddleware(configPath string) gin.HandlerFunc {
 			return
 		}
 
-		email := claims["sub"].(string)
+		email, ok := claims["sub"].(string)
+		if !ok || email == "" {
+			log.Printf("Invalid or missing 'sub' claim in JWT")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
 
 		// Fetch user from database
-		dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
 		if db.MongoDatabase == nil {
@@ -77,7 +84,12 @@ func AuthMiddleware(configPath string) gin.HandlerFunc {
 		var user models.User
 		err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+			} else {
+				log.Printf("Failed to load user %s: %v", email, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication lookup failed"})
+			}
 			c.Abort()
 			return
 		}

@@ -1,6 +1,4 @@
 import React, { useState, useCallback } from "react";
-import { useAtom } from "jotai";
-import { userAtom } from "@/state/userAtom";
 import {
   createTeam,
   getAvailableTeams,
@@ -19,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useUser } from "@/hooks/useUser";
 import {
   Dialog,
   DialogContent,
@@ -81,7 +80,7 @@ interface SelectedMember {
 }
 
 const TeamBuilder: React.FC = () => {
-  const [user] = useAtom(userAtom);
+  const { user } = useUser();
   const [teamName, setTeamName] = useState("");
   const [maxSize, setMaxSize] = useState<number>(4);
   const [isCreating, setIsCreating] = useState(false);
@@ -631,6 +630,22 @@ const TeamBuilder: React.FC = () => {
                       </div>
 
                       {/* Team Matchmaking */}
+<<<<<<< HEAD
+                      <div className="mt-4">
+                        <TeamMatchmaking
+                          team={team}
+                          user={
+                            user
+                              ? {
+                                  id: user.id || "",
+                                  email: user.email,
+                                  displayName: user.displayName,
+                                }
+                              : null
+                          }
+                        />
+                      </div>
+=======
                       {user && user.id && (
                         <div className="mt-4">
                           <TeamMatchmaking
@@ -643,6 +658,7 @@ const TeamBuilder: React.FC = () => {
                           />
                         </div>
                       )}
+>>>>>>> main
 
                       <div className="flex flex-wrap gap-2">
                         {(team.members || []).map((member: TeamMember) => (
@@ -821,8 +837,12 @@ const TeamBuilder: React.FC = () => {
             <div className="space-y-4">
               {availableTeams.map((team) => {
                 const memberCount = team.members?.length || 0;
+<<<<<<< HEAD
+                const capacity = team.maxSize || 4;
+=======
                 const capacity =
                   team.maxSize && team.maxSize > 0 ? team.maxSize : 4;
+>>>>>>> main
                 const isFull = memberCount >= capacity;
 
                 return (

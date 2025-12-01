@@ -11,6 +11,7 @@ import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
 
 const baseURL = import.meta.env.VITE_BASE_URL;
+const USER_CACHE_KEY = 'userProfile';
 
 interface AuthContextType {
   token: string | null;
@@ -78,8 +79,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (userResponse.ok) {
         const userData = await userResponse.json();
-        setUser({
-          id: userData.id,
+        const normalizedUser: User = {
+          id: userData.id || userData._id,
           email: userData.email,
           displayName: userData.displayName || 'User',
           bio: userData.bio || '',
@@ -100,9 +101,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           resetPasswordCode: userData.resetPasswordCode,
           createdAt: userData.createdAt || new Date().toISOString(),
           updatedAt: userData.updatedAt || new Date().toISOString(),
-        });
+        };
+        setUser(normalizedUser);
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
       }
     } catch (error) {
+      console.log('error', error);
       logout();
     }
   }, [setUser]);
@@ -126,8 +130,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(data.accessToken);
       localStorage.setItem('token', data.accessToken);
       // Set user details in userAtom based on the new User type
-      setUser({
-        id: data.user?.id || undefined,
+      const normalizedUser: User = {
+        id: data.user?.id || data.user?._id || undefined,
         email: data.user?.email || email,
         displayName: data.user?.displayName || 'User',
         bio: data.user?.bio || '',
@@ -148,7 +152,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         resetPasswordCode: data.user?.resetPasswordCode || undefined,
         createdAt: data.user?.createdAt || new Date().toISOString(),
         updatedAt: data.user?.updatedAt || new Date().toISOString(),
-      });
+      };
+      setUser(normalizedUser);
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
       navigate('/');
     } catch (error) {
       handleError(error);
@@ -191,9 +197,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(data.message || 'Verification failed');
       }
       // Optionally update userAtom with isVerified: true
-      setUser((prev: User | null) =>
-        prev ? { ...prev, isVerified: true, verificationCode: undefined } : null
-      );
+      setUser((prev: User | null) => {
+        if (!prev) return null;
+        const updatedUser = { ...prev, isVerified: true, verificationCode: undefined };
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(updatedUser));
+        return updatedUser;
+      });
     } catch (error) {
       handleError(error);
     } finally {
@@ -260,8 +269,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(data.accessToken);
       localStorage.setItem('token', data.accessToken);
       // Set user details in userAtom based on the new User type
-      setUser({
-        id: data.user?.id || undefined,
+      const normalizedUser: User = {
+        id: data.user?.id || data.user?._id || undefined,
         email: data.user?.email || 'googleuser@example.com',
         displayName: data.user?.displayName || 'Google User',
         bio: data.user?.bio || '',
@@ -282,7 +291,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         resetPasswordCode: data.user?.resetPasswordCode || undefined,
         createdAt: data.user?.createdAt || new Date().toISOString(),
         updatedAt: data.user?.updatedAt || new Date().toISOString(),
-      });
+      };
+      setUser(normalizedUser);
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+      console.log('User after Google login:', data.user);
       navigate('/');
     } catch (error) {
       handleError(error);
@@ -294,6 +306,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem(USER_CACHE_KEY);
     setUser(null); // Clear userAtom on logout
     navigate('/auth');
   };
