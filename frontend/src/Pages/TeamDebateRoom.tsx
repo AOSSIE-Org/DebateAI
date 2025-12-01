@@ -184,7 +184,7 @@ const TeamDebateRoom: React.FC = () => {
   const [, setLocalStream] = useState<MediaStream | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const toggleCamera = useCallback(() => {
+  let toggleCamera = useCallback(() => {
     const stream = localStreamRef.current;
     if (stream) {
       stream.getVideoTracks().forEach((track) => {
@@ -916,7 +916,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [isListening]);
 
-  const toggleCamera = useCallback(() => {
+   toggleCamera = useCallback(() => {
     const stream = localStreamRef.current;
     if (!stream) {
       console.warn("[TeamDebateRoom] toggleCamera called without local stream");
