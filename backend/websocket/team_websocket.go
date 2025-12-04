@@ -1128,7 +1128,7 @@ func handleTeamWebRTCOffer(room *TeamRoom, client *TeamClient, message TeamMessa
 // handleTeamWebRTCAnswer relays an SDP answer to the offer initiator
 func handleTeamWebRTCAnswer(room *TeamRoom, client *TeamClient, message TeamMessage) {
 	if message.TargetUserID == "" || message.Answer == nil {
-		log.Printf("[handleTeamWebRTCAnswer] Missing answer or target for user %s", client.UserID.Hex(), message.TargetUserID)
+		log.Printf("[handleTeamWebRTCAnswer] Missing answer or target for user %s (target: %s)", client.UserID.Hex(), message.TargetUserID)
 		return
 	}
 

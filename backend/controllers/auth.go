@@ -543,7 +543,7 @@ func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 	now := time.Now()
 	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
 
-	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", email, now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
+	log.Printf("JWT Generation - Now: %s, Expiry: %s (in %d minutes)", now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
 
 	claims := jwt.MapClaims{
 		"sub": email,

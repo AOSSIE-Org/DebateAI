@@ -115,7 +115,7 @@ func setupRouter(cfg *config.Config, configPath string) *gin.Engine {
 
 	// Protected routes (JWT auth)
 	auth := router.Group("/")
-	auth.Use(middlewares.AuthMiddleware("./config/config.prod.yml"))
+	auth.Use(middlewares.AuthMiddleware(configPath))
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
