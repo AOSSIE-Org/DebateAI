@@ -12,7 +12,7 @@ import (
 	"arguehub/models"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"google.golang.org/genai"
+	"github.com/google/generative-ai-go/genai"
 )
 
 // Global Gemini client instance

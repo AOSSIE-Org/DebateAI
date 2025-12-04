@@ -20,7 +20,11 @@ import (
 
 func main() {
 	// Load the configuration from the specified YAML file
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "./config/config.dev.yml"
+	}
+	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
@@ -36,14 +40,14 @@ func main() {
 	log.Println("Connected to MongoDB")
 
 	// Initialize Casbin RBAC
-	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
+	if err := middlewares.InitCasbin(configPath); err != nil {
 		log.Fatalf("Failed to initialize Casbin: %v", err)
 	}
 	log.Println("Casbin RBAC initialized")
 
 	// Connect to Redis if configured
-	if cfg.Redis.URL != "" {
-		redisURL := cfg.Redis.URL
+	if cfg.Redis.Addr != "" {
+		redisURL := cfg.Redis.Addr
 		if redisURL == "" {
 			redisURL = "localhost:6379"
 		}
@@ -69,7 +73,7 @@ func main() {
 	os.MkdirAll("uploads", os.ModePerm)
 
 	// Set up the Gin router and configure routes
-	router := setupRouter(cfg)
+	router := setupRouter(cfg, configPath)
 	port := strconv.Itoa(cfg.Server.Port)
 
 	if err := router.Run(":" + port); err != nil {
@@ -77,7 +81,7 @@ func main() {
 	}
 }
 
-func setupRouter(cfg *config.Config) *gin.Engine {
+func setupRouter(cfg *config.Config, configPath string) *gin.Engine {
 	router := gin.Default()
 
 	// Set trusted proxies (adjust as needed)
@@ -158,7 +162,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
 
 	// Admin routes
-	routes.SetupAdminRoutes(router, "./config/config.prod.yml")
+	routes.SetupAdminRoutes(router, configPath)
 	log.Println("Admin routes registered")
 
 	// Debate spectator WebSocket handler (no auth required for anonymous spectators)

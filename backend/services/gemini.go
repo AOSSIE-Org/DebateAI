@@ -5,17 +5,14 @@ import (
 	"errors"
 	"strings"
 
-	"google.golang.org/genai"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 )
 
 const defaultGeminiModel = "gemini-2.5-flash"
 
 func initGemini(apiKey string) (*genai.Client, error) {
-	config := &genai.ClientConfig{}
-	if apiKey != "" {
-		config.APIKey = apiKey
-	}
-	return genai.NewClient(context.Background(), config)
+	return genai.NewClient(context.Background(), option.WithAPIKey(apiKey))
 }
 
 func generateModelText(ctx context.Context, modelName, prompt string) (string, error) {
@@ -34,7 +31,18 @@ func generateModelText(ctx context.Context, modelName, prompt string) (string, e
 	if err != nil {
 		return "", err
 	}
-	return cleanModelOutput(resp.Text()), nil
+
+	var sb strings.Builder
+	for _, cand := range resp.Candidates {
+		if cand.Content != nil {
+			for _, part := range cand.Content.Parts {
+				if txt, ok := part.(genai.Text); ok {
+					sb.WriteString(string(txt))
+				}
+			}
+		}
+	}
+	return cleanModelOutput(sb.String()), nil
 }
 
 func cleanModelOutput(text string) string {

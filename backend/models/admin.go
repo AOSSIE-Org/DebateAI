@@ -19,7 +19,7 @@ type Admin struct {
 
 // Comment represents a comment that can be moderated
 // This can be a TeamDebateMessage, TeamChatMessage, or other user-generated content
-type Comment struct {
+type ModeratedComment struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	Type        string             `bson:"type" json:"type"` // "team_debate_message", "team_chat_message", "debate_vs_bot_message"
 	Content     string             `bson:"content" json:"content"`

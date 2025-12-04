@@ -1,0 +1,37 @@
+server:
+  port: 8080 # The port number your backend server will run on
+
+database:
+  uri: "mongodb://localhost:27017/arguehub" # Local MongoDB or replace with Atlas URI
+
+gemini:
+  apiKey: 'PLACEHOLDER_GEMINI_API_KEY' # API key for Gemini model access
+
+openai:
+  gptApiKey: 'PLACEHOLDER_OPENAI_API_KEY'
+
+cognito:
+  appClientId: 'PLACEHOLDER_APP_CLIENT_ID'
+  appClientSecret: 'PLACEHOLDER_APP_CLIENT_SECRET'
+  userPoolId: 'PLACEHOLDER_USER_POOL_ID'
+  region: 'us-east-1'
+
+jwt:
+  secret: 'development_secret_key_change_in_prod' # A secret string used to sign JWT tokens
+  expiry: 1440 # Token expiry time in minutes (e.g. 1440 = 24 hours)
+
+smtp:
+  host: 'smtp.gmail.com' # SMTP server host for sending emails (example is Gmail SMTP)
+  port: 587 # SMTP server port (587 for TLS)
+  username: 'PLACEHOLDER_EMAIL@gmail.com' # Email username (your email address)
+  password: 'PLACEHOLDER_APP_PASSWORD' # Password for the email or app-specific password if 2FA is enabled
+  senderEmail: 'PLACEHOLDER_EMAIL@gmail.com' # The 'from' email address used when sending mails
+  senderName: 'DebateAI Team'
+
+googleOAuth:
+  clientID: 'PLACEHOLDER_GOOGLE_CLIENT_ID' # Google OAuth Client ID for OAuth login
+
+redis:
+  addr: 'localhost:6379'
+  password: ''
+  db: 0
