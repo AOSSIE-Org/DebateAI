@@ -11,10 +11,11 @@ import (
 	"arguehub/services"
 	"arguehub/utils"
 
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"os"
 )
 
 // SubmitTranscriptsRequest represents the request to submit debate transcripts
@@ -48,7 +49,7 @@ func SubmitTranscripts(c *gin.Context) {
 
 	token = strings.TrimPrefix(token, "Bearer ")
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
- 	if err != nil || !valid || email == "" {
+	if err != nil || !valid || email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}
@@ -410,8 +411,6 @@ func UpdatePendingTranscriptsHandler(c *gin.Context) {
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return
 	}
-
-	_ = email
 
 	err = services.UpdatePendingTranscripts()
 	if err != nil {

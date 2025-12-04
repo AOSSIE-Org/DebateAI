@@ -43,21 +43,17 @@ type Config struct {
 	}
 
 	SMTP struct { // Add SMTP configuration
-		Host        string
-		Port        int
-		Username    string // Gmail address
-		Password    string // App Password
-		SenderEmail string // Same as Username for Gmail
-		SenderName  string
+		Host        string `yaml:"host"`
+		Port        int    `yaml:"port"`
+		Username    string `yaml:"username"` // Gmail address
+		Password    string `yaml:"password"` // App Password
+		SenderEmail string `yaml:"senderEmail"` // Same as Username for Gmail
+		SenderName  string `yaml:"senderName"`
 	}
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
 	}
-	Redis struct {
-		URL      string `yaml:"url"`
-		Password string `yaml:"password"`
-		DB       int    `yaml:"db"`
-	}
+
 }
 
 // LoadConfig reads the configuration file

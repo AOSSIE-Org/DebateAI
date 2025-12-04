@@ -2,6 +2,10 @@
 from fastapi import FastAPI
 import whisper
 import json
+import ssl
+
+# Workaround for SSL certificate verify failed error
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Initialize the FastAPI app
 app = FastAPI()
