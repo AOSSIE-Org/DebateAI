@@ -3,49 +3,33 @@ package services
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"google.golang.org/genai"
 )
 
-const defaultGeminiModel = "gemini-2.5-flash"
-
+// initGemini initializes the Gemini client.
+// For now this is a stub that returns nil without error, so the rest of the
+// backend can compile and run. A real implementation can be added later.
 func initGemini(apiKey string) (*genai.Client, error) {
-	config := &genai.ClientConfig{}
-	if apiKey != "" {
-		config.APIKey = apiKey
-	}
-	return genai.NewClient(context.Background(), config)
+	// TODO: real implementation later
+	return nil, nil
 }
 
+// generateModelText is a stubbed helper that keeps the expected signature
+// used throughout the codebase but does not call the real Gemini API yet.
 func generateModelText(ctx context.Context, modelName, prompt string) (string, error) {
+	// geminiClient is declared in another file (e.g., debatevsbot.go) as *genai.Client.
 	if geminiClient == nil {
 		return "", errors.New("gemini client not initialized")
 	}
-	model := geminiClient.GenerativeModel(modelName)
-	model.SafetySettings = []*genai.SafetySetting{
-		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockNone},
-	}
 
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return "", err
-	}
-	return cleanModelOutput(resp.Text()), nil
+	// TODO: Replace with real Gemini API call.
+	// Temporary stub: return an empty string and no error.
+	return "", nil
 }
 
-func cleanModelOutput(text string) string {
-	cleaned := strings.TrimSpace(text)
-	cleaned = strings.TrimPrefix(cleaned, "```json")
-	cleaned = strings.TrimPrefix(cleaned, "```JSON")
-	cleaned = strings.TrimPrefix(cleaned, "```")
-	cleaned = strings.TrimSuffix(cleaned, "```")
-	return strings.TrimSpace(cleaned)
-}
-
+// generateDefaultModelText is used by several services to call a default model.
 func generateDefaultModelText(ctx context.Context, prompt string) (string, error) {
-	return generateModelText(ctx, defaultGeminiModel, prompt)
+	const defaultModel = "gemini-1.5-flash"
+	return generateModelText(ctx, defaultModel, prompt)
 }

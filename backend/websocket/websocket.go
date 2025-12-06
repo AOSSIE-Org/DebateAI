@@ -321,7 +321,6 @@ func WebsocketHandler(c *gin.Context) {
 		IsMuted:      false,
 		Role:         "",
 		SpeechText:   "",
-		IsSpectator:  isSpectator,
 	}
 
 	if isSpectator {
