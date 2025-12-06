@@ -40,16 +40,17 @@ type Config struct {
 	JWT struct {
 		Secret string `yaml:"secret"`
 		Expiry int    `yaml:"expiry"`
-	}
+	} `yaml:"jwt"`
 
 	SMTP struct {
-		Host        string
-		Port        int
-		Username    string // Gmail address
-		Password    string // App Password
-		SenderEmail string // Same as Username for Gmail
-		SenderName  string
-	}
+		Host        string `yaml:"host"`
+		Port        int    `yaml:"port"`
+		Username    string `yaml:"username"`    // Gmail address
+		Password    string `yaml:"password"`    // App Password
+		SenderEmail string `yaml:"senderEmail"` // Same as Username for Gmail
+		SenderName  string `yaml:"senderName"`
+	} `yaml:"smtp"`
+
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
 	}
