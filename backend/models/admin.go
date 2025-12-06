@@ -17,9 +17,9 @@ type Admin struct {
 	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
-// Comment represents a comment that can be moderated
-// This can be a TeamDebateMessage, TeamChatMessage, or other user-generated content
-type Comment struct {
+// AdminComment represents a comment that can be moderated
+// Renamed from Comment to AdminComment to avoid collision with models/comment.go
+type AdminComment struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	Type        string             `bson:"type" json:"type"` // "team_debate_message", "team_chat_message", "debate_vs_bot_message"
 	Content     string             `bson:"content" json:"content"`
@@ -61,4 +61,3 @@ type AnalyticsSnapshot struct {
 	CommentsToday int64              `bson:"commentsToday" json:"commentsToday"`
 	NewUsersToday int64              `bson:"newUsersToday" json:"newUsersToday"`
 }
-

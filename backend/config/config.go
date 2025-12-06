@@ -42,7 +42,7 @@ type Config struct {
 		Expiry int    `yaml:"expiry"`
 	}
 
-	SMTP struct { // Add SMTP configuration
+	SMTP struct {
 		Host        string
 		Port        int
 		Username    string // Gmail address
@@ -52,11 +52,6 @@ type Config struct {
 	}
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
-	}
-	Redis struct {
-		URL      string `yaml:"url"`
-		Password string `yaml:"password"`
-		DB       int    `yaml:"db"`
 	}
 }
 
