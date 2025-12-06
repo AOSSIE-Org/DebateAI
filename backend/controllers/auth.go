@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -84,9 +85,9 @@ func GoogleLogin(ctx *gin.Context) {
 			LastRatingUpdate: now,
 			AvatarURL:        avatarURL,
 			IsVerified:       true,
-			Score:            0, // Initialize gamification score
+			Score:            0,          // Initialize gamification score
 			Badges:           []string{}, // Initialize badges array
-			CurrentStreak:    0, // Initialize streak
+			CurrentStreak:    0,          // Initialize streak
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
@@ -171,9 +172,9 @@ func SignUp(ctx *gin.Context) {
 		Password:         string(hashedPassword),
 		IsVerified:       false,
 		VerificationCode: verificationCode,
-		Score:            0, // Initialize gamification score
+		Score:            0,          // Initialize gamification score
 		Badges:           []string{}, // Initialize badges array
-		CurrentStreak:    0, // Initialize streak
+		CurrentStreak:    0,          // Initialize streak
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -541,9 +542,9 @@ func VerifyToken(ctx *gin.Context) {
 func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 	now := time.Now()
 	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
-	
+
 	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", email, now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
-	
+
 	claims := jwt.MapClaims{
 		"sub": email,
 		"exp": expirationTime.Unix(),
@@ -555,7 +556,7 @@ func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 		log.Printf("JWT signing error: %v", err)
 		return "", err
 	}
-	
+
 	log.Printf("JWT Generated successfully - Expiration Unix: %d", expirationTime.Unix())
 	return signedToken, nil
 }
