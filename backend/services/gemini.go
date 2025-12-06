@@ -22,15 +22,17 @@ func generateModelText(ctx context.Context, modelName, prompt string) (string, e
 	if geminiClient == nil {
 		return "", errors.New("gemini client not initialized")
 	}
-	model := geminiClient.GenerativeModel(modelName)
-	model.SafetySettings = []*genai.SafetySetting{
-		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockNone},
+
+	config := &genai.GenerateContentConfig{
+		SafetySettings: []*genai.SafetySetting{
+			{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockThresholdBlockNone},
+			{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockThresholdBlockNone},
+			{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockThresholdBlockNone},
+			{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockThresholdBlockNone},
+		},
 	}
 
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := geminiClient.Models.GenerateContent(ctx, defaultGeminiModel, genai.Text(prompt), config)
 	if err != nil {
 		return "", err
 	}
