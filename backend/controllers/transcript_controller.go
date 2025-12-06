@@ -410,7 +410,7 @@ func UpdatePendingTranscriptsHandler(c *gin.Context) {
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return
 	}
-
+   email := ""  // or load actual email
 	_ = email
 
 	err = services.UpdatePendingTranscripts()

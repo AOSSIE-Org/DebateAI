@@ -166,3 +166,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	return router
 }
+func DebateWebsocketHandler(c *gin.Context) {
+	// TODO: implement real debate websocket logic.
+	// Temporary stub so the backend compiles and runs.
+	c.JSON(501, gin.H{
+		"error": "DebateWebsocketHandler not implemented yet",
+	})
+}

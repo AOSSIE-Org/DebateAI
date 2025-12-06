@@ -19,33 +19,19 @@ type Admin struct {
 
 // Comment represents a comment that can be moderated
 // This can be a TeamDebateMessage, TeamChatMessage, or other user-generated content
-type Comment struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	Type        string             `bson:"type" json:"type"` // "team_debate_message", "team_chat_message", "debate_vs_bot_message"
-	Content     string             `bson:"content" json:"content"`
-	UserID      primitive.ObjectID `bson:"userId" json:"userId"`
-	UserEmail   string             `bson:"userEmail" json:"userEmail"`
-	DisplayName string             `bson:"displayName" json:"displayName"`
-	DebateID    primitive.ObjectID `bson:"debateId,omitempty" json:"debateId,omitempty"`
-	TeamID      primitive.ObjectID `bson:"teamId,omitempty" json:"teamId,omitempty"`
-	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
-	IsDeleted   bool               `bson:"isDeleted" json:"isDeleted"`
-	DeletedAt   *time.Time         `bson:"deletedAt,omitempty" json:"deletedAt,omitempty"`
-	DeletedBy   *primitive.ObjectID `bson:"deletedBy,omitempty" json:"deletedBy,omitempty"`
-}
 
 // AdminActionLog represents a log entry for admin actions
 type AdminActionLog struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	AdminID     primitive.ObjectID `bson:"adminId" json:"adminId"`
-	AdminEmail  string             `bson:"adminEmail" json:"adminEmail"`
-	Action      string             `bson:"action" json:"action"` // "delete_debate", "delete_comment", etc.
-	ResourceType string            `bson:"resourceType" json:"resourceType"` // "debate", "comment", etc.
-	ResourceID   primitive.ObjectID `bson:"resourceId" json:"resourceId"`
-	IPAddress    string            `bson:"ipAddress" json:"ipAddress"`
-	UserAgent    string            `bson:"userAgent" json:"userAgent"`
-	DeviceInfo   string            `bson:"deviceInfo,omitempty" json:"deviceInfo,omitempty"`
-	Timestamp    time.Time         `bson:"timestamp" json:"timestamp"`
+	ID           primitive.ObjectID     `bson:"_id,omitempty" json:"id,omitempty"`
+	AdminID      primitive.ObjectID     `bson:"adminId" json:"adminId"`
+	AdminEmail   string                 `bson:"adminEmail" json:"adminEmail"`
+	Action       string                 `bson:"action" json:"action"`             // "delete_debate", "delete_comment", etc.
+	ResourceType string                 `bson:"resourceType" json:"resourceType"` // "debate", "comment", etc.
+	ResourceID   primitive.ObjectID     `bson:"resourceId" json:"resourceId"`
+	IPAddress    string                 `bson:"ipAddress" json:"ipAddress"`
+	UserAgent    string                 `bson:"userAgent" json:"userAgent"`
+	DeviceInfo   string                 `bson:"deviceInfo,omitempty" json:"deviceInfo,omitempty"`
+	Timestamp    time.Time              `bson:"timestamp" json:"timestamp"`
 	Details      map[string]interface{} `bson:"details,omitempty" json:"details,omitempty"`
 }
 
@@ -61,4 +47,3 @@ type AnalyticsSnapshot struct {
 	CommentsToday int64              `bson:"commentsToday" json:"commentsToday"`
 	NewUsersToday int64              `bson:"newUsersToday" json:"newUsersToday"`
 }
-

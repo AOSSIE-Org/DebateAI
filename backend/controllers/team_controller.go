@@ -366,15 +366,11 @@ func JoinTeam(c *gin.Context) {
 	for _, member := range team.Members {
 		totalElo += member.Elo
 	}
-<<<<<<< HEAD
-	if len(team.Members) >= team.MaxSize {
-=======
-	capacity := team.MaxSize
+	capacity = team.MaxSize
 	if capacity <= 0 {
 		capacity = 4
 	}
 	if len(team.Members) >= capacity {
->>>>>>> main
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Team is already full"})
 		return
 	}
@@ -391,6 +387,7 @@ func JoinTeam(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully joined team"})
 }
+
 
 // LeaveTeam allows a user to leave a team
 func LeaveTeam(c *gin.Context) {
@@ -630,19 +627,11 @@ func GetAvailableTeams(c *gin.Context) {
 	collection := db.GetCollection("teams")
 	cursor, err := collection.Find(context.Background(), bson.M{
 		"$expr": bson.M{
-<<<<<<< HEAD
-		"$lt": []interface{}{
-			bson.M{"$size": "$members"},
-			"$maxSize",
-		},
-	},
-=======
 			"$lt": bson.A{
 				bson.M{"$size": "$members"},
 				"$maxSize",
 			},
 		},
->>>>>>> main
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve teams"})
