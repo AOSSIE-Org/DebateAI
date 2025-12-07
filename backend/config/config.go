@@ -53,7 +53,7 @@ type Config struct {
 
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
-	}
+	} `yaml:"googleOAuth"`
 }
 
 // LoadConfig reads the configuration file
