@@ -349,7 +349,8 @@ func GetComments(ctx *gin.Context) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var comments []models.Comment
+	// Changed to AdminComment to match fields
+	var comments []models.AdminComment
 
 	// Get team debate messages
 	teamDebateCollection := db.MongoDatabase.Collection("team_debate_messages")
@@ -359,7 +360,8 @@ func GetComments(ctx *gin.Context) {
 		var messages []models.TeamDebateMessage
 		if err := cursor1.All(dbCtx, &messages); err == nil {
 			for _, msg := range messages {
-				comments = append(comments, models.Comment{
+				// Using AdminComment struct
+				comments = append(comments, models.AdminComment{
 					ID:          msg.ID,
 					Type:        "team_debate_message",
 					Content:     msg.Message,
@@ -383,7 +385,8 @@ func GetComments(ctx *gin.Context) {
 		var chatMessages []models.TeamChatMessage
 		if err := cursor2.All(dbCtx, &chatMessages); err == nil {
 			for _, msg := range chatMessages {
-				comments = append(comments, models.Comment{
+				// Using AdminComment struct
+				comments = append(comments, models.AdminComment{
 					ID:          msg.ID,
 					Type:        "team_chat_message",
 					Content:     msg.Message,

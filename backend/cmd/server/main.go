@@ -42,8 +42,9 @@ func main() {
 	log.Println("Casbin RBAC initialized")
 
 	// Connect to Redis if configured
-	if cfg.Redis.URL != "" {
-		redisURL := cfg.Redis.URL
+	// FIX: Changed .URL to .Addr to match config.go definition
+	if cfg.Redis.Addr != "" {
+		redisURL := cfg.Redis.Addr
 		if redisURL == "" {
 			redisURL = "localhost:6379"
 		}
@@ -54,7 +55,7 @@ func main() {
 			log.Println("Connected to Redis")
 		}
 	} else {
-		log.Println("Redis URL not configured; continuing without Redis-backed features")
+		log.Println("Redis Addr not configured; continuing without Redis-backed features")
 	}
 	// Start the room watching service for matchmaking after DB connection
 	go websocket.WatchForNewRooms()
@@ -162,7 +163,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	log.Println("Admin routes registered")
 
 	// Debate spectator WebSocket handler (no auth required for anonymous spectators)
-	router.GET("/ws/debate/:debateID", DebateWebsocketHandler)
+	// FIX: Use websocket.DebateWebsocketHandler (moved to websocket package)
+	router.GET("/ws/debate/:debateID", websocket.DebateWebsocketHandler)
 
 	return router
 }

@@ -405,13 +405,14 @@ func UpdatePendingTranscriptsHandler(c *gin.Context) {
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
-	valid, _, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	// FIX: Assign email to variable
+	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
 	if err != nil || !valid {
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 
-	_ = email
+	_ = email // Keep compiler happy if email is indeed not used below
 
 	err = services.UpdatePendingTranscripts()
 	if err != nil {

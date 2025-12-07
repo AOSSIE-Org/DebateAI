@@ -4,13 +4,14 @@ import (
 	"arguehub/models"
 	"context"
 	"fmt"
+	"log" // Added missing import
 	"net/url"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/redis/go-redis/v9"
 )
 
 var MongoClient *mongo.Client
