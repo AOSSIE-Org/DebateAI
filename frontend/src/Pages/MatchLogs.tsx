@@ -101,34 +101,37 @@ const logs: MatchLog[] = [
 
 const MatchLogs: React.FC = () => {
   const getMatchDetails = (log: MatchLog) => {
-    const [player1, player2] = log.match.split(" vs ");
+    const [leftRaw, rightRaw] = log.match.split(" vs ");
+    const player1 = leftRaw.split(": ")[1] || leftRaw;
+    const player2 = rightRaw || "";
+
     const stage = log.match.includes("First Round")
       ? "First Round"
       : log.match.includes("Semifinal")
       ? "Semifinal"
       : "Final";
+    const isFirstRoundMatch3 = log.match.includes("First Round Match 3");
     let winner = "";
     if (log.score && log.score.total) {
-      const [score1, score2] = log.score.total.split("-").map(Number);
-      if (score1 > score2) winner = player1.split(": ")[1];
-      else if (score2 > score1) winner = player2;
-<<<<<<< HEAD
-      else {
-        winner = log.match.includes("First Round Match 3")
-          ? "Ayaan Khanna (Tiebreaker)"
-          : "";
+      const parts = log.score.total.split("-");
+      if (parts.length === 2) {
+        const score1 = Number(parts[0]);
+        const score2 = Number(parts[1]);
+        if (!Number.isNaN(score1) && !Number.isNaN(score2)) {
+          if (score1 > score2) winner = player1;
+          else if (score2 > score1) winner = player2;
+          else {
+            if (isFirstRoundMatch3) {
+              winner = player1;
+            } else {
+              winner = ""; 
+            }
+          }
+        }
       }
-=======
-      else
-        winner = isFirstRoundMatch3 ? "Ayaan Khanna (Tiebreaker)" : "";
->>>>>>> main
     }
-    return {
-      player1: player1.split(": ")[1] || player1,
-      player2,
-      stage,
-      winner,
-    };
+
+    return { player1, player2, stage, winner, isFirstRoundMatch3 };
   };
 
   return (
@@ -136,7 +139,9 @@ const MatchLogs: React.FC = () => {
       <h2 className="text-2xl font-bold text-foreground mb-6">Match Logs</h2>
       <div className="space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto scrollbar-hide">
         {[...logs].reverse().map((log, index) => {
-          const { player1, player2, stage, winner } = getMatchDetails(log);
+          const { player1, player2, stage, winner, isFirstRoundMatch3 } = getMatchDetails(log);
+          const totalParts = log.score && log.score.total ? log.score.total.split("-") : ["", ""];
+ 
           return (
             <div
               key={index}
@@ -165,7 +170,9 @@ const MatchLogs: React.FC = () => {
                   </span>
                 </div>
               </div>
+
               <div className="h-px bg-border mb-4" />
+
               <div className="mb-4">
                 <div className="grid grid-cols-3 gap-2 text-sm text-foreground">
                   <span className="font-medium capitalize">Category</span>
@@ -200,6 +207,7 @@ const MatchLogs: React.FC = () => {
                       </React.Fragment>
                     );
                   })}
+                  
                   <span className="font-semibold">Total</span>
                   <span
                     className={`font-semibold ${
@@ -210,21 +218,20 @@ const MatchLogs: React.FC = () => {
                         : ""
                     }`}
                   >
-                    {log.score?.total.split("-")[0]}
+                    {totalParts[0]}
                   </span>
                   <span
                     className={`font-semibold ${
                       log.score &&
-                      parseInt(log.score.total.split("-")[1]) >
-                        parseInt(log.score.total.split("-")[0])
+                      parseInt(totalParts[1]) > parseInt(totalParts[0])
                         ? "text-primary"
                         : ""
                     }`}
                   >
-                    {log.score?.total.split("-")[1]}
+                    {totalParts[1]}
                   </span>
                 </div>
-                {stage === "First Round Match 3" && (
+                {isFirstRoundMatch3 && (
                   <p className="text-xs text-muted-foreground mt-2">
                     * Ayaan Khanna advanced via tiebreaker
                   </p>
