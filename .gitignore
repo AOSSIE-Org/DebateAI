@@ -30,3 +30,6 @@ dist-ssr
 
 
 kjn
+
+backend/config/config.prod.yml
+backend/config/*.prod.yml
