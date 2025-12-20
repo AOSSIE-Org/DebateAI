@@ -3,8 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -38,8 +40,99 @@ func extractNameFromEmail(email string) string {
 	return email
 }
 
-
 func GetProfile(c *gin.Context) {
+	// Check if userId query parameter is provided (for fetching other users' profiles)
+	// This must be checked FIRST before any auth context is used
+	// Read query parameter using standard Gin methods
+	userIDParam := strings.TrimSpace(c.Query("userId"))
+	
+	// Log detailed request information for debugging
+	log.Printf("GetProfile: Request URL = '%s'", c.Request.URL.String())
+	log.Printf("GetProfile: Raw Query = '%s'", c.Request.URL.RawQuery)
+	log.Printf("GetProfile: Query params map = %v", c.Request.URL.Query())
+	log.Printf("GetProfile: userId from c.Query() = '%s'", userIDParam)
+	
+	// If c.Query() didn't work, try reading from URL.Query() directly
+	if userIDParam == "" {
+		values := c.Request.URL.Query()
+		if val, ok := values["userId"]; ok && len(val) > 0 && val[0] != "" {
+			userIDParam = strings.TrimSpace(val[0])
+			log.Printf("GetProfile: Got userId from URL.Query(): '%s'", userIDParam)
+		}
+	}
+	
+	// If still empty, try parsing raw query string manually
+	if userIDParam == "" && c.Request.URL.RawQuery != "" {
+		rawQuery := c.Request.URL.RawQuery
+		parts := strings.Split(rawQuery, "&")
+		for _, part := range parts {
+			if strings.HasPrefix(part, "userId=") {
+				userIDParam = strings.TrimSpace(strings.TrimPrefix(part, "userId="))
+				// URL decode if needed
+				if decoded, err := url.QueryUnescape(userIDParam); err == nil {
+					userIDParam = strings.TrimSpace(decoded)
+				}
+				log.Printf("GetProfile: Extracted userId from raw query: '%s'", userIDParam)
+				break
+			}
+		}
+	}
+	
+	log.Printf("GetProfile: Final userId param = '%s'", userIDParam)
+	
+	if userIDParam != "" && userIDParam != "undefined" && userIDParam != "null" {
+		log.Printf("GetProfile: Processing userId query param: '%s'", userIDParam)
+		
+		userID, err := primitive.ObjectIDFromHex(userIDParam)
+		if err != nil {
+			log.Printf("GetProfile: Invalid ObjectID format: '%s', error: %v", userIDParam, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format", "provided": userIDParam})
+			return
+		}
+
+		dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		var user models.User
+		err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": userID}).Decode(&user)
+		if err != nil {
+			log.Printf("GetProfile: User not found in DB for ID: '%s', error: %v", userIDParam, err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "userId": userIDParam})
+			return
+		}
+
+		log.Printf("GetProfile: Found user - ID: %s, Email: %s, DisplayName: %s", user.ID.Hex(), user.Email, user.DisplayName)
+
+		displayName := user.DisplayName
+		if displayName == "" {
+			displayName = extractNameFromEmail(user.Email)
+		}
+		avatar := user.AvatarURL
+		if avatar == "" {
+			avatar = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + displayName
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"profile": gin.H{
+				"id":             user.ID.Hex(),
+				"email":          user.Email,
+				"displayName":    displayName,
+				"bio":            user.Bio,
+				"rating":         user.Rating,
+				"score":          user.Score,
+				"badges":         user.Badges,
+				"currentStreak":  user.CurrentStreak,
+				"avatarUrl":      avatar,
+				"lastActivityAt": user.LastActivityDate,
+			},
+		})
+		return
+	}
+
+	// Log when falling back to current user
+	log.Printf("GetProfile: No userId query param provided, falling back to authenticated user")
+
+	// Otherwise, get current user's profile
 	email := c.GetString("email")
 	if email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "message": "Missing email in context"})
@@ -69,9 +162,7 @@ func GetProfile(c *gin.Context) {
 			}},
 		)
 		if err != nil {
-			fmt.Printf("Failed to update user rating: %v", err)
 		} else {
-			fmt.Printf("Updated user %s rating from 0 to 1200", email)
 		}
 	}
 
@@ -157,13 +248,13 @@ func GetProfile(c *gin.Context) {
 		// Add to recent debates (last 10)
 		if len(recentDebates) < 10 {
 			recentDebates = append(recentDebates, gin.H{
-				"id":          transcript.ID.Hex(),
-				"topic":       transcript.Topic,
-				"result":      transcript.Result,
-				"opponent":    transcript.Opponent,
-				"debateType":  transcript.DebateType,
-				"date":        transcript.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-				"eloChange":   0, // TODO: Add actual Elo change tracking
+				"id":         transcript.ID.Hex(),
+				"topic":      transcript.Topic,
+				"result":     transcript.Result,
+				"opponent":   transcript.Opponent,
+				"debateType": transcript.DebateType,
+				"date":       transcript.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+				"eloChange":  0, // TODO: Add actual Elo change tracking
 			})
 		}
 
@@ -190,14 +281,18 @@ func GetProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"profile": gin.H{
+			"id":          user.ID.Hex(),
 			"displayName": displayName,
 			"email":       user.Email,
-			"bio":         user.Bio,
-			"rating":   int(user.Rating),
-			"twitter":     user.Twitter,
-			"instagram":   user.Instagram,
-			"linkedin":    user.LinkedIn,
-			"avatarUrl":   avatar,
+			"bio":           user.Bio,
+			"rating":        int(user.Rating),
+			"score":         user.Score,
+			"badges":        user.Badges,
+			"currentStreak": user.CurrentStreak,
+			"twitter":       user.Twitter,
+			"instagram":     user.Instagram,
+			"linkedin":      user.LinkedIn,
+			"avatarUrl":     avatar,
 		},
 		"leaderboard": leaderboard,
 		"stats": gin.H{
@@ -291,7 +386,7 @@ func UpdateEloAfterDebate(ctx *gin.Context) {
 		"topic":     req.Topic,
 		"result":    "win",
 		"eloChange": winnerChange,
-		"rating": newWinnerElo,
+		"rating":    newWinnerElo,
 		"date":      now,
 	})
 	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
@@ -299,7 +394,7 @@ func UpdateEloAfterDebate(ctx *gin.Context) {
 		"topic":     req.Topic,
 		"result":    "loss",
 		"eloChange": loserChange,
-		"rating": newLoserElo,
+		"rating":    newLoserElo,
 		"date":      now,
 	})
 

@@ -2,7 +2,7 @@ package routes
 
 import (
 	"context"
-	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -21,14 +21,17 @@ import (
 type Room struct {
 	ID           string        `json:"id" bson:"_id"`
 	Type         string        `json:"type" bson:"type"`
+	OwnerID      string        `json:"ownerId" bson:"ownerId"`
 	Participants []Participant `json:"participants" bson:"participants"`
 }
 
 // Participant represents a user in a room.
 type Participant struct {
-	ID       string `json:"id" bson:"id"`
-	Username string `json:"username" bson:"username"`
-	Elo      int    `json:"elo" bson:"elo"`
+	ID        string `json:"id" bson:"id"`
+	Username  string `json:"username" bson:"username"`
+	Elo       int    `json:"elo" bson:"elo"`
+	AvatarURL string `json:"avatarUrl" bson:"avatarUrl,omitempty"`
+	Email     string `json:"email" bson:"email,omitempty"`
 }
 
 // generateRoomID creates a random six-digit room ID as a string.
@@ -64,9 +67,10 @@ func CreateRoomHandler(c *gin.Context) {
 
 	var user struct {
 		ID          primitive.ObjectID `bson:"_id"`
-		Email       string `bson:"email"`
-		DisplayName string `bson:"displayName"`
-		Rating   int    `bson:"rating"`
+		Email       string             `bson:"email"`
+		DisplayName string             `bson:"displayName"`
+		Rating      float64            `bson:"rating"`
+		AvatarURL   string             `bson:"avatarUrl"`
 	}
 
 	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
@@ -77,15 +81,18 @@ func CreateRoomHandler(c *gin.Context) {
 
 	// Add the room creator as the first participant
 	creatorParticipant := Participant{
-		ID:       user.ID.Hex(),
-		Username: user.DisplayName,
-		Elo:      user.Rating,
+		ID:        user.ID.Hex(),
+		Username:  user.DisplayName,
+		Elo:       int(math.Round(user.Rating)),
+		AvatarURL: user.AvatarURL,
+		Email:     user.Email,
 	}
 
 	roomID := generateRoomID()
 	newRoom := Room{
 		ID:           roomID,
 		Type:         input.Type,
+		OwnerID:      creatorParticipant.ID,
 		Participants: []Participant{creatorParticipant},
 	}
 
@@ -101,7 +108,6 @@ func CreateRoomHandler(c *gin.Context) {
 
 // GetRoomsHandler handles GET /rooms and returns all rooms.
 func GetRoomsHandler(c *gin.Context) {
-	log.Println("🔍 GetRoomsHandler called")
 
 	collection := db.MongoClient.Database("DebateAI").Collection("rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -125,7 +131,7 @@ func GetRoomsHandler(c *gin.Context) {
 // JoinRoomHandler handles POST /rooms/:id/join where a user joins a room.
 func JoinRoomHandler(c *gin.Context) {
 	roomId := c.Param("id")
-	
+
 	// Get user email from middleware-set context
 	email, exists := c.Get("email")
 	if !exists {
@@ -138,14 +144,21 @@ func JoinRoomHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var user struct {
-		ID          primitive.ObjectID `bson:"_id"`
-		Email       string `bson:"email"`
-		DisplayName string `bson:"displayName"`
-		Rating      int    `bson:"rating"`
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
 	}
 
-	err := userCollection.FindOne(ctx, bson.M{"email": email.(string)}).Decode(&user)
+	var user struct {
+		ID          primitive.ObjectID `bson:"_id"`
+		Email       string             `bson:"email"`
+		DisplayName string             `bson:"displayName"`
+		Rating      float64            `bson:"rating"`
+		AvatarURL   string             `bson:"avatarUrl"`
+	}
+
+	err := userCollection.FindOne(ctx, bson.M{"email": emailStr}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -153,9 +166,11 @@ func JoinRoomHandler(c *gin.Context) {
 
 	// Create participant
 	participant := Participant{
-		ID:       user.ID.Hex(),
-		Username: user.DisplayName,
-		Elo:      user.Rating,
+		ID:        user.ID.Hex(),
+		Username:  user.DisplayName,
+		Elo:       int(math.Round(user.Rating)),
+		AvatarURL: user.AvatarURL,
+		Email:     user.Email,
 	}
 
 	// Use atomic operation to join room
@@ -182,7 +197,7 @@ func JoinRoomHandler(c *gin.Context) {
 // GetRoomParticipantsHandler handles GET /rooms/:id/participants and returns the participants of a room.
 func GetRoomParticipantsHandler(c *gin.Context) {
 	roomId := c.Param("id")
-	
+
 	// Get user email from middleware-set context
 	email, exists := c.Get("email")
 	if !exists {
@@ -204,10 +219,16 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	}
 
 	// Get user ID from email
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
+	}
+
 	var user struct {
 		ID primitive.ObjectID `bson:"_id"`
 	}
-	err = userCollection.FindOne(ctx, bson.M{"email": email.(string)}).Decode(&user)
+	err = userCollection.FindOne(ctx, bson.M{"email": emailStr}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -227,56 +248,81 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 		return
 	}
 
+	// Prepare email list for batch lookup
+	emailSet := make(map[string]struct{})
+	for _, participant := range room.Participants {
+		if participant.Email != "" {
+			emailSet[participant.Email] = struct{}{}
+		}
+	}
+
+	emailList := make([]string, 0, len(emailSet))
+	for addr := range emailSet {
+		emailList = append(emailList, addr)
+	}
+
+	type userDetails struct {
+		Email       string  `bson:"email"`
+		DisplayName string  `bson:"displayName"`
+		Rating      float64 `bson:"rating"`
+		AvatarURL   string  `bson:"avatarUrl"`
+	}
+	userMap := make(map[string]userDetails, len(emailList))
+
+	if len(emailList) > 0 {
+		cursor, err := userCollection.Find(ctx, bson.M{"email": bson.M{"$in": emailList}})
+		if err == nil {
+			var users []userDetails
+			if err := cursor.All(ctx, &users); err == nil {
+				for _, u := range users {
+					userMap[u.Email] = u
+				}
+			}
+		}
+	}
+
 	// Get full user details for each participant
 	var participantsWithDetails []gin.H
 
 	for _, participant := range room.Participants {
-		var user struct {
-			ID          primitive.ObjectID `bson:"_id"`
-			Email       string `bson:"email"`
-			DisplayName string `bson:"displayName"`
-			Rating      int    `bson:"rating"`
-			AvatarURL   string `bson:"avatarUrl"`
+		avatarURL := participant.AvatarURL
+		if avatarURL == "" {
+			avatarURL = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + participant.ID
 		}
 
-		// Try to find user by ID first
-		objectID, err := primitive.ObjectIDFromHex(participant.ID)
-		if err != nil {
-			// If not a valid ObjectID, try to find by email (fallback)
-			err = userCollection.FindOne(ctx, bson.M{"email": participant.ID}).Decode(&user)
-		} else {
-			err = userCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
-			if err != nil {
-				// If not found by ID, try to find by email (fallback)
-				err = userCollection.FindOne(ctx, bson.M{"email": participant.ID}).Decode(&user)
+		displayName := participant.Username
+		elo := participant.Elo
+
+		if participant.Email != "" {
+			if details, found := userMap[participant.Email]; found {
+				if details.DisplayName != "" {
+					displayName = details.DisplayName
+				}
+				if details.AvatarURL != "" {
+					avatarURL = details.AvatarURL
+				}
+				if details.Rating != 0 {
+					elo = int(math.Round(details.Rating))
+				}
 			}
 		}
-		
-		if err != nil {
-			// If user not found, use basic participant info with default avatar
-			participantsWithDetails = append(participantsWithDetails, gin.H{
-				"id":          participant.ID,
-				"username":    participant.Username,
-				"displayName": participant.Username,
-				"elo":         participant.Elo,
-				"avatarUrl":   "https://api.dicebear.com/9.x/adventurer/svg?seed=" + participant.ID,
-			})
-		} else {
-			// Ensure we have a default avatar if none is set
-			avatarUrl := user.AvatarURL
-			if avatarUrl == "" {
-				avatarUrl = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + user.ID.Hex()
-			}
-			
-			participantsWithDetails = append(participantsWithDetails, gin.H{
-				"id":          user.ID.Hex(),
-				"username":    user.DisplayName,
-				"displayName": user.DisplayName,
-				"elo":         user.Rating,
-				"avatarUrl":   avatarUrl,
-			})
-		}
+
+		participantsWithDetails = append(participantsWithDetails, gin.H{
+			"id":          participant.ID,
+			"username":    displayName,
+			"displayName": displayName,
+			"elo":         elo,
+			"avatarUrl":   avatarURL,
+		})
 	}
 
-	c.JSON(http.StatusOK, participantsWithDetails)
+	ownerID := room.OwnerID
+	if ownerID == "" && len(room.Participants) > 0 {
+		ownerID = room.Participants[0].ID
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ownerId":      ownerID,
+		"participants": participantsWithDetails,
+	})
 }

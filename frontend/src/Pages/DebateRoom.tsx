@@ -196,10 +196,24 @@ const turnTypes = [
 ];
 
 const extractJSON = (response: string): string => {
+  if (!response) return "{}";
+  
+  // Try to extract JSON from markdown code fences
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
   const match = fenceRegex.exec(response);
-  if (match && match[1]) return match[1].trim();
-  return response;
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  
+  // Try to find JSON object in the response
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return jsonMatch[0];
+  }
+  
+  // If no JSON found, return empty object
+  console.warn("No JSON found in response:", response);
+  return "{}";
 };
 
 const DebateRoom: React.FC = () => {
@@ -208,7 +222,6 @@ const DebateRoom: React.FC = () => {
   const phases = debateData.phaseTimings;
   const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
   const [user] = useAtom(userAtom);
-  console.log("user", user);
 
   const [state, setState] = useState<DebateState>(() => {
     const savedState = localStorage.getItem(debateKey);
@@ -250,39 +263,42 @@ const DebateRoom: React.FC = () => {
     if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = "en-US";
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = "en-US";
 
-      recognitionRef.current.onresult = (event) => {
-        let newFinalTranscript = "";
-        let newInterimTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            newFinalTranscript += result[0].transcript + " ";
-          } else {
-            newInterimTranscript = result[0].transcript;
+        recognitionRef.current.onresult = (event) => {
+          let newFinalTranscript = "";
+          let newInterimTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              newFinalTranscript += result[0].transcript + " ";
+            } else {
+              newInterimTranscript = result[0].transcript;
+            }
           }
-        }
-        if (newFinalTranscript) {
-          setFinalInput((prev) =>
-            prev
-              ? prev + " " + newFinalTranscript.trim()
-              : newFinalTranscript.trim()
-          );
-          setInterimInput("");
-        } else {
-          setInterimInput(newInterimTranscript);
-        }
-      };
+          if (newFinalTranscript) {
+            setFinalInput((prev) =>
+              prev
+                ? prev + " " + newFinalTranscript.trim()
+                : newFinalTranscript.trim()
+            );
+            setInterimInput("");
+          } else {
+            setInterimInput(newInterimTranscript);
+          }
+        };
 
-      recognitionRef.current.onend = () => setIsRecognizing(false);
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        setIsRecognizing(false);
-      };
+        recognitionRef.current.onend = () => setIsRecognizing(false);
+        recognitionRef.current.onerror = (event: Event) => {
+          const errorEvent = event as Event & { error?: string };
+          console.error("Speech recognition error:", errorEvent.error ?? event);
+          setIsRecognizing(false);
+        };
+      }
     }
 
     return () => {
@@ -399,12 +415,12 @@ const DebateRoom: React.FC = () => {
       const nextStance = currentSequence[nextStep];
       const nextEntity =
         currentState.userStance === nextStance ? "User" : "Bot";
-      setState((prev) => ({
-        ...prev,
+      setState({
+        ...currentState,
         phaseStep: nextStep,
         isBotTurn: nextEntity === "Bot",
         timer: phases[currentState.currentPhase].time,
-      }));
+      });
       setNextTurnPending(false);
     } else if (currentState.currentPhase < phases.length - 1) {
       const newPhase = currentState.currentPhase + 1;
@@ -432,7 +448,7 @@ const DebateRoom: React.FC = () => {
         message: "Calculating scores and judging results...",
         isJudging: true,
       });
-      setState((prev) => ({ ...prev, isDebateEnded: true }));
+      setState({ ...currentState, isDebateEnded: true });
       judgeDebateResult(currentState.messages);
       setNextTurnPending(false);
     }
@@ -500,15 +516,34 @@ const DebateRoom: React.FC = () => {
         phase: phases[state.currentPhase].name,
       };
 
-      setState((prev) => ({
-        ...prev,
-        messages: [...prev.messages, botMessage],
-      }));
-
-      setNextTurnPending(true);
+      setState((prev) => {
+        const updatedState = {
+          ...prev,
+          messages: [...prev.messages, botMessage],
+        };
+        // Advance turn after bot responds
+        setTimeout(() => {
+          advanceTurn(updatedState);
+        }, 100); // Small delay to ensure state is updated
+        return updatedState;
+      });
     } catch (error) {
       console.error("Bot error:", error);
-      setNextTurnPending(true);
+      // Even on error, advance turn to prevent getting stuck
+      setState((prev) => {
+        const errorMessage: Message = {
+          sender: "Bot",
+          text: "I encountered an error. Please continue.",
+          phase: phases[prev.currentPhase].name,
+        };
+        const updatedState = {
+          ...prev,
+          messages: [...prev.messages, errorMessage],
+          isBotTurn: false, // Reset bot turn on error
+        };
+        advanceTurn(updatedState);
+        return updatedState;
+      });
     } finally {
       botTurnRef.current = false;
     }
@@ -516,44 +551,77 @@ const DebateRoom: React.FC = () => {
 
   const judgeDebateResult = async (messages: Message[]) => {
     try {
+      console.log("Starting judgment with messages:", messages);
       const { result } = await judgeDebate({
         history: messages,
         userId: debateData.userId,
       });
+      console.log("Raw judge result:", result);
+      
       const jsonString = extractJSON(result);
-      const judgment: JudgmentData = JSON.parse(jsonString);
+      console.log("Extracted JSON string:", jsonString);
+      
+      let judgment: JudgmentData;
+      try {
+        judgment = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError, "Trying to fix JSON...");
+        // Try to fix common JSON issues
+        const fixedJson = jsonString
+          .replace(/'/g, '"') // Replace single quotes with double quotes
+          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
+          .replace(/,\s*}/g, '}') // Remove trailing commas
+          .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
+        try {
+          judgment = JSON.parse(fixedJson);
+        } catch (e) {
+          throw new Error(`Failed to parse JSON: ${e}`);
+        }
+      }
+      
+      console.log("Parsed judgment:", judgment);
       setJudgmentData(judgment);
       setPopup({ show: false, message: "" });
       setShowJudgment(true);
     } catch (error) {
       console.error("Judging error:", error);
+      // Show error to user
+      setPopup({
+        show: true,
+        message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
+        isJudging: false,
+      });
+      
+      // Set default judgment data
       setJudgmentData({
         opening_statement: {
-          user: { score: 0, reason: "Error" },
-          bot: { score: 0, reason: "Error" },
+          user: { score: 0, reason: "Error occurred during judgment" },
+          bot: { score: 0, reason: "Error occurred during judgment" },
         },
         cross_examination: {
-          user: { score: 0, reason: "Error" },
-          bot: { score: 0, reason: "Error" },
+          user: { score: 0, reason: "Error occurred during judgment" },
+          bot: { score: 0, reason: "Error occurred during judgment" },
         },
         answers: {
-          user: { score: 0, reason: "Error" },
-          bot: { score: 0, reason: "Error" },
+          user: { score: 0, reason: "Error occurred during judgment" },
+          bot: { score: 0, reason: "Error occurred during judgment" },
         },
         closing: {
-          user: { score: 0, reason: "Error" },
-          bot: { score: 0, reason: "Error" },
+          user: { score: 0, reason: "Error occurred during judgment" },
+          bot: { score: 0, reason: "Error occurred during judgment" },
         },
         total: { user: 0, bot: 0 },
         verdict: {
           winner: "None",
-          reason: "Judgment failed",
+          reason: error instanceof Error ? error.message : "Judgment failed",
           congratulations: "",
           opponent_analysis: "",
         },
       });
-      setPopup({ show: false, message: "" });
-      setShowJudgment(true);
+      setTimeout(() => {
+        setPopup({ show: false, message: "" });
+        setShowJudgment(true);
+      }, 3000);
     }
   };
 

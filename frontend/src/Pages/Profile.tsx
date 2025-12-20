@@ -49,7 +49,9 @@ import {
   X,
   Image as ImageIcon,
   ChevronRight,
+  Flame,
 } from "lucide-react";
+import { FaTrophy, FaMedal, FaAward } from "react-icons/fa";
 import { format, isSameDay, subDays } from "date-fns";
 import defaultAvatar from "@/assets/avatar2.jpg";
 import {
@@ -74,6 +76,8 @@ import { getAuthToken } from "@/utils/auth";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
+import ProfileHover from "../components/ProfileHover";
+import { useUser } from "../hooks/useUser";
 import {
   transcriptService,
   SavedDebateTranscript,
@@ -84,6 +88,9 @@ interface ProfileData {
   email: string;
   bio: string;
   rating: number;
+  score?: number;
+  badges?: string[];
+  currentStreak?: number;
   twitter?: string;
   instagram?: string;
   linkedin?: string;
@@ -191,7 +198,6 @@ const Profile: React.FC = () => {
         setDebateStatsLoading(false);
       } catch (err) {
         setErrorMessage("Failed to load dashboard data.");
-        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -222,7 +228,6 @@ const Profile: React.FC = () => {
       const transcript = await transcriptService.getTranscriptById(debate.id);
       setFullTranscript(transcript);
     } catch (err) {
-      console.error("Failed to fetch full transcript:", err);
     } finally {
       setTranscriptLoading(false);
     }
@@ -270,7 +275,6 @@ const Profile: React.FC = () => {
       setEditingField(null);
     } catch (err) {
       setErrorMessage(`Failed to update ${field}.`);
-      console.error(err);
     }
   };
 
@@ -300,7 +304,6 @@ const Profile: React.FC = () => {
       setErrorMessage("");
     } catch (err) {
       setErrorMessage("Failed to update avatar.");
-      console.error(err);
       // Optionally revert state on failure
       setDashboard({
         ...dashboard,
@@ -616,6 +619,141 @@ const Profile: React.FC = () => {
     }
   };
 
+  // Followers and Following Section Component
+  const FollowersFollowingSection: React.FC = () => {
+    const { user } = useUser();
+    const [followers, setFollowers] = useState<any[]>([]);
+    const [following, setFollowing] = useState<any[]>([]);
+    const [loadingFollowers, setLoadingFollowers] = useState(false);
+    const [loadingFollowing, setLoadingFollowing] = useState(false);
+    const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+
+    useEffect(() => {
+      if (user?.id) {
+        fetchFollowers();
+        fetchFollowing();
+      }
+    }, [user?.id]);
+
+    const fetchFollowers = async () => {
+      if (!user?.id) return;
+      setLoadingFollowers(true);
+      try {
+        const token = getAuthToken();
+        const response = await fetch(`${baseURL}/users/${user.id}/followers`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFollowers(data.followers || []);
+        }
+      } catch (err) {
+        console.error('Error fetching followers:', err);
+      } finally {
+        setLoadingFollowers(false);
+      }
+    };
+
+    const fetchFollowing = async () => {
+      if (!user?.id) return;
+      setLoadingFollowing(true);
+      try {
+        const token = getAuthToken();
+        const response = await fetch(`${baseURL}/users/${user.id}/following`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFollowing(data.following || []);
+        }
+      } catch (err) {
+        console.error('Error fetching following:', err);
+      } finally {
+        setLoadingFollowing(false);
+      }
+    };
+
+    return (
+      <div className="space-y-3">
+        <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+          Connections
+        </h3>
+        
+        {/* Followers Section */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <Users className="w-3 h-3" />
+            <span>Followers ({followers.length})</span>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
+            {loadingFollowers ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Loading...
+              </div>
+            ) : followers.length === 0 ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                No followers yet
+              </div>
+            ) : (
+              followers.map((follower: any) => (
+                <ProfileHover key={follower.id || follower._id} userId={follower.id || follower._id}>
+                  <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
+                    <img
+                      src={follower.avatarUrl || defaultAvatar}
+                      alt={follower.displayName || 'User'}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                    <span className="text-xs truncate">
+                      {follower.displayName || follower.email || 'User'}
+                    </span>
+                  </div>
+                </ProfileHover>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Following Section */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <Users className="w-3 h-3" />
+            <span>Following ({following.length})</span>
+          </div>
+          <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
+            {loadingFollowing ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Loading...
+              </div>
+            ) : following.length === 0 ? (
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Not following anyone yet
+              </div>
+            ) : (
+              following.map((followed: any) => (
+                <ProfileHover key={followed.id || followed._id} userId={followed.id || followed._id}>
+                  <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
+                    <img
+                      src={followed.avatarUrl || defaultAvatar}
+                      alt={followed.displayName || 'User'}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                    <span className="text-xs truncate">
+                      {followed.displayName || followed.email || 'User'}
+                    </span>
+                  </div>
+                </ProfileHover>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col md:flex-row gap-4 p-2 sm:p-4 bg-background min-h-[calc(100vh-4rem)]">
       <div className="w-full md:w-1/4 lg:w-1/5 bg-card p-4 border border-border rounded-md shadow max-h-[calc(100vh-4rem)] overflow-y-auto">
@@ -711,6 +849,17 @@ const Profile: React.FC = () => {
           <p className="text-sm bg-primary text-primary-foreground px-2 py-1 rounded mt-2">
             Elo: {profile.rating}
           </p>
+          {profile.score !== undefined && (
+            <p className="text-sm bg-secondary text-secondary-foreground px-2 py-1 rounded mt-2">
+              Score: {profile.score}
+            </p>
+          )}
+          {profile.currentStreak !== undefined && profile.currentStreak > 0 && (
+            <p className="text-sm bg-orange-500 text-white px-2 py-1 rounded mt-2 flex items-center gap-1">
+              <Flame className="w-4 h-4" />
+              Streak: {profile.currentStreak} days
+            </p>
+          )}
         </div>
         <Separator className="my-2" />
         <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
@@ -740,11 +889,62 @@ const Profile: React.FC = () => {
           )}
         </div>
         <Separator className="my-2" />
-        <div className="space-y-2">
+        <div className="space-y-2 mb-4">
           <h3 className="text-xs sm:text-sm font-semibold text-foreground">
             Bio
           </h3>
           {renderBioField()}
+        </div>
+        <Separator className="my-2" />
+        <FollowersFollowingSection />
+        <div className="space-y-2">
+          <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+            Badges
+          </h3>
+          {profile.badges && profile.badges.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {profile.badges.map((badge, index) => {
+                const badgeIcons: Record<string, React.ReactNode> = {
+                  Novice: <FaAward className="w-6 h-6 text-blue-500" />,
+                  Streak5: <FaMedal className="w-6 h-6 text-yellow-500" />,
+                  FactMaster: <FaTrophy className="w-6 h-6 text-purple-500" />,
+                  FirstWin: <FaTrophy className="w-6 h-6 text-green-500" />,
+                  Debater10: <FaMedal className="w-6 h-6 text-orange-500" />,
+                };
+                const badgeDescriptions: Record<string, string> = {
+                  Novice: "Completed first debate",
+                  Streak5: "5-day streak achieved",
+                  FactMaster: "Master of facts (500+ points)",
+                  FirstWin: "First victory earned",
+                  Debater10: "10 debates completed",
+                };
+                const badgeIcon = badgeIcons[badge] || <FaAward className="w-6 h-6 text-primary" />;
+                const badgeDescription = badgeDescriptions[badge] || "Achievement unlocked";
+                
+                return (
+                  <div
+                    key={index}
+                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:bg-accent transition-colors cursor-pointer group"
+                    title={badgeDescription}
+                  >
+                    <div className="mb-1 group-hover:scale-110 transition-transform">
+                      {badgeIcon}
+                    </div>
+                    <span className="text-xs font-medium text-foreground text-center">
+                      {badge}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg border border-dashed border-border">
+              <Award className="w-8 h-8 text-muted-foreground mb-2" />
+              <p className="text-xs text-muted-foreground text-center">
+                No badges yet. Complete debates to earn badges!
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

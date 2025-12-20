@@ -25,8 +25,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   isTurn,
   turnDuration = 0,
 }) => {
-  console.log("turn duration: ", turnDuration);
-  console.log(isTurn);
   return (
     <div className="flex justify-between items-center border rounded w-full p-2 ">
       {/* Player Details Section */}

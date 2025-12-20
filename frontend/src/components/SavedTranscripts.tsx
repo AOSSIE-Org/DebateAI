@@ -28,12 +28,16 @@ import {
   SavedDebateTranscript,
 } from '@/services/transcriptService';
 import { format } from 'date-fns';
+import CommentTree from './CommentTree';
+import { Share2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface SavedTranscriptsProps {
   className?: string;
 }
 
 const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
+  const navigate = useNavigate();
   const [transcripts, setTranscripts] = useState<SavedDebateTranscript[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +45,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     useState<SavedDebateTranscript | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [creatingPost, setCreatingPost] = useState(false);
 
   useEffect(() => {
     fetchTranscripts();
@@ -51,10 +56,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
       setLoading(true);
       setError(null);
       const data = await transcriptService.getUserTranscripts();
-      console.log('Fetched transcripts:', data); // Debug log
       if (data && data.length > 0) {
-        console.log('First transcript ID:', data[0].id); // Debug log
-        console.log('First transcript ID type:', typeof data[0].id); // Debug log
       }
       setTranscripts(data);
     } catch (err) {
@@ -67,8 +69,6 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   };
 
   const handleDeleteTranscript = async (id: string) => {
-    console.log('Attempting to delete transcript with ID:', id); // Debug log
-    console.log('ID type:', typeof id); // Debug log
 
     if (
       !confirm(
@@ -83,7 +83,6 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
       await transcriptService.deleteTranscript(id);
       setTranscripts(transcripts.filter((t) => t.id !== id));
     } catch (err) {
-      console.error('Delete error:', err); // Debug log
       alert(err instanceof Error ? err.message : 'Failed to delete transcript');
     } finally {
       setDeletingId(null);
@@ -93,6 +92,48 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   const handleViewTranscript = (transcript: SavedDebateTranscript) => {
     setSelectedTranscript(transcript);
     setIsViewDialogOpen(true);
+  };
+
+  const handleCreatePost = async () => {
+    if (!selectedTranscript) return;
+
+    setCreatingPost(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Please log in to create a post');
+        return;
+      }
+
+      const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+      const response = await fetch(`${baseURL}/posts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          transcriptId: selectedTranscript.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create post');
+      }
+
+      alert(
+        'Post created successfully! You can view it in the Community Feed.'
+      );
+      navigate('/community');
+    } catch (err) {
+      console.error('Error creating post:', err);
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to create post';
+      alert(errorMessage);
+    } finally {
+      setCreatingPost(false);
+    }
   };
 
   const getResultIcon = (result: string) => {
@@ -282,7 +323,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
 
       {/* View Transcript Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className='max-w-4xl max-h-[80vh]'>
+        <DialogContent className='max-w-4xl max-h-[90vh] overflow-y-auto'>
           <DialogHeader>
             <DialogTitle className='flex items-center gap-2'>
               <MessageSquare className='w-5 h-5' />
@@ -412,6 +453,31 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                     </div>
                   </>
                 )}
+
+              <Separator />
+
+              <div className='flex justify-between items-center'>
+                <Button
+                  onClick={handleCreatePost}
+                  disabled={creatingPost}
+                  className='flex items-center gap-2'
+                  variant='default'
+                >
+                  <Share2 className='w-4 h-4' />
+                  {creatingPost ? 'Creating Post...' : 'Create Post'}
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div>
+                <CommentTree
+                  transcriptId={selectedTranscript.id}
+                  onCommentAdded={() => {
+                    // Refresh comments after adding
+                  }}
+                />
+              </div>
             </div>
           )}
         </DialogContent>

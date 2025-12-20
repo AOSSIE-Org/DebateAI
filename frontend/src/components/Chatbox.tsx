@@ -117,8 +117,7 @@ const Chatbox: React.FC<{
         setInputText(finalTranscript + interimTranscript);
       };
 
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
+      recognition.onerror = () => {
         setIsRecognizing(false);
         onSpeakingChangeRef.current(false);
       };

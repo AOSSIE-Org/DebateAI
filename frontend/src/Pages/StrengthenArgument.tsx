@@ -132,7 +132,6 @@ const StrengthenArgument: React.FC = () => {
       setWeakStatement(data);
       setCurrentStep(2);
     } catch (err: any) {
-      console.error("Fetch error:", err);
       const errorMessage = err.message.includes("invalid character")
         ? "Server returned invalid data. Please try again or contact support."
         : err.message;
@@ -177,7 +176,6 @@ const StrengthenArgument: React.FC = () => {
       setShowModal(true);
       setCurrentStep(3);
     } catch (err: any) {
-      console.error("Submit error:", err);
       setError(err.message);
       notify("Error", err.message, "destructive");
     } finally {

@@ -8,6 +8,7 @@ import {
   Info,
   Trophy,
   Users,
+  MessageCircle,
 } from 'lucide-react';
 import debateAiLogo from '@/assets/aossie.png';
 import { ThemeToggle } from './ThemeToggle';
@@ -39,9 +40,19 @@ function Sidebar() {
           icon={<Trophy className='mr-3 h-4 w-4' />}
         />
         <NavItem
+          to='/team-builder'
+          label='Team Debates'
+          icon={<Users className='mr-3 h-4 w-4' />}
+        />
+        <NavItem
           to='/leaderboard'
           label='Leaderboard'
           icon={<BarChart className='mr-3 h-4 w-4' />}
+        />
+        <NavItem
+          to='/community'
+          label='Community'
+          icon={<MessageCircle className='mr-3 h-4 w-4' />}
         />
         <NavItem
           to='/profile'

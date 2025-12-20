@@ -1,20 +1,22 @@
 package websocket
 
 import (
-    "context"
-    "encoding/json"
-    "log"
-    "net/http"
-    "sync"
-    "time"
+	"context"
+	"encoding/json"
+	"log"
+	"math"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
 
-    "arguehub/db"
-    "arguehub/utils"
-    "github.com/gin-gonic/gin"
-    "github.com/gorilla/websocket"
-    "go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive"
-    "strings" 
+	"arguehub/db"
+	"arguehub/utils"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var upgrader = websocket.Upgrader{
@@ -37,6 +39,9 @@ type Client struct {
 	UserID       string
 	Username     string
 	Email        string
+	AvatarURL    string
+	Elo          int
+	IsSpectator  bool
 	IsTyping     bool
 	IsSpeaking   bool
 	PartialText  string
@@ -44,6 +49,7 @@ type Client struct {
 	IsMuted      bool   // New field to track mute status
 	Role         string // New field to track debate role (for/against)
 	SpeechText   string // New field to store speech text
+	ConnectionID string
 }
 
 // SafeWriteJSON safely writes JSON data to the client's WebSocket connection
@@ -61,12 +67,12 @@ func (c *Client) SafeWriteMessage(messageType int, data []byte) error {
 }
 
 type Message struct {
-	Type        string          `json:"type"`
-	Room        string          `json:"room,omitempty"`
-	Username    string          `json:"username,omitempty"`
-	UserID      string          `json:"userId,omitempty"`
-	Content     string          `json:"content,omitempty"`
-	Extra       json.RawMessage `json:"extra,omitempty"`
+	Type     string          `json:"type"`
+	Room     string          `json:"room,omitempty"`
+	Username string          `json:"username,omitempty"`
+	UserID   string          `json:"userId,omitempty"`
+	Content  string          `json:"content,omitempty"`
+	Extra    json.RawMessage `json:"extra,omitempty"`
 	// New fields for real-time communication
 	IsTyping    bool   `json:"isTyping,omitempty"`
 	IsSpeaking  bool   `json:"isSpeaking,omitempty"`
@@ -74,14 +80,15 @@ type Message struct {
 	Timestamp   int64  `json:"timestamp,omitempty"`
 	Mode        string `json:"mode,omitempty"` // 'type' or 'speak'
 	// Debate-specific fields
-	Phase       string `json:"phase,omitempty"`
-	Topic       string `json:"topic,omitempty"`
-	Role        string `json:"role,omitempty"`
-	Ready       *bool  `json:"ready,omitempty"`
+	Phase string `json:"phase,omitempty"`
+	Topic string `json:"topic,omitempty"`
+	Role  string `json:"role,omitempty"`
+	Ready *bool  `json:"ready,omitempty"`
 	// New fields for automatic muting
-	IsMuted     bool   `json:"isMuted,omitempty"`
-	CurrentTurn string `json:"currentTurn,omitempty"` // "for" or "against"
-	SpeechText  string `json:"speechText,omitempty"`  // Converted speech to text
+	IsMuted        bool   `json:"isMuted,omitempty"`
+	CurrentTurn    string `json:"currentTurn,omitempty"`    // "for" or "against"
+	SpeechText     string `json:"speechText,omitempty"`     // Converted speech to text
+	LiveTranscript string `json:"liveTranscript,omitempty"` // Live/interim transcript
 }
 
 type TypingIndicator struct {
@@ -101,45 +108,158 @@ func snapshotRecipients(room *Room, exclude *websocket.Conn) []*Client {
 	defer room.Mutex.Unlock()
 	out := make([]*Client, 0, len(room.Clients))
 	for cc, cl := range room.Clients {
-		if cc != exclude {
-			out = append(out, cl)
+		if cc == exclude {
+			continue
 		}
+		out = append(out, cl)
 	}
 	return out
 }
 
+func nonSpectatorRecipients(room *Room, exclude *websocket.Conn) []*Client {
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	out := make([]*Client, 0, len(room.Clients))
+	for cc, cl := range room.Clients {
+		if (exclude != nil && cc == exclude) || cl.IsSpectator {
+			continue
+		}
+		out = append(out, cl)
+	}
+	return out
+}
+
+func countDebaters(room *Room) int {
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	count := 0
+	for _, cl := range room.Clients {
+		if !cl.IsSpectator {
+			count++
+		}
+	}
+	return count
+}
+
+func countSpectators(room *Room) int {
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	count := 0
+	for _, cl := range room.Clients {
+		if cl.IsSpectator {
+			count++
+		}
+	}
+	return count
+}
+
+func buildParticipantsMessage(room *Room) map[string]interface{} {
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+
+	participants := make([]map[string]interface{}, 0, len(room.Clients))
+	spectatorCount := 0
+
+	for _, client := range room.Clients {
+		if client.IsSpectator {
+			spectatorCount++
+			continue
+		}
+
+		participants = append(participants, map[string]interface{}{
+			"id":          client.UserID,
+			"displayName": client.Username,
+			"email":       client.Email,
+			"role":        client.Role,
+			"isMuted":     client.IsMuted,
+		})
+	}
+
+	message := map[string]interface{}{
+		"type":             "roomParticipants",
+		"roomParticipants": participants,
+		"spectatorCount":   spectatorCount,
+	}
+
+	return message
+}
+
+func broadcastParticipants(room *Room) {
+	message := buildParticipantsMessage(room)
+	for _, client := range snapshotRecipients(room, nil) {
+		if err := client.SafeWriteJSON(message); err != nil {
+		}
+	}
+}
+
+func notifySpectatorStatus(room *Room, spectator *Client, joined bool) {
+	if spectator == nil {
+		return
+	}
+
+	messageType := "spectatorJoined"
+	if !joined {
+		messageType = "spectatorLeft"
+	}
+
+	status := map[string]interface{}{
+		"type": messageType,
+		"spectator": map[string]interface{}{
+			"connectionId":         spectator.ConnectionID,
+			"spectatorUserId":      spectator.UserID,
+			"spectatorDisplayName": spectator.Username,
+		},
+		"spectatorCount": countSpectators(room),
+	}
+
+	for _, client := range nonSpectatorRecipients(room, nil) {
+		if err := client.SafeWriteJSON(status); err != nil {
+		}
+	}
+}
+
+func broadcastRawToDebaters(room *Room, exclude *websocket.Conn, payload []byte) {
+	recipients := nonSpectatorRecipients(room, exclude)
+	for _, client := range recipients {
+		if err := client.SafeWriteMessage(websocket.TextMessage, payload); err != nil {
+		}
+	}
+}
+
 // WebsocketHandler handles WebSocket connections for debate signaling.
 func WebsocketHandler(c *gin.Context) {
-	
-	
-	
+
 	authz := c.GetHeader("Authorization")
 	token := strings.TrimPrefix(authz, "Bearer ")
 	if token == "" {
 		token = c.Query("token")
+	} else {
 	}
+
 	if token == "" {
-  		log.Println("WebSocket connection failed: missing token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
-  		return
-}
+		return
+	}
 
 	// Validate token
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
-	if err != nil || !valid || email == "" {
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	if !valid || email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		return
 	}
 
 	roomID := c.Query("room")
 	if roomID == "" {
-		log.Println("WebSocket connection failed: missing room parameter")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing room parameter"})
 		return
 	}
 
 	// Get user details from database
-	userID, username, err := getUserDetails(email)
+	userID, username, avatarURL, rating, err := getUserDetails(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user details"})
 		return
@@ -156,16 +276,33 @@ func WebsocketHandler(c *gin.Context) {
 	// Upgrade the connection.
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Println("WebSocket upgrade error:", err)
 		return
 	}
 
-	// Limit room to 2 clients.
+	// Check if this is a spectator connection (they want to receive video streams)
+	// Allow spectators to connect even if room has 2 debaters
+	isSpectator := strings.EqualFold(c.Query("spectator"), "true")
 	room.Mutex.Lock()
-	if len(room.Clients) >= 2 {
+	currentDebaters := 0
+	for _, existing := range room.Clients {
+		if !existing.IsSpectator {
+			currentDebaters++
+		}
+	}
+	maxDebaters := 2
+	if !isSpectator && currentDebaters >= maxDebaters {
 		room.Mutex.Unlock()
+		log.Printf("[ws] rejecting debater %s for room %s: already full", email, roomID)
 		conn.Close()
 		return
+	}
+	room.Mutex.Unlock()
+
+	if avatarURL == "" {
+		avatarURL = "https://avatar.iran.liara.run/public/31"
+	}
+	if rating == 0 {
+		rating = 1500
 	}
 
 	// Create client instance
@@ -174,6 +311,9 @@ func WebsocketHandler(c *gin.Context) {
 		UserID:       userID,
 		Username:     username,
 		Email:        email,
+		AvatarURL:    avatarURL,
+		Elo:          rating,
+		IsSpectator:  isSpectator,
 		IsTyping:     false,
 		IsSpeaking:   false,
 		PartialText:  "",
@@ -181,25 +321,114 @@ func WebsocketHandler(c *gin.Context) {
 		IsMuted:      false,
 		Role:         "",
 		SpeechText:   "",
+		IsSpectator:  isSpectator,
 	}
 
+	if isSpectator {
+		client.Role = "spectator"
+		client.ConnectionID = uuid.New().String()
+	}
+
+	// Mark as spectator if needed (we can add a field to Client struct for this)
+	// For now, we'll handle it through the message handlers
+
+	// Send current participants to the new client
+	room.Mutex.Lock()
 	room.Clients[conn] = client
 	room.Mutex.Unlock()
+
+	// Send participants list to newly connected client
+	participantsMsg := buildParticipantsMessage(room)
+	client.SafeWriteJSON(participantsMsg)
+
+	// Send existing participants' detailed info to the new client
+	for connRef, existing := range room.Clients {
+		payload := map[string]interface{}{
+			"id":          existing.UserID,
+			"username":    existing.Username,
+			"displayName": existing.Username,
+			"email":       existing.Email,
+			"avatarUrl":   existing.AvatarURL,
+			"elo":         existing.Elo,
+		}
+		detailMessage := map[string]interface{}{
+			"type":        "userDetails",
+			"userDetails": payload,
+		}
+
+		if connRef == conn {
+			// Already sent this client's participant data; ensure they have their own detail payload too
+			client.SafeWriteJSON(detailMessage)
+		} else {
+			// Send existing participant info to the new client
+			client.SafeWriteJSON(detailMessage)
+		}
+	}
+
+	// Prepare detailed payload for the new client to broadcast to others
+	userDetailsPayload := map[string]interface{}{
+		"id":          client.UserID,
+		"username":    client.Username,
+		"displayName": client.Username,
+		"email":       client.Email,
+		"avatarUrl":   client.AvatarURL,
+		"elo":         client.Elo,
+	}
+
+	userDetailsMessage := map[string]interface{}{
+		"type":        "userDetails",
+		"userDetails": userDetailsPayload,
+	}
+
+	// Broadcast new participant to other clients
+	for _, r := range snapshotRecipients(room, conn) {
+		r.SafeWriteJSON(userDetailsMessage)
+		r.SafeWriteJSON(participantsMsg)
+	}
+
+	if client.IsSpectator {
+		log.Printf("[ws] spectator connected: room=%s connectionId=%s user=%s", roomID, client.ConnectionID, client.Email)
+		notifySpectatorStatus(room, client, true)
+	}
 
 	// Listen for messages.
 	for {
 		messageType, msg, err := conn.ReadMessage()
 		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				log.Printf("[ws] connection closed: room=%s spectator=%t user=%s", roomID, client.IsSpectator, client.Email)
+			} else {
+				log.Printf("[ws] read error: room=%s spectator=%t user=%s err=%v", roomID, client.IsSpectator, client.Email, err)
+			}
 			// Remove client from room.
+			var (
+				disconnectedClient *Client
+				exists             bool
+				clientCount        int
+			)
 			room.Mutex.Lock()
-			delete(room.Clients, conn)
+			if disconnectedClient, exists = room.Clients[conn]; exists {
+				delete(room.Clients, conn)
+			}
+			clientCount = len(room.Clients)
+
 			// If room is empty, delete it.
-			if len(room.Clients) == 0 {
+			if clientCount == 0 {
 				roomsMutex.Lock()
 				delete(rooms, roomID)
 				roomsMutex.Unlock()
 			}
 			room.Mutex.Unlock()
+
+			if exists && disconnectedClient.IsSpectator {
+				log.Printf("[ws] spectator disconnected: room=%s connectionId=%s user=%s", roomID, disconnectedClient.ConnectionID, disconnectedClient.Email)
+				notifySpectatorStatus(room, disconnectedClient, false)
+			}
+
+			// Broadcast updated participants to remaining clients
+			if clientCount > 0 {
+				broadcastParticipants(room)
+			}
 			break
 		}
 
@@ -228,6 +457,8 @@ func WebsocketHandler(c *gin.Context) {
 			handleSpeakingIndicator(room, conn, message, client, roomID)
 		case "speechText":
 			handleSpeechText(room, conn, message, client, roomID)
+		case "liveTranscript":
+			handleLiveTranscript(room, conn, message, client, roomID)
 		case "phaseChange":
 			handlePhaseChange(room, conn, message, roomID)
 		case "topicChange":
@@ -241,12 +472,29 @@ func WebsocketHandler(c *gin.Context) {
 		case "unmute":
 			handleUnmuteRequest(room, conn, message, client, roomID)
 		default:
-			// Broadcast the message to all other clients in the room.
+			if message.Type == "requestOffer" && client.IsSpectator {
+				var req map[string]interface{}
+				if err := json.Unmarshal(msg, &req); err == nil {
+					if client.ConnectionID == "" {
+						client.ConnectionID = uuid.New().String()
+					}
+					log.Printf("[ws] spectator requestOffer: room=%s connectionId=%s user=%s", roomID, client.ConnectionID, client.Email)
+					req["connectionId"] = client.ConnectionID
+					req["spectatorUserId"] = client.UserID
+					req["spectatorDisplayName"] = client.Username
+					if enriched, err := json.Marshal(req); err == nil {
+						broadcastRawToDebaters(room, conn, enriched)
+						continue
+					}
+				}
+			}
+			// Broadcast the message to all other clients in the room (including spectators).
+			// This handles WebRTC offers, answers, candidates, etc.
+			recipientCount := 0
 			for _, r := range snapshotRecipients(room, conn) {
 				if err := r.SafeWriteMessage(messageType, msg); err != nil {
-					log.Printf("WebSocket write error in room %s: %v", roomID, err)
 				} else {
-					log.Printf("Forwarded message to a client in room %s", roomID)
+					recipientCount++
 				}
 			}
 		}
@@ -278,7 +526,6 @@ func handleChatMessage(room *Room, conn *websocket.Conn, message Message, client
 			"mode":      message.Mode,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -300,7 +547,6 @@ func handleTypingIndicator(room *Room, conn *websocket.Conn, message Message, cl
 			"partialText": message.PartialText,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -320,7 +566,6 @@ func handleSpeakingIndicator(room *Room, conn *websocket.Conn, message Message, 
 			"isSpeaking": message.IsSpeaking,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -338,9 +583,27 @@ func handleSpeechText(room *Room, conn *websocket.Conn, message Message, client 
 			"userId":     client.UserID,
 			"username":   client.Username,
 			"speechText": client.SpeechText,
+			"phase":      message.Phase,
+			"role":       client.Role,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
+		}
+	}
+}
+
+// handleLiveTranscript handles live/interim transcript updates
+func handleLiveTranscript(room *Room, conn *websocket.Conn, message Message, client *Client, roomID string) {
+	// Broadcast live transcript to other clients
+	for _, r := range snapshotRecipients(room, conn) {
+		response := map[string]interface{}{
+			"type":           "liveTranscript",
+			"userId":         client.UserID,
+			"username":       client.Username,
+			"liveTranscript": message.LiveTranscript,
+			"phase":          message.Phase,
+			"role":           client.Role,
+		}
+		if err := r.SafeWriteJSON(response); err != nil {
 		}
 	}
 }
@@ -375,7 +638,6 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 				"phase":       message.Phase,
 			}
 			if err := clientConn.WriteJSON(response); err != nil {
-				log.Printf("WebSocket write error in room %s: %v", roomID, err)
 			}
 		}
 	}
@@ -384,7 +646,6 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 	// Broadcast phase change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -394,7 +655,6 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 	// Broadcast topic change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -403,17 +663,22 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, roomID string) {
 	// Store the role in the client
 	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
 	if client, exists := room.Clients[conn]; exists {
+		if client.IsSpectator {
+			return
+		}
 		client.Role = message.Role
 	}
-	room.Mutex.Unlock()
 
 	// Broadcast role selection to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
+
+	// Send updated participant snapshot to everyone
+	broadcastParticipants(room)
 }
 
 // handleReadyStatus handles ready status
@@ -421,7 +686,6 @@ func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID
 	// Broadcast ready status to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -441,7 +705,6 @@ func handleMuteRequest(room *Room, conn *websocket.Conn, message Message, client
 			"isMuted":  true,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
@@ -461,13 +724,12 @@ func handleUnmuteRequest(room *Room, conn *websocket.Conn, message Message, clie
 			"isMuted":  false,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("WebSocket write error in room %s: %v", roomID, err)
 		}
 	}
 }
 
 // getUserDetails fetches user details from database
-func getUserDetails(email string) (string, string, error) {
+func getUserDetails(email string) (string, string, string, int, error) {
 	// Query user document using email
 	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -477,12 +739,15 @@ func getUserDetails(email string) (string, string, error) {
 		ID          primitive.ObjectID `bson:"_id"`
 		Email       string             `bson:"email"`
 		DisplayName string             `bson:"displayName"`
+		AvatarURL   string             `bson:"avatarUrl"`
+		Rating      float64            `bson:"rating"`
 	}
 
 	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		return "", "", err
+		return "", "", "", 0, err
 	}
 
-	return user.ID.Hex(), user.DisplayName, nil
+	rating := int(math.Round(user.Rating))
+	return user.ID.Hex(), user.DisplayName, user.AvatarURL, rating, nil
 }

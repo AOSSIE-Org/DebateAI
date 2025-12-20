@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"arguehub/services"
 	"arguehub/db"
+	"arguehub/services"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,7 +17,7 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 	var request struct {
 		UserID     primitive.ObjectID `json:"userId"`
 		OpponentID primitive.ObjectID `json:"opponentId"`
-		Outcome    string             `json:"outcome"` 
+		Outcome    string             `json:"outcome"`
 		Topic      string             `json:"topic"`
 	}
 
@@ -41,7 +41,7 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 	}
 
 	// Update ratings
-	debate, err := services.UpdateRatings(
+	debate, opponentDebate, err := services.UpdateRatings(
 		request.UserID,
 		request.OpponentID,
 		outcome,
@@ -56,18 +56,50 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 	debate.Topic = request.Topic
 	debate.Result = request.Outcome
 
-	// Save debate record
+	opponentOutcome := "draw"
+	switch request.Outcome {
+	case "win":
+		opponentOutcome = "loss"
+	case "loss":
+		opponentOutcome = "win"
+	}
+
+	if opponentDebate != nil {
+		opponentDebate.Topic = request.Topic
+		opponentDebate.Result = opponentOutcome
+	}
+
+	// Save debate records
+	records := []interface{}{debate}
+	if opponentDebate != nil {
+		records = append(records, opponentDebate)
+	}
+
 	collection := db.MongoDatabase.Collection("debates")
-	_, err = collection.InsertOne(context.Background(), debate)
-	if err != nil {
+	if _, err = collection.InsertMany(context.Background(), records); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save debate record"})
 		return
 	}
 
+	opponentSummary := gin.H{}
+	if opponentDebate != nil {
+		opponentSummary = gin.H{
+			"rating": opponentDebate.PostRating,
+			"change": opponentDebate.RatingChange,
+			"rd":     opponentDebate.PostRD,
+			"result": opponentOutcome,
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "Ratings updated successfully",
-		"newRating":    debate.PostRating,
-		"ratingChange": debate.RatingChange,
-		"newRD":        debate.PostRD,
+		"message": "Ratings updated successfully",
+		"ratingSummary": gin.H{
+			"user": gin.H{
+				"rating": debate.PostRating,
+				"change": debate.RatingChange,
+				"rd":     debate.PostRD,
+			},
+			"opponent": opponentSummary,
+		},
 	})
 }

@@ -2,8 +2,8 @@ package models
 
 import (
 	"encoding/json"
-	"time"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"time"
 )
 
 type DebateTranscript struct {

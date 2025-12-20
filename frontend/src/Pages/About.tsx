@@ -1,5 +1,3 @@
-import React from "react"
-
 function About() {
   return (
     <div className="min-h-screen py-8 px-4 md:px-16 lg:px-32 text-foreground">
@@ -10,21 +8,19 @@ function About() {
 
       {/* Intro Paragraph */}
       <p className="text-center text-base md:text-lg text-muted-foreground mb-8 leading-relaxed">
-        DebateAI is a platform dedicated to helping you sharpen your argumentation
-        and public speaking skills through interactive, AI-enhanced debates.
-        Whether you’re a seasoned debater or just starting out, you’ll find
-        exciting real-time challenges, structured debate formats, and a vibrant
-        community ready to engage with you.
+        DebateAI is a platform dedicated to helping you sharpen your
+        argumentation and public speaking skills through interactive,
+        AI-enhanced debates. Whether you’re a seasoned debater or just starting
+        out, you’ll find exciting real-time challenges, structured debate
+        formats, and a vibrant community ready to engage with you.
       </p>
 
       {/* Our Mission */}
       <section className="my-10 space-y-4">
-        <h2 className="text-2xl md:text-3xl font-semibold">
-          Our Mission
-        </h2>
+        <h2 className="text-2xl md:text-3xl font-semibold">Our Mission</h2>
         <p className="leading-relaxed text-base md:text-lg">
-          We believe that strong communication skills are essential in every area
-          of life. Our goal is to make debate practice accessible, fun, and
+          We believe that strong communication skills are essential in every
+          area of life. Our goal is to make debate practice accessible, fun, and
           effective. Through DebateAI, you can learn to construct compelling
           arguments, understand multiple perspectives, and boost your confidence
           in presenting your ideas—all in an engaging, interactive environment.
@@ -33,17 +29,16 @@ function About() {
 
       {/* Key Features */}
       <section className="my-10 space-y-4">
-        <h2 className="text-2xl md:text-3xl font-semibold">
-          Key Features
-        </h2>
+        <h2 className="text-2xl md:text-3xl font-semibold">Key Features</h2>
         <ul className="list-disc list-inside space-y-3 text-base md:text-lg leading-relaxed">
           <li>
-            <strong>AI-Enhanced Debates:</strong> Challenge an AI-driven opponent
-            that adapts to your arguments in real time.
+            <strong>AI-Enhanced Debates:</strong> Challenge an AI-driven
+            opponent that adapts to your arguments in real time.
           </li>
           <li>
-            <strong>Real-Time User Matchups:</strong> Engage in live debates with
-            fellow users on topics ranging from pop culture to global issues.
+            <strong>Real-Time User Matchups:</strong> Engage in live debates
+            with fellow users on topics ranging from pop culture to global
+            issues.
           </li>
           <li>
             <strong>Structured Formats:</strong> Practice formal debate rounds
@@ -70,9 +65,7 @@ function About() {
           DebateAI helps you:
         </p>
         <ul className="list-disc list-inside space-y-3 text-base md:text-lg leading-relaxed">
-          <li>
-            Build critical thinking and persuasive communication skills.
-          </li>
+          <li>Build critical thinking and persuasive communication skills.</li>
           <li>
             Gain confidence in articulating your viewpoints in front of others.
           </li>
@@ -89,9 +82,7 @@ function About() {
 
       {/* Contributing / Community Involvement */}
       <section className="my-10 space-y-4">
-        <h2 className="text-2xl md:text-3xl font-semibold">
-          Get Involved
-        </h2>
+        <h2 className="text-2xl md:text-3xl font-semibold">Get Involved</h2>
         <p className="leading-relaxed text-base md:text-lg">
           We’re always looking for passionate debaters, topic curators, and
           community members who want to help us grow. Here’s how you can
@@ -124,7 +115,7 @@ function About() {
         © 2016-2025 AOSSIE. All rights reserved.
       </footer>
     </div>
-  )
+  );
 }
 
-export default About
+export default About;

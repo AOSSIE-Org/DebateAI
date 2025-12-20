@@ -11,9 +11,8 @@ import (
 	"arguehub/db"
 	"arguehub/models"
 
-	"github.com/google/generative-ai-go/genai"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 // Global Gemini client instance
@@ -21,11 +20,22 @@ var geminiClient *genai.Client
 
 // InitDebateVsBotService initializes the Gemini client using the API key from the config
 func InitDebateVsBotService(cfg *config.Config) {
-	var err error
-	geminiClient, err = genai.NewClient(context.Background(), option.WithAPIKey(cfg.Gemini.ApiKey))
-	if err != nil {
-		log.Fatalf("Failed to initialize Gemini client: %v", err)
+	if cfg.Gemini.ApiKey == "" || cfg.Gemini.ApiKey == "<YOUR_GEMINI_API_KEY>" {
+		log.Printf("⚠️  Warning: Gemini API key not configured")
+		log.Printf("⚠️  Server will continue but debate bot and AI features will not work")
+		log.Printf("⚠️  To enable these features, set a valid Gemini API key in config")
+		return
 	}
+
+	var err error
+	geminiClient, err = initGemini(cfg.Gemini.ApiKey)
+	if err != nil {
+		log.Printf("⚠️  Warning: Failed to initialize Gemini client: %v", err)
+		log.Printf("⚠️  Server will continue but debate bot and AI features will not work")
+		log.Printf("⚠️  To enable these features, check your Gemini API key configuration")
+		return
+	}
+	log.Println("✅ Gemini client initialized successfully")
 }
 
 // FormatHistory converts a slice of debate messages into a formatted transcript
@@ -259,7 +269,6 @@ Please provide your full argument.`,
 // It uses the bot’s personality to handle errors and responses vividly.
 func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
 	if geminiClient == nil {
-		log.Println("Gemini client not initialized")
 		return personalityErrorResponse(botName, "My systems are offline, it seems.")
 	}
 
@@ -268,51 +277,17 @@ func GenerateBotResponse(botName, botLevel, topic string, history []models.Messa
 	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
 	ctx := context.Background()
-	model := geminiClient.GenerativeModel("gemini-1.5-flash")
-
-	// Set safety settings to BLOCK_NONE for all categories
-	model.SafetySettings = []*genai.SafetySetting{
-		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockNone},
-	}
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	response, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
-		log.Printf("Gemini error: %v", err)
 		return personalityErrorResponse(botName, "A glitch in my logic, there is.")
 	}
-
-	// Check for prompt blocking
-	if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason != 0 {
-		log.Printf("Prompt blocked: %v", resp.PromptFeedback.BlockReason)
-		return personalityErrorResponse(botName, fmt.Sprintf("Blocked, my words are, by unseen forces: %v", resp.PromptFeedback.BlockReason))
+	if response == "" {
+		return personalityErrorResponse(botName, "Lost in translation, my thoughts are.")
 	}
-
-	if len(resp.Candidates) == 0 {
-		log.Println("No candidates returned")
-		return personalityErrorResponse(botName, "Stumped, I am, by cosmic interference!")
+	if strings.Contains(strings.ToLower(response), "clarify") {
+		return personalityClarificationRequest(botName)
 	}
-
-	if len(resp.Candidates[0].Content.Parts) == 0 {
-		log.Println("No parts in candidate content")
-		return personalityErrorResponse(botName, "Empty, my response is, like a void in the stars.")
-	}
-
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			response := string(text)
-			// If the response is a clarification request, customize it to the bot’s persona
-			if strings.Contains(strings.ToLower(response), "clarify") {
-				return personalityClarificationRequest(botName)
-			}
-			return response
-		}
-	}
-
-	log.Println("No text part found in Gemini response")
-	return personalityErrorResponse(botName, "Lost in translation, my thoughts are.")
+	return response
 }
 
 // personalityErrorResponse returns a personality-specific error message
@@ -403,11 +378,8 @@ func personalityClarificationRequest(botName string) string {
 // JudgeDebate evaluates the debate, factoring in the bot’s personality adherence
 func JudgeDebate(history []models.Message) string {
 	if geminiClient == nil {
-		log.Println("Gemini client not initialized")
 		return "Unable to judge."
 	}
-	log.Println("Judging debate...")
-	log.Println("History:", history)
 
 	// Extract bot name from history (assume bot is the non-user sender)
 	botName := "Default"
@@ -481,27 +453,14 @@ Provide ONLY the JSON output without any additional text.`,
 		bot.DebateStrategy, strings.Join(bot.SignatureMoves, ", "), strings.Join(bot.PhilosophicalTenets, ", "), FormatHistory(history))
 
 	ctx := context.Background()
-	model := geminiClient.GenerativeModel("gemini-1.5-flash")
-
-	model.SafetySettings = []*genai.SafetySetting{
-		{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockNone},
-		{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockNone},
-	}
-
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		log.Printf("Gemini error: %v", err)
+	text, err := generateDefaultModelText(ctx, prompt)
+	if err != nil || text == "" {
+		if err != nil {
+			log.Printf("Gemini error: %v", err)
+		}
 		return "Unable to judge."
 	}
-
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return string(text)
-		}
-	}
-	return "Unable to judge."
+	return text
 }
 
 // CreateDebateService creates a new debate in MongoDB, ensuring bot personality is logged
@@ -518,23 +477,16 @@ func CreateDebateService(debate *models.DebateVsBot, stance string) (string, err
 	debate.Stance = stance
 
 	if db.DebateVsBotCollection == nil {
-		log.Println("Debate collection not initialized")
 		return "", fmt.Errorf("database not initialized")
 	}
 
-	// Log bot personality for debugging
-	bot := GetBotPersonality(debate.BotName)
-	log.Printf("Creating debate with bot %s (Level: %s, Rating: %d)", bot.Name, bot.Level, bot.Rating)
-
 	result, err := db.DebateVsBotCollection.InsertOne(ctx, debate)
 	if err != nil {
-		log.Printf("Failed to create debate in MongoDB: %v", err)
 		return "", err
 	}
 
 	id, ok := result.InsertedID.(primitive.ObjectID)
 	if !ok {
-		log.Println("Failed to convert InsertedID to ObjectID")
 		return "", fmt.Errorf("internal server error")
 	}
 

@@ -24,7 +24,6 @@ const SpeechTest: React.FC = () => {
       recognitionRef.current.lang = "en-US";
 
       recognitionRef.current.onstart = () => {
-        console.log("Speech recognition started");
         setIsListening(true);
         setStatus("Listening...");
       };
@@ -52,19 +51,16 @@ const SpeechTest: React.FC = () => {
       };
 
       recognitionRef.current.onend = () => {
-        console.log("Speech recognition ended");
         setIsListening(false);
         setStatus("Stopped listening");
       };
 
       recognitionRef.current.onerror = (event) => {
         const errorEvent = event as SpeechRecognitionErrorEvent;
-        console.error("Speech recognition error:", errorEvent.error);
         setIsListening(false);
         setStatus(`Error: ${errorEvent.error}`);
       };
 
-      console.log("Speech recognition initialized");
     } else {
       setStatus("Speech recognition not supported");
     }
@@ -74,7 +70,6 @@ const SpeechTest: React.FC = () => {
       try {
         recognitionRef.current?.stop();
       } catch (err) {
-        console.warn("Error stopping recognition during cleanup:", err);
       }
       recognitionRef.current = null;
     };
@@ -85,7 +80,6 @@ const SpeechTest: React.FC = () => {
       try {
         recognitionRef.current.start();
       } catch (error) {
-        console.error("Error starting recognition:", error);
         setStatus("Error starting recognition");
       }
     }
@@ -96,7 +90,6 @@ const SpeechTest: React.FC = () => {
       try {
         recognitionRef.current.stop();
       } catch (error) {
-        console.error("Error stopping recognition:", error);
       }
     }
   };
@@ -113,7 +106,6 @@ const SpeechTest: React.FC = () => {
       setStatus("Microphone permission granted");
       return true;
     } catch (error) {
-      console.error("Microphone permission denied:", error);
       setStatus("Microphone permission denied");
       return false;
     }

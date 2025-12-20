@@ -34,15 +34,12 @@ const Matchmaking: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is logged in
-
     // If still loading, wait
     if (isLoading) {
       return;
     }
 
     if (!user) {
-      console.log('No user found, redirecting to login');
       navigate('/login');
       return;
     }
@@ -50,15 +47,15 @@ const Matchmaking: React.FC = () => {
     // Get token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
-      console.log('No token found, redirecting to login');
       navigate('/login');
       return;
     }
 
-    console.log(
-      'Connecting to WebSocket with token:',
-      token ? 'present' : 'missing'
-    );
+    // Don't reconnect if already connected
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      return;
+    }
+
 
     // Connect to WebSocket with authentication token
     const ws = new WebSocket(
@@ -68,58 +65,71 @@ const Matchmaking: React.FC = () => {
 
     ws.onopen = () => {
       setIsConnected(true);
-      console.log('✅ Connected to matchmaking WebSocket');
     };
 
     ws.onmessage = (event) => {
-      const message: MatchmakingMessage = JSON.parse(event.data);
+      try {
+        const message: MatchmakingMessage = JSON.parse(event.data);
 
-      switch (message.type) {
-        case 'pool_update':
-          if (message.pool) {
-            const poolData: MatchmakingPool[] = Array.isArray(message.pool)
-              ? message.pool
-              : JSON.parse(message.pool as string);
-            setPool(poolData);
+        switch (message.type) {
+          case 'pool_update':
+            if (message.pool) {
+              const poolData: MatchmakingPool[] = Array.isArray(message.pool)
+                ? message.pool
+                : JSON.parse(message.pool as string);
+              setPool(poolData);
 
-            // Check if current user is in pool
-            const currentUser = poolData.find(
-              (p) => p.userId === user.id || p.username === user.displayName
-            );
-            setIsInPool(!!currentUser);
-          }
-          break;
+              // Check if current user is in pool (only if they've started matchmaking)
+              const currentUser = poolData.find(
+                (p) => p.userId === user.id || p.username === user.displayName
+              );
+              const shouldBeInPool =
+                !!currentUser && currentUser.startedMatchmaking;
+              setIsInPool(shouldBeInPool);
+            }
+            break;
 
-        case 'room_created':
-          if (message.roomId) {
-            // Navigate to the created room
-            console.log('Room created, navigating to:', message.roomId);
-            navigate(`/debate-room/${message.roomId}`);
-          }
-          break;
+          case 'room_created':
+            if (message.roomId) {
+              // Navigate to the created room
+              ws.close(); // Close connection before navigating
+              navigate(`/debate-room/${message.roomId}`);
+            }
+            break;
 
-        case 'error':
-          console.error('Matchmaking error:', message.error);
-          // Handle error appropriately
-          break;
+          case 'matchmaking_started':
+            setIsInPool(true);
+            setWaitTime(0);
+            break;
 
-        default:
-          console.log('Received message:', message);
+          case 'matchmaking_stopped':
+            setIsInPool(false);
+            setWaitTime(0);
+            break;
+
+          case 'error':
+            alert(`Matchmaking error: ${message.error}`);
+            break;
+
+          default:
+        }
+      } catch (error) {
       }
     };
 
     ws.onclose = (event) => {
-      setIsConnected(false);
-      setIsInPool(false);
-      console.log(
+      console.warn(
         '🔌 Disconnected from matchmaking WebSocket:',
         event.code,
         event.reason
       );
+      setIsConnected(false);
+      setIsInPool(false);
+      // Don't set wsRef.current = null here, let the cleanup handle it
     };
 
     ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
+      console.error('Matchmaking WebSocket error', error);
       setIsConnected(false);
     };
 
@@ -128,19 +138,52 @@ const Matchmaking: React.FC = () => {
         wsRef.current.close();
       }
     };
-  }, [navigate, user, isLoading]);
+  }, [navigate, user?.id, user?.displayName, isLoading]);
 
   const joinPool = () => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'join_pool' }));
-      setIsInPool(true);
+
+    // Try to send regardless of state tracking, since state might be delayed
+    if (!wsRef.current) {
+      alert('Connection not available. Please refresh the page and try again.');
+      return;
+    }
+
+    const readyState = wsRef.current.readyState;
+
+    if (readyState === WebSocket.OPEN) {
+      try {
+        const message = JSON.stringify({ type: 'join_pool' });
+        wsRef.current.send(message);
+      } catch (error) {
+        alert('Failed to send matchmaking request. Please try again.');
+      }
+    } else if (readyState === WebSocket.CONNECTING) {
+      // Wait a bit and try again
+      setTimeout(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'join_pool' }));
+        } else {
+          alert(
+            'Connection is taking too long. Please check your internet connection and try again.'
+          );
+        }
+      }, 1000);
+    } else {
+      alert(
+        'Connection is not ready. Please ensure the green indicator is showing.'
+      );
     }
   };
 
   const leavePool = () => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'leave_pool' }));
-      setIsInPool(false);
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN || isConnected)
+    ) {
+      try {
+        wsRef.current.send(JSON.stringify({ type: 'leave_pool' }));
+      } catch (error) {
+      }
     }
   };
 
@@ -198,14 +241,20 @@ const Matchmaking: React.FC = () => {
           <div className='text-sm text-muted-foreground'>
             Your Elo:{' '}
             <span className='font-semibold text-foreground'>
-              {user?.rating || 0}
+              {user?.rating || 1200}
             </span>
           </div>
-          <div
-            className={`w-3 h-3 rounded-full ${
-              isConnected ? 'bg-green-500' : 'bg-red-500'
-            }`}
-          ></div>
+          <div className='flex items-center gap-2'>
+            <div
+              className={`w-3 h-3 rounded-full animate-pulse ${
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              }`}
+              title={isConnected ? 'Connected' : 'Not connected'}
+            ></div>
+            <span className='text-xs text-muted-foreground'>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -239,9 +288,9 @@ const Matchmaking: React.FC = () => {
             <button
               onClick={joinPool}
               disabled={!isConnected}
-              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition disabled:opacity-50'
+              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed'
             >
-              Start Matchmaking
+              {isConnected ? 'Start Matchmaking' : 'Waiting for connection...'}
             </button>
           )}
         </div>

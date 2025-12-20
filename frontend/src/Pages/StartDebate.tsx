@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
@@ -34,11 +34,16 @@ const StartDebate = () => {
       <div className="flex items-center justify-center flex-1">
         <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
           <div className="w-full md:w-2/3 p-4 md:p-16">
-            <img src={DebateCover} alt="Debate Cover" className="w-full object-cover" />
+            <img
+              src={DebateCover}
+              alt="Debate Cover"
+              className="w-full object-cover"
+            />
           </div>
           <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <h3 className="text-xl md:text-4xl font-bold text-center">
-              Play Debate Online on the <span className="text-primary">#1</span> Site!
+              Play Debate Online on the <span className="text-primary">#1</span>{" "}
+              Site!
             </h3>
             <div className="flex flex-col w-full">
               <Button

@@ -103,7 +103,6 @@ export const transcriptService = {
     }
 
     const data = await response.json();
-    console.log('Raw API response:', data); // Debug log
     return data.transcripts || [];
   },
 

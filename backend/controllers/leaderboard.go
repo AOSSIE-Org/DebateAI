@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"arguehub/db"
 	"arguehub/models"
@@ -22,12 +24,13 @@ type LeaderboardData struct {
 
 // Debater represents a leaderboard entry
 type Debater struct {
-	ID          string `json:"id"`
-	Rank        int    `json:"rank"`
-	Name        string `json:"name"`
-	Score       int    `json:"score"`
-	AvatarURL   string `json:"avatarUrl"`
-	CurrentUser bool   `json:"currentUser"`
+	ID          string  `json:"id"`
+	Rank        int     `json:"rank"`
+	Name        string  `json:"name"`
+	Score       int     `json:"score"`
+	Rating      int     `json:"rating"`
+	AvatarURL   string  `json:"avatarUrl"`
+	CurrentUser bool    `json:"currentUser"`
 }
 
 // Stat represents a single statistic
@@ -51,7 +54,6 @@ func GetLeaderboard(c *gin.Context) {
 	findOptions := options.Find().SetSort(bson.D{{"rating", -1}})
 	cursor, err := collection.Find(c, bson.M{}, findOptions)
 	if err != nil {
-		log.Printf("Failed to fetch users: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard data"})
 		return
 	}
@@ -60,7 +62,6 @@ func GetLeaderboard(c *gin.Context) {
 	// Decode users into slice
 	var users []models.User
 	if err := cursor.All(c, &users); err != nil {
-		log.Printf("Failed to decode users: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode leaderboard data"})
 		return
 	}
@@ -83,7 +84,8 @@ func GetLeaderboard(c *gin.Context) {
 			ID:          user.ID.Hex(),
 			Rank:        i + 1,
 			Name:        name,
-			Score:       int(user.Rating),
+			Score:       user.Score,
+			Rating:      int(user.Rating),
 			AvatarURL:   avatarURL,
 			CurrentUser: isCurrentUser,
 		})
@@ -91,11 +93,106 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Generate stats
 	totalUsers := len(users)
+	ctx := context.Background()
+
+	// Calculate DEBATES TODAY - count all debates created today
+	todayStart := time.Now().Truncate(24 * time.Hour)
+	todayEnd := todayStart.Add(24 * time.Hour)
+
+	debatesToday := 0
+
+	// Count from saved_debate_transcripts
+	transcriptCollection := db.MongoDatabase.Collection("saved_debate_transcripts")
+	transcriptCount, err := transcriptCollection.CountDocuments(ctx, bson.M{
+		"createdAt": bson.M{
+			"$gte": todayStart,
+			"$lt":  todayEnd,
+		},
+	})
+	if err == nil {
+		debatesToday += int(transcriptCount)
+	}
+
+	// Count from debates_vs_bot (createdAt is int64 timestamp)
+	botDebateCollection := db.MongoDatabase.Collection("debates_vs_bot")
+	botDebateCount, err := botDebateCollection.CountDocuments(ctx, bson.M{
+		"createdAt": bson.M{
+			"$gte": todayStart.Unix(),
+			"$lt":  todayEnd.Unix(),
+		},
+	})
+	if err == nil {
+		debatesToday += int(botDebateCount)
+	}
+
+	// Count from team_debates
+	teamDebateCollection := db.MongoDatabase.Collection("team_debates")
+	teamDebateCount, err := teamDebateCollection.CountDocuments(ctx, bson.M{
+		"createdAt": bson.M{
+			"$gte": todayStart,
+			"$lt":  todayEnd,
+		},
+	})
+	if err == nil {
+		debatesToday += int(teamDebateCount)
+	}
+
+	// Count from debates collection (uses date field)
+	debateCollection := db.MongoDatabase.Collection("debates")
+	debateCount, err := debateCollection.CountDocuments(ctx, bson.M{
+		"date": bson.M{
+			"$gte": todayStart,
+			"$lt":  todayEnd,
+		},
+	})
+	if err == nil {
+		debatesToday += int(debateCount)
+	}
+
+	// Calculate DEBATING NOW - count active debates
+	debatingNow := 0
+
+	// Count active team debates
+	activeTeamDebates, err := teamDebateCollection.CountDocuments(ctx, bson.M{
+		"status": "active",
+	})
+	if err == nil {
+		debatingNow += int(activeTeamDebates)
+	}
+
+	// Count debates with pending status (might be in progress)
+	pendingDebates, err := transcriptCollection.CountDocuments(ctx, bson.M{
+		"result": "pending",
+		"updatedAt": bson.M{
+			"$gte": time.Now().Add(-2 * time.Hour), // Active within last 2 hours
+		},
+	})
+	if err == nil {
+		debatingNow += int(pendingDebates)
+	}
+
+	// Calculate EXPERTS ONLINE - users with high rating who have been active recently
+	// Consider users with rating >= 1500 as experts, and active within last 30 minutes
+	expertThreshold := 1500.0
+	activeThreshold := time.Now().Add(-30 * time.Minute)
+
+	expertsOnline, err := collection.CountDocuments(ctx, bson.M{
+		"rating": bson.M{"$gte": expertThreshold},
+		"$or": []bson.M{
+			{"lastActivityDate": bson.M{"$gte": activeThreshold}},
+			{"updatedAt": bson.M{"$gte": activeThreshold}},
+		},
+	})
+	if err != nil {
+		log.Printf("Error counting experts online: %v", err)
+		expertsOnline = 0
+	}
+
 	stats := []Stat{
 		{Icon: "crown", Value: strconv.Itoa(totalUsers), Label: "REGISTERED DEBATERS"},
-		{Icon: "chessQueen", Value: "430", Label: "DEBATES TODAY"}, // Placeholder
-		{Icon: "medal", Value: "98", Label: "DEBATING NOW"},        // Placeholder
-		{Icon: "crown", Value: "37", Label: "EXPERTS ONLINE"},      // Placeholder
+		{Icon: "chessQueen", Value: strconv.Itoa(debatesToday), Label: "DEBATES TODAY"},
+		{Icon: "medal", Value: strconv.Itoa(debatingNow), Label: "DEBATING NOW"},
+		{Icon: "crown", Value: strconv.Itoa(int(expertsOnline)), Label: "EXPERTS ONLINE"},
 	}
 
 	// Send response

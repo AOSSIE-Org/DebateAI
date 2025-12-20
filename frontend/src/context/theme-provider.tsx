@@ -30,18 +30,15 @@ function getInitialTheme() {
     let systemThemeCodeStr = localStorage.getItem("Theme");
     if (systemThemeCodeStr == null) {
         let defaultBrowserTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? ThemeOptions.Light : ThemeOptions.Dark;
-        console.log(defaultBrowserTheme);
         newTheme = defaultBrowserTheme;
     }
     else {
         //learned importance of validation
         //validation is for the code which other people will write on top of mine
         let systemThemeCode = +systemThemeCodeStr;
-        console.log(validateThemeCode(systemThemeCode))
         if (validateThemeCode(systemThemeCode)) {
             //learned value to its correlated enum
             newTheme = systemThemeCode as ThemeOptions;
-            console.log("storage", newTheme);
         }
         else {
             newTheme = ThemeOptions.Light;

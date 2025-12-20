@@ -3,7 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -44,7 +44,6 @@ func GoogleLogin(ctx *gin.Context) {
 	// Verify Google ID token
 	payload, err := idtoken.Validate(ctx, request.IDToken, cfg.GoogleOAuth.ClientID)
 	if err != nil {
-		log.Printf("Google ID token validation failed: %v", err)
 		ctx.JSON(401, gin.H{"error": "Invalid Google ID token", "message": err.Error()})
 		return
 	}
@@ -67,7 +66,6 @@ func GoogleLogin(ctx *gin.Context) {
 	var existingUser models.User
 	err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&existingUser)
 	if err != nil && err != mongo.ErrNoDocuments {
-		log.Printf("Database error: %v", err)
 		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
 		return
 	}
@@ -86,12 +84,14 @@ func GoogleLogin(ctx *gin.Context) {
 			LastRatingUpdate: now,
 			AvatarURL:        avatarURL,
 			IsVerified:       true,
+			Score:            0, // Initialize gamification score
+			Badges:           []string{}, // Initialize badges array
+			CurrentStreak:    0, // Initialize streak
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
 		result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 		if err != nil {
-			log.Printf("User insertion error: %v", err)
 			ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
 			return
 		}
@@ -99,10 +99,15 @@ func GoogleLogin(ctx *gin.Context) {
 		existingUser = newUser
 	}
 
+	// Normalize stats if needed to prevent NaN values
+	if normalizeUserStats(&existingUser) {
+		if err := persistUserStats(dbCtx, &existingUser); err != nil {
+		}
+	}
+
 	// Generate JWT
 	token, err := generateJWT(existingUser.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
-		log.Printf("Token generation error: %v", err)
 		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
 	}
@@ -111,24 +116,7 @@ func GoogleLogin(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Google login successful",
 		"accessToken": token,
-		"user": gin.H{
-			"id":              existingUser.ID.Hex(),
-			"email":           existingUser.Email,
-			"displayName":     existingUser.DisplayName,
-			"nickname":        existingUser.Nickname,
-			"bio":             existingUser.Bio,
-			"rating":          existingUser.Rating,
-			"rd":              existingUser.RD,
-			"volatility":      existingUser.Volatility,
-			"lastRatingUpdate": existingUser.LastRatingUpdate.Format(time.RFC3339),
-			"avatarUrl":       existingUser.AvatarURL,
-			"twitter":         existingUser.Twitter,
-			"instagram":       existingUser.Instagram,
-			"linkedin":        existingUser.LinkedIn,
-			"isVerified":      existingUser.IsVerified,
-			"createdAt":       existingUser.CreatedAt.Format(time.RFC3339),
-			"updatedAt":       existingUser.UpdatedAt.Format(time.RFC3339),
-		},
+		"user":        buildUserResponse(existingUser),
 	})
 }
 
@@ -140,7 +128,6 @@ func SignUp(ctx *gin.Context) {
 
 	var request structs.SignUpRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		log.Printf("Binding error: %v", err)
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
@@ -184,6 +171,9 @@ func SignUp(ctx *gin.Context) {
 		Password:         string(hashedPassword),
 		IsVerified:       false,
 		VerificationCode: verificationCode,
+		Score:            0, // Initialize gamification score
+		Badges:           []string{}, // Initialize badges array
+		CurrentStreak:    0, // Initialize streak
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -206,24 +196,7 @@ func SignUp(ctx *gin.Context) {
 	// Return user details
 	ctx.JSON(200, gin.H{
 		"message": "Sign-up successful. Please verify your email.",
-		"user": gin.H{
-			"id":              newUser.ID.Hex(),
-			"email":           newUser.Email,
-			"displayName":     newUser.DisplayName,
-			"nickname":        newUser.Nickname,
-			"bio":             newUser.Bio,
-			"rating":          newUser.Rating,
-			"rd":              newUser.RD,
-			"volatility":      newUser.Volatility,
-			"lastRatingUpdate": newUser.LastRatingUpdate.Format(time.RFC3339),
-			"avatarUrl":       newUser.AvatarURL,
-			"twitter":         newUser.Twitter,
-			"instagram":       newUser.Instagram,
-			"linkedin":        newUser.LinkedIn,
-			"isVerified":      newUser.IsVerified,
-			"createdAt":       newUser.CreatedAt.Format(time.RFC3339),
-			"updatedAt":       newUser.UpdatedAt.Format(time.RFC3339),
-		},
+		"user":    buildUserResponse(newUser),
 	})
 }
 
@@ -266,24 +239,12 @@ func VerifyEmail(ctx *gin.Context) {
 	// Return updated user details
 	ctx.JSON(200, gin.H{
 		"message": "Email verification successful",
-		"user": gin.H{
-			"id":              user.ID.Hex(),
-			"email":           user.Email,
-			"displayName":     user.DisplayName,
-			"nickname":        user.Nickname,
-			"bio":             user.Bio,
-			"rating":          user.Rating,
-			"rd":              user.RD,
-			"volatility":      user.Volatility,
-			"lastRatingUpdate": user.LastRatingUpdate.Format(time.RFC3339),
-			"avatarUrl":       user.AvatarURL,
-			"twitter":         user.Twitter,
-			"instagram":       user.Instagram,
-			"linkedin":        user.LinkedIn,
-			"isVerified":      true,
-			"createdAt":       user.CreatedAt.Format(time.RFC3339),
-			"updatedAt":       now.Format(time.RFC3339),
-		},
+		"user": func() gin.H {
+			response := buildUserResponse(user)
+			response["isVerified"] = true
+			response["updatedAt"] = now.Format(time.RFC3339)
+			return response
+		}(),
 	})
 }
 
@@ -307,6 +268,12 @@ func Login(ctx *gin.Context) {
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
+	}
+
+	// Normalize stats if needed
+	if normalizeUserStats(&user) {
+		if err := persistUserStats(dbCtx, &user); err != nil {
+		}
 	}
 
 	// Check if user is verified
@@ -333,25 +300,85 @@ func Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Sign-in successful",
 		"accessToken": token,
-		"user": gin.H{
-			"id":              user.ID.Hex(),
-			"email":           user.Email,
-			"displayName":     user.DisplayName,
-			"nickname":        user.Nickname,
-			"bio":             user.Bio,
-			"rating":          user.Rating,
-			"rd":              user.RD,
-			"volatility":      user.Volatility,
-			"lastRatingUpdate": user.LastRatingUpdate.Format(time.RFC3339),
-			"avatarUrl":       user.AvatarURL,
-			"twitter":         user.Twitter,
-			"instagram":       user.Instagram,
-			"linkedin":        user.LinkedIn,
-			"isVerified":      user.IsVerified,
-			"createdAt":       user.CreatedAt.Format(time.RFC3339),
-			"updatedAt":       user.UpdatedAt.Format(time.RFC3339),
-		},
+		"user":        buildUserResponse(user),
 	})
+}
+
+func normalizeUserStats(user *models.User) bool {
+	updated := false
+	if math.IsNaN(user.Rating) || math.IsInf(user.Rating, 0) {
+		user.Rating = 1200.0
+		updated = true
+	}
+	if math.IsNaN(user.RD) || math.IsInf(user.RD, 0) {
+		user.RD = 350.0
+		updated = true
+	}
+	if math.IsNaN(user.Volatility) || math.IsInf(user.Volatility, 0) || user.Volatility <= 0 {
+		user.Volatility = 0.06
+		updated = true
+	}
+	if user.LastRatingUpdate.IsZero() {
+		user.LastRatingUpdate = time.Now()
+		updated = true
+	}
+	if updated {
+		user.UpdatedAt = time.Now()
+	}
+	return updated
+}
+
+func persistUserStats(ctx context.Context, user *models.User) error {
+	if user.ID.IsZero() {
+		return nil
+	}
+	collection := db.MongoDatabase.Collection("users")
+	update := bson.M{
+		"$set": bson.M{
+			"rating":           user.Rating,
+			"rd":               user.RD,
+			"volatility":       user.Volatility,
+			"lastRatingUpdate": user.LastRatingUpdate,
+			"updatedAt":        user.UpdatedAt,
+		},
+	}
+	_, err := collection.UpdateByID(ctx, user.ID, update)
+	return err
+}
+
+func sanitizeFloat(value, fallback float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return fallback
+	}
+	return value
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
+}
+
+func buildUserResponse(user models.User) gin.H {
+	return gin.H{
+		"id":               user.ID.Hex(),
+		"email":            user.Email,
+		"displayName":      user.DisplayName,
+		"nickname":         user.Nickname,
+		"bio":              user.Bio,
+		"rating":           sanitizeFloat(user.Rating, 1200.0),
+		"rd":               sanitizeFloat(user.RD, 350.0),
+		"volatility":       sanitizeFloat(user.Volatility, 0.06),
+		"lastRatingUpdate": formatTime(user.LastRatingUpdate),
+		"avatarUrl":        user.AvatarURL,
+		"twitter":          user.Twitter,
+		"instagram":        user.Instagram,
+		"linkedin":         user.LinkedIn,
+		"isVerified":       user.IsVerified,
+		"createdAt":        formatTime(user.CreatedAt),
+		"updatedAt":        formatTime(user.UpdatedAt),
+	}
 }
 
 func ForgotPassword(ctx *gin.Context) {
@@ -490,35 +517,47 @@ func VerifyToken(ctx *gin.Context) {
 	ctx.JSON(200, gin.H{
 		"message": "Token is valid",
 		"user": gin.H{
-			"id":              user.ID.Hex(),
-			"email":           user.Email,
-			"displayName":     user.DisplayName,
-			"nickname":        user.Nickname,
-			"bio":             user.Bio,
-			"rating":          user.Rating,
-			"rd":              user.RD,
-			"volatility":      user.Volatility,
+			"id":               user.ID.Hex(),
+			"email":            user.Email,
+			"displayName":      user.DisplayName,
+			"nickname":         user.Nickname,
+			"bio":              user.Bio,
+			"rating":           user.Rating,
+			"rd":               user.RD,
+			"volatility":       user.Volatility,
 			"lastRatingUpdate": user.LastRatingUpdate.Format(time.RFC3339),
-			"avatarUrl":       user.AvatarURL,
-			"twitter":         user.Twitter,
-			"instagram":       user.Instagram,
-			"linkedin":        user.LinkedIn,
-			"isVerified":      user.IsVerified,
-			"createdAt":       user.CreatedAt.Format(time.RFC3339),
-			"updatedAt":       user.UpdatedAt.Format(time.RFC3339),
+			"avatarUrl":        user.AvatarURL,
+			"twitter":          user.Twitter,
+			"instagram":        user.Instagram,
+			"linkedin":         user.LinkedIn,
+			"isVerified":       user.IsVerified,
+			"createdAt":        user.CreatedAt.Format(time.RFC3339),
+			"updatedAt":        user.UpdatedAt.Format(time.RFC3339),
 		},
 	})
 }
 
 // Helper function to generate JWT
 func generateJWT(email, secret string, expiryMinutes int) (string, error) {
+	now := time.Now()
+	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
+	
+	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", email, now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
+	
 	claims := jwt.MapClaims{
 		"sub": email,
-		"exp": time.Now().Add(time.Minute * time.Duration(expiryMinutes)).Unix(),
-		"iat": time.Now().Unix(),
+		"exp": expirationTime.Unix(),
+		"iat": now.Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	signedToken, err := token.SignedString([]byte(secret))
+	if err != nil {
+		log.Printf("JWT signing error: %v", err)
+		return "", err
+	}
+	
+	log.Printf("JWT Generated successfully - Expiration Unix: %d", expirationTime.Unix())
+	return signedToken, nil
 }
 
 // Helper function to validate JWT
@@ -545,7 +584,6 @@ func loadConfig(ctx *gin.Context) *config.Config {
 	}
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		log.Println("Failed to load config")
 		ctx.JSON(500, gin.H{"error": "Internal server error"})
 		return nil
 	}
@@ -556,10 +594,10 @@ func loadConfig(ctx *gin.Context) *config.Config {
 func GetMatchmakingPoolStatus(ctx *gin.Context) {
 	matchmakingService := services.GetMatchmakingService()
 	pool := matchmakingService.GetPool()
-	
+
 	ctx.JSON(200, gin.H{
-		"pool":        pool,
-		"poolSize":    len(pool),
-		"timestamp":   time.Now().Format(time.RFC3339),
+		"pool":      pool,
+		"poolSize":  len(pool),
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }

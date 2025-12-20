@@ -298,7 +298,6 @@ const BotSelection: React.FC = () => {
       };
       navigate(`/debate/${data.debateId}`, { state });
     } catch (error) {
-      console.error("Error starting debate:", error);
       setError("Failed to start debate");
     } finally {
       setIsLoading(false);

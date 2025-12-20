@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/authContext';
 import { ThemeProvider } from './context/theme-provider';
@@ -22,6 +22,12 @@ import ChatRoom from './components/ChatRoom';
 import TournamentHub from './Pages/TournamentHub';
 import TournamentDetails from './Pages/TournamentDetails';
 import ProsConsChallenge from './Pages/ProsConsChallenge';
+import TeamBuilder from './Pages/TeamBuilder';
+import TeamDebateRoom from './Pages/TeamDebateRoom';
+import CommunityFeed from './Pages/CommunityFeed';
+import AdminSignup from './Pages/Admin/AdminSignup';
+import AdminDashboard from './Pages/Admin/AdminDashboard';
+import ViewDebate from './Pages/ViewDebate';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -53,13 +59,17 @@ function AppRoutes() {
         }
       />
       <Route path='/auth' element={<Authentication />} />
+      <Route path='/admin/login' element={<AdminSignup />} />
+      <Route path='/admin/dashboard' element={<AdminDashboard />} />
       {/* Protected routes with layout */}
       <Route element={<ProtectedRoute />}>
         <Route path='/' element={<Layout />}>
           <Route path='startDebate' element={<StartDebate />} />
           <Route path='leaderboard' element={<Leaderboard />} />
           <Route path='profile' element={<Profile />} />
+          <Route path='community' element={<CommunityFeed />} />
           <Route path='about' element={<About />} />
+          <Route path='team-builder' element={<TeamBuilder />} />
           <Route path='game/:userId' element={<DebateApp />} />
           <Route path='bot-selection' element={<BotSelection />} />
           <Route path='/tournaments' element={<TournamentHub />} />
@@ -82,7 +92,10 @@ function AppRoutes() {
         </Route>
         <Route path='/debate/:roomId' element={<DebateRoom />} />
         <Route path='/debate-room/:roomId' element={<OnlineDebateRoom />} />
+        <Route path='/team-debate/:debateId' element={<TeamDebateRoom />} />
         <Route path='/spectator/:roomId' element={<ChatRoom />} />
+        <Route path='/debate/:debateID/view' element={<ViewDebate />} />
+        <Route path='/view-debate/:debateID' element={<ViewDebate />} />
         <Route path='/speech-test' element={<SpeechTest />} />
       </Route>
       {/* Redirect unknown routes */}

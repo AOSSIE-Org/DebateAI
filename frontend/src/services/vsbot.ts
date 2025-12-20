@@ -82,7 +82,6 @@ export const createDebate = async (data: DebateRequest): Promise<DebateResponse>
 // Function to send a message in an existing debate
 export const sendDebateMessage = async (data: DebateRequest): Promise<{ response: string }> => {
   const token = getAuthToken();
-  console.log("Sending debate message:", data); // Debugging line 
   const response = await fetch(`${baseURL}/vsbot/debate`, {
     method: "POST",
     headers: {
@@ -104,7 +103,6 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
 // Function to judge a debate
 export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> => {
   const token = getAuthToken();
-  console.log("Judging Debate:", data)
   const response = await fetch(`${baseURL}/vsbot/judge`, {
     method: "POST",
     headers: {
