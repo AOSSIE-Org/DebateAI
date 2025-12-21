@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"gopkg.in/yaml.v3"
 )
@@ -40,29 +40,26 @@ type Config struct {
 	JWT struct {
 		Secret string `yaml:"secret"`
 		Expiry int    `yaml:"expiry"`
-	}
+	} `yaml:"jwt"`
 
-	SMTP struct { // Add SMTP configuration
-		Host        string
-		Port        int
-		Username    string // Gmail address
-		Password    string // App Password
-		SenderEmail string // Same as Username for Gmail
-		SenderName  string
-	}
+	SMTP struct {
+		Host        string `yaml:"host"`
+		Port        int    `yaml:"port"`
+		Username    string `yaml:"username"`    // Gmail address
+		Password    string `yaml:"password"`    // App Password
+		SenderEmail string `yaml:"senderEmail"` // Same as Username for Gmail
+		SenderName  string `yaml:"senderName"`
+	} `yaml:"smtp"`
+
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
-	}
-	Redis struct {
-		URL      string `yaml:"url"`
-		Password string `yaml:"password"`
-		DB       int    `yaml:"db"`
-	}
+	} `yaml:"googleOAuth"`
 }
 
 // LoadConfig reads the configuration file
 func LoadConfig(path string) (*Config, error) {
-	data, err := ioutil.ReadFile(path)
+
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}

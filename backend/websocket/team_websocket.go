@@ -3,15 +3,10 @@ package websocket
 import (
 	"context"
 	"encoding/json"
-<<<<<<< HEAD
 	"errors"
 	"log"
 	"net/http"
 	"os"
-=======
-	"log"
-	"net/http"
->>>>>>> main
 	"strings"
 	"sync"
 	"time"
@@ -454,7 +449,6 @@ func snapshotTeamRecipients(room *TeamRoom, exclude *websocket.Conn) []*TeamClie
 	return out
 }
 
-<<<<<<< HEAD
 // findClientByUserID returns the TeamClient matching the provided user ID
 func findClientByUserID(room *TeamRoom, userID string) *TeamClient {
 	room.Mutex.Lock()
@@ -499,17 +493,6 @@ func broadcastAll(room *TeamRoom, payload any) {
 			log.Printf("Team WebSocket write error: %v", err)
 		}
 	}
-=======
-// snapshotAllTeamClients returns a slice of all team clients in the room.
-func snapshotAllTeamClients(room *TeamRoom) []*TeamClient {
-	room.Mutex.Lock()
-	defer room.Mutex.Unlock()
-	out := make([]*TeamClient, 0, len(room.Clients))
-	for _, cl := range room.Clients {
-		out = append(out, cl)
-	}
-	return out
->>>>>>> main
 }
 
 // handleTeamJoin handles team join messages
@@ -522,12 +505,8 @@ func handleTeamJoin(room *TeamRoom, conn *websocket.Conn, message TeamMessage, c
 	}
 
 	// Broadcast to all clients in the room
-<<<<<<< HEAD
 	recipients := snapshotTeamRecipients(room, nil)
 	for _, r := range recipients {
-=======
-	for _, r := range snapshotAllTeamClients(room) {
->>>>>>> main
 		response := map[string]interface{}{
 			"type":        "teamStatus",
 			"teamStatus":  teamStatus,
@@ -675,20 +654,12 @@ func handleTeamPhaseChange(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		Type:  "phaseChange",
 		Phase: currentPhase,
 	}
-<<<<<<< HEAD
 	recipients := snapshotTeamRecipients(room, nil)
 	for _, r := range recipients {
-=======
-	for _, r := range snapshotAllTeamClients(room) {
->>>>>>> main
 		if err := r.SafeWriteJSON(phaseMessage); err != nil {
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 		} else {
-<<<<<<< HEAD
-			log.Printf("[handleTeamPhaseChange] ✓ Phase change broadcasted: %s", room.CurrentPhase)
-=======
 			log.Printf("[handleTeamPhaseChange] ✓ Phase change broadcasted: %s", currentPhase)
->>>>>>> main
 		}
 	}
 }
@@ -703,12 +674,8 @@ func handleTeamTopicChange(room *TeamRoom, conn *websocket.Conn, message TeamMes
 	room.Mutex.Unlock()
 
 	// Broadcast topic change to ALL clients (including sender for sync)
-<<<<<<< HEAD
 	recipients := snapshotTeamRecipients(room, nil)
 	for _, r := range recipients {
-=======
-	for _, r := range snapshotAllTeamClients(room) {
->>>>>>> main
 		if err := r.SafeWriteJSON(message); err != nil {
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 		}
@@ -747,12 +714,8 @@ func handleTeamRoleSelection(room *TeamRoom, conn *websocket.Conn, message TeamM
 		}
 		room.Mutex.Unlock()
 
-<<<<<<< HEAD
 		recipients := snapshotTeamRecipients(room, nil)
 		for _, r := range recipients {
-=======
-		for _, r := range snapshotAllTeamClients(room) {
->>>>>>> main
 			if err := r.SafeWriteJSON(roleMessage); err != nil {
 				log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 			}
@@ -977,19 +940,15 @@ func handleTeamTurnRequest(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		client.SafeWriteJSON(response)
 
 		// Broadcast turn status to all clients
-<<<<<<< HEAD
 		teamStatus, statusErr := room.TokenBucket.GetTeamSpeakingStatus(client.TeamID, room.TurnManager)
 		if statusErr != nil {
 			log.Printf("failed to load team status for team %s: %v", client.TeamID.Hex(), statusErr)
 			teamStatus = map[string]interface{}{}
 		}
+		currentTurn := room.TurnManager.GetCurrentTurn(client.TeamID).Hex()
+
 		recipients := snapshotTeamRecipients(room, nil)
 		for _, r := range recipients {
-=======
-		teamStatus := room.TokenBucket.GetTeamSpeakingStatus(client.TeamID, room.TurnManager)
-		currentTurn := room.TurnManager.GetCurrentTurn(client.TeamID).Hex()
-		for _, r := range snapshotAllTeamClients(room) {
->>>>>>> main
 			if r.TeamID == client.TeamID {
 				response := map[string]interface{}{
 					"type":        "teamStatus",
@@ -1026,12 +985,8 @@ func handleTeamTurnEnd(room *TeamRoom, conn *websocket.Conn, message TeamMessage
 	}
 
 	// Broadcast turn change to all clients in the team
-<<<<<<< HEAD
 	recipients := snapshotTeamRecipients(room, nil)
 	for _, r := range recipients {
-=======
-	for _, r := range snapshotAllTeamClients(room) {
->>>>>>> main
 		if r.TeamID == client.TeamID {
 			response := map[string]interface{}{
 				"type":        "teamStatus",
