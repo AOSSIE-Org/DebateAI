@@ -1,0 +1,12 @@
+server:
+  port: 1313
+
+cognito:
+  appClientId: 
+  appClientSecret: 
+  userPoolId:
+  region:
+
+openai:
+  gptApiKey: 
+  
