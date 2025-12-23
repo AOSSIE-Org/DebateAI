@@ -29,81 +29,66 @@
 ## Project Setup Guide
 
 ### Backend Configuration
+### Prerequisites
+- Go (version 1.20 or later)
+- MongoDB (local instance or MongoDB Atlas)
 
-1. Create a file named `config.prod.yml` in the `backend/config/` directory.
+---
 
-Paste the following configuration:
+### 1. Create the Backend Config File
 
+The backend expects a `config.prod.yml` file at runtime.  
+Only a sample config file is provided in the repository.
+
+Create the required config file by copying the sample:
+
+```bash
+cd backend/config
+cp config.prod.sample.yml config.prod.yml
 ```
-server:
-  port: 1313  # The port number your backend server will run on
 
+---
+
+### 2. Configure MongoDB
+
+Update `backend/config/config.prod.yml` with a valid MongoDB connection string:
+
+```yaml
 database:
-  uri: "mongodb+srv://<username>:<password>@<cluster-url>/<database-name>"
-  # Replace with your MongoDB Atlas connection string
-  # Get this from your MongoDB Atlas dashboard after creating a cluster and database
+  uri: "<YOUR_MONGODB_URI>"
+```
 
+Without a valid MongoDB URI, the backend will fail to start.
+
+---
+
+### 3. (Optional) Gemini API Configuration
+
+If the Gemini API key is not configured, the backend will still run, but AI-related features will be disabled.
+
+```yaml
 gemini:
   apiKey: "<YOUR_GEMINI_API_KEY>"
-  # API key for OpenAI / Gemini model access
-  # Obtain from your OpenRouter.ai or OpenAI account dashboard
-
-jwt:
-  secret: "<YOUR_JWT_SECRET>"
-  # A secret string used to sign JWT tokens
-  # Generate a strong random string (e.g. use `openssl rand -hex 32`)
-
-  expiry: 1440
-  # Token expiry time in minutes (e.g. 1440 = 24 hours)
-
-smtp:
-  host: "smtp.gmail.com"
-  # SMTP server host for sending emails (example is Gmail SMTP)
-
-  port: 587
-  # SMTP server port (587 for TLS)
-
-  username: "<YOUR_EMAIL_ADDRESS>"
-  # Email username (your email address)
-
-  password: "<YOUR_EMAIL_PASSWORD_OR_APP_PASSWORD>"
-  # Password for the email or app-specific password if 2FA is enabled
-
-  senderEmail: "<YOUR_EMAIL_ADDRESS>"
-  # The 'from' email address used when sending mails
-
-  senderName: "DebateAI Team"
-
-googleOAuth:
-  clientID: "<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
-  # Google OAuth Client ID for OAuth login
-  # Obtain from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs)
 ```
 
-> **Note**: Do **not** commit this file to a public repository. Use `.gitignore`.
+---
+
+### 4. Run the Backend Server
+
+From the `backend` directory, start the server:
+
+```bash
+go run cmd/server/main.go
+```
+
+The server will start on the port defined in the config file (default: `1313`).
 
 ---
 
-### Running the Backend (Go)
+### Notes
+- Do **not** commit `config.prod.yml` to version control.
+- Only `config.prod.sample.yml` should remain committed.
 
-1. Navigate to the backend folder:
-
-   ```
-   cd backend
-   ```
-
-2. Initialize Go modules (if not already done):
-
-   ```
-   go mod tidy
-   ```
-
-3. Run the server:
-   ```
-   go run cmd/server/main.go
-   ```
-
----
 
 ### Frontend Configuration
 
