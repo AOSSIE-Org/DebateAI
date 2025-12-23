@@ -142,10 +142,10 @@ const TeamDebateRoom: React.FC = () => {
   const { debateId } = useParams<{ debateId: string }>();
   const [user] = useAtom(userAtom);
   const { user: userFromHook, isLoading: isUserLoading, isAuthenticated } = useUser();
-  
+
   // Use user from hook if available, otherwise fallback to atom
   const currentUser = userFromHook || user;
-  
+
   // Debug: Log user state
   useEffect(() => {
     console.log("[TeamDebateRoom] User state:", {
@@ -180,7 +180,7 @@ const TeamDebateRoom: React.FC = () => {
   const [team2ReadyCount, setTeam2ReadyCount] = useState(0);
   const [team1MembersCount, setTeam1MembersCount] = useState(0);
   const [team2MembersCount, setTeam2MembersCount] = useState(0);
-  
+
   // Track individual ready status for each player
   const [playerReadyStatus, setPlayerReadyStatus] = useState<Map<string, boolean>>(new Map());
   const [hasDeterminedTeam, setHasDeterminedTeam] = useState(false);
@@ -221,7 +221,7 @@ const TeamDebateRoom: React.FC = () => {
   useEffect(() => {
     currentUserIdRef.current = currentUser?.id;
   }, [currentUser?.id]);
->>>>>>> main
+
 
   // Timer state
   const [timer, setTimer] = useState<number>(0);
@@ -307,21 +307,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [currentUser?.id, isCameraOn, setIsCameraOn]);
 
-  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
-  const isTeam1Ref = useRef<boolean>(isTeam1);
-  const debatePhaseRef = useRef<DebatePhase>(debatePhase);
 
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
-
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
 
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const initiatedOffersRef = useRef<Set<string>>(new Set());
@@ -551,10 +537,10 @@ const TeamDebateRoom: React.FC = () => {
   // Determine if it's the local team's turn to speak
   const isMyTurn = React.useMemo(() => {
     if (!localRole || !debatePhase) return false;
-    
+
     const isForPhase = debatePhase.includes("For");
     const isAgainstPhase = debatePhase.includes("Against");
-    
+
     if (isForPhase && localRole === "for") return true;
     if (isAgainstPhase && localRole === "against") return true;
     return false;
@@ -564,12 +550,12 @@ const TeamDebateRoom: React.FC = () => {
   useEffect(() => {
     const fetchDebate = async () => {
       const token = getAuthToken();
-      
+
       // Allow proceeding if we have a token, even if user isn't fully loaded yet
-        // The debate API will use the token for authentication
-        if (!debateId || (!token && !currentUser?.id)) {
-        console.log("[TeamDebateRoom] Waiting for user/token...", { 
-          debateId, 
+      // The debate API will use the token for authentication
+      if (!debateId || (!token && !currentUser?.id)) {
+        console.log("[TeamDebateRoom] Waiting for user/token...", {
+          debateId,
           userId: currentUser?.id,
           hasToken: !!token,
           isUserLoading,
@@ -681,21 +667,7 @@ const TeamDebateRoom: React.FC = () => {
     };
   }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
 
-  useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
 
-  useEffect(() => {
-    myTeamIdRef.current = myTeamId;
-  }, [myTeamId]);
-
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
-
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
 
   // Initialize WebSocket connection - only need token and debateId
   // User ID will be extracted from token on backend
@@ -839,7 +811,7 @@ const TeamDebateRoom: React.FC = () => {
           if (data.team2Ready !== undefined) setTeam2ReadyCount(data.team2Ready);
           if (data.team1MembersCount !== undefined) setTeam1MembersCount(data.team1MembersCount);
           if (data.team2MembersCount !== undefined) setTeam2MembersCount(data.team2MembersCount);
-          
+
           // Update team names if provided (for late joiners)
           if ((data as any).team1Name) {
             if (amTeam1) {
@@ -855,7 +827,7 @@ const TeamDebateRoom: React.FC = () => {
               setMyTeamName((data as any).team2Name);
             }
           }
-          
+
           // Update individual player ready status (for late joiners)
           if ((data as any).team1ReadyStatus) {
             const team1Status = (data as any).team1ReadyStatus as Record<string, boolean>;
@@ -877,7 +849,7 @@ const TeamDebateRoom: React.FC = () => {
               return updated;
             });
           }
-          
+
           // Check if opponent team members are all ready (but don't override localReady)
           // localReady should only be set when the user clicks the ready button
           const opponentReadyCount =
@@ -886,9 +858,9 @@ const TeamDebateRoom: React.FC = () => {
             (amTeam1 ? data.team2MembersCount : data.team1MembersCount) ?? 0;
           setPeerReady(
             opponentMemberCount > 0 &&
-              opponentReadyCount === opponentMemberCount
+            opponentReadyCount === opponentMemberCount
           );
-          
+
           // Update localReady if we have the user's ready status in stateSync
           if (currentUserId) {
             const team1Status = (data as any).team1ReadyStatus as Record<string, boolean> | undefined;
@@ -899,7 +871,7 @@ const TeamDebateRoom: React.FC = () => {
               setLocalReady(team2Status[currentUserId]);
             }
           }
-          
+
           break;
         }
         case "teamMembers": {
@@ -955,7 +927,7 @@ const TeamDebateRoom: React.FC = () => {
               currentMyTeamId !== null
                 ? messageTeamId === currentMyTeamId
                 : false;
-            
+
             if (isFromMyTeam) {
               // This role selection is from my team
               setLocalRole(data.role as DebateRole);
@@ -990,18 +962,7 @@ const TeamDebateRoom: React.FC = () => {
           console.log("Message teamId:", data.teamId);
           console.log("Message assignedToTeam:", (data as any).assignedToTeam);
           console.log("isTeam1:", amTeam1);
-          console.log("myTeamId:", myTeamId);
-          console.log("Team1Ready:", data.team1Ready, "Team2Ready:", data.team2Ready);
-          console.log("Team1MembersCount:", data.team1MembersCount, "Team2MembersCount:", data.team2MembersCount);
-        case "ready": {
-          console.log("=== READY MESSAGE RECEIVED ===");
-          console.log("Received ready message:", data);
-          console.log("Current user:", currentUser?.id);
-          console.log("Message userId:", data.userId);
-          console.log("Message teamId:", data.teamId);
-          console.log("Message assignedToTeam:", (data as any).assignedToTeam);
-          console.log("isTeam1:", isTeam1);
-          console.log("myTeamId:", myTeamId);
+          console.log("myTeamId:", currentMyTeamId);
           console.log(
             "Team1Ready:",
             data.team1Ready,
@@ -1014,12 +975,12 @@ const TeamDebateRoom: React.FC = () => {
             "Team2MembersCount:",
             data.team2MembersCount
           );
-          
+
           // CRITICAL: Verify the ready status is assigned to the correct team
           const messageTeamId = data.teamId;
           const expectedTeamId = currentMyTeamId; // Should be the same regardless of isTeam1
           const assignedTeam = (data as any).assignedToTeam;
-          
+
           // Update the ready status for the specific user who clicked
           if (data.userId === currentUserId && data.ready !== undefined) {
             // Verify team assignment matches
@@ -1032,12 +993,12 @@ const TeamDebateRoom: React.FC = () => {
               setLocalReady(data.ready);
             }
           }
-          
+
           // Update individual player ready status
           if (data.userId && data.ready !== undefined) {
             setPlayerReadyStatus(prev => new Map(prev).set(data.userId!, data.ready!));
           }
-          
+
           // Update team ready counts - these are the ACTUAL counts from backend
           if (data.team1Ready !== undefined) {
             console.log(`Updating team1ReadyCount to ${data.team1Ready}`);
@@ -1051,7 +1012,7 @@ const TeamDebateRoom: React.FC = () => {
           // Check both direct access and through (data as any) to handle type issues
           const team1Count = data.team1MembersCount ?? (data as any).team1MembersCount;
           const team2Count = data.team2MembersCount ?? (data as any).team2MembersCount;
-          
+
           if (team1Count !== undefined && team1Count !== null) {
             console.log(`✓ Updating team1MembersCount to ${team1Count}`);
             setTeam1MembersCount(team1Count);
@@ -1065,7 +1026,7 @@ const TeamDebateRoom: React.FC = () => {
           } else {
             console.warn(`⚠️ team2MembersCount is undefined in ready message. Raw data:`, data);
           }
-          
+
           // Display what we're showing to the user
           // CRITICAL: Each user should see their own team correctly
           // Use (data as any) to access fields that might not be in TypeScript interface
@@ -1082,14 +1043,14 @@ const TeamDebateRoom: React.FC = () => {
           const oppTeamTotal = amTeam1
             ? (data.team2MembersCount ?? dataAny.team2MembersCount)
             : (data.team1MembersCount ?? dataAny.team1MembersCount);
-          
+
           console.log(`[Display] isTeam1=${amTeam1}, myTeamName=${myTeamName}`);
           console.log(`[Display] My Team (${myTeamName}) Ready: ${myTeamReadyCount}/${myTeamTotal}`);
           console.log(`[Display] Opponent Team (${opponentTeamName}) Ready: ${oppReadyCount}/${oppTeamTotal}`);
           console.log(`[Display] Backend counts - Team1Ready=${data.team1Ready}, Team2Ready=${data.team2Ready}`);
           console.log(`[Display] Raw data - team1MembersCount=${data.team1MembersCount}, team2MembersCount=${data.team2MembersCount}`);
           console.log(`[Display] Full ready message data:`, JSON.stringify(data));
-          
+
           // Validation: Ensure we're showing the right team
           if (data.userId === currentUserId && assignedTeam) {
             const expectedTeamForUser = amTeam1 ? "Team1" : "Team2";
@@ -1099,7 +1060,7 @@ const TeamDebateRoom: React.FC = () => {
               console.log(`✓ Validation passed: User is ${expectedTeamForUser} and ready assigned to ${assignedTeam}`);
             }
           }
-                    // Update peer ready status (whether all opponent team members are ready)
+          // Update peer ready status (whether all opponent team members are ready)
           const allOppReady = oppReadyCount === oppTeamTotal && oppTeamTotal > 0;
           setPeerReady(allOppReady);
           console.log("=== END READY MESSAGE ===");
@@ -1134,7 +1095,7 @@ const TeamDebateRoom: React.FC = () => {
           if (data.userId && data.speechText) {
             const targetPhase = data.phase || debatePhaseRef.current;
             setSpeechTranscripts((prev) => ({
-            ...prev,
+              ...prev,
               [targetPhase]:
                 (prev[targetPhase] || "") + " " + data.speechText,
             }));
@@ -1381,7 +1342,7 @@ const TeamDebateRoom: React.FC = () => {
               if (recognitionRef.current) {
                 try {
                   recognitionRef.current.start();
-      } catch (error) {
+                } catch (error) {
                   console.error("Error restarting speech recognition:", error);
                 }
               }
@@ -1453,25 +1414,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [isListening]);
 
-  const toggleCamera = useCallback(() => {
-    const stream = localStreamRef.current;
-    if (!stream) {
-      console.warn("[TeamDebateRoom] toggleCamera called without local stream");
-      return;
-    }
 
-    const [videoTrack] = stream.getVideoTracks();
-    if (!videoTrack) {
-      console.warn("[TeamDebateRoom] No video track available to toggle");
-      return;
-    }
-
-    setIsCameraOn((prev) => {
-      const next = !prev;
-      videoTrack.enabled = next;
-      return next;
-    });
-  }, []);
 
   // Auto start/stop speech recognition based on turn
   useEffect(() => {
@@ -1518,17 +1461,17 @@ const TeamDebateRoom: React.FC = () => {
     const phasesForRole =
       localRole === "for"
         ? [
-            DebatePhase.OpeningFor,
-            DebatePhase.CrossForQuestion,
-            DebatePhase.CrossForAnswer,
-            DebatePhase.ClosingFor,
-          ]
+          DebatePhase.OpeningFor,
+          DebatePhase.CrossForQuestion,
+          DebatePhase.CrossForAnswer,
+          DebatePhase.ClosingFor,
+        ]
         : [
-            DebatePhase.OpeningAgainst,
-            DebatePhase.CrossAgainstAnswer,
-            DebatePhase.CrossAgainstQuestion,
-            DebatePhase.ClosingAgainst,
-          ];
+          DebatePhase.OpeningAgainst,
+          DebatePhase.CrossAgainstAnswer,
+          DebatePhase.CrossAgainstQuestion,
+          DebatePhase.ClosingAgainst,
+        ];
 
     phasesForRole.forEach((phase) => {
       const transcript =
@@ -1611,15 +1554,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   };
 
-  const toggleCamera = () => {
-    const stream = localStreamRef.current;
-    const videoTrack = stream?.getVideoTracks()[0];
-    const nextState = !isCameraOn;
-    if (videoTrack) {
-      videoTrack.enabled = nextState;
-    }
-    setIsCameraOn(nextState);
-  };
+
 
   // Manage setup popup visibility and check if debate should start
   useEffect(() => {
@@ -1627,11 +1562,11 @@ const TeamDebateRoom: React.FC = () => {
     const myTeamTotal = isTeam1 ? team1MembersCount : team2MembersCount;
     const oppTeamReadyCount = isTeam1 ? team2ReadyCount : team1ReadyCount;
     const oppTeamTotal = isTeam1 ? team2MembersCount : team1MembersCount;
-    
+
     const allMyTeamReady = myTeamReadyCount === myTeamTotal && myTeamTotal > 0;
     const allOpponentReady = oppTeamReadyCount === oppTeamTotal && oppTeamTotal > 0;
     const allReady = allMyTeamReady && allOpponentReady;
-    
+
     console.log('Ready check:', {
       myTeamReadyCount,
       myTeamTotal,
@@ -1644,7 +1579,7 @@ const TeamDebateRoom: React.FC = () => {
       peerReady,
       debatePhase
     });
-    
+
     // CRITICAL: Check if debate has started first - if so, NEVER show popup again
     if (debateStartedRef.current || debatePhase !== DebatePhase.Setup) {
       // Debate has started - don't show popup EVER
@@ -1655,7 +1590,7 @@ const TeamDebateRoom: React.FC = () => {
       }
       return; // Exit early to prevent any other logic from showing popup
     }
-    
+
     // Debate hasn't started yet - manage popup based on ready status
     if (allReady && debatePhase === DebatePhase.Setup) {
       // All ready - close popup and start countdown
@@ -1663,7 +1598,7 @@ const TeamDebateRoom: React.FC = () => {
       if (countdown === null) {
         console.log('🚀 All teams ready! Starting countdown...');
         setCountdown(3);
-        
+
         // Also notify backend (for synchronization)
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           try {
@@ -1691,18 +1626,18 @@ const TeamDebateRoom: React.FC = () => {
       // Countdown finished - start the debate by transitioning to OpeningFor
       console.log('✓✓✓ COUNTDOWN FINISHED! Starting debate at OpeningFor phase');
       console.log('Current phase before change:', debatePhase);
-      
+
       // Mark debate as started FIRST to prevent popup from reopening
       debateStartedRef.current = true;
       // Close popup FIRST before phase change
       setShowSetupPopup(false);
       setCountdown(null);
-      
+
       // Change phase to OpeningFor
       const newPhase = DebatePhase.OpeningFor;
       console.log('Setting debate phase to:', newPhase);
       setDebatePhase(newPhase);
-      
+
       // Send phase change to backend
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         const phaseChangeMessage = JSON.stringify({ type: "phaseChange", phase: DebatePhase.OpeningFor });
@@ -1711,7 +1646,7 @@ const TeamDebateRoom: React.FC = () => {
       } else {
         console.error('❌ WebSocket not open, cannot send phase change');
       }
-      
+
       // Note: debatePhase state won't update immediately due to React batching
       // The phase change handler will receive the backend's phase change message
       // which will update the phase correctly
@@ -1724,9 +1659,8 @@ const TeamDebateRoom: React.FC = () => {
       .padStart(2, "0")}`;
     return (
       <span
-        className={`font-mono ${
-          seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
-        }`}
+        className={`font-mono ${seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
+          }`}
       >
         {timeStr}
       </span>
@@ -1736,7 +1670,7 @@ const TeamDebateRoom: React.FC = () => {
   // Check for token - if token exists, user is authenticated even if user object isn't loaded yet
   const token = getAuthToken();
   const hasAuthToken = !!token;
-  
+
   // Debug: Log user state for troubleshooting
   useEffect(() => {
     if (hasAuthToken && !currentUser?.id) {
@@ -1750,7 +1684,7 @@ const TeamDebateRoom: React.FC = () => {
       });
     }
   }, [hasAuthToken, currentUser, user, userFromHook, isUserLoading, isAuthenticated]);
-  
+
   // Show loading while debate is loading, or while user is loading (if we have a token)
   if (!debate || isLoading) {
     return (
@@ -1762,7 +1696,7 @@ const TeamDebateRoom: React.FC = () => {
       </div>
     );
   }
-  
+
   // Only show "not authenticated" if we're sure there's no token
   // Don't block if we have a token - proceed even without user object (user ID will come from token)
   if (!hasAuthToken && !isAuthenticated && !currentUser?.id) {
@@ -1793,11 +1727,11 @@ const TeamDebateRoom: React.FC = () => {
               {debatePhase.includes("Question")
                 ? "ask a question"
                 : debatePhase.includes("Answer")
-                ? "answer"
-                : "make a statement"}
+                  ? "answer"
+                  : "make a statement"}
             </span>
           </p>
-            </div>
+        </div>
       </div>
 
       {/* Setup Popup */}
@@ -1836,7 +1770,7 @@ const TeamDebateRoom: React.FC = () => {
                     placeholder="Or enter a custom debate topic"
                     className="border border-border rounded p-2 w-full bg-input text-foreground"
                   />
-                        </div>
+                </div>
 
                 <div className="mb-6">
                   <div className="text-sm mb-2">
@@ -1855,27 +1789,25 @@ const TeamDebateRoom: React.FC = () => {
                     <div className="flex space-x-2 mb-4">
                       <button
                         onClick={() => handleRoleSelection("for")}
-                        className={`px-4 py-2 rounded text-sm border transition ${
-                          peerRole !== "for"
-                            ? "bg-primary text-primary-foreground border-transparent"
-                            : "bg-muted text-muted-foreground border-border"
-                        }`}
+                        className={`px-4 py-2 rounded text-sm border transition ${peerRole !== "for"
+                          ? "bg-primary text-primary-foreground border-transparent"
+                          : "bg-muted text-muted-foreground border-border"
+                          }`}
                       >
                         For
                       </button>
                       <button
                         onClick={() => handleRoleSelection("against")}
-                        className={`px-4 py-2 rounded text-sm border transition ${
-                          peerRole !== "against"
-                            ? "bg-primary text-primary-foreground border-transparent"
-                            : "bg-muted text-muted-foreground border-border"
-                        }`}
+                        className={`px-4 py-2 rounded text-sm border transition ${peerRole !== "against"
+                          ? "bg-primary text-primary-foreground border-transparent"
+                          : "bg-muted text-muted-foreground border-border"
+                          }`}
                       >
                         Against
                       </button>
                     </div>
-                )}
-              </div>
+                  )}
+                </div>
 
                 <div>
                   {/* Players List - Side by Side */}
@@ -1897,9 +1829,8 @@ const TeamDebateRoom: React.FC = () => {
                                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div
-                                  className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                                    isReady ? "bg-green-500" : "bg-red-500"
-                                  }`}
+                                  className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isReady ? "bg-green-500" : "bg-red-500"
+                                    }`}
                                   title={isReady ? "Ready" : "Not Ready"}
                                 />
                               </div>
@@ -1934,9 +1865,8 @@ const TeamDebateRoom: React.FC = () => {
                                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div
-                                  className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                                    isReady ? "bg-green-500" : "bg-red-500"
-                                  }`}
+                                  className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isReady ? "bg-green-500" : "bg-red-500"
+                                    }`}
                                   title={isReady ? "Ready" : "Not Ready"}
                                 />
                               </div>
@@ -1956,11 +1886,10 @@ const TeamDebateRoom: React.FC = () => {
                   </div>
                   <Button
                     onClick={toggleReady}
-                    className={`w-full py-2 rounded-lg transition ${
-                      localReady
-                        ? "bg-destructive text-destructive-foreground"
-                        : "bg-accent text-accent-foreground"
-                    }`}
+                    className={`w-full py-2 rounded-lg transition ${localReady
+                      ? "bg-destructive text-destructive-foreground"
+                      : "bg-accent text-accent-foreground"
+                      }`}
                   >
                     {localReady ? "Cancel Ready" : "I'm Ready"}
                     {localReady && <span className="ml-2">✓</span>}
@@ -2033,11 +1962,10 @@ const TeamDebateRoom: React.FC = () => {
       <div className="w-full max-w-6xl mx-auto flex flex-col md:flex-row gap-4 mt-4">
         {/* My Team Section - Left Side */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            isMyTurn && debatePhase !== DebatePhase.Finished
-              ? "animate-glow"
-              : ""
-          } bg-white border border-gray-200 shadow-md min-h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${isMyTurn && debatePhase !== DebatePhase.Finished
+            ? "animate-glow"
+            : ""
+            } bg-white border border-gray-200 shadow-md min-h-[540px] flex flex-col`}
         >
           <div className="p-3 bg-gray-50 border-b">
             <h2 className="text-lg font-bold text-gray-900 text-center">
@@ -2068,12 +1996,12 @@ const TeamDebateRoom: React.FC = () => {
                       >
                         {isCameraOn ? (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="white">
-                            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
+                            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
                           </svg>
                         ) : (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="white">
-                            <path d="M21 6.5l-4-4v3.5H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h13v3.5l4-4v-11z" fill="white" opacity="0.5"/>
-                            <line x1="2" y1="2" x2="22" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                            <path d="M21 6.5l-4-4v3.5H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h13v3.5l4-4v-11z" fill="white" opacity="0.5" />
+                            <line x1="2" y1="2" x2="22" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round" />
                           </svg>
                         )}
                       </button>
@@ -2083,7 +2011,7 @@ const TeamDebateRoom: React.FC = () => {
                     <div className="w-full h-48 bg-gray-800 flex items-center justify-center">
                       <div className="text-center text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
+                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
                         </svg>
                         <p className="text-sm">Camera Off</p>
                       </div>
@@ -2134,26 +2062,25 @@ const TeamDebateRoom: React.FC = () => {
               <div className="flex items-center justify-center gap-2 mt-2">
                 <button
                   onClick={toggleCamera}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                    isCameraOn
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-gray-400 text-white hover:bg-gray-500"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${isCameraOn
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    : "bg-gray-400 text-white hover:bg-gray-500"
+                    }`}
                   title={isCameraOn ? "Turn camera off" : "Turn camera on"}
                 >
                   <span className="flex items-center gap-1.5">
                     {isCameraOn ? (
                       <>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
+                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
                         </svg>
                         Camera On
                       </>
                     ) : (
                       <>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
-                          <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+                          <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                         Camera Off
                       </>
@@ -2167,11 +2094,10 @@ const TeamDebateRoom: React.FC = () => {
 
         {/* Opponent Team Section - Right Side */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            !isMyTurn && debatePhase !== DebatePhase.Finished
-              ? "animate-glow"
-              : ""
-          } bg-white border border-gray-200 shadow-md min-h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${!isMyTurn && debatePhase !== DebatePhase.Finished
+            ? "animate-glow"
+            : ""
+            } bg-white border border-gray-200 shadow-md min-h-[540px] flex flex-col`}
         >
           <div className="p-3 bg-gray-50 border-b">
             <h2 className="text-lg font-bold text-gray-900 text-center">

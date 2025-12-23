@@ -105,23 +105,18 @@ const MatchLogs: React.FC = () => {
     const stage = log.match.includes("First Round")
       ? "First Round"
       : log.match.includes("Semifinal")
-      ? "Semifinal"
-      : "Final";
+        ? "Semifinal"
+        : "Final";
     let winner = "";
     if (log.score && log.score.total) {
       const [score1, score2] = log.score.total.split("-").map(Number);
       if (score1 > score2) winner = player1.split(": ")[1];
       else if (score2 > score1) winner = player2;
-<<<<<<< HEAD
       else {
         winner = log.match.includes("First Round Match 3")
           ? "Ayaan Khanna (Tiebreaker)"
           : "";
       }
-=======
-      else
-        winner = isFirstRoundMatch3 ? "Ayaan Khanna (Tiebreaker)" : "";
->>>>>>> main
     }
     return {
       player1: player1.split(": ")[1] || player1,
@@ -145,13 +140,12 @@ const MatchLogs: React.FC = () => {
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-md transition-all duration-200 ${
-                      stage === "Final"
+                    className={`text-xs font-medium px-2 py-0.5 rounded-md transition-all duration-200 ${stage === "Final"
                         ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
                         : stage === "Semifinal"
-                        ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    }`}
+                          ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      }`}
                   >
                     {stage}
                   </span>
@@ -202,24 +196,22 @@ const MatchLogs: React.FC = () => {
                   })}
                   <span className="font-semibold">Total</span>
                   <span
-                    className={`font-semibold ${
-                      log.score &&
-                      parseInt(log.score.total.split("-")[0]) >
+                    className={`font-semibold ${log.score &&
+                        parseInt(log.score.total.split("-")[0]) >
                         parseInt(log.score.total.split("-")[1])
                         ? "text-primary"
                         : ""
-                    }`}
+                      }`}
                   >
                     {log.score?.total.split("-")[0]}
                   </span>
                   <span
-                    className={`font-semibold ${
-                      log.score &&
-                      parseInt(log.score.total.split("-")[1]) >
+                    className={`font-semibold ${log.score &&
+                        parseInt(log.score.total.split("-")[1]) >
                         parseInt(log.score.total.split("-")[0])
                         ? "text-primary"
                         : ""
-                    }`}
+                      }`}
                   >
                     {log.score?.total.split("-")[1]}
                   </span>

@@ -233,17 +233,17 @@ const TeamBuilder: React.FC = () => {
 
   const isCaptain = (team: Team | null): boolean => {
     if (!team || !user) return false;
-    
+
     // Convert captainId to string if it's an object (for backwards compatibility)
-    const captainIdStr = typeof team.captainId === 'string' 
-      ? team.captainId 
+    const captainIdStr = typeof team.captainId === 'string'
+      ? team.captainId
       : (team.captainId as any)?.$oid || String(team.captainId);
-    
+
     // Convert user.id to string if needed
     const userIdStr = typeof user.id === 'string'
       ? user.id
       : (user.id as any)?.$oid || String(user.id);
-    
+
     // Check both ID and email
     return captainIdStr === userIdStr || team.captainEmail === user?.email;
   };
@@ -343,9 +343,8 @@ const TeamBuilder: React.FC = () => {
 
       {/* User Status Banner */}
       <div
-        className={`mb-6 p-4 rounded-lg border ${
-          isUserInTeam ? "bg-card border-border" : "bg-muted border-border"
-        }`}
+        className={`mb-6 p-4 rounded-lg border ${isUserInTeam ? "bg-card border-border" : "bg-muted border-border"
+          }`}
       >
         <div className="flex items-center gap-2">
           <FaUsers
@@ -630,22 +629,6 @@ const TeamBuilder: React.FC = () => {
                       </div>
 
                       {/* Team Matchmaking */}
-<<<<<<< HEAD
-                      <div className="mt-4">
-                        <TeamMatchmaking
-                          team={team}
-                          user={
-                            user
-                              ? {
-                                  id: user.id || "",
-                                  email: user.email,
-                                  displayName: user.displayName,
-                                }
-                              : null
-                          }
-                        />
-                      </div>
-=======
                       {user && user.id && (
                         <div className="mt-4">
                           <TeamMatchmaking
@@ -658,7 +641,6 @@ const TeamBuilder: React.FC = () => {
                           />
                         </div>
                       )}
->>>>>>> main
 
                       <div className="flex flex-wrap gap-2">
                         {(team.members || []).map((member: TeamMember) => (
@@ -786,29 +768,29 @@ const TeamBuilder: React.FC = () => {
                   <div className="pt-4 border-t border-border space-y-2">
                     {isCaptain(
                       userTeams.find((t) => t.id === selectedMember.teamId) ||
-                        null
+                      null
                     ) && (
-                      <>
-                        {selectedMember.memberUserId !==
-                          (userTeams.find((t) => t.id === selectedMember.teamId)
-                            ?.captainId || "") && (
-                          <Button
-                            variant="destructive"
-                            className="w-full"
-                            onClick={() => {
-                              handleRemoveMember(
-                                selectedMember.teamId,
-                                selectedMember.memberUserId
-                              );
-                              setIsMemberProfileOpen(false);
-                            }}
-                          >
-                            <FaTimes className="mr-2" />
-                            Remove Member from Team
-                          </Button>
-                        )}
-                      </>
-                    )}
+                        <>
+                          {selectedMember.memberUserId !==
+                            (userTeams.find((t) => t.id === selectedMember.teamId)
+                              ?.captainId || "") && (
+                              <Button
+                                variant="destructive"
+                                className="w-full"
+                                onClick={() => {
+                                  handleRemoveMember(
+                                    selectedMember.teamId,
+                                    selectedMember.memberUserId
+                                  );
+                                  setIsMemberProfileOpen(false);
+                                }}
+                              >
+                                <FaTimes className="mr-2" />
+                                Remove Member from Team
+                              </Button>
+                            )}
+                        </>
+                      )}
                   </div>
                 )}
             </div>
@@ -837,22 +819,17 @@ const TeamBuilder: React.FC = () => {
             <div className="space-y-4">
               {availableTeams.map((team) => {
                 const memberCount = team.members?.length || 0;
-<<<<<<< HEAD
-                const capacity = team.maxSize || 4;
-=======
                 const capacity =
                   team.maxSize && team.maxSize > 0 ? team.maxSize : 4;
->>>>>>> main
                 const isFull = memberCount >= capacity;
 
                 return (
                   <div
                     key={team.id}
-                    className={`group relative overflow-hidden p-5 rounded-lg border transition-all ${
-                      isFull
-                        ? "bg-muted border-border opacity-60"
-                        : "bg-card border-border hover:border-primary hover:shadow-md"
-                    }`}
+                    className={`group relative overflow-hidden p-5 rounded-lg border transition-all ${isFull
+                      ? "bg-muted border-border opacity-60"
+                      : "bg-card border-border hover:border-primary hover:shadow-md"
+                      }`}
                   >
                     <div className="relative">
                       <div className="flex items-start justify-between gap-4 mb-3">
