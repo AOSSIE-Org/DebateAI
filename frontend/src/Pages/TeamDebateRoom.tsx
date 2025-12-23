@@ -192,6 +192,10 @@ const TeamDebateRoom: React.FC = () => {
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const debateStartedRef = useRef<boolean>(false); // Track if debate has started to prevent popup reopening
+  const currentUserIdRef = useRef<string | null>(null);
+  const myTeamIdRef = useRef<string | null>(null);
+  const isTeam1Ref = useRef<boolean>(false);
+  const debatePhaseRef = useRef<DebatePhase>(DebatePhase.Setup);
 
   
 

@@ -136,8 +136,13 @@ const extractJSON = (response: string): string => {
   if (match && match[1]) return match[1].trim();
   return response;
 };
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const WS_BASE_URL = import.meta.env.VITE_BASE_URL?.replace(/^http/, "ws");
+const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
+
+const WS_BASE_URL = BASE_URL.replace(
+  /^https?/,
+  (match) => (match === "https" ? "wss" : "ws")
+);
+
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
