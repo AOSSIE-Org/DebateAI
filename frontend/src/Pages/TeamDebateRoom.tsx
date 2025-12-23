@@ -193,9 +193,7 @@ const TeamDebateRoom: React.FC = () => {
   const localStreamRef = useRef<MediaStream | null>(null);
   const debateStartedRef = useRef<boolean>(false); // Track if debate has started to prevent popup reopening
 
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
+  
 
   // State for media streams
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -290,27 +288,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [currentUser?.id, isCameraOn, setIsCameraOn]);
 
-  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
-  const isTeam1Ref = useRef<boolean>(isTeam1);
-  const debatePhaseRef = useRef<DebatePhase>(debatePhase);
-  const myTeamIdRef = useRef<string | null>(myTeamId);
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-  myTeamIdRef.current = myTeamId;
-}, [myTeamId]);
-
-
-  useEffect(() => {
   
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
-
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
 
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const initiatedOffersRef = useRef<Set<string>>(new Set());
@@ -671,43 +649,16 @@ const TeamDebateRoom: React.FC = () => {
   }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
 
   useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
+  currentUserIdRef.current = currentUser?.id;
+  myTeamIdRef.current = myTeamId;
+  isTeam1Ref.current = isTeam1;
+  debatePhaseRef.current = debatePhase;
+}, [currentUser?.id, myTeamId, isTeam1, debatePhase]);
 
-  useEffect(() => {
-    myTeamIdRef.current = myTeamId;
-  }, [myTeamId]);
-
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
-
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
 
   // Initialize WebSocket connection - only need token and debateId
   // User ID will be extracted from token on backend
-  const getMedia = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: true,
-      });
-      localStreamRef.current = stream;
-
-      const currentUserId = currentUserIdRef.current || "";
-      const localVideo = localVideoRefs.current.get(currentUserId);
-      if (localVideo) {
-        localVideo.srcObject = stream;
-      }
-    } catch (err) {
-      setMediaError(
-        "Failed to access camera/microphone. Please check permissions."
-      );
-    }
-  }, [setMediaError]);
-
+ 
   useEffect(() => {
     const token = getAuthToken();
     if (!token || !debateId || !hasDeterminedTeam) {
@@ -1505,7 +1456,8 @@ const TeamDebateRoom: React.FC = () => {
 
     try {
       const token = getAuthToken();
-      const response = await fetch(`http://localhost:1313/submit-transcripts`, {
+      const response = await fetch(`${BASE_URL}/submit-transcripts`, {
+
         method: "POST",
         headers: {
           "Content-Type": "application/json",
