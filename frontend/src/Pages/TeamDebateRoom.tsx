@@ -192,7 +192,6 @@ const TeamDebateRoom: React.FC = () => {
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const debateStartedRef = useRef<boolean>(false); // Track if debate has started to prevent popup reopening
-  const debatePhaseRef = useRef<DebatePhase>(debatePhase);
 
   useEffect(() => {
     debatePhaseRef.current = debatePhase;
@@ -206,22 +205,6 @@ const TeamDebateRoom: React.FC = () => {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(true);
 
-  // Refs mirroring frequently used reactive state inside WebSocket handlers
-  const isTeam1Ref = useRef(isTeam1);
-  useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
-
-  const myTeamIdRef = useRef<string | null>(myTeamId);
-  useEffect(() => {
-    myTeamIdRef.current = myTeamId;
-  }, [myTeamId]);
-
-  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
->>>>>>> main
 
   // Timer state
   const [timer, setTimer] = useState<number>(0);
@@ -310,12 +293,18 @@ const TeamDebateRoom: React.FC = () => {
   const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
   const isTeam1Ref = useRef<boolean>(isTeam1);
   const debatePhaseRef = useRef<DebatePhase>(debatePhase);
-
+  const myTeamIdRef = useRef<string | null>(myTeamId);
   useEffect(() => {
     currentUserIdRef.current = currentUser?.id;
   }, [currentUser?.id]);
 
   useEffect(() => {
+  myTeamIdRef.current = myTeamId;
+}, [myTeamId]);
+
+
+  useEffect(() => {
+  
     isTeam1Ref.current = isTeam1;
   }, [isTeam1]);
 
@@ -985,17 +974,6 @@ const TeamDebateRoom: React.FC = () => {
         case "ready": {
           console.log("=== READY MESSAGE RECEIVED ===");
           console.log("Received ready message:", data);
-          console.log("Current user:", currentUserId);
-          console.log("Message userId:", data.userId);
-          console.log("Message teamId:", data.teamId);
-          console.log("Message assignedToTeam:", (data as any).assignedToTeam);
-          console.log("isTeam1:", amTeam1);
-          console.log("myTeamId:", myTeamId);
-          console.log("Team1Ready:", data.team1Ready, "Team2Ready:", data.team2Ready);
-          console.log("Team1MembersCount:", data.team1MembersCount, "Team2MembersCount:", data.team2MembersCount);
-        case "ready": {
-          console.log("=== READY MESSAGE RECEIVED ===");
-          console.log("Received ready message:", data);
           console.log("Current user:", currentUser?.id);
           console.log("Message userId:", data.userId);
           console.log("Message teamId:", data.teamId);
@@ -1453,26 +1431,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [isListening]);
 
-  const toggleCamera = useCallback(() => {
-    const stream = localStreamRef.current;
-    if (!stream) {
-      console.warn("[TeamDebateRoom] toggleCamera called without local stream");
-      return;
-    }
-
-    const [videoTrack] = stream.getVideoTracks();
-    if (!videoTrack) {
-      console.warn("[TeamDebateRoom] No video track available to toggle");
-      return;
-    }
-
-    setIsCameraOn((prev) => {
-      const next = !prev;
-      videoTrack.enabled = next;
-      return next;
-    });
-  }, []);
-
+ 
   // Auto start/stop speech recognition based on turn
   useEffect(() => {
     if (
@@ -1611,15 +1570,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   };
 
-  const toggleCamera = () => {
-    const stream = localStreamRef.current;
-    const videoTrack = stream?.getVideoTracks()[0];
-    const nextState = !isCameraOn;
-    if (videoTrack) {
-      videoTrack.enabled = nextState;
-    }
-    setIsCameraOn(nextState);
-  };
+ 
 
   // Manage setup popup visibility and check if debate should start
   useEffect(() => {
