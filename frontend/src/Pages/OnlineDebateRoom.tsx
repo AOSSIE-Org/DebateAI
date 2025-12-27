@@ -136,6 +136,13 @@ const extractJSON = (response: string): string => {
   if (match && match[1]) return match[1].trim();
   return response;
 };
+const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
+
+const WS_BASE_URL = BASE_URL.replace(
+  /^https?/,
+  (match) => (match === "https" ? "wss" : "ws")
+);
+
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -508,7 +515,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       judgePollRef.current = setInterval(async () => {
         try {
           const pollResponse = await fetch(
-            `http://localhost:1313/submit-transcripts`,
+            `${BASE_URL}/submit-transcripts`,
             {
               method: "POST",
               headers: {
@@ -595,7 +602,7 @@ const OnlineDebateRoom = (): JSX.Element => {
 
       try {
         const response = await fetch(
-          `http://localhost:1313/submit-transcripts`,
+          `${BASE_URL}/submit-transcripts`,
           {
             method: "POST",
             headers: {
@@ -867,7 +874,8 @@ const OnlineDebateRoom = (): JSX.Element => {
 
     try {
       const token = getAuthToken();
-      const response = await fetch(`http://localhost:1313/rooms`, {
+      const response = await fetch(`${BASE_URL}/rooms`, {
+
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -900,7 +908,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       try {
         const token = getAuthToken();
         const response = await fetch(
-          `http://localhost:1313/rooms/${roomId}/participants`,
+          `${BASE_URL}/rooms/${roomId}/participants`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -1084,7 +1092,8 @@ const OnlineDebateRoom = (): JSX.Element => {
     const token = getAuthToken();
     if (!token || !roomId) return;
 
-    const wsUrl = `ws://localhost:1313/ws?room=${roomId}&token=${token}`;
+   const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
+
     const rws = new ReconnectingWebSocket(wsUrl, [], {
       connectionTimeout: 4000,
       maxRetries: Infinity,

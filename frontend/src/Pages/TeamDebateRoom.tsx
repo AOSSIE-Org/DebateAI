@@ -192,11 +192,12 @@ const TeamDebateRoom: React.FC = () => {
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const debateStartedRef = useRef<boolean>(false); // Track if debate has started to prevent popup reopening
-  const debatePhaseRef = useRef<DebatePhase>(debatePhase);
+  const currentUserIdRef = useRef<string | null>(null);
+  const myTeamIdRef = useRef<string | null>(null);
+  const isTeam1Ref = useRef<boolean>(false);
+  const debatePhaseRef = useRef<DebatePhase>(DebatePhase.Setup);
 
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
+  
 
   // State for media streams
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -206,22 +207,6 @@ const TeamDebateRoom: React.FC = () => {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(true);
 
-  // Refs mirroring frequently used reactive state inside WebSocket handlers
-  const isTeam1Ref = useRef(isTeam1);
-  useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
-
-  const myTeamIdRef = useRef<string | null>(myTeamId);
-  useEffect(() => {
-    myTeamIdRef.current = myTeamId;
-  }, [myTeamId]);
-
-  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
->>>>>>> main
 
   // Timer state
   const [timer, setTimer] = useState<number>(0);
@@ -307,21 +292,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [currentUser?.id, isCameraOn, setIsCameraOn]);
 
-  const currentUserIdRef = useRef<string | undefined>(currentUser?.id);
-  const isTeam1Ref = useRef<boolean>(isTeam1);
-  const debatePhaseRef = useRef<DebatePhase>(debatePhase);
-
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
-
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
+  
 
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const initiatedOffersRef = useRef<Set<string>>(new Set());
@@ -682,43 +653,16 @@ const TeamDebateRoom: React.FC = () => {
   }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
 
   useEffect(() => {
-    isTeam1Ref.current = isTeam1;
-  }, [isTeam1]);
+  currentUserIdRef.current = currentUser?.id;
+  myTeamIdRef.current = myTeamId;
+  isTeam1Ref.current = isTeam1;
+  debatePhaseRef.current = debatePhase;
+}, [currentUser?.id, myTeamId, isTeam1, debatePhase]);
 
-  useEffect(() => {
-    myTeamIdRef.current = myTeamId;
-  }, [myTeamId]);
-
-  useEffect(() => {
-    debatePhaseRef.current = debatePhase;
-  }, [debatePhase]);
-
-  useEffect(() => {
-    currentUserIdRef.current = currentUser?.id;
-  }, [currentUser?.id]);
 
   // Initialize WebSocket connection - only need token and debateId
   // User ID will be extracted from token on backend
-  const getMedia = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: true,
-      });
-      localStreamRef.current = stream;
-
-      const currentUserId = currentUserIdRef.current || "";
-      const localVideo = localVideoRefs.current.get(currentUserId);
-      if (localVideo) {
-        localVideo.srcObject = stream;
-      }
-    } catch (err) {
-      setMediaError(
-        "Failed to access camera/microphone. Please check permissions."
-      );
-    }
-  }, [setMediaError]);
-
+ 
   useEffect(() => {
     const token = getAuthToken();
     if (!token || !debateId || !hasDeterminedTeam) {
@@ -982,17 +926,6 @@ const TeamDebateRoom: React.FC = () => {
           // This is sent by frontend to backend, not the other way around
           console.log('Received checkStart message (ignoring - this is from us)');
           break;
-        case "ready": {
-          console.log("=== READY MESSAGE RECEIVED ===");
-          console.log("Received ready message:", data);
-          console.log("Current user:", currentUserId);
-          console.log("Message userId:", data.userId);
-          console.log("Message teamId:", data.teamId);
-          console.log("Message assignedToTeam:", (data as any).assignedToTeam);
-          console.log("isTeam1:", amTeam1);
-          console.log("myTeamId:", myTeamId);
-          console.log("Team1Ready:", data.team1Ready, "Team2Ready:", data.team2Ready);
-          console.log("Team1MembersCount:", data.team1MembersCount, "Team2MembersCount:", data.team2MembersCount);
         case "ready": {
           console.log("=== READY MESSAGE RECEIVED ===");
           console.log("Received ready message:", data);
@@ -1453,26 +1386,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [isListening]);
 
-  const toggleCamera = useCallback(() => {
-    const stream = localStreamRef.current;
-    if (!stream) {
-      console.warn("[TeamDebateRoom] toggleCamera called without local stream");
-      return;
-    }
-
-    const [videoTrack] = stream.getVideoTracks();
-    if (!videoTrack) {
-      console.warn("[TeamDebateRoom] No video track available to toggle");
-      return;
-    }
-
-    setIsCameraOn((prev) => {
-      const next = !prev;
-      videoTrack.enabled = next;
-      return next;
-    });
-  }, []);
-
+ 
   // Auto start/stop speech recognition based on turn
   useEffect(() => {
     if (
@@ -1546,7 +1460,8 @@ const TeamDebateRoom: React.FC = () => {
 
     try {
       const token = getAuthToken();
-      const response = await fetch(`http://localhost:1313/submit-transcripts`, {
+      const response = await fetch(`${BASE_URL}/submit-transcripts`, {
+
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1611,15 +1526,7 @@ const TeamDebateRoom: React.FC = () => {
     }
   };
 
-  const toggleCamera = () => {
-    const stream = localStreamRef.current;
-    const videoTrack = stream?.getVideoTracks()[0];
-    const nextState = !isCameraOn;
-    if (videoTrack) {
-      videoTrack.enabled = nextState;
-    }
-    setIsCameraOn(nextState);
-  };
+ 
 
   // Manage setup popup visibility and check if debate should start
   useEffect(() => {

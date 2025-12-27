@@ -630,7 +630,6 @@ const TeamBuilder: React.FC = () => {
                       </div>
 
                       {/* Team Matchmaking */}
-<<<<<<< HEAD
                       <div className="mt-4">
                         <TeamMatchmaking
                           team={team}
@@ -645,20 +644,6 @@ const TeamBuilder: React.FC = () => {
                           }
                         />
                       </div>
-=======
-                      {user && user.id && (
-                        <div className="mt-4">
-                          <TeamMatchmaking
-                            team={team}
-                            user={{
-                              id: user.id,
-                              email: user.email ?? "",
-                              displayName: user.displayName ?? user.email ?? "",
-                            }}
-                          />
-                        </div>
-                      )}
->>>>>>> main
 
                       <div className="flex flex-wrap gap-2">
                         {(team.members || []).map((member: TeamMember) => (
@@ -837,12 +822,7 @@ const TeamBuilder: React.FC = () => {
             <div className="space-y-4">
               {availableTeams.map((team) => {
                 const memberCount = team.members?.length || 0;
-<<<<<<< HEAD
                 const capacity = team.maxSize || 4;
-=======
-                const capacity =
-                  team.maxSize && team.maxSize > 0 ? team.maxSize : 4;
->>>>>>> main
                 const isFull = memberCount >= capacity;
 
                 return (
