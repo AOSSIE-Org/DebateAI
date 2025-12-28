@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
 import { Link } from 'react-router-dom';
+import DebateCover from '../assets/DebateCover4.svg';
 
 const LeftSection = () => (
   <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
@@ -12,6 +13,9 @@ const LeftSection = () => (
         </svg>
         Arguehub
       </Link>
+    </div>
+    <div className="flex justify-center items-center flex-1 p-10">
+      <img src={DebateCover} alt="Debate Cover" className="max-w-full max-h-full object-contain" />
     </div>
     <div>
       <blockquote className="space-y-2">
@@ -32,11 +36,11 @@ interface RightSectionProps {
   startOtpVerification: (email: string) => void;
   handleOtpVerified: () => void;
   startForgotPassword: () => void;
-  startResetPassword: (email: string) => void; 
-  handlePasswordReset: () => void; 
+  startResetPassword: (email: string) => void;
+  handlePasswordReset: () => void;
   emailForOTP: string;
-  emailForPasswordReset: string; 
-  infoMessage: string; 
+  emailForPasswordReset: string;
+  infoMessage: string;
 }
 
 const RightSection: React.FC<RightSectionProps> = ({
@@ -98,7 +102,7 @@ const Authentication = () => {
   >('login');
 
   const [emailForOTP, setEmailForOTP] = useState('');
-  const [emailForPasswordReset, setEmailForPasswordReset] = useState(''); 
+  const [emailForPasswordReset, setEmailForPasswordReset] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
 
   const toggleAuthMode = () => {
@@ -143,11 +147,11 @@ const Authentication = () => {
         startOtpVerification={startOtpVerification}
         handleOtpVerified={handleOtpVerified}
         startForgotPassword={startForgotPassword}
-        startResetPassword={startResetPassword} 
-        handlePasswordReset={handlePasswordReset} 
+        startResetPassword={startResetPassword}
+        handlePasswordReset={handlePasswordReset}
         emailForOTP={emailForOTP}
-        emailForPasswordReset={emailForPasswordReset} 
-        infoMessage={infoMessage} 
+        emailForPasswordReset={emailForPasswordReset}
+        infoMessage={infoMessage}
       />
     </div>
   );
