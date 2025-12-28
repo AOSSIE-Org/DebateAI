@@ -2,7 +2,7 @@ import { useContext, useState, useRef, useEffect } from "react";
 import { ThemeContext, ThemeOptions } from "../context/theme-provider";
 import { Moon, Sun, Contrast } from "lucide-react";
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -31,10 +31,10 @@ export function ThemeToggle() {
   }, []);
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full flex items-center gap-2 p-2 text-sm font-medium rounded-md hover:bg-muted/70 transition"
+        className="flex items-center gap-2 p-2 text-sm font-medium rounded-md hover:bg-muted/70 transition"
       >
         {themeOptions.find((t) => t.id === theme)?.icon} Theme:{" "}
         <span>{themeOptions.find((t) => t.id === theme)?.name}</span>

@@ -82,10 +82,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 text-foreground'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         Forgot your password?{' '}
         <span className="underline cursor-pointer" onClick={startForgotPassword}>
           Reset Password
@@ -118,7 +118,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       authContext.handleError('Passwords do not match');
       return;
@@ -190,7 +190,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 text-foreground'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
       <Button type="submit" className="w-full mb-2" disabled={loading}>
@@ -224,8 +224,8 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
 
   return (
     <div className="w-full flex flex-col items-center">
-      <h3 className="text-2xl font-medium my-4">Verify Your Email</h3>
-      <p className="mb-4">Enter the OTP sent to your email to complete the sign-up process.</p>
+      <h3 className="text-2xl font-medium my-4 text-foreground">Verify Your Email</h3>
+      <p className="mb-4 text-foreground">Enter the OTP sent to your email to complete the sign-up process.</p>
       <form onSubmit={handleSubmit} className="w-full">
         <Input
           type="text"
@@ -279,8 +279,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center">
-      <h3 className="text-2xl font-medium my-4">Reset Password</h3>
-      <p className="mb-4">Enter your email to receive a password reset code.</p>
+      <h3 className="text-2xl font-medium my-4 text-foreground">Reset Password</h3>
+      <p className="mb-4 text-foreground">Enter your email to receive a password reset code.</p>
       <form onSubmit={handleSubmit} className="w-full">
         <Input
           type="email"
@@ -318,7 +318,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmNewPassword) {
       authContext.handleError('Passwords do not match');
       return;
@@ -331,7 +331,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
 
   return (
     <div className="w-full flex flex-col items-center">
-      <h3 className="text-2xl font-medium my-4">Reset Your Password</h3>
+      <h3 className="text-2xl font-medium my-4 text-foreground">Reset Your Password</h3>
       <form onSubmit={handleSubmit} className="w-full">
         <Input
           type="text"
@@ -362,7 +362,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
               onChange={(e) => setPasswordVisible(e.target.checked)}
             />
           </div>
-          <div className='pl-2'>show password</div>
+          <div className='pl-2 text-foreground'>show password</div>
         </div>
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full" disabled={loading}>

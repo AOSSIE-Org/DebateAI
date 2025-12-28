@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import debateAiLogo from "@/assets/aossie.png";
 import avatarImage from "@/assets/avatar2.jpg";
+import { ThemeToggle } from "./ThemeToggle";
 
 function Header() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -60,6 +61,7 @@ function Header() {
       <header className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
         <div className="text-lg font-semibold">{getBreadcrumbs()}</div>
         <div className="flex items-center gap-4">
+          <ThemeToggle className="hidden md:block" />
           <button className="relative">
             <Bell className="w-5 h-5 text-gray-600" />
             <span className="absolute -top-1 -right-1 block h-2 w-2 rounded-full bg-red-500" />
@@ -130,6 +132,7 @@ function Header() {
                 icon={<Info className="mr-3 h-4 w-4" />}
                 onClick={toggleDrawer}
               />
+              <ThemeToggle className="w-full" />
             </nav>
           </div>
         </div>
