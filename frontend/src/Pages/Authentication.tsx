@@ -65,7 +65,7 @@ const RightSection: React.FC<RightSectionProps> = ({
         {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
       </Button>
     )}
-    <div className="flex flex-col items-center justify-center h-full w-3/5 text-center">
+    <div className="flex flex-col items-center justify-center h-full w-4/5 md:w-3/5 text-center">
       {authMode === 'login' && (
         <>
           <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
