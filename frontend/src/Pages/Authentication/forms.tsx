@@ -49,6 +49,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         size: 'large',
         text: 'signin_with',
         width: '100%',
+        shape: 'rectangular',
+        logo_alignment: 'center'
       });
     }
 
@@ -65,14 +67,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2"
+        className="mb-2 h-12"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-1"
+        className="mb-1 h-12"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -82,16 +84,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 '>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted mb-4">
+      <p className="text-sm mb-4 text-blue-500">
         Forgot your password?{' '}
-        <span className="underline cursor-pointer" onClick={startForgotPassword}>
+        <span className="underline cursor-pointer text-blue-500" onClick={startForgotPassword}>
           Reset Password
         </span>
       </p>
-      <Button type="submit" className="w-full mb-2" disabled={loading}>
+      <Button type="submit" className="w-full mb-2 h-10" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
       <div id="googleSignInButton" className="w-full"></div>
@@ -151,6 +153,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         size: 'large',
         text: 'signup_with',
         width: '100%',
+        shape: 'rectangular',
+        logo_alignment: 'center'
       });
     }
 
@@ -166,23 +170,23 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2"
+        className="mb-2 h-12"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-2"
+        className="mb-2 h-12"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="confirm password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4"
+        className="mb-4 h-12"
       />
-      <div className='w-full flex justify-start items-center pl-1'>
+      <div className='w-full mb-2 flex justify-start items-center pl-1'>
         <div className='w-4'>
           <Input
             type='checkbox'
@@ -190,10 +194,10 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 '>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <Button type="submit" className="w-full mb-2" disabled={loading}>
+      <Button type="submit" className="w-full mb-2 h-10 " disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
       <div id="googleSignUpButton" className="w-full"></div>
