@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
 import { Link } from 'react-router-dom';
 import DebateCover from '../assets/DebateCover4.svg';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
   <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
@@ -56,15 +57,20 @@ const RightSection: React.FC<RightSectionProps> = ({
   infoMessage,
 }) => (
   <div className="flex items-center justify-center w-full h-full relative">
-    {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
-      <Button
-        className="absolute right-4 top-4 md:right-8 md:top-8 border-black dark:border-white"
-        onClick={toggleAuthMode}
-        variant="outline"
-      >
-        {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
-      </Button>
-    )}
+    <div className="absolute right-4 top-4 md:right-8 md:top-8 flex flex-col md:flex-row gap-2 items-center">
+      <div className="w-32">
+        <ThemeToggle />
+      </div>
+      {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
+        <Button
+          className="border-black dark:border-white"
+          onClick={toggleAuthMode}
+          variant="outline"
+        >
+          {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
+        </Button>
+      )}
+    </div>
     <div className="flex flex-col items-center justify-center h-full w-4/5 md:w-3/5 text-center">
       {authMode === 'login' && (
         <>
