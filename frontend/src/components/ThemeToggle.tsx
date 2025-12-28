@@ -13,11 +13,14 @@ export function ThemeToggle() {
     { id: ThemeOptions.Contrast, name: "High Contrast", icon: <Contrast size={16} /> },
   ];
 
+  const activeTheme = themeOptions.find((t) => t.id === theme);
+
   const setTheme = (targetId: number) => {
     const current = theme;
     const totalThemes = Object.keys(ThemeOptions).length / 2;
     const clicks = (targetId - current + totalThemes) % totalThemes;
     for (let i = 0; i < clicks; i++) toggleTheme();
+    setOpen(false);
   };
 
   useEffect(() => {
@@ -31,15 +34,19 @@ export function ThemeToggle() {
   }, []);
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full flex items-center gap-2 p-2 text-sm font-medium rounded-md hover:bg-muted/70 transition"
+        className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/70 transition"
       >
-        {themeOptions.find((t) => t.id === theme)?.icon} Theme:{" "}
-        <span>{themeOptions.find((t) => t.id === theme)?.name}</span>
+        {activeTheme?.icon}
+        <span className="hidden sm:inline text-sm font-medium">
+          Theme: {activeTheme?.name}
+        </span>
         <svg
-          className={`ml-auto w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`hidden sm:block ml-1 w-3 h-3 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
@@ -50,12 +57,12 @@ export function ThemeToggle() {
       </button>
 
       {open && (
-        <div className="absolute left-2 right-2 mt-1 bg-popover border border-border rounded-md shadow z-10">
+        <div className="absolute right-0 mt-2 w-44 bg-popover border border-border rounded-md shadow z-50">
           {themeOptions.map((option) => (
             <div
               key={option.id}
               onClick={() => setTheme(option.id)}
-              className="flex items-center gap-2 p-2 text-sm hover:bg-muted cursor-pointer rounded-md"
+              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted cursor-pointer"
             >
               {option.icon}
               <span>{option.name}</span>
