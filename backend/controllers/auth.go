@@ -154,8 +154,18 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Generate verification code
-	verificationCode := utils.GenerateRandomCode(6)
+	// Determine if we should auto-verify based on environment
+	env := os.Getenv("ENV")
+	if env == "" {
+		log.Println("Warning: ENV variable is unset, defaulting to production behavior")
+	}
+	isDevelopment := env == "development" || env == "local"
+
+	// Generate verification code only if needed (production)
+	verificationCode := ""
+	if !isDevelopment {
+		verificationCode = utils.GenerateRandomCode(6)
+	}
 
 	// Create new user
 	now := time.Now()
@@ -170,7 +180,7 @@ func SignUp(ctx *gin.Context) {
 		LastRatingUpdate: now,
 		AvatarURL:        "https://avatar.iran.liara.run/public/10",
 		Password:         string(hashedPassword),
-		IsVerified:       false,
+		IsVerified:       isDevelopment, // Auto-verify only in development
 		VerificationCode: verificationCode,
 		Score:            0,          // Initialize gamification score
 		Badges:           []string{}, // Initialize badges array
@@ -187,18 +197,31 @@ func SignUp(ctx *gin.Context) {
 	}
 	newUser.ID = result.InsertedID.(primitive.ObjectID)
 
-	// Send verification email
-	err = utils.SendVerificationEmail(request.Email, verificationCode)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
-		return
+	if isDevelopment {
+		// Generate JWT token for immediate login in development
+		token, err := generateJWT(newUser.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
+			return
+		}
+		ctx.JSON(200, gin.H{
+			"message":     "Sign-up successful. You are now logged in.",
+			"accessToken": token,
+			"user":        buildUserResponse(newUser),
+		})
+	} else {
+		// Send verification email in production
+		err = utils.SendVerificationEmail(request.Email, verificationCode)
+		if err != nil {
+			log.Printf("Failed to send verification email to %s: %v", request.Email, err)
+			ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
+			return
+		}
+		ctx.JSON(200, gin.H{
+			"message": "Sign-up successful. Please check your email to verify your account.",
+			"user":    buildUserResponse(newUser),
+		})
 	}
-
-	// Return user details
-	ctx.JSON(200, gin.H{
-		"message": "Sign-up successful. Please verify your email.",
-		"user":    buildUserResponse(newUser),
-	})
 }
 
 func VerifyEmail(ctx *gin.Context) {
