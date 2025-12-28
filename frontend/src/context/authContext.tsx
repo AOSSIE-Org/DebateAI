@@ -172,9 +172,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ email, password }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.message || 'Signup failed');
+      }
+
+      if (data.registrationToken) {
+        localStorage.setItem('registrationToken', data.registrationToken);
       }
     } catch (error) {
       handleError(error);
@@ -186,16 +191,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verifyEmail = async (email: string, code: string) => {
     setLoading(true);
     try {
+      const registrationToken = localStorage.getItem('registrationToken');
       const response = await fetch(`${baseURL}/verifyEmail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, confirmationCode: code }),
+        body: JSON.stringify({ email, confirmationCode: code, token: registrationToken }),
       });
 
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.message || 'Verification failed');
       }
+      
+      localStorage.removeItem('registrationToken');
+
       // Optionally update userAtom with isVerified: true
       setUser((prev: User | null) => {
         if (!prev) return null;
