@@ -2,7 +2,7 @@ server:
   port: 1313 # The port number your backend server will run on
 
 database:
-  uri: "mongodb://localhost:27017/"
+  uri: "mongodb://localhost:27017"
   # Replace with your MongoDB Atlas connection string
   # Get this from your MongoDB Atlas dashboard after creating a cluster and database
 
@@ -12,7 +12,7 @@ gemini:
   # Obtain from your OpenRouter.ai or OpenAI account dashboard
 
 jwt:
-  secret: "flvfmvbvl;vzdfflbhmlgmlld/zdcg35343423"
+  secret: "flvfmvbvl;vzdfflbhmlgmlld7zdcg35343423"
   # A secret string used to sign JWT tokens
   # Generate a strong random string (e.g. use `openssl rand -hex 32`)
 

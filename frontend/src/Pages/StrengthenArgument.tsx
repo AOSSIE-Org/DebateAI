@@ -125,8 +125,13 @@ const StrengthenArgument: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Server error (Status: ${response.status}): ${text || "Unknown error"}`);
       }
-      const data: WeakStatement = JSON.parse(text);
-      if (!data.id || !data.text || !data.topic || !data.stance) {
+      let data: WeakStatement | null = null;
+      try {
+        data = JSON.parse(text) as WeakStatement;
+      } catch (err) {
+        console.warn('Failed to parse weak statement response', err);
+      }
+      if (!data || !data.id || !data.text || !data.topic || !data.stance) {
         throw new Error("Invalid response format: missing fields");
       }
       setWeakStatement(data);
@@ -170,7 +175,13 @@ const StrengthenArgument: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Server error (Status: ${response.status}): ${text || "Unknown error"}`);
       }
-      const data: Evaluation = JSON.parse(text);
+      let data: Evaluation | null = null;
+      try {
+        data = JSON.parse(text) as Evaluation;
+      } catch (err) {
+        console.warn('Failed to parse evaluation response', err);
+      }
+      if (!data) throw new Error('Invalid evaluation result');
       setFeedback(data.feedback);
       setScore(data.pointsEarned);
       setShowModal(true);

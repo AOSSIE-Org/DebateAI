@@ -108,10 +108,17 @@ export const createGamificationWebSocket = (
 
   ws.onmessage = (event) => {
     try {
-      const data: GamificationEvent = JSON.parse(event.data);
-      onMessage(data);
+      // parse safely
+      const raw = event.data;
+      let parsed: GamificationEvent | null = null;
+      try {
+        parsed = JSON.parse(typeof raw === 'string' ? raw : String(raw));
+      } catch (err) {
+        console.warn('Failed to parse gamification event, ignoring', err);
+      }
+      if (parsed) onMessage(parsed);
     } catch (error) {
-      console.error("Error parsing gamification event:", error);
+      console.error("Error handling gamification event:", error);
     }
   };
 

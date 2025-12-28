@@ -12,6 +12,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { useUser } from "@/hooks/useUser";
 import { getAuthToken } from "@/utils/auth";
+import { safeParse } from "@/utils/safeParse";
 import ReconnectingWebSocket from "reconnecting-websocket";
 import { useAtom } from "jotai";
 import {
@@ -555,10 +556,15 @@ const OnlineDebateRoom = (): JSX.Element => {
               judgePollRef.current = null;
             }
             const jsonString = extractJSON(pollData.result);
-            const judgment: JudgmentData = JSON.parse(jsonString);
-            setJudgmentData(judgment);
-            setPopup({ show: false, message: "" });
-            setShowJudgment(true);
+            const judgment = safeParse<JudgmentData>(jsonString, null);
+            if (judgment) {
+              setJudgmentData(judgment);
+              setPopup({ show: false, message: "" });
+              setShowJudgment(true);
+            } else {
+              console.warn('Failed to parse judgment JSON from pollData.result');
+              setPopup({ show: false, message: 'Error parsing judgment result' });
+            }
             submissionStartedRef.current = false;
           }
         } catch (error) {
@@ -653,7 +659,10 @@ const OnlineDebateRoom = (): JSX.Element => {
           result.message === "Debate already judged"
         ) {
           const jsonString = extractJSON(result.result);
-          const judgment: JudgmentData = JSON.parse(jsonString);
+          const judgment = safeParse<JudgmentData>(jsonString, null);
+          if (!judgment) {
+            console.warn('Failed to parse judgment JSON from result.result');
+          }
           return judgment;
         }
       } catch (error) {
@@ -715,7 +724,7 @@ const OnlineDebateRoom = (): JSX.Element => {
 
       return rolePhases.reduce((acc, phase) => {
         const storageKey = `${roomId}_${phase}_${role}`;
-        const stored = storageKey ? localStorage.getItem(storageKey) : null;
+        const stored = storageKey ? getLocalString(storageKey) : null;
         const fromState = speechTranscripts[phase] ?? "";
         const combined =
           (typeof fromState === "string" && fromState.trim().length > 0
@@ -1114,7 +1123,11 @@ const OnlineDebateRoom = (): JSX.Element => {
     };
 
     rws.onmessage = async (event) => {
-      const data: WSMessage = JSON.parse(event.data);
+      const data = safeParse<WSMessage>(event.data, null);
+      if (!data) {
+        console.warn('Received invalid WS message in OnlineDebateRoom');
+        return;
+      }
       switch (data.type) {
         case "topicChange":
           if (data.topic !== undefined) setTopic(data.topic);

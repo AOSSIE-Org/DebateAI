@@ -18,6 +18,7 @@ import {
   type Admin,
 } from "@/services/adminService";
 import { Button } from "@/components/ui/button";
+import { getLocalString, getLocalJSON } from "@/utils/storage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -364,15 +365,15 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const adminToken = localStorage.getItem("adminToken");
-    const adminData = localStorage.getItem("admin");
+    const adminToken = getLocalString("adminToken");
+    const adminData = getLocalJSON<Admin>("admin");
 
     if (!adminToken || !adminData) {
       navigate("/admin/login");
       return;
     }
     setToken(adminToken);
-    setAdmin(JSON.parse(adminData));
+    setAdmin(adminData);
     loadData(adminToken);
   }, [loadData, navigate]);
 
@@ -504,8 +505,8 @@ export default function AdminDashboard() {
           No analytics data available yet.
         </p>
         <Button
-          onClick={() => {
-            const currentToken = token || localStorage.getItem("adminToken");
+            onClick={() => {
+            const currentToken = token || getLocalString("adminToken");
             if (currentToken) {
               loadData(currentToken);
             }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { getLocalString, setLocalString } from '@/utils/storage';
 
 export enum ThemeOptions {
     Light,
@@ -27,7 +28,7 @@ function getInitialTheme() {
     //get theme to browser default
     let newTheme: ThemeOptions;
 
-    let systemThemeCodeStr = localStorage.getItem("Theme");
+    let systemThemeCodeStr = getLocalString("Theme");
     if (systemThemeCodeStr == null) {
         let defaultBrowserTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? ThemeOptions.Light : ThemeOptions.Dark;
         newTheme = defaultBrowserTheme;
@@ -55,7 +56,7 @@ export function ThemeProvider({ children }: { children: any }): any {
     bodyElement.classList.remove("dark", "contrast");
     const className = ThemeOptions[theme].toLowerCase(); // "light", "dark", or "contrast"
     bodyElement.classList.add(className);
-    localStorage.setItem("Theme", String(theme));
+    setLocalString("Theme", String(theme));
 }, [theme])
     function toggleTheme() {
         const enumCount = Object.values(ThemeOptions).filter(x => typeof x === "number").length;

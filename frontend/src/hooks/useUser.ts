@@ -2,6 +2,7 @@ import { useEffect, useContext } from "react";
 import { useAtom } from "jotai";
 import { userAtom } from "../state/userAtom";
 import { AuthContext } from "../context/authContext";
+import { getLocalString, getLocalJSON, setLocalJSON } from '@/utils/storage';
 
 const USER_CACHE_KEY = "userProfile";
 const DEFAULT_AVATAR = "https://avatar.iran.liara.run/public/10";
@@ -16,14 +17,14 @@ export const useUser = () => {
   // Hydrate from localStorage if available
   useEffect(() => {
     if (!user) {
-      const cachedUser = localStorage.getItem(USER_CACHE_KEY);
+      const cachedUser = getLocalString(USER_CACHE_KEY);
       if (cachedUser) {
         try {
           const parsedUser = JSON.parse(cachedUser);
           setUser(parsedUser);
         } catch (error) {
           console.error("Failed to parse cached user profile:", error);
-          localStorage.removeItem(USER_CACHE_KEY);
+          try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
         }
       }
     }
@@ -87,7 +88,7 @@ export const useUser = () => {
         };
 
         setUser(normalizedUser);
-        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+        setLocalJSON(USER_CACHE_KEY, normalizedUser);
       } catch (error) {
         console.error("Failed to fetch user data:", error);
       }
@@ -106,7 +107,7 @@ export const useUser = () => {
     setUser,
     isLoading:
       authContext?.loading ||
-      (!user && !!(authContext?.token || localStorage.getItem("token"))),
-    isAuthenticated: !!(authContext?.token || localStorage.getItem("token")),
+      (!user && !!(authContext?.token || getLocalString("token"))),
+    isAuthenticated: !!(authContext?.token || getLocalString("token")),
   };
 };

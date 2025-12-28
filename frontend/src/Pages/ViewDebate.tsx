@@ -274,7 +274,14 @@ export const ViewDebate: React.FC = () => {
 
     ws.onmessage = async (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const raw = event.data;
+        let data: any = null;
+        try {
+          data = JSON.parse(typeof raw === 'string' ? raw : String(raw));
+        } catch (err) {
+          console.warn('ViewDebate: failed to parse WS message', err);
+          return;
+        }
 
         if (data.type === "roomParticipants" && data.roomParticipants) {
           const roomParticipants =
