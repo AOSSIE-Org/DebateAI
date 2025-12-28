@@ -65,14 +65,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 border dark:border-white"
+        className="mb-2 dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-1 border dark:border-white"
+        className="mb-1 dark:border-white"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -86,13 +86,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         <div className='pl-2'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-gray-600 dark:text-white mb-4">
+      <p className="text-sm text-muted-foreground dark:text-white mb-4">
         Forgot your password?{' '}
         <span className="underline cursor-pointer" onClick={startForgotPassword}>
           Reset Password
         </span>
       </p>
-      <Button type="submit" className="w-full mb-2" disabled={loading}>
+      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
       <div id="googleSignInButton" className="w-full"></div>
@@ -167,21 +167,21 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 border dark:border-white"
+        className="mb-2 dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-2 border dark:border-white"
+        className="mb-2 dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="confirm password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4 border dark:border-white"
+        className="mb-4 dark:border-white"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -195,7 +195,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         <div className='pl-2'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <Button type="submit" className="w-full mb-2" disabled={loading}>
+      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
       <div id="googleSignUpButton" className="w-full"></div>
@@ -234,7 +234,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
           value={otp}
           onChange={(e) => setOtp(e.target.value)}
           placeholder="Enter OTP"
-          className="w-full mb-4 border dark:border-white"
+          className="w-full mb-4 dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
@@ -289,7 +289,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="name@example.com"
-          className="w-full mb-4 border dark:border-white"
+          className="w-full mb-4 dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white">
@@ -347,14 +347,14 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           placeholder="New Password"
-          className="w-full mb-2 border dark:border-white"
+          className="w-full mb-2 dark:border-white"
         />
         <Input
           type={passwordVisible ? "text" : "password"}
           value={confirmNewPassword}
           onChange={(e) => setConfirmNewPassword(e.target.value)}
           placeholder="Confirm New Password"
-          className="w-full mb-4 border dark:border-white"
+          className="w-full mb-4 dark:border-white"
         />
         <div className='w-full flex justify-start items-center pl-1'>
           <div className='w-4'>
