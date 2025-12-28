@@ -2,9 +2,9 @@ server:
   port: 1313 # The port number your backend server will run on
 
 database:
-  uri: "mongodb://localhost:27017/"
-  # Replace with your MongoDB Atlas connection string
-  # Get this from your MongoDB Atlas dashboard after creating a cluster and database
+  uri: "<YOUR_MONGODB_URI>"
+  # Replace with your MongoDB connection string (include DB name/credentials)
+  # Example: mongodb://localhost:27017/your_database_name or a MongoDB Atlas URI
 
 gemini:
   apiKey: "AIzaSyBd5DxOkKuMdR1i8XKY-KbvmO3E7-j9FVg"
