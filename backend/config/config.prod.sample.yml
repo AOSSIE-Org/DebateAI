@@ -7,12 +7,12 @@ database:
   # Example: mongodb://localhost:27017/your_database_name or a MongoDB Atlas URI
 
 gemini:
-  apiKey: "AIzaSyBd5DxOkKuMdR1i8XKY-KbvmO3E7-j9FVg"
+  apiKey: "<YOUR_GEMINI_API_KEY>"
   # API key for OpenAI / Gemini model access
   # Obtain from your OpenRouter.ai or OpenAI account dashboard
 
 jwt:
-  secret: "flvfmvbvl;vzdfflbhmlgmlld/zdcg35343423"
+  secret: "<YOUR_JWT_SECRET>"
   # A secret string used to sign JWT tokens
   # Generate a strong random string (e.g. use `openssl rand -hex 32`)
 

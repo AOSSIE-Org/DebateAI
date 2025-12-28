@@ -33,7 +33,7 @@ interface WeakStatement {
 }
 
 interface Evaluation {
-  pointsEarned: number;
+  score: number;
   feedback: string;
 }
 
@@ -179,11 +179,16 @@ const StrengthenArgument: React.FC = () => {
       try {
         data = JSON.parse(text) as Evaluation;
       } catch (err) {
-        console.warn('Failed to parse evaluation response', err);
+        console.warn("Failed to parse evaluation response", err);
       }
-      if (!data) throw new Error('Invalid evaluation result');
+
+      // Validate parsed response
+      if (!data || typeof data.score !== "number" || !data.feedback) {
+        throw new Error("Invalid evaluation result: missing score or feedback");
+      }
+
       setFeedback(data.feedback);
-      setScore(data.pointsEarned);
+      setScore(data.score);
       setShowModal(true);
       setCurrentStep(3);
     } catch (err: any) {

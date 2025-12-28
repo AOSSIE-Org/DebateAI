@@ -108,15 +108,21 @@ export const createGamificationWebSocket = (
 
   ws.onmessage = (event) => {
     try {
-      // parse safely
+      // parse using shared safeParse utility
+      // import safeParse lazily to avoid import cycles in some builds
+      // (top-level import kept minimal) -- but here we import directly
+      // to use the utility consistently.
+      // NOTE: safeParse returns null on failure
+      // (ensures consistent parsing behavior across the app)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { safeParse } = require("@/utils/safeParse");
       const raw = event.data;
-      let parsed: GamificationEvent | null = null;
-      try {
-        parsed = JSON.parse(typeof raw === 'string' ? raw : String(raw));
-      } catch (err) {
-        console.warn('Failed to parse gamification event, ignoring', err);
+      const parsed: GamificationEvent | null = safeParse<GamificationEvent>(raw, null);
+      if (!parsed) {
+        console.warn("Failed to parse gamification event, ignoring", raw);
+        return;
       }
-      if (parsed) onMessage(parsed);
+      onMessage(parsed);
     } catch (error) {
       console.error("Error handling gamification event:", error);
     }

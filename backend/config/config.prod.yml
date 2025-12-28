@@ -7,12 +7,12 @@ database:
   # Get this from your MongoDB Atlas dashboard after creating a cluster and database
 
 gemini:
-  apiKey: "AIzaSyBd5DxOkKuMdR1i8XKY-KbvmO3E7-j9FVg"
+  apiKey: "<YOUR_GEMINI_API_KEY>"
   # API key for OpenAI / Gemini model access
   # Obtain from your OpenRouter.ai or OpenAI account dashboard
 
 jwt:
-  secret: "flvfmvbvl;vzdfflbhmlgmlld7zdcg35343423"
+  secret: "<YOUR_JWT_SECRET>"
   # A secret string used to sign JWT tokens
   # Generate a strong random string (e.g. use `openssl rand -hex 32`)
 
