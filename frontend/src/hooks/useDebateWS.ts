@@ -13,6 +13,8 @@ import {
   PollInfo,
 } from '../atoms/debateAtoms';
 import ReconnectingWebSocket from 'reconnecting-websocket';
+import { getLocalString, setLocalString } from '@/utils/storage';
+import { safeParse } from '@/utils/safeParse';
 
 interface Event {
   type: string;
@@ -75,10 +77,10 @@ export const useDebateWS = (debateId: string | null) => {
       }
     }
 
-    let spectatorId = localStorage.getItem('spectatorId');
+    let spectatorId = getLocalString('spectatorId');
     if (!spectatorId) {
       spectatorId = crypto.randomUUID();
-      localStorage.setItem('spectatorId', spectatorId);
+      setLocalString('spectatorId', spectatorId);
     }
 
     const wsUrl = `${protocol}//${host}/ws/debate/${debateId}${
@@ -100,8 +102,7 @@ export const useDebateWS = (debateId: string | null) => {
     rws.onopen = () => {
       setWsStatus('connected');
 
-      const spectatorHashValue =
-        spectatorHash || localStorage.getItem('spectatorHash') || '';
+      const spectatorHashValue = spectatorHash || getLocalString('spectatorHash') || '';
       const joinMessage = {
         type: 'join',
         payload: {
@@ -113,7 +114,11 @@ export const useDebateWS = (debateId: string | null) => {
 
     rws.onmessage = (event) => {
       try {
-        const eventData: Event = JSON.parse(event.data);
+        const eventData = safeParse<Event>(event.data, null);
+        if (!eventData) {
+          console.warn('useDebateWS: failed to parse event data');
+          return;
+        }
 
         if (eventData.type !== 'poll_snapshot' && eventData.timestamp) {
           setLastEventId(String(eventData.timestamp));

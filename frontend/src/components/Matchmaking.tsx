@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { safeParse } from '@/utils/safeParse';
 import { useNavigate } from 'react-router-dom';
 import Avatar from 'react-avatar';
 import { useUser } from '../hooks/useUser';
@@ -69,14 +70,15 @@ const Matchmaking: React.FC = () => {
 
     ws.onmessage = (event) => {
       try {
-        const message: MatchmakingMessage = JSON.parse(event.data);
+        const message = safeParse<MatchmakingMessage>(event.data, null);
+        if (!message) return;
 
         switch (message.type) {
           case 'pool_update':
             if (message.pool) {
               const poolData: MatchmakingPool[] = Array.isArray(message.pool)
                 ? message.pool
-                : JSON.parse(message.pool as string);
+                : safeParse<MatchmakingPool[]>(message.pool as string, []);
               setPool(poolData);
 
               // Check if current user is in pool (only if they've started matchmaking)

@@ -58,6 +58,8 @@ database:
   uri: "<YOUR_MONGODB_URI>"
 ```
 
+Replace `<YOUR_MONGODB_URI>` with your actual connection string including the database name and any required credentials (for example: `mongodb://localhost:27017/your_database_name`). Do not commit real connection strings or credentials to version control.
+
 Without a valid MongoDB URI, the backend will fail to start.
 
 ---

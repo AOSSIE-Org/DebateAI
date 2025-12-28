@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { safeParse } from "@/utils/safeParse";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { useDebateWS } from "../hooks/useDebateWS";
@@ -274,7 +275,11 @@ export const ViewDebate: React.FC = () => {
 
     ws.onmessage = async (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data: any = safeParse<any>(event.data, null);
+        if (!data) {
+          console.warn("ViewDebate: failed to parse WS message", event.data);
+          return;
+        }
 
         if (data.type === "roomParticipants" && data.roomParticipants) {
           const roomParticipants =

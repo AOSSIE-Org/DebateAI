@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useUser } from "../hooks/useUser";
+import { getLocalString } from '@/utils/storage';
 import CommentTree from "../components/CommentTree";
 import ProfileHover from "../components/ProfileHover";
 import { Button } from "../components/ui/button";
@@ -278,7 +279,7 @@ const CommunityFeed: React.FC = () => {
   const fetchFeed = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = getLocalString("token");
       const userId = currentUserId;
       const response = await fetch(`${baseURL}/posts/feed`, {
         method: "GET",
@@ -356,7 +357,7 @@ const CommunityFeed: React.FC = () => {
   }, [fetchFeed]);
 
   const handleFollow = async (userId: string, isFollowing: boolean) => {
-    const token = localStorage.getItem("token");
+    const token = getLocalString("token");
     if (!token) {
       alert("Please log in to follow users");
       return;
@@ -402,7 +403,7 @@ const CommunityFeed: React.FC = () => {
   };
 
   const handleDeletePost = async (postId: string) => {
-    const token = localStorage.getItem("token");
+    const token = getLocalString("token");
     if (!token) {
       alert("Please log in to delete posts");
       return;

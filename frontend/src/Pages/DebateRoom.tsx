@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { safeParse } from '@/utils/safeParse';
 import { useLocation } from "react-router-dom";
+import { getLocalString } from '@/utils/storage';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { sendDebateMessage, judgeDebate } from "@/services/vsbot";
@@ -224,19 +226,38 @@ const DebateRoom: React.FC = () => {
   const [user] = useAtom(userAtom);
 
   const [state, setState] = useState<DebateState>(() => {
-    const savedState = localStorage.getItem(debateKey);
-    return savedState
-      ? JSON.parse(savedState)
-      : {
-          messages: [],
-          currentPhase: 0,
-          phaseStep: 0,
-          isBotTurn: false,
-          userStance: "",
-          botStance: "",
-          timer: phases[0].time,
-          isDebateEnded: false,
-        };
+    const savedState = getLocalString(debateKey);
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState) as Partial<DebateState> | null;
+        if (parsed && typeof parsed === 'object') {
+          return {
+            messages: parsed.messages ?? [],
+            currentPhase: parsed.currentPhase ?? 0,
+            phaseStep: parsed.phaseStep ?? 0,
+            isBotTurn: parsed.isBotTurn ?? false,
+            userStance: parsed.userStance ?? "",
+            botStance: parsed.botStance ?? "",
+            timer: parsed.timer ?? phases[0].time,
+            isDebateEnded: parsed.isDebateEnded ?? false,
+          } as DebateState;
+        }
+      } catch (err) {
+        console.warn('Failed to parse saved debate state, clearing corrupt value', err);
+        try { localStorage.removeItem(debateKey); } catch {}
+      }
+    }
+
+    return {
+      messages: [],
+      currentPhase: 0,
+      phaseStep: 0,
+      isBotTurn: false,
+      userStance: "",
+      botStance: "",
+      timer: phases[0].time,
+      isDebateEnded: false,
+    };
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
@@ -561,21 +582,17 @@ const DebateRoom: React.FC = () => {
       const jsonString = extractJSON(result);
       console.log("Extracted JSON string:", jsonString);
       
-      let judgment: JudgmentData;
-      try {
-        judgment = JSON.parse(jsonString);
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError, "Trying to fix JSON...");
-        // Try to fix common JSON issues
+      let judgment: JudgmentData | null = safeParse<JudgmentData>(jsonString, null);
+      if (!judgment) {
+        console.warn('Initial safe parse failed, attempting to fix JSON...');
         const fixedJson = jsonString
           .replace(/'/g, '"') // Replace single quotes with double quotes
           .replace(/(\w+):/g, '"$1":') // Add quotes to keys
           .replace(/,\s*}/g, '}') // Remove trailing commas
           .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-        try {
-          judgment = JSON.parse(fixedJson);
-        } catch (e) {
-          throw new Error(`Failed to parse JSON: ${e}`);
+        judgment = safeParse<JudgmentData>(fixedJson, null);
+        if (!judgment) {
+          throw new Error('Failed to parse judgment JSON after attempts');
         }
       }
       

@@ -282,9 +282,17 @@ const Game: React.FC = () => {
     ws.onopen = () => console.log("WebSocket connection established");
     ws.onmessage = (event) => {
       try {
-        handleWebSocketMessage(JSON.parse(event.data));
+        const raw = event.data;
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(typeof raw === 'string' ? raw : String(raw));
+        } catch (err) {
+          console.warn('Game: failed to parse WS message', err);
+          return;
+        }
+        handleWebSocketMessage(parsed);
       } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
+        console.error("Failed to handle WebSocket message:", error);
       }
     };
     ws.onerror = (error) => console.error("WebSocket error:", error);

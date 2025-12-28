@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Send, Users } from 'lucide-react';
+import { safeParse } from '@/utils/safeParse';
 
 interface ChatMessage {
   id: string;
@@ -58,7 +59,8 @@ const TeamChatSidebar: React.FC<TeamChatSidebarProps> = ({
     }
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      const data = safeParse<any>(event.data, null);
+      if (!data) return;
 
       if (data.type === 'teamChatMessage') {
         const newChatMessage: ChatMessage = {

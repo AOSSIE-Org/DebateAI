@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { getAuthToken } from "@/utils/auth";
+import { safeParse } from "@/utils/safeParse";
+import { getLocalString } from '@/utils/storage';
 
 // Define debate phases as an enum (same as OnlineDebateRoom)
 enum DebatePhase {
@@ -732,7 +734,11 @@ const TeamDebateRoom: React.FC = () => {
     };
 
     ws.onmessage = async (event) => {
-      const data: WSMessage = JSON.parse(event.data);
+      const data = safeParse<WSMessage>(event.data, null);
+      if (!data) {
+        console.warn("Received invalid team-debate WS message");
+        return;
+      }
       console.log("Received WebSocket message:", data);
 
       const amTeam1 = isTeam1Ref.current;
@@ -1446,7 +1452,7 @@ const TeamDebateRoom: React.FC = () => {
 
     phasesForRole.forEach((phase) => {
       const transcript =
-        localStorage.getItem(`${debateId}_${phase}_${localRole}`) ||
+        getLocalString(`${debateId}_${phase}_${localRole}`) ||
         speechTranscripts[phase] ||
         "No response";
       debateTranscripts[phase] = transcript;
@@ -1478,10 +1484,15 @@ const TeamDebateRoom: React.FC = () => {
         const result = await response.json();
         if (result.message === "Debate judged" || result.message === "Debate already judged") {
           const jsonString = extractJSON(result.result);
-          const judgment: JudgmentData = JSON.parse(jsonString);
-          setJudgmentData(judgment);
-          setPopup({ show: false, message: "" });
-          setShowJudgment(true);
+          const judgment = safeParse<JudgmentData>(jsonString, null);
+          if (judgment) {
+            setJudgmentData(judgment);
+            setPopup({ show: false, message: "" });
+            setShowJudgment(true);
+          } else {
+            console.warn('Failed to parse judgment JSON');
+            setPopup({ show: false, message: 'Error parsing judgment result' });
+          }
         }
       }
     } catch (error) {

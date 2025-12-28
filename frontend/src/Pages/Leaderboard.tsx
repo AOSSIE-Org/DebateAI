@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { getLocalString } from "@/utils/storage";
 import {
   Table,
   TableHeader,
@@ -93,7 +94,7 @@ const Leaderboard: React.FC = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
+        const token = getLocalString("token");
         if (!token) return;
 
         // Try to fetch from gamification endpoint first, fallback to old endpoint
@@ -121,7 +122,7 @@ const Leaderboard: React.FC = () => {
 
   // Set up WebSocket connection for live updates
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getLocalString("token");
     if (!token || !user) return;
 
     // Clean up existing connection
@@ -172,11 +173,11 @@ const Leaderboard: React.FC = () => {
           // Reload full leaderboard periodically to ensure accuracy
           const reloadTimer = setTimeout(async () => {
             try {
-              const token = localStorage.getItem("token");
-              if (token) {
-                const data = await fetchGamificationLeaderboard(token);
-                setDebaters(data.debaters);
-              }
+                const token = getLocalString("token");
+                if (token) {
+                  const data = await fetchGamificationLeaderboard(token);
+                  setDebaters(data.debaters);
+                }
             } catch (err) {
               console.error("Error reloading leaderboard:", err);
             }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { safeParse } from '@/utils/safeParse';
 import { useParams } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -58,7 +59,8 @@ const ChatRoom = () => {
     };
 
     wsRef.current.onmessage = (event: MessageEvent) => {
-      const data = JSON.parse(event.data);
+      const data = safeParse<any>(event.data, null);
+      if (!data) return;
       switch (data.type) {
         case 'chatMessage':
           setMessages((prev) => [

@@ -5,8 +5,10 @@ const API_BASE_URL =
   (import.meta.env.VITE_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
   window.location.origin;
 
+import { getLocalString } from '@/utils/storage';
+
 function getAuthToken(): string {
-  return localStorage.getItem("token") || "";
+  return getLocalString('token') || '';
 }
 
 export interface TeamDebateMember {

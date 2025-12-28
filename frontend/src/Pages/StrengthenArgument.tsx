@@ -33,7 +33,7 @@ interface WeakStatement {
 }
 
 interface Evaluation {
-  pointsEarned: number;
+  score: number;
   feedback: string;
 }
 
@@ -125,8 +125,13 @@ const StrengthenArgument: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Server error (Status: ${response.status}): ${text || "Unknown error"}`);
       }
-      const data: WeakStatement = JSON.parse(text);
-      if (!data.id || !data.text || !data.topic || !data.stance) {
+      let data: WeakStatement | null = null;
+      try {
+        data = JSON.parse(text) as WeakStatement;
+      } catch (err) {
+        console.warn('Failed to parse weak statement response', err);
+      }
+      if (!data || !data.id || !data.text || !data.topic || !data.stance) {
         throw new Error("Invalid response format: missing fields");
       }
       setWeakStatement(data);
@@ -170,9 +175,20 @@ const StrengthenArgument: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Server error (Status: ${response.status}): ${text || "Unknown error"}`);
       }
-      const data: Evaluation = JSON.parse(text);
+      let data: Evaluation | null = null;
+      try {
+        data = JSON.parse(text) as Evaluation;
+      } catch (err) {
+        console.warn("Failed to parse evaluation response", err);
+      }
+
+      // Validate parsed response
+      if (!data || typeof data.score !== "number" || !data.feedback) {
+        throw new Error("Invalid evaluation result: missing score or feedback");
+      }
+
       setFeedback(data.feedback);
-      setScore(data.pointsEarned);
+      setScore(data.score);
       setShowModal(true);
       setCurrentStep(3);
     } catch (err: any) {
