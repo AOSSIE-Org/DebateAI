@@ -4,7 +4,7 @@ import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPa
 import { Link } from 'react-router-dom';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-white">
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
         <svg>
@@ -15,10 +15,10 @@ const LeftSection = () => (
     </div>
     <div>
       <blockquote className="space-y-2">
-        <p className="text-lg">
+        <p className="text-lg text-black dark:text-white">
           "We cannot solve our problems with the same thinking we used when we created them."
         </p>
-        <footer className="text-sm">Albert Einstein</footer>
+        <footer className="text-sm text-black dark:text-white">Albert Einstein</footer>
       </blockquote>
     </div>
   </div>
@@ -54,7 +54,7 @@ const RightSection: React.FC<RightSectionProps> = ({
   <div className="flex items-center justify-center w-full h-full relative">
     {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
       <Button
-        className="absolute right-4 top-4 md:right-8 md:top-8"
+        className="absolute right-4 top-4 md:right-8 md:top-8 border-black dark:border-white"
         onClick={toggleAuthMode}
         variant="outline"
       >
