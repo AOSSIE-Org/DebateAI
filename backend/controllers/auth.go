@@ -26,10 +26,12 @@ import (
 	"google.golang.org/api/idtoken"
 )
 
+// GoogleLoginRequest represents the payload for Google OAuth login
 type GoogleLoginRequest struct {
 	IDToken string `json:"idToken" binding:"required"`
 }
 
+// GoogleLogin handles user authentication via Google OAuth
 func GoogleLogin(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
@@ -121,6 +123,7 @@ func GoogleLogin(ctx *gin.Context) {
 	})
 }
 
+// SignUp handles user registration and initiates the email verification process
 func SignUp(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
@@ -178,6 +181,7 @@ func SignUp(ctx *gin.Context) {
 	})
 }
 
+// VerifyEmail confirms the user's email address using the verification code and creates the user account
 func VerifyEmail(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
@@ -263,6 +267,7 @@ func VerifyEmail(ctx *gin.Context) {
 	})
 }
 
+// Login authenticates a user and returns a JWT
 func Login(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
@@ -396,6 +401,7 @@ func buildUserResponse(user models.User) gin.H {
 	}
 }
 
+// ForgotPassword initiates the password recovery process
 func ForgotPassword(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
@@ -445,6 +451,7 @@ func ForgotPassword(ctx *gin.Context) {
 	ctx.JSON(200, gin.H{"message": "Password reset initiated. Check your email for further instructions."})
 }
 
+// VerifyForgotPassword completes the password reset process using the verification code
 func VerifyForgotPassword(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
@@ -492,6 +499,7 @@ func VerifyForgotPassword(ctx *gin.Context) {
 	ctx.JSON(200, gin.H{"message": "Password successfully changed"})
 }
 
+// VerifyToken checks the validity of the provided JWT and returns the associated user
 func VerifyToken(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
