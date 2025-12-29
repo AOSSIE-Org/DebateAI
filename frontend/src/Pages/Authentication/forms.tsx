@@ -220,7 +220,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await verifyEmail(email, otp);
+    await verifyEmail(otp);
     handleOtpVerified();
   };
 
