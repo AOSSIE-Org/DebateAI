@@ -118,7 +118,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       authContext.handleError('Passwords do not match');
       return;
@@ -218,7 +218,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await verifyEmail(otp);
+    await verifyEmail(email, otp);
     handleOtpVerified();
   };
 
@@ -318,7 +318,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmNewPassword) {
       authContext.handleError('Passwords do not match');
       return;

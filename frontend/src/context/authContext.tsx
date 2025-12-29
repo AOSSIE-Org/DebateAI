@@ -22,7 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   signup: (email: string, password: string) => Promise<void>;
-  verifyEmail: (code: string) => Promise<void>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   confirmForgotPassword: (
     email: string,
@@ -176,12 +176,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const data = await response.json();
         throw new Error(data.message || 'Signup failed');
       }
-
-      // Store signup token for verification
-      const data = await response.json();
-      if (data.signupToken) {
-        localStorage.setItem('signupToken', data.signupToken);
-      }
     } catch (error) {
       handleError(error);
     } finally {
@@ -189,19 +183,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const verifyEmail = async (code: string) => {
+  const verifyEmail = async (email: string, code: string) => {
     setLoading(true);
     try {
-      // Get signup token from localStorage
-      const signupToken = localStorage.getItem('signupToken');
-      if (!signupToken) {
-        throw new Error('Signup token not found. Please sign up again.');
-      }
-
       const response = await fetch(`${baseURL}/verifyEmail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: signupToken, confirmationCode: code }),
+        body: JSON.stringify({ email, confirmationCode: code }),
       });
 
       if (!response.ok) {
@@ -211,9 +199,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const data = await response.json();
 
-      // Clear signup token
-      localStorage.removeItem('signupToken');
-
       // User is now verified and logged in
       if (data.accessToken) {
         setToken(data.accessToken);
@@ -222,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Set user details
         const normalizedUser: User = {
           id: data.user?.id || data.user?._id || undefined,
-          email: data.user?.email || '',
+          email: data.user?.email || email,
           displayName: data.user?.displayName || 'User',
           bio: data.user?.bio || '',
           rating: data.user?.rating || 1200,
