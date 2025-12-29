@@ -278,7 +278,7 @@ func Login(ctx *gin.Context) {
 	}
 
 	// Check if user is verified
-	if !user.IsVerified && user.Password == "" {
+	if !user.IsVerified {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified"})
 		return
 	}
