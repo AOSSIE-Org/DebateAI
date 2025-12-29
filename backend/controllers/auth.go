@@ -595,67 +595,6 @@ func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
-// Helper function to generate signup JWT (for temporary storage of unverified user data)
-func generateSignupJWT(email, hashedPassword, verificationCode, secret string) (string, error) {
-	now := time.Now()
-	expirationTime := now.Add(24 * time.Hour)
-
-	claims := jwt.MapClaims{
-		"email":            email,
-		"hashedPassword":   hashedPassword,
-		"verificationCode": verificationCode,
-		"exp":              expirationTime.Unix(),
-		"iat":              now.Unix(),
-		"type":             "signup", // Token type to distinguish from auth tokens
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(secret))
-	if err != nil {
-		return "", err
-	}
-	return signedToken, nil
-}
-
-// Helper function to validate signup JWT and extract user data
-func validateSignupJWT(tokenString, secret string) (email, hashedPassword, verificationCode string, err error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(secret), nil
-	})
-	if err != nil {
-		return "", "", "", err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return "", "", "", fmt.Errorf("invalid token")
-	}
-
-	// Verify token type
-	tokenType, ok := claims["type"].(string)
-	if !ok || tokenType != "signup" {
-		return "", "", "", fmt.Errorf("invalid token type")
-	}
-
-	// Extract claims
-	email, ok = claims["email"].(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("email not found in token")
-	}
-	hashedPassword, ok = claims["hashedPassword"].(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("password not found in token")
-	}
-	verificationCode, ok = claims["verificationCode"].(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("verification code not found in token")
-	}
-
-	return email, hashedPassword, verificationCode, nil
-}
-
 func loadConfig(ctx *gin.Context) *config.Config {
 	cfgPath := os.Getenv("CONFIG_PATH")
 	if cfgPath == "" {
