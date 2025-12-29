@@ -197,20 +197,20 @@ const turnTypes = [
 
 const extractJSON = (response: string): string => {
   if (!response) return "{}";
-  
+
   // Try to extract JSON from markdown code fences
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
   const match = fenceRegex.exec(response);
   if (match && match[1]) {
     return match[1].trim();
   }
-  
+
   // Try to find JSON object in the response
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     return jsonMatch[0];
   }
-  
+
   // If no JSON found, return empty object
   console.warn("No JSON found in response:", response);
   return "{}";
@@ -228,15 +228,15 @@ const DebateRoom: React.FC = () => {
     return savedState
       ? JSON.parse(savedState)
       : {
-          messages: [],
-          currentPhase: 0,
-          phaseStep: 0,
-          isBotTurn: false,
-          userStance: "",
-          botStance: "",
-          timer: phases[0].time,
-          isDebateEnded: false,
-        };
+        messages: [],
+        currentPhase: 0,
+        phaseStep: 0,
+        isBotTurn: false,
+        userStance: "",
+        botStance: "",
+        timer: phases[0].time,
+        isDebateEnded: false,
+      };
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
@@ -335,7 +335,7 @@ const DebateRoom: React.FC = () => {
     if (!state.userStance) {
       const stanceNormalized =
         debateData.stance.toLowerCase() === "for" ||
-        debateData.stance.toLowerCase() === "against"
+          debateData.stance.toLowerCase() === "against"
           ? debateData.stance.toLowerCase() === "for"
             ? "For"
             : "Against"
@@ -426,9 +426,8 @@ const DebateRoom: React.FC = () => {
       const newPhase = currentState.currentPhase + 1;
       setPopup({
         show: true,
-        message: `${phases[currentState.currentPhase].name} completed. Next: ${
-          phases[newPhase].name
-        } - ${getPhaseInstructions(newPhase)}`,
+        message: `${phases[currentState.currentPhase].name} completed. Next: ${phases[newPhase].name
+          } - ${getPhaseInstructions(newPhase)}`,
       });
       setTimeout(() => {
         setPopup({ show: false, message: "" });
@@ -557,10 +556,10 @@ const DebateRoom: React.FC = () => {
         userId: debateData.userId,
       });
       console.log("Raw judge result:", result);
-      
+
       const jsonString = extractJSON(result);
       console.log("Extracted JSON string:", jsonString);
-      
+
       let judgment: JudgmentData;
       try {
         judgment = JSON.parse(jsonString);
@@ -578,7 +577,7 @@ const DebateRoom: React.FC = () => {
           throw new Error(`Failed to parse JSON: ${e}`);
         }
       }
-      
+
       console.log("Parsed judgment:", judgment);
       setJudgmentData(judgment);
       setPopup({ show: false, message: "" });
@@ -591,7 +590,7 @@ const DebateRoom: React.FC = () => {
         message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
         isJudging: false,
       });
-      
+
       // Set default judgment data
       setJudgmentData({
         opening_statement: {
@@ -631,9 +630,8 @@ const DebateRoom: React.FC = () => {
       .padStart(2, "0")}`;
     return (
       <span
-        className={`font-mono ${
-          seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
-        }`}
+        className={`font-mono ${seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
+          }`}
       >
         {timeStr}
       </span>
@@ -682,8 +680,8 @@ const DebateRoom: React.FC = () => {
               {currentTurnType === "statement"
                 ? "make a statement"
                 : currentTurnType === "question"
-                ? "ask a question"
-                : "answer"}
+                  ? "ask a question"
+                  : "answer"}
             </span>
           </p>
         </div>
@@ -729,9 +727,8 @@ const DebateRoom: React.FC = () => {
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            state.isBotTurn ? "animate-glow" : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""
+            } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -777,9 +774,8 @@ const DebateRoom: React.FC = () => {
 
         {/* User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            !state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${!state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
+            } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -835,10 +831,10 @@ const DebateRoom: React.FC = () => {
                     currentTurnType === "statement"
                       ? "Make your statement"
                       : currentTurnType === "question"
-                      ? "Ask your question"
-                      : "Provide your answer"
+                        ? "Ask your question"
+                        : "Provide your answer"
                   }
-                  className="flex-1 border-gray-300 focus:border-orange-400 rounded-md text-sm"
+                  className="flex-1 border-gray-300 focus:border-orange-400 rounded-md text-sm text-gray-900 bg-white"
                 />
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}
