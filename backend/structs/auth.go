@@ -6,7 +6,7 @@ type SignUpRequest struct {
 }
 
 type VerifyEmailRequest struct {
-	Email            string `json:"email" binding:"required,email"`
+	Token            string `json:"token" binding:"required"`
 	ConfirmationCode string `json:"confirmationCode" binding:"required"`
 }
 
