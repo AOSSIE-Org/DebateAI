@@ -1,8 +1,10 @@
+/* Tailwind base setup */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom CSS variables and dark/contrast modes */
 @layer base {
-  
   :root {
     --background: 0 0% 100%;
     --foreground: 20 14.3% 4.1%;
@@ -84,17 +86,33 @@
     --chart-4: 300 100% 50%;
     --chart-5: 180 100% 50%;
   }
-}
 
-@layer base {
+  /* Apply border color globally */
   * {
     @apply border-border;
   }
+
+  /* Body background and text color */
   body {
     @apply bg-background text-foreground;
   }
 }
 
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Floating animation */
 @keyframes floatUp {
   0% {
     transform: translateY(0);
