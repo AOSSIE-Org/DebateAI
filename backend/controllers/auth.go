@@ -157,35 +157,12 @@ func SignUp(ctx *gin.Context) {
 	// Generate verification code
 	verificationCode := utils.GenerateRandomCode(6)
 
-	// Create new user
-	now := time.Now()
-	newUser := models.User{
-		Email:            request.Email,
-		DisplayName:      utils.ExtractNameFromEmail(request.Email),
-		Nickname:         utils.ExtractNameFromEmail(request.Email),
-		Bio:              "",
-		Rating:           1200.0,
-		RD:               350.0,
-		Volatility:       0.06,
-		LastRatingUpdate: now,
-		AvatarURL:        "https://avatar.iran.liara.run/public/10",
-		Password:         string(hashedPassword),
-		IsVerified:       false,
-		VerificationCode: verificationCode,
-		Score:            0,          // Initialize gamification score
-		Badges:           []string{}, // Initialize badges array
-		CurrentStreak:    0,          // Initialize streak
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-
-	// Insert user into MongoDB
-	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
+	// Generate signup JWT token
+	signupToken, err := generateSignupJWT(request.Email, string(hashedPassword), verificationCode, cfg.JWT.Secret)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
+		ctx.JSON(500, gin.H{"error": "Failed to generate signup token", "message": err.Error()})
 		return
 	}
-	newUser.ID = result.InsertedID.(primitive.ObjectID)
 
 	// Send verification email
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
@@ -194,10 +171,10 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Return user details
+	// Return success response with signup token (user not created yet)
 	ctx.JSON(200, gin.H{
-		"message": "Sign-up successful. Please verify your email.",
-		"user":    buildUserResponse(newUser),
+		"message":     "Sign-up successful. Please verify your email to complete registration.",
+		"signupToken": signupToken,
 	})
 }
 
@@ -213,39 +190,75 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
+	// Validate and decode signup JWT token
+	email, hashedPassword, verificationCode, err := validateSignupJWT(request.Token, cfg.JWT.Secret)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": "Invalid or expired verification token", "message": err.Error()})
+		return
+	}
+
+	// Verify the confirmation code matches
+	if verificationCode != request.ConfirmationCode {
+		ctx.JSON(400, gin.H{"error": "Invalid verification code"})
+		return
+	}
+
+	// Check if user already exists (prevent duplicate signups)
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email, "verificationCode": request.ConfirmationCode}).Decode(&user)
-	if err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid email or verification code"})
+	var existingUser models.User
+	err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&existingUser)
+	if err == nil {
+		ctx.JSON(400, gin.H{"error": "User already exists. Please login instead."})
+		return
+	}
+	if err != mongo.ErrNoDocuments {
+		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
 		return
 	}
 
-	// Update user verification status
+	// Create new user in database
 	now := time.Now()
-	update := bson.M{
-		"$set": bson.M{
-			"isVerified":       true,
-			"verificationCode": "",
-			"updatedAt":        now,
-		},
+	newUser := models.User{
+		Email:            email,
+		DisplayName:      utils.ExtractNameFromEmail(email),
+		Nickname:         utils.ExtractNameFromEmail(email),
+		Bio:              "",
+		Rating:           1200.0,
+		RD:               350.0,
+		Volatility:       0.06,
+		LastRatingUpdate: now,
+		AvatarURL:        "https://avatar.iran.liara.run/public/10",
+		Password:         hashedPassword, // Already hashed from signup
+		IsVerified:       true,           // User is verified immediately
+		VerificationCode: "",             // Clear verification code
+		Score:            0,               // Initialize gamification score
+		Badges:           []string{},     // Initialize badges array
+		CurrentStreak:    0,               // Initialize streak
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
+
+	// Insert user into MongoDB
+	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to verify email", "message": err.Error()})
+		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
+		return
+	}
+	newUser.ID = result.InsertedID.(primitive.ObjectID)
+
+	// Generate JWT for immediate login
+	token, err := generateJWT(newUser.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
 	}
 
-	// Return updated user details
+	// Return user details and access token
 	ctx.JSON(200, gin.H{
-		"message": "Email verification successful",
-		"user": func() gin.H {
-			response := buildUserResponse(user)
-			response["isVerified"] = true
-			response["updatedAt"] = now.Format(time.RFC3339)
-			return response
-		}(),
+		"message":     "Email verification successful. You are now logged in.",
+		"accessToken": token,
+		"user":        buildUserResponse(newUser),
 	})
 }
 
@@ -576,6 +589,67 @@ func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 		return claims, nil
 	}
 	return nil, fmt.Errorf("invalid token")
+}
+
+// Helper function to generate signup JWT (for temporary storage of unverified user data)
+func generateSignupJWT(email, hashedPassword, verificationCode, secret string) (string, error) {
+	now := time.Now()
+	expirationTime := now.Add(24 * time.Hour)
+
+	claims := jwt.MapClaims{
+		"email":            email,
+		"hashedPassword":   hashedPassword,
+		"verificationCode": verificationCode,
+		"exp":              expirationTime.Unix(),
+		"iat":              now.Unix(),
+		"type":             "signup", // Token type to distinguish from auth tokens
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+	return signedToken, nil
+}
+
+// Helper function to validate signup JWT and extract user data
+func validateSignupJWT(tokenString, secret string) (email, hashedPassword, verificationCode string, err error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
+	if err != nil {
+		return "", "", "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return "", "", "", fmt.Errorf("invalid token")
+	}
+
+	// Verify token type
+	tokenType, ok := claims["type"].(string)
+	if !ok || tokenType != "signup" {
+		return "", "", "", fmt.Errorf("invalid token type")
+	}
+
+	// Extract claims
+	email, ok = claims["email"].(string)
+	if !ok {
+		return "", "", "", fmt.Errorf("email not found in token")
+	}
+	hashedPassword, ok = claims["hashedPassword"].(string)
+	if !ok {
+		return "", "", "", fmt.Errorf("password not found in token")
+	}
+	verificationCode, ok = claims["verificationCode"].(string)
+	if !ok {
+		return "", "", "", fmt.Errorf("verification code not found in token")
+	}
+
+	return email, hashedPassword, verificationCode, nil
 }
 
 func loadConfig(ctx *gin.Context) *config.Config {

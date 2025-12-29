@@ -41,7 +41,9 @@ func SendVerificationEmail(email, code string) error {
 			"MIME-Version: 1.0\r\n"+
 			"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
 			"\r\n"+
-			"<p>Your verification code is: <strong>%s</strong></p>\r\n",
+			"<h2>Welcome to ArgueHub!</h2>\r\n"+
+			"<p>Your verification code is: <strong>%s</strong></p>\r\n"+
+			"<p><em>This code will expire in 24 hours.</em></p>\r\n",
 		email, cfg.SMTP.SenderName, cfg.SMTP.SenderEmail, code))
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTP.Host, cfg.SMTP.Port)
