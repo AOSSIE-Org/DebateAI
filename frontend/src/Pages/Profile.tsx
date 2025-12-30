@@ -72,7 +72,8 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { getProfile, updateProfile } from "@/services/profileService";
-import { getAuthToken } from "@/utils/auth";
+import { getAuthToken, clearAuthToken } from "@/utils/auth";
+import { useNavigate } from 'react-router-dom';
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
@@ -196,8 +197,15 @@ const Profile: React.FC = () => {
           setRecentDebates(data.stats.recentDebates);
         }
         setDebateStatsLoading(false);
-      } catch (err) {
-        setErrorMessage("Failed to load dashboard data.");
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        // If the backend indicates the token is invalid/expired, clear it and prompt login
+        if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('authorization')) {
+          clearAuthToken();
+          setErrorMessage('Session expired. Please sign in to continue.');
+        } else {
+          setErrorMessage('Failed to load dashboard data.');
+        }
       } finally {
         setLoading(false);
       }
@@ -328,7 +336,27 @@ const Profile: React.FC = () => {
 
   if (!dashboard) {
     return (
-      <div className="p-4 text-red-500 text-center text-sm">{errorMessage}</div>
+      <div className="p-4 flex flex-col items-center justify-center min-h-[200px]">
+        <div className="text-center">
+          <div className="text-red-500 text-sm mb-4">{errorMessage}</div>
+          <div className="flex gap-2 justify-center">
+            <Button
+              onClick={() => window.location.href = '/authentication'}
+              variant="default"
+              size="sm"
+            >
+              Sign In
+            </Button>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              size="sm"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 

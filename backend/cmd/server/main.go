@@ -105,6 +105,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
+	router.GET("/debug/db-info", routes.DebugDBInfo)
 
 	// WebSocket routes (handle auth internally)
 	router.GET("/ws/matchmaking", websocket.MatchmakingHandler)
@@ -125,6 +126,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.GET("/api/leaderboard", routes.GetGamificationLeaderboardRouteHandler)
 
 		routes.SetupDebateVsBotRoutes(auth)
+
+		// Judge endpoints for saved debates
+		routes.SetupDebateJudgeRoutes(auth)
 
 		// WebSocket signaling endpoint (handles auth internally)
 		router.GET("/ws", websocket.WebsocketHandler)

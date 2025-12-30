@@ -274,31 +274,39 @@ const Game: React.FC = () => {
   );
 
   useEffect(() => {
-    const wsURL = `${import.meta.env.VITE_BASE_URL}/ws?userId=${userId}`;
-    const ws = new WebSocket(wsURL);
-    ws.binaryType = "arraybuffer";
-    websocketRef.current = ws;
+    let ws: WebSocket | null = null;
+    (async () => {
+      const { buildWsUrl } = await import('@/lib/ws');
+      const wsURL = buildWsUrl('/ws', { userId });
+      ws = new WebSocket(wsURL);
+      ws.binaryType = "arraybuffer";
+      websocketRef.current = ws;
 
-    ws.onopen = () => console.log("WebSocket connection established");
-    ws.onmessage = (event) => {
-      try {
-        const raw = event.data;
-        let parsed: any = null;
+      ws.onopen = () => console.log("WebSocket connection established");
+      ws.onmessage = (event) => {
         try {
-          parsed = JSON.parse(typeof raw === 'string' ? raw : String(raw));
-        } catch (err) {
-          console.warn('Game: failed to parse WS message', err);
-          return;
+          const raw = event.data;
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(typeof raw === 'string' ? raw : String(raw));
+          } catch (err) {
+            console.warn('Game: failed to parse WS message', err);
+            return;
+          }
+          handleWebSocketMessage(parsed);
+        } catch (error) {
+          console.error("Failed to handle WebSocket message:", error);
         }
-        handleWebSocketMessage(parsed);
-      } catch (error) {
-        console.error("Failed to handle WebSocket message:", error);
-      }
-    };
-    ws.onerror = (error) => console.error("WebSocket error:", error);
-    ws.onclose = () => console.log("WebSocket connection closed");
+      };
+      ws.onerror = (error) => console.error("WebSocket error:", error);
+      ws.onclose = () => console.log("WebSocket connection closed");
+    })();
 
-    return () => ws.close();
+    return () => {
+      try {
+        websocketRef.current?.close();
+      } catch {}
+    };
   }, [userId, handleWebSocketMessage]);
 
   const renderGameContent = () => (

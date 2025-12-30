@@ -61,7 +61,7 @@ func CreateRoomHandler(c *gin.Context) {
 	}
 
 	// Query user document using email
-	userCollection := db.MongoClient.Database("DebateAI").Collection("users")
+	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -96,7 +96,7 @@ func CreateRoomHandler(c *gin.Context) {
 		Participants: []Participant{creatorParticipant},
 	}
 
-	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
+	roomCollection := db.MongoDatabase.Collection("rooms")
 	_, err = roomCollection.InsertOne(ctx, newRoom)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
@@ -109,7 +109,7 @@ func CreateRoomHandler(c *gin.Context) {
 // GetRoomsHandler handles GET /rooms and returns all rooms.
 func GetRoomsHandler(c *gin.Context) {
 
-	collection := db.MongoClient.Database("DebateAI").Collection("rooms")
+	collection := db.MongoDatabase.Collection("rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -140,7 +140,7 @@ func JoinRoomHandler(c *gin.Context) {
 	}
 
 	// Query user document using email
-	userCollection := db.MongoClient.Database("DebateAI").Collection("users")
+	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -174,7 +174,7 @@ func JoinRoomHandler(c *gin.Context) {
 	}
 
 	// Use atomic operation to join room
-	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
+	roomCollection := db.MongoDatabase.Collection("rooms")
 	filter := bson.M{"_id": roomId}
 	update := bson.M{
 		"$addToSet": bson.M{"participants": participant},
@@ -206,8 +206,8 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	}
 
 	// Query room document
-	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
-	userCollection := db.MongoClient.Database("DebateAI").Collection("users")
+	roomCollection := db.MongoDatabase.Collection("rooms")
+	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

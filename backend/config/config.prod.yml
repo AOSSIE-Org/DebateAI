@@ -7,12 +7,12 @@ database:
   # Get this from your MongoDB Atlas dashboard after creating a cluster and database
 
 gemini:
-  apiKey: "<YOUR_GEMINI_API_KEY>"
+  apiKey: "AIzaSyBgwbE92uDx5Hxcrs4ZJNqKdFdcMoqoiOo"
   # API key for OpenAI / Gemini model access
   # Obtain from your OpenRouter.ai or OpenAI account dashboard
 
 jwt:
-  secret: "<YOUR_JWT_SECRET>"
+  secret: "dlblvgbk78vkzdd4335342dkvfbgdf/mvds"
   # A secret string used to sign JWT tokens
   # Generate a strong random string (e.g. use `openssl rand -hex 32`)
 
@@ -26,18 +26,18 @@ smtp:
   port: 587
   # SMTP server port (587 for TLS)
 
-  username: "<YOUR_EMAIL_ADDRESS>"
+  username: "nilanjan.saha.csiot.2023@tint.edu.in"
   # Email username (your email address)
 
-  password: "<YOUR_EMAIL_PASSWORD_OR_APP_PASSWORD>"
+  password: "10052002"
   # Password for the email or app-specific password if 2FA is enabled
 
-  senderEmail: "<YOUR_EMAIL_ADDRESS>"
+  senderEmail: "nilanjan.saha.csiot.2023@tint.edu.in"
   # The 'from' email address used when sending mails
 
   senderName: "DebateAI Team"
 
 googleOAuth:
-  clientID: "<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
+  clientID: "926438884290-019tmibvc61i0vq5ra0l2pbi7b71gr5o.apps.googleusercontent.com"
   # Google OAuth Client ID for OAuth login
   # Obtain from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs)

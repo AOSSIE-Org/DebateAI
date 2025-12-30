@@ -13,6 +13,7 @@ import {
   PollInfo,
 } from '../atoms/debateAtoms';
 import ReconnectingWebSocket from 'reconnecting-websocket';
+import { buildWsUrl } from '@/lib/ws';
 import { getLocalString, setLocalString } from '@/utils/storage';
 import { safeParse } from '@/utils/safeParse';
 
@@ -33,6 +34,42 @@ export const useDebateWS = (debateId: string | null) => {
   const [, setLastEventId] = useAtom(lastEventIdAtom);
   const [spectatorHash] = useAtom(spectatorHashAtom);
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
+  const creatingRef = useRef(false);
+
+  // Helper to cleanly remove handlers and close a socket
+  const cleanupSocket = (socket: ReconnectingWebSocket | null) => {
+    try {
+      if (!socket) return;
+      // remove handlers to avoid receiving events during/after close
+      // @ts-ignore - reconnecting-websocket typings allow assignment
+      socket.onopen = null;
+      // @ts-ignore
+      socket.onmessage = null;
+      // @ts-ignore
+      socket.onerror = null;
+      // @ts-ignore
+      socket.onclose = null;
+
+      try {
+        // close only if not already closed
+        if (
+          socket.readyState === WebSocket.OPEN ||
+          socket.readyState === WebSocket.CONNECTING
+        ) {
+          socket.close();
+        }
+      } catch (e) {}
+
+      if (wsRef.current === socket) {
+        wsRef.current = null;
+      }
+      try {
+        setWs(null);
+      } catch {}
+    } catch (err) {
+      // swallow
+    }
+  };
 
   useEffect(() => {
     if (!debateId) return;
@@ -40,7 +77,9 @@ export const useDebateWS = (debateId: string | null) => {
     setDebateId(debateId);
 
     if (wsRef.current) {
-      return;
+      // ensure any existing socket is fully cleaned before proceeding
+      cleanupSocket(wsRef.current);
+      // allow creating a fresh connection
     }
 
     if (ws) {
@@ -65,60 +104,79 @@ export const useDebateWS = (debateId: string | null) => {
 
     setWsStatus('connecting');
 
-    // Get WebSocket URL
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const apiUrl = import.meta.env.VITE_API_URL;
-    let host = window.location.host;
-    if (apiUrl) {
-      try {
-        host = new URL(apiUrl).host;
-      } catch {
-        host = apiUrl.replace(/^https?:\/\//, '');
+    // Prevent concurrent creations
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+
+    let rws: ReconnectingWebSocket | null = null;
+    try {
+      let spectatorId = getLocalString('spectatorId');
+      if (!spectatorId) {
+        spectatorId = crypto.randomUUID();
+        setLocalString('spectatorId', spectatorId);
       }
-    }
 
-    let spectatorId = getLocalString('spectatorId');
-    if (!spectatorId) {
-      spectatorId = crypto.randomUUID();
-      setLocalString('spectatorId', spectatorId);
-    }
+      const wsUrl = buildWsUrl(`/ws/debate/${debateId}`, { spectatorId });
 
-    const wsUrl = `${protocol}//${host}/ws/debate/${debateId}${
-      spectatorId ? `?spectatorId=${spectatorId}` : ''
-    }`;
+      // If an existing socket already matches this URL and is open/connecting, reuse it
+      const existing = wsRef.current as ReconnectingWebSocket | null;
+      const existingUrl = (existing as any)?.url || (existing as any)?.URL || (existing as any)?._url || null;
+      if (
+        existing &&
+        (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING) &&
+        existingUrl === wsUrl
+      ) {
+        // already connected or connecting to the same room
+        setWsStatus(existing.readyState === WebSocket.OPEN ? 'connected' : 'connecting');
+        return;
+      }
 
-    const rws = new ReconnectingWebSocket(wsUrl, [], {
-      connectionTimeout: 4000,
-      maxRetries: Infinity,
-      maxReconnectionDelay: 10000,
-      minReconnectionDelay: 1000,
-      reconnectionDelayGrowFactor: 1.3,
-    });
+      // cleanup previous socket if it's different
+      if (existing) {
+        cleanupSocket(existing);
+      }
 
-    wsRef.current = rws;
-    setWs(rws as unknown as WebSocket);
-    let ownsConnection = true;
+      rws = new ReconnectingWebSocket(wsUrl, [], {
+        connectionTimeout: 4000,
+        // avoid infinite rapid reconnect loops that exhaust browser resources
+        maxRetries: 10,
+        maxReconnectionDelay: 10000,
+        minReconnectionDelay: 2000,
+        reconnectionDelayGrowFactor: 1.3,
+      });
+      const socket = rws;
 
-    rws.onopen = () => {
-      setWsStatus('connected');
+      // set ref and global atom
+      wsRef.current = socket;
+      setWs(socket as unknown as WebSocket);
 
-      const spectatorHashValue = spectatorHash || getLocalString('spectatorHash') || '';
-      const joinMessage = {
-        type: 'join',
-        payload: {
-          spectatorHash: spectatorHashValue,
-        },
+      socket.onopen = () => {
+        // ignore events from stale sockets
+        if (socket !== wsRef.current) return;
+        setWsStatus('connected');
+
+        const spectatorHashValue = spectatorHash || getLocalString('spectatorHash') || '';
+        const joinMessage = {
+          type: 'join',
+          payload: {
+            spectatorHash: spectatorHashValue,
+          },
+        };
+        try {
+          socket.send(JSON.stringify(joinMessage));
+        } catch {}
       };
-      rws.send(JSON.stringify(joinMessage));
-    };
 
-    rws.onmessage = (event) => {
+      socket.onmessage = (event) => {
       try {
         const eventData = safeParse<Event>(event.data, null);
         if (!eventData) {
           console.warn('useDebateWS: failed to parse event data');
           return;
         }
+
+          // ignore stale socket messages
+          if (socket !== wsRef.current) return;
 
         if (eventData.type !== 'poll_snapshot' && eventData.timestamp) {
           setLastEventId(String(eventData.timestamp));
@@ -299,36 +357,43 @@ export const useDebateWS = (debateId: string | null) => {
         }
       } catch (error) {
       }
-    };
+      };
 
-    rws.onerror = () => {
-      setWsStatus('error');
-    };
+      socket.onerror = () => {
+        if (socket !== wsRef.current) return;
+        setWsStatus('error');
+      };
 
-    rws.onclose = () => {
-      setWsStatus('disconnected');
-      setWs(null);
-      if (wsRef.current === rws) {
-        wsRef.current = null;
-      }
-    };
+      socket.onclose = () => {
+        // ensure we only update state for the current socket
+        if (socket !== wsRef.current) return;
+        setWsStatus('disconnected');
+        // cleanup handlers and null refs
+        cleanupSocket(socket);
+      };
+    } catch (err) {
+      // creation failed — ensure status updated
+      try {
+        setWsStatus('disconnected');
+      } catch {}
+    } finally {
+      creatingRef.current = false;
+    }
 
     return () => {
-      if (ownsConnection) {
-        rws.close();
-        if (wsRef.current === rws) {
-          wsRef.current = null;
-        }
-        setWs(null);
+      // cleanup the active socket (if any) in a safe, sync manner
+      try {
+        cleanupSocket(wsRef.current);
+      } catch {}
+      try {
         setWsStatus('disconnected');
-      }
-      ownsConnection = false;
+      } catch {}
     };
+  // Note: `ws` and `setWs` intentionally omitted to avoid re-running
+  // the effect when we update the atom inside the effect (prevents loops)
   }, [
     debateId,
     spectatorHash,
-    ws,
-    setWs,
     setDebateId,
     setPollState,
     setQuestions,

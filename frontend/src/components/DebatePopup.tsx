@@ -24,28 +24,49 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
 
   // Handler to create a new room by sending a POST request to the backend.
   const handleCreateRoom = async () => {
+    const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
     const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('You must be signed in to create a room. Please sign in first.');
+      return;
+    }
+
     try {
-      // Sending a POST request to create a new room.
-      // You might also send additional parameters (e.g., room type, settings).
-      const response = await fetch('http://localhost:1313/rooms', {
+      const response = await fetch(`${API_BASE_URL}/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        // Here we send an example payload with the room type.
         body: JSON.stringify({ type: 'public' }),
       });
+
       if (!response.ok) {
-        alert('Error creating room.');
+        // Try to parse an error message from the backend
+        let errMsg = 'Error creating room.';
+        try {
+          const payload = await response.json();
+          if (payload?.error) errMsg = payload.error;
+          else if (payload?.message) errMsg = payload.message;
+        } catch (e) {
+          // Not JSON, fallback to text
+          try {
+            const text = await response.text();
+            if (text) errMsg = text;
+          } catch {}
+        }
+        console.error('Create room failed:', response.status, errMsg);
+        alert(errMsg);
         return;
       }
+
       const room = await response.json();
       navigate(`/debate-room/${room.id}`);
       onClose();
     } catch (error) {
-      alert('Error creating room.');
+      console.error('Create room request failed:', error);
+      alert('Error creating room. See console for details.');
     }
   };
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { safeParse } from '@/utils/safeParse';
+import { buildWsUrl } from '@/lib/ws';
 import { useParams } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -45,9 +46,7 @@ const ChatRoom = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    wsRef.current = new WebSocket(
-      `ws://localhost:1313/chat/${roomId}?token=${token}`
-    );
+    wsRef.current = new WebSocket(buildWsUrl(`/chat/${roomId}`, { token }));
 
     wsRef.current.onopen = () => {
       if (wsRef.current) {

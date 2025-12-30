@@ -57,6 +57,20 @@ func ConnectMongoDB(uri string) error {
 
 	MongoDatabase = client.Database(dbName)
 	DebateVsBotCollection = MongoDatabase.Collection("debates_vs_bot")
+	// Ensure unique index on debate_judgements.debateId to prevent multiple judgements
+	go func() {
+		coll := MongoDatabase.Collection("debate_judgements")
+		indexModel := mongo.IndexModel{
+			Keys:    bson.D{{Key: "debateId", Value: 1}},
+			Options: options.Index().SetUnique(true).SetBackground(true),
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if _, err := coll.Indexes().CreateOne(ctx, indexModel); err != nil {
+			// Log the error but do not fail startup; index creation can be retried later
+			log.Printf("warning: failed to create index on debate_judgements.debateId: %v", err)
+		}
+	}()
 	return nil
 }
 

@@ -12,7 +12,10 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { useUser } from "@/hooks/useUser";
 import { getAuthToken } from "@/utils/auth";
+// Temporary dev helper: auto-load a mock AI judgement if present.
+import '@/lib/autoLoadMockAi';
 import { safeParse } from "@/utils/safeParse";
+import { buildWsUrl } from '@/lib/ws';
 import ReconnectingWebSocket from "reconnecting-websocket";
 import { useAtom } from "jotai";
 import {
@@ -22,6 +25,9 @@ import {
   PollInfo,
 } from "@/atoms/debateAtoms";
 import { useDebateWS } from "@/hooks/useDebateWS";
+import { judgeDebate, getJudgement, JudgementResult } from '@/services/judge';
+import { getLocalString } from "@/utils/storage";
+import DebateScorecard from "@/components/DebateScorecard";
 
 // Define debate phases as an enum
 enum DebatePhase {
@@ -141,7 +147,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
 
 const WS_BASE_URL = BASE_URL.replace(
   /^https?/,
-  (match) => (match === "https" ? "wss" : "ws")
+  (match: string) => (match === "https" ? "wss" : "ws")
 );
 
 
@@ -465,6 +471,11 @@ const OnlineDebateRoom = (): JSX.Element => {
     message: string;
     isJudging?: boolean;
   }>({ show: false, message: "" });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiJudgement, setAiJudgement] = useState<JudgementResult | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showAiScorecard, setShowAiScorecard] = useState(false);
+  const judgeCalledRef = useRef(false);
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [showJudgment, setShowJudgment] = useState(false);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(
@@ -1101,7 +1112,7 @@ const OnlineDebateRoom = (): JSX.Element => {
     const token = getAuthToken();
     if (!token || !roomId) return;
 
-   const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
+  const wsUrl = buildWsUrl('/ws', { room: roomId, token });
 
     const rws = new ReconnectingWebSocket(wsUrl, [], {
       connectionTimeout: 4000,
@@ -1955,6 +1966,55 @@ const OnlineDebateRoom = (): JSX.Element => {
     }
   }, [debatePhase, localRole, logMessageHistory]);
 
+  // Trigger AI judge once when debate finishes (owner triggers POST)
+  useEffect(() => {
+    if (debatePhase !== DebatePhase.Finished) return;
+    if (!roomId) return;
+    if (!isRoomOwner) return; // only owner triggers the POST
+    if (judgeCalledRef.current) return;
+
+    judgeCalledRef.current = true;
+    (async () => {
+      try {
+        setAiLoading(true);
+        setPopup({ show: true, message: 'AI judging in progress...', isJudging: true });
+        const result = await judgeDebate(roomId);
+        setAiJudgement(result as any);
+        setShowAiScorecard(true);
+        setPopup({ show: false, message: '' });
+      } catch (err: any) {
+        console.error('AI judge failed:', err);
+        setAiError(err?.message || 'AI judge failed');
+        setPopup({ show: true, message: 'AI judging failed — continuing without AI score.', isJudging: false });
+      } finally {
+        setAiLoading(false);
+      }
+    })();
+  }, [debatePhase, roomId, isRoomOwner]);
+
+  // Dev helper: if a mock judgement was injected via window.__mockAiJudgement
+  // and persisted to sessionStorage by `autoLoadMockAi`, load it so testers
+  // can view the scorecard without calling the backend. This is intentionally
+  // lightweight and does not alter production behavior when no mock is present.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('mockAiJudgement');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed) return;
+      // Only auto-apply for room owners to mimic judge flow
+      if (!isRoomOwner) return;
+      // Avoid overwriting a real judgement
+      if (aiJudgement || showAiScorecard) return;
+      setAiJudgement(parsed as any);
+      setShowAiScorecard(true);
+      // clear mock so it doesn't reapply repeatedly
+      // sessionStorage.removeItem('mockAiJudgement');
+    } catch (err) {
+      // ignore parse errors
+    }
+  }, [isRoomOwner, aiJudgement, showAiScorecard]);
+
   // Reset submissionStartedRef whenever phase moves away from Finished.
   useEffect(() => {
     if (debatePhase !== DebatePhase.Finished) {
@@ -2346,6 +2406,21 @@ const OnlineDebateRoom = (): JSX.Element => {
           ratingSummary={ratingSummary}
           onClose={() => setShowJudgment(false)}
         />
+      )}
+
+      {/* AI Scorecard Modal */}
+      {showAiScorecard && aiJudgement && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-4 relative">
+            <button
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-900"
+              onClick={() => setShowAiScorecard(false)}
+            >
+              Close
+            </button>
+            <DebateScorecard judgement={aiJudgement} />
+          </div>
+        </div>
       )}
 
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">

@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"os"
 )
 
@@ -302,6 +303,33 @@ func CreateTestTranscriptHandler(c *gin.Context) {
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to save test transcript"})
 		return
+	}
+	// Attempt to locate the transcript we just created and insert a mock judgement
+	ctx2, cancel2 := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel2()
+
+	coll := db.MongoDatabase.Collection("saved_debate_transcripts")
+	var saved models.SavedDebateTranscript
+	// Find the most recent matching transcript for this user and topic
+	if err := coll.FindOne(ctx2, bson.M{"userId": userID, "topic": "Climate Change Action"}, options.FindOne().SetSort(bson.M{"createdAt": -1})).Decode(&saved); err == nil {
+		// Insert a mock judgement document so the frontend can display a scorecard
+		jColl := db.MongoDatabase.Collection("debate_judgements")
+		mockScores := bson.M{
+			"logic":      bson.M{"sideA": 8, "sideB": 6},
+			"evidence":   bson.M{"sideA": 7, "sideB": 5},
+			"persuasion": bson.M{"sideA": 8, "sideB": 7},
+			"rebuttal":   bson.M{"sideA": 6, "sideB": 5},
+		}
+		insertDoc := bson.M{
+			"_id":       primitive.NewObjectID(),
+			"debateId":  saved.ID,
+			"winner":    "Side A",
+			"scores":    mockScores,
+			"summary":   "Mock judgement: Side A provided stronger reasoning and evidence.",
+			"createdAt": time.Now(),
+		}
+		// Ignore duplicate key errors to be idempotent
+		_, _ = jColl.InsertOne(ctx2, insertDoc)
 	}
 
 	c.JSON(200, gin.H{"message": "Test transcript created successfully"})

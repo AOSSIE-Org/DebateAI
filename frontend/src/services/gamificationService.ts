@@ -1,3 +1,4 @@
+import { buildWsUrl } from '@/lib/ws';
 const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
 export interface GamificationEvent {
@@ -96,10 +97,7 @@ export const createGamificationWebSocket = (
   onError?: (error: Event) => void,
   onClose?: () => void
 ): WebSocket => {
-  const target = new URL("/ws/gamification", baseURL);
-  target.protocol = target.protocol === "https:" ? "wss:" : "ws:";
-  target.searchParams.set("token", token);
-  const wsURL = target.toString();
+  const wsURL = buildWsUrl('/ws/gamification', { token });
   const ws = new WebSocket(wsURL);
 
   ws.onopen = () => {

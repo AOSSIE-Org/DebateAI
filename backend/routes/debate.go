@@ -7,6 +7,7 @@ import (
 
 	"arguehub/db"
 	"arguehub/services"
+	"arguehub/controllers"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -102,4 +103,10 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 			"opponent": opponentSummary,
 		},
 	})
+}
+
+// Register judge endpoints for debates
+func SetupDebateJudgeRoutes(router *gin.RouterGroup) {
+	router.POST("/debate/:id/judge", controllers.JudgeDebateHandler)
+	router.GET("/debate/:id/judge", controllers.GetDebateJudgementHandler)
 }

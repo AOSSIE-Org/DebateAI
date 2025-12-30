@@ -74,21 +74,29 @@ const Matchmaking: React.FC = () => {
         if (!message) return;
 
         switch (message.type) {
-          case 'pool_update':
-            if (message.pool) {
-              const poolData: MatchmakingPool[] = Array.isArray(message.pool)
-                ? message.pool
-                : safeParse<MatchmakingPool[]>(message.pool as string, []);
-              setPool(poolData);
-
-              // Check if current user is in pool (only if they've started matchmaking)
-              const currentUser = poolData.find(
-                (p) => p.userId === user.id || p.username === user.displayName
-              );
-              const shouldBeInPool =
-                !!currentUser && currentUser.startedMatchmaking;
-              setIsInPool(shouldBeInPool);
+          case 'pool_update': {
+            // message.pool may be an array, a JSON string, null, or malformed.
+            // Normalize to an array safely.
+            let candidate: MatchmakingPool[] | null = null;
+            if (Array.isArray(message.pool)) {
+              candidate = message.pool;
+            } else if (typeof message.pool === 'string') {
+              candidate = safeParse<MatchmakingPool[]>(message.pool as string, null);
+            } else {
+              candidate = null;
             }
+
+            const poolData: MatchmakingPool[] = candidate ?? [];
+            setPool(poolData);
+
+            // Check if current user is in pool (only if they've started matchmaking)
+            const currentUser = poolData.find(
+              (p) => p.userId === user.id || p.username === user.displayName
+            );
+            const shouldBeInPool = !!currentUser && currentUser.startedMatchmaking;
+            setIsInPool(shouldBeInPool);
+            break;
+          }
             break;
 
           case 'room_created':

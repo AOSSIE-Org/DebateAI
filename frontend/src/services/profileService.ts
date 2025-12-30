@@ -1,17 +1,23 @@
 const baseURL = import.meta.env.VITE_BASE_URL;
 
 export const getProfile = async (token: string) => {
-  
   const response = await fetch(`${baseURL}/user/fetchprofile`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
   if (!response.ok) {
-    throw new Error("Failed to fetch profile");
+    // Surface backend error message when available
+    const msg = data?.error || data?.message || response.statusText || 'Failed to fetch profile';
+    throw new Error(msg);
   }
-  return response.json();
+
+  return data;
 };
 
 export const updateProfile = async (

@@ -3,6 +3,7 @@ import { safeParse } from "@/utils/safeParse";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { useDebateWS } from "../hooks/useDebateWS";
+import { buildWsUrl } from "@/lib/ws";
 import { ReactionBar } from "../components/ReactionBar";
 import { AnonymousQA } from "../components/AnonymousQA";
 import {
@@ -81,19 +82,11 @@ export const ViewDebate: React.FC = () => {
       return;
     }
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const apiUrl = import.meta.env.VITE_API_URL;
-    let host = window.location.host;
-    if (apiUrl) {
-      try {
-        host = new URL(apiUrl).host;
-      } catch {
-        host = apiUrl.replace(/^https?:\/\//, "");
-      }
-    }
-    const wsUrl = `${protocol}//${host}/ws?room=${debateID}&token=${encodeURIComponent(
-      token
-    )}&spectator=true`;
+    const wsUrl = buildWsUrl(`/ws`, {
+      room: debateID,
+      token,
+      spectator: "true",
+    });
     const ws = new WebSocket(wsUrl);
     roomWsRef.current = ws;
 

@@ -10,6 +10,7 @@ import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { getAuthToken } from "@/utils/auth";
 import { safeParse } from "@/utils/safeParse";
 import { getLocalString } from '@/utils/storage';
+import { buildWsUrl } from '@/lib/ws';
 
 // Define debate phases as an enum (same as OnlineDebateRoom)
 enum DebatePhase {
@@ -714,12 +715,8 @@ const TeamDebateRoom: React.FC = () => {
       }
     };
 
-    const wsUrl = new URL("/ws/team", BASE_URL);
-    wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
-    wsUrl.searchParams.set("debateId", debateId);
-    wsUrl.searchParams.set("token", token);
-
-    const ws = new WebSocket(wsUrl.toString());
+    const wsUrl = buildWsUrl('/ws/team', { debateId, token });
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
