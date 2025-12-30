@@ -838,7 +838,7 @@ const DebateRoom: React.FC = () => {
                       ? "Ask your question"
                       : "Provide your answer"
                   }
-                  className="flex-1 border-gray-300 focus:border-orange-400 rounded-md text-sm text-gray-900 bg-white"
+                  className="flex-1 border-gray-300 focus:border-orange-400 rounded-md text-sm text-foreground bg-card"
                 />
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}

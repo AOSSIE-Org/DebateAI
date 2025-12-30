@@ -529,7 +529,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                   value={replyContent}
                   onChange={(e) => setReplyContent(e.target.value)}
                   placeholder="Write a reply..."
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-gray-900"
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-card"
                   rows={3}
                 />
                 <div className="flex justify-end gap-2 mt-2">
@@ -574,12 +574,12 @@ const CommentTree: React.FC<CommentTreeProps> = ({
     }
 
     return (
-      <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg">
+      <div className="mb-6 p-4 bg-card border border-gray-200 rounded-lg">
         <textarea
           value={replyContent}
           onChange={(e) => setReplyContent(e.target.value)}
           placeholder="Write a comment..."
-          className="w-full p-3 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-gray-900"
+          className="w-full p-3 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-card"
           rows={4}
         />
         <div className="flex justify-end gap-2 mt-3">
