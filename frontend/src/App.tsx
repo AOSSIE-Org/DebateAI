@@ -28,6 +28,7 @@ import CommunityFeed from './Pages/CommunityFeed';
 import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
+import { Toaster } from '@/components/ui/toaster';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -110,6 +111,7 @@ function App() {
     <AuthProvider>
       <ThemeProvider>
         <AppRoutes />
+        <Toaster />
       </ThemeProvider>
     </AuthProvider>
   );

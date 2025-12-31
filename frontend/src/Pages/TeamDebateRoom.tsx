@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { getAuthToken } from "@/utils/auth";
+import { useToast } from "@/hooks/use-toast";
 
 // Define debate phases as an enum (same as OnlineDebateRoom)
 enum DebatePhase {
@@ -139,6 +140,7 @@ const extractJSON = (response: string): string => {
 };
 
 const TeamDebateRoom: React.FC = () => {
+  const { toast } = useToast();
   const { debateId } = useParams<{ debateId: string }>();
   const [user] = useAtom(userAtom);
   const { user: userFromHook, isLoading: isUserLoading, isAuthenticated } = useUser();
@@ -1504,9 +1506,11 @@ const TeamDebateRoom: React.FC = () => {
 
   const handleRoleSelection = (role: DebateRole) => {
     if (peerRole === role) {
-      alert(
-        `Your opponent already chose "${role}". Please select the other side.`
-      );
+      toast({
+        title: "Role Conflict",
+        description: `Your opponent already chose "${role}". Please select the other side.`,
+        variant: "destructive",
+      });
       return;
     }
     setLocalRole(role);

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Avatar from 'react-avatar';
 import { useUser } from '../hooks/useUser';
+import { useToast } from '@/hooks/use-toast';
 
 interface MatchmakingPool {
   userId: string;
@@ -32,6 +33,7 @@ const Matchmaking: React.FC = () => {
   const { user, isLoading } = useUser();
   const wsRef = useRef<WebSocket | null>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     // If still loading, wait
@@ -108,7 +110,11 @@ const Matchmaking: React.FC = () => {
             break;
 
           case 'error':
-            alert(`Matchmaking error: ${message.error}`);
+            toast({
+              variant: "destructive",
+              title: "Matchmaking Error",
+              description: message.error,
+            });
             break;
 
           default:
@@ -144,7 +150,11 @@ const Matchmaking: React.FC = () => {
 
     // Try to send regardless of state tracking, since state might be delayed
     if (!wsRef.current) {
-      alert('Connection not available. Please refresh the page and try again.');
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Connection not available. Please refresh the page and try again.",
+      });
       return;
     }
 
@@ -155,7 +165,11 @@ const Matchmaking: React.FC = () => {
         const message = JSON.stringify({ type: 'join_pool' });
         wsRef.current.send(message);
       } catch (error) {
-        alert('Failed to send matchmaking request. Please try again.');
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to send matchmaking request. Please try again.",
+        });
       }
     } else if (readyState === WebSocket.CONNECTING) {
       // Wait a bit and try again
@@ -163,15 +177,19 @@ const Matchmaking: React.FC = () => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: 'join_pool' }));
         } else {
-          alert(
-            'Connection is taking too long. Please check your internet connection and try again.'
-          );
+          toast({
+            variant: "destructive",
+            title: "Connection Timeout",
+            description: "Connection is taking too long. Please check your internet connection and try again.",
+          });
         }
       }, 1000);
     } else {
-      alert(
-        'Connection is not ready. Please ensure the green indicator is showing.'
-      );
+      toast({
+        variant: "destructive",
+        title: "Connection Not Ready",
+        description: "Connection is not ready. Please ensure the green indicator is showing.",
+      });
     }
   };
 

@@ -3,6 +3,8 @@ import { useAtom } from 'jotai';
 import { useUser } from '../hooks/useUser';
 import ProfileHover from './ProfileHover';
 import UserProfileModal from './UserProfileModal';
+import ConfirmationModal from './ConfirmationModal';
+import { useToast } from '../hooks/use-toast';
 import {
   commentsByTranscriptAtom,
   getCommentsForTranscriptAtom,
@@ -240,6 +242,9 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const { toast } = useToast();
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
 
@@ -410,6 +415,43 @@ const CommentTree: React.FC<CommentTreeProps> = ({
     }
   };
 
+  const handleDeleteComment = async () => {
+    if (!commentToDelete) return;
+    
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${baseURL}/comments/${commentToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        // Remove from atom
+        removeCommentAtom(commentToDelete);
+        // Also refresh to ensure consistency
+        await fetchComments();
+        toast({
+          title: "Success",
+          description: "Comment deleted successfully",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete comment",
+        });
+      }
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete comment",
+      });
+    }
+  };
+
   const renderComment = (comment: Comment, depth: number = 0): React.ReactNode => {
     const maxDepth = 5;
     if (depth > maxDepth) return null;
@@ -453,7 +495,11 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                   
                   if (!clickedUserId || clickedUserId === 'undefined' || clickedUserId === 'null' || clickedUserId === '') {
                     console.error('❌ Invalid userId:', clickedUserId);
-                    alert('Unable to load profile: Invalid user ID');
+                    toast({
+                      variant: "destructive",
+                      title: "Error",
+                      description: "Unable to load profile: Invalid user ID",
+                    });
                     return;
                   }
                   
@@ -495,26 +541,9 @@ const CommentTree: React.FC<CommentTreeProps> = ({
               )}
               {isOwnComment && (
                 <button
-                  onClick={async () => {
-                    if (confirm('Are you sure you want to delete this comment?')) {
-                      const token = localStorage.getItem('token');
-                      try {
-                        const response = await fetch(`${baseURL}/comments/${comment.id}`, {
-                          method: 'DELETE',
-                          headers: {
-                            Authorization: `Bearer ${token}`,
-                          },
-                        });
-                        if (response.ok) {
-                          // Remove from atom
-                          removeCommentAtom(comment.id);
-                          // Also refresh to ensure consistency
-                          await fetchComments();
-                        }
-                      } catch (err) {
-                        console.error('Error deleting comment:', err);
-                      }
-                    }
+                  onClick={() => {
+                    setCommentToDelete(comment.id);
+                    setDeleteModalOpen(true);
                   }}
                   className="text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
                 >
@@ -662,6 +691,19 @@ const CommentTree: React.FC<CommentTreeProps> = ({
           }}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setCommentToDelete(null);
+        }}
+        onConfirm={handleDeleteComment}
+        title="Delete Comment"
+        description="Are you sure you want to delete this comment? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+      />
     </div>
   );
 };

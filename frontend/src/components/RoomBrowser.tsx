@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface Participant {
   id: string;
@@ -17,6 +18,7 @@ const RoomBrowser: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const fetchRooms = async () => {
     const token = localStorage.getItem('token');
@@ -71,12 +73,20 @@ const RoomBrowser: React.FC = () => {
         }
       );
       if (!response.ok) {
-        alert(`Failed to join room ${roomId}.`);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to join room ${roomId}.`,
+        });
         return;
       }
       navigate(`/debate-room/${roomId}`);
     } catch (error) {
-      alert('An error occurred while joining the match.');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An error occurred while joining the match.",
+      });
     }
   };
 

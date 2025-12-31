@@ -7,6 +7,8 @@ import React, {
 } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { useToast } from '@/hooks/use-toast';
 
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
@@ -146,6 +148,8 @@ const WS_BASE_URL = BASE_URL.replace(
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
+  const [concedeModalOpen, setConcedeModalOpen] = useState(false);
+  const { toast } = useToast();
   const { user: currentUser } = useUser();
   const currentUserId = currentUser?.id ?? null;
   useDebateWS(roomId ?? null);
@@ -798,22 +802,24 @@ const OnlineDebateRoom = (): JSX.Element => {
   ]);
 
   const handleConcede = useCallback(() => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
-      if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({
-          type: "concede",
-          room: roomId,
-          userId: currentUserId,
-          username: currentUser?.displayName || "User"
-        }));
-      }
-      setDebatePhase(DebatePhase.Finished);
-      setPopup({
-        show: true,
-        message: "You have conceded the debate.",
-        isJudging: false,
-      });
+    setConcedeModalOpen(true);
+  }, []);
+
+  const confirmConcede = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.send(JSON.stringify({
+        type: "concede",
+        room: roomId,
+        userId: currentUserId,
+        username: currentUser?.displayName || "User"
+      }));
     }
+    setDebatePhase(DebatePhase.Finished);
+    setPopup({
+      show: true,
+      message: "You have conceded the debate.",
+      isJudging: false,
+    });
   }, [roomId, currentUserId, currentUser, setDebatePhase, setPopup]);
 
   const handlePhaseDone = useCallback(() => {
@@ -1988,9 +1994,11 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   const handleRoleSelection = (role: DebateRole) => {
     if (peerRole === role) {
-      alert(
-        `Your opponent already chose "${role}". Please select the other side.`
-      );
+      toast({
+        variant: "destructive",
+        title: "Role Unavailable",
+        description: `Your opponent already chose "${role}". Please select the other side.`,
+      });
       return;
     }
     setLocalRole(role);
@@ -2590,6 +2598,16 @@ const OnlineDebateRoom = (): JSX.Element => {
       {mediaError && (
         <p className="text-red-500 mt-4 text-center">{mediaError}</p>
       )}
+
+      <ConfirmationModal
+        isOpen={concedeModalOpen}
+        onClose={() => setConcedeModalOpen(false)}
+        onConfirm={confirmConcede}
+        title="Concede Debate"
+        description="Are you sure you want to concede? This will count as a loss."
+        confirmText="Concede"
+        variant="destructive"
+      />
 
       <style>{`
         @keyframes glow {

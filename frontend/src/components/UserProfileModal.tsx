@@ -6,6 +6,7 @@ import { UserPlus, UserCheck, Users } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import defaultAvatar from '@/assets/avatar2.jpg';
 import ProfileHover from './ProfileHover';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserProfile {
   id: string;
@@ -36,6 +37,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
   const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+  const { toast } = useToast();
 
   useEffect(() => {
     console.log('=== UserProfileModal useEffect ===');
@@ -208,7 +210,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const handleFollow = async () => {
     if (!currentUser?.id) {
-      alert('Please log in to follow users');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please log in to follow users",
+      });
       return;
     }
 
@@ -235,7 +241,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       }
     } catch (err: any) {
       console.error('Error following user:', err);
-      alert(err.message || `Failed to ${isFollowing ? 'unfollow' : 'follow'} user`);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || `Failed to ${isFollowing ? 'unfollow' : 'follow'} user`,
+      });
     }
   };
 

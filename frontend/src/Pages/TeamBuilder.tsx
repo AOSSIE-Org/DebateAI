@@ -40,6 +40,8 @@ import {
 } from "react-icons/fa";
 import TeamMatchmaking from "@/components/TeamMatchmaking";
 import MatchmakingPool from "@/components/MatchmakingPool";
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { useToast } from '@/hooks/use-toast';
 
 interface TeamMember {
   userId: string;
@@ -98,6 +100,14 @@ const TeamBuilder: React.FC = () => {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editingSize, setEditingSize] = useState(false);
   const [editTeamName, setEditTeamName] = useState<string>("");
+  
+  const [removeMemberModalOpen, setRemoveMemberModalOpen] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{teamId: string, memberId: string} | null>(null);
+  const [deleteTeamModalOpen, setDeleteTeamModalOpen] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<string | null>(null);
+  const [leaveTeamModalOpen, setLeaveTeamModalOpen] = useState(false);
+  const [teamToLeave, setTeamToLeave] = useState<string | null>(null);
+  const { toast } = useToast();
   const [searchCode, setSearchCode] = useState<string>("");
   const [joiningByCode, setJoiningByCode] = useState(false);
 
@@ -193,41 +203,56 @@ const TeamBuilder: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = async (
+  const handleRemoveMember = (
     teamId: string,
     memberId: string
-  ): Promise<void> => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
+  ): void => {
+    setMemberToRemove({ teamId, memberId });
+    setRemoveMemberModalOpen(true);
+  };
+
+  const confirmRemoveMember = async (): Promise<void> => {
+    if (!memberToRemove) return;
 
     try {
-      await removeMember(teamId, memberId);
-      setSuccess("Member removed successfully");
+      await removeMember(memberToRemove.teamId, memberToRemove.memberId);
+      toast({
+        title: "Success",
+        description: "Member removed successfully",
+      });
       fetchUserTeams();
       fetchAvailableTeams();
-      setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
-      setError((error as Error).message || "Failed to remove member");
-      setTimeout(() => setError(""), 5000);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: (error as Error).message || "Failed to remove member",
+      });
     }
   };
 
-  const handleDeleteTeam = async (teamId: string): Promise<void> => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this team? This action cannot be undone."
-      )
-    )
-      return;
+  const handleDeleteTeam = (teamId: string): void => {
+    setTeamToDelete(teamId);
+    setDeleteTeamModalOpen(true);
+  };
+
+  const confirmDeleteTeam = async (): Promise<void> => {
+    if (!teamToDelete) return;
 
     try {
-      await deleteTeam(teamId);
-      setSuccess("Team deleted successfully");
+      await deleteTeam(teamToDelete);
+      toast({
+        title: "Success",
+        description: "Team deleted successfully",
+      });
       fetchUserTeams();
       fetchAvailableTeams();
-      setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
-      setError((error as Error).message || "Failed to delete team");
-      setTimeout(() => setError(""), 5000);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: (error as Error).message || "Failed to delete team",
+      });
     }
   };
 
@@ -293,19 +318,27 @@ const TeamBuilder: React.FC = () => {
     setTimeout(() => setSuccess(""), 3000);
   };
 
-  const handleLeaveTeam = async (teamId: string): Promise<void> => {
-    if (!window.confirm("Are you sure you want to leave this team?")) {
-      return;
-    }
+  const handleLeaveTeam = (teamId: string): void => {
+    setTeamToLeave(teamId);
+    setLeaveTeamModalOpen(true);
+  };
+
+  const confirmLeaveTeam = async (): Promise<void> => {
+    if (!teamToLeave) return;
 
     try {
-      await leaveTeam(teamId);
-      setSuccess("You have left the team");
+      await leaveTeam(teamToLeave);
+      toast({
+        title: "Success",
+        description: "You have left the team",
+      });
       fetchUserTeams();
-      setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
-      setError((error as Error).message || "Failed to leave team");
-      setTimeout(() => setError(""), 5000);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: (error as Error).message || "Failed to leave team",
+      });
     }
   };
 
@@ -921,6 +954,45 @@ const TeamBuilder: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmationModal
+        isOpen={removeMemberModalOpen}
+        onClose={() => {
+          setRemoveMemberModalOpen(false);
+          setMemberToRemove(null);
+        }}
+        onConfirm={confirmRemoveMember}
+        title="Remove Member"
+        description="Are you sure you want to remove this member?"
+        confirmText="Remove"
+        variant="destructive"
+      />
+
+      <ConfirmationModal
+        isOpen={deleteTeamModalOpen}
+        onClose={() => {
+          setDeleteTeamModalOpen(false);
+          setTeamToDelete(null);
+        }}
+        onConfirm={confirmDeleteTeam}
+        title="Delete Team"
+        description="Are you sure you want to delete this team? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+      />
+
+      <ConfirmationModal
+        isOpen={leaveTeamModalOpen}
+        onClose={() => {
+          setLeaveTeamModalOpen(false);
+          setTeamToLeave(null);
+        }}
+        onConfirm={confirmLeaveTeam}
+        title="Leave Team"
+        description="Are you sure you want to leave this team?"
+        confirmText="Leave"
+        variant="destructive"
+      />
     </div>
   );
 };
