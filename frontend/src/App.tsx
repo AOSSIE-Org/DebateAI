@@ -28,6 +28,8 @@ import CommunityFeed from './Pages/CommunityFeed';
 import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
+import { Toaster } from '@/components/ui/toaster';
+import GamificationOverlay from './components/GamificationOverlay';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -110,6 +112,8 @@ function App() {
     <AuthProvider>
       <ThemeProvider>
         <AppRoutes />
+        <GamificationOverlay />
+        <Toaster />
       </ThemeProvider>
     </AuthProvider>
   );

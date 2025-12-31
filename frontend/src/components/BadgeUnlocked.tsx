@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Confetti from "react-confetti";
-import { FaTrophy, FaMedal, FaAward } from "react-icons/fa";
+import { FaTrophy, FaMedal, FaAward, FaCrown } from "react-icons/fa";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +16,7 @@ const badgeIcons: Record<string, React.ReactNode> = {
   FactMaster: <FaTrophy className="w-16 h-16 text-purple-500" />,
   FirstWin: <FaTrophy className="w-16 h-16 text-green-500" />,
   Debater10: <FaMedal className="w-16 h-16 text-orange-500" />,
+  Top10: <FaCrown className="w-16 h-16 text-yellow-400" />,
 };
 
 const badgeDescriptions: Record<string, string> = {
@@ -24,6 +25,7 @@ const badgeDescriptions: Record<string, string> = {
   FactMaster: "You're a master of facts! Keep up the great work!",
   FirstWin: "Congratulations on your first victory!",
   Debater10: "You've completed 10 debates! You're becoming a pro!",
+  Top10: "You've reached the Top 10! You are among the elite debaters!",
 };
 
 const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeName, isOpen, onClose }) => {
