@@ -25,7 +25,6 @@ import {
   createGamificationWebSocket,
   GamificationEvent,
 } from "@/services/gamificationService";
-import BadgeUnlocked from "@/components/BadgeUnlocked";
 import { useUser } from "@/hooks/useUser";
 
 interface Debater {
@@ -77,13 +76,6 @@ const Leaderboard: React.FC = () => {
   const [stats, setStats] = useState<Stat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [badgeUnlocked, setBadgeUnlocked] = useState<{
-    badgeName: string;
-    isOpen: boolean;
-  }>({
-    badgeName: "",
-    isOpen: false,
-  });
   const [sortCategory, setSortCategory] = useState<SortCategory>("score");
   const wsRef = useRef<WebSocket | null>(null);
   const { user } = useUser();
@@ -133,25 +125,6 @@ const Leaderboard: React.FC = () => {
       token,
       (event: GamificationEvent) => {
         console.log("Gamification event received:", event);
-
-        if (event.type === "badge_awarded" && event.badgeName) {
-          // Show badge unlock notification if it's for the current user
-          setDebaters((currentDebaters) => {
-            const currentUserDebater = currentDebaters.find(
-              (d) => d.currentUser
-            );
-            if (
-              event.userId === currentUserDebater?.id ||
-              event.userId === user?.id
-            ) {
-              setBadgeUnlocked({
-                badgeName: event.badgeName!,
-                isOpen: true,
-              });
-            }
-            return currentDebaters;
-          });
-        }
 
         if (event.type === "score_updated") {
           // Update the leaderboard when scores change
@@ -263,11 +236,6 @@ const Leaderboard: React.FC = () => {
 
   return (
     <div className="p-6 bg-background text-foreground">
-      <BadgeUnlocked
-        badgeName={badgeUnlocked.badgeName}
-        isOpen={badgeUnlocked.isOpen}
-        onClose={() => setBadgeUnlocked({ badgeName: "", isOpen: false })}
-      />
       <div className="max-w-7xl mx-auto">
         <p className="text-center text-muted-foreground mb-8 text-lg">
           Hone your skills and see how you stack up against top debaters! 🏆
