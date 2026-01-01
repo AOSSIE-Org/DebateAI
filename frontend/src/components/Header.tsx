@@ -1,6 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Bell, Menu, X, Home, BarChart, User, Info } from "lucide-react";
+import { Bell, Menu, X, Home, BarChart, User, Info, LogOut } from "lucide-react";
+import { useAtom } from "jotai";
+import { userAtom } from "@/state/userAtom";
+import { AuthContext } from "@/context/authContext";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,6 +23,8 @@ import avatarImage from "@/assets/avatar2.jpg";
 function Header() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const location = useLocation();
+  const [user] = useAtom(userAtom);
+  const auth = useContext(AuthContext);
 
   const toggleDrawer = () => setIsDrawerOpen(!isDrawerOpen);
 
@@ -64,11 +74,55 @@ function Header() {
             <Bell className="w-5 h-5 text-gray-600" />
             <span className="absolute -top-1 -right-1 block h-2 w-2 rounded-full bg-red-500" />
           </button>
-          <img
-            src={avatarImage}
-            alt="User avatar"
-            className="w-8 h-8 rounded-full border-2 border-gray-300 object-cover"
-          />
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="focus:outline-none">
+                <img
+                  src={user?.avatarUrl || avatarImage}
+                  alt="User avatar"
+                  className="w-8 h-8 rounded-full border-2 border-gray-300 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <img
+                    src={user?.avatarUrl || avatarImage}
+                    alt="User avatar"
+                    className="w-12 h-12 rounded-full border-2 border-gray-200 object-cover"
+                  />
+                  <div className="overflow-hidden">
+                    <h4 className="font-semibold text-gray-900 truncate">{user?.displayName || "User"}</h4>
+                    <p className="text-sm text-gray-500 truncate">{user?.email || "No email"}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">User ID</span>
+                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-700 truncate max-w-[150px]" title={user?.id}>
+                      {user?.id || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Rating</span>
+                    <span className="font-medium text-blue-600">{user?.rating ? Math.round(user.rating) : 1500}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-2">
+                <button
+                  onClick={() => auth?.logout()}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign out
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <button
             onClick={toggleDrawer}
             className="md:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100"
