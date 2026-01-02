@@ -1,1 +1,7 @@
 *.local
+# Environment files
+.env
+frontend/.env
+backend/.env
+.env.*
+*.env.local
