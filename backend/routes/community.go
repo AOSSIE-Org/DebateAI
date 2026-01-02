@@ -26,8 +26,8 @@ func SetupCommunityRoutes(router *gin.RouterGroup) {
 	router.DELETE("/comments/:id", controllers.DeleteCommentHandler)
 
 	// Follow routes
-	router.POST("/users/:userId/follow", controllers.FollowUserHandler)
-	router.DELETE("/users/:userId/follow", controllers.UnfollowUserHandler)
-	router.GET("/users/:userId/followers", controllers.GetFollowersHandler)
-	router.GET("/users/:userId/following", controllers.GetFollowingHandler)
+	router.POST("/users/:id/follow", controllers.FollowUserHandler)
+	router.DELETE("/users/:id/follow", controllers.UnfollowUserHandler)
+	router.GET("/users/:id/followers", controllers.GetFollowersHandler)
+	router.GET("/users/:id/following", controllers.GetFollowingHandler)
 }

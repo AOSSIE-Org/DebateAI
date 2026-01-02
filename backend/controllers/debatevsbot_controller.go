@@ -274,6 +274,7 @@ func JudgeDebate(c *gin.Context) {
 		latestDebate.Topic,
 		latestDebate.BotName,
 		resultStatus,
+		"",
 		req.History,
 		nil,
 	)

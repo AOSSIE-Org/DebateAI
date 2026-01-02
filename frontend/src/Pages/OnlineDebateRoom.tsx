@@ -28,6 +28,7 @@ import { useDebateWS } from "@/hooks/useDebateWS";
 import { judgeDebate, getJudgement, JudgementResult } from '@/services/judge';
 import { getLocalString } from "@/utils/storage";
 import DebateScorecard from "@/components/DebateScorecard";
+import AnalyticsModal from '@/components/AnalyticsModal'
 
 // Define debate phases as an enum
 enum DebatePhase {
@@ -475,6 +476,8 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [aiJudgement, setAiJudgement] = useState<JudgementResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showAiScorecard, setShowAiScorecard] = useState(false);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false)
+  const analyticsShownRef = useRef(false)
   const judgeCalledRef = useRef(false);
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [showJudgment, setShowJudgment] = useState(false);
@@ -1963,6 +1966,11 @@ const OnlineDebateRoom = (): JSX.Element => {
   useEffect(() => {
     if (debatePhase === DebatePhase.Finished && localRole) {
       logMessageHistory();
+      // fetch and show analytics once per finished debate
+      if (roomId && !analyticsShownRef.current) {
+        analyticsShownRef.current = true
+        setShowAnalyticsModal(true)
+      }
     }
   }, [debatePhase, localRole, logMessageHistory]);
 
@@ -2421,6 +2429,14 @@ const OnlineDebateRoom = (): JSX.Element => {
             <DebateScorecard judgement={aiJudgement} />
           </div>
         </div>
+      )}
+
+      {/* Analytics Modal (post-debate) */}
+      {showAnalyticsModal && (
+        <AnalyticsModal
+          debateId={roomId}
+          onClose={() => setShowAnalyticsModal(false)}
+        />
       )}
 
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">

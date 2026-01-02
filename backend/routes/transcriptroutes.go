@@ -14,6 +14,8 @@ func SetupTranscriptRoutes(router *gin.RouterGroup) {
 
 	router.POST("/submit-transcripts", controllers.SubmitTranscripts)
 	router.POST("/save-transcript", controllers.SaveDebateTranscriptHandler)
+	router.GET("/debates/:id/analytics", controllers.GetDebateAnalytics)
+	router.GET("/users/:id/analytics", controllers.GetUserAnalytics)
 	router.GET("/debate-stats", controllers.GetDebateStatsHandler)
 	router.POST("/create-test-transcript", controllers.CreateTestTranscriptHandler)
 	router.POST("/create-test-bot-debate", controllers.CreateTestBotDebateHandler)

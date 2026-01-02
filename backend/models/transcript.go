@@ -32,8 +32,19 @@ type SavedDebateTranscript struct {
 	Result      string             `bson:"result" json:"result"`     // "win", "loss", "draw", "pending"
 	Messages    []Message          `bson:"messages" json:"messages"`
 	Transcripts map[string]string  `bson:"transcripts,omitempty" json:"transcripts,omitempty"` // For user vs user debates
+	RoomID      string             `bson:"roomId,omitempty" json:"roomId,omitempty"`
+	Analytics   *DebateAnalytics   `bson:"analytics,omitempty" json:"analytics,omitempty"`
 	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
+}
+
+// DebateAnalytics holds computed analytics for a saved debate
+type DebateAnalytics struct {
+	TotalArguments        int     `bson:"totalArguments" json:"totalArguments"`
+	TotalDurationSeconds  int64   `bson:"totalDurationSeconds" json:"totalDurationSeconds"`
+	AvgResponseTimeSecs   float64 `bson:"avgResponseTimeSecs" json:"avgResponseTimeSecs"`
+	TotalRebuttals        int     `bson:"totalRebuttals" json:"totalRebuttals"`
+	AvgArgumentLength     float64 `bson:"avgArgumentLength" json:"avgArgumentLength"`
 }
 
 func (s SavedDebateTranscript) MarshalJSON() ([]byte, error) {

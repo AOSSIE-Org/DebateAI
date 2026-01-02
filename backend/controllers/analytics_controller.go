@@ -3,6 +3,7 @@ package controllers
 import (
 	"arguehub/db"
 	"arguehub/models"
+	"arguehub/services"
 	"context"
 	"log"
 	"net/http"
@@ -338,4 +339,58 @@ func GetAdminActionLogs(ctx *gin.Context) {
 		"page":  page,
 		"limit": limit,
 	})
+}
+
+// GetDebateAnalytics returns analytics for a specific debate (by saved transcript ID or room ID)
+func GetDebateAnalytics(ctx *gin.Context) {
+	debateId := ctx.Param("id")
+	if debateId == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "debate id required"})
+		return
+	}
+
+	dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	coll := db.MongoDatabase.Collection("saved_debate_transcripts")
+
+	// Try interpret as ObjectID
+	if objID, err := primitive.ObjectIDFromHex(debateId); err == nil {
+		var saved models.SavedDebateTranscript
+		if err := coll.FindOne(dbCtx, bson.M{"_id": objID}).Decode(&saved); err == nil {
+			ctx.JSON(http.StatusOK, gin.H{"analytics": saved.Analytics, "transcript": saved})
+			return
+		}
+	}
+
+	// Fallback: treat as roomId and lookup saved transcripts or debate_transcripts
+	var saved models.SavedDebateTranscript
+	if err := coll.FindOne(dbCtx, bson.M{"roomId": debateId}).Decode(&saved); err == nil {
+		ctx.JSON(http.StatusOK, gin.H{"analytics": saved.Analytics, "transcript": saved})
+		return
+	}
+
+	// No analytics found
+	ctx.JSON(http.StatusNotFound, gin.H{"error": "analytics not found for debate"})
+}
+
+// GetUserAnalytics returns historical analytics for a user
+func GetUserAnalytics(ctx *gin.Context) {
+	userId := ctx.Param("id")
+	if userId == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user id required"})
+		return
+	}
+	obj, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	stats, err := services.GetDebateStats(obj)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user analytics", "message": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"analytics": stats})
 }

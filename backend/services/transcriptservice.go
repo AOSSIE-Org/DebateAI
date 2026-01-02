@@ -184,6 +184,7 @@ func SubmitTranscripts(
 					topic,
 					againstUser.Email,
 					resultFor,
+					roomID,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					forSubmission.Transcripts,
 				)
@@ -198,6 +199,7 @@ func SubmitTranscripts(
 					topic,
 					forUser.Email,
 					resultAgainst,
+					roomID,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					againstSubmission.Transcripts,
 				)
@@ -659,11 +661,97 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 }
 
 // SaveDebateTranscript saves a debate transcript for later viewing
-func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, roomID string, messages []models.Message, transcripts map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := db.MongoDatabase.Collection("saved_debate_transcripts")
+
+	// Compute analytics if possible
+	var analytics *models.DebateAnalytics
+	// Compute from transcripts when available, otherwise try messages
+	totalArgs := 0
+	totalLen := 0
+	rebuttals := 0
+	if transcripts != nil && len(transcripts) > 0 {
+		for k, v := range transcripts {
+			if strings.TrimSpace(v) != "" {
+				totalArgs++
+				totalLen += len(v)
+			}
+			lk := strings.ToLower(k)
+			if strings.Contains(lk, "rebut") {
+				rebuttals++
+			}
+		}
+	} else if messages != nil && len(messages) > 0 {
+		for _, m := range messages {
+			text := strings.TrimSpace(m.Text)
+			if text == "" {
+				continue
+			}
+			// Count user/bot messages as arguments (exclude judge)
+			if !strings.EqualFold(m.Sender, "Judge") {
+				totalArgs++
+				totalLen += len(text)
+			}
+			if strings.Contains(strings.ToLower(m.Phase), "rebut") {
+				rebuttals++
+			}
+		}
+	}
+
+	// Estimate duration from debate_transcripts if roomID provided
+	var totalDurationSecs int64 = 0
+	if roomID != "" {
+		coll := db.MongoDatabase.Collection("debate_transcripts")
+		cur, err := coll.Find(ctx, bson.M{"roomId": roomID})
+		if err == nil {
+			defer cur.Close(ctx)
+			var minCreated time.Time
+			var maxUpdated time.Time
+			first := true
+			for cur.Next(ctx) {
+				var dt models.DebateTranscript
+				if err := cur.Decode(&dt); err != nil {
+					continue
+				}
+				if first {
+					minCreated = dt.CreatedAt
+					maxUpdated = dt.UpdatedAt
+					first = false
+				} else {
+					if dt.CreatedAt.Before(minCreated) {
+						minCreated = dt.CreatedAt
+					}
+					if dt.UpdatedAt.After(maxUpdated) {
+						maxUpdated = dt.UpdatedAt
+					}
+				}
+			}
+			if !minCreated.IsZero() && !maxUpdated.IsZero() && maxUpdated.After(minCreated) {
+				totalDurationSecs = int64(maxUpdated.Sub(minCreated).Seconds())
+			}
+		}
+	}
+
+	avgArgLen := 0.0
+	if totalArgs > 0 {
+		avgArgLen = float64(totalLen) / float64(totalArgs)
+	}
+	avgResp := 0.0
+	if totalArgs > 0 && totalDurationSecs > 0 {
+		avgResp = float64(totalDurationSecs) / float64(totalArgs)
+	}
+	if totalArgs > 0 || totalDurationSecs > 0 || rebuttals > 0 {
+		analytics = &models.DebateAnalytics{
+			TotalArguments:       totalArgs,
+			TotalDurationSeconds: totalDurationSecs,
+			AvgResponseTimeSecs:  avgResp,
+			TotalRebuttals:       rebuttals,
+			AvgArgumentLength:    avgArgLen,
+		}
+	}
 
 	// Check if a similar transcript already exists to prevent duplicates
 	// Look for transcripts with the same user, topic, opponent, and debate type created within the last 5 minutes
@@ -682,14 +770,19 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 
 		// If the result has changed or is "pending", update the transcript
 		if existingTranscript.Result != result || existingTranscript.Result == "pending" {
-			update := bson.M{
-				"$set": bson.M{
-					"result":      result,
-					"messages":    messages,
-					"transcripts": transcripts,
-					"updatedAt":   time.Now(),
-				},
+			updateDoc := bson.M{
+				"result":      result,
+				"messages":    messages,
+				"transcripts": transcripts,
+				"updatedAt":   time.Now(),
 			}
+			if roomID != "" {
+				updateDoc["roomId"] = roomID
+			}
+			if analytics != nil {
+				updateDoc["analytics"] = analytics
+			}
+			update := bson.M{"$set": updateDoc}
 
 			_, err = collection.UpdateOne(ctx, bson.M{"_id": existingTranscript.ID}, update)
 			if err != nil {
@@ -713,6 +806,8 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		Result:      result,
 		Messages:    messages,
 		Transcripts: transcripts,
+		RoomID:      roomID,
+		Analytics:   analytics,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
@@ -945,6 +1040,11 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 
 	// Get recent debates (last 10)
 	recentDebates := make([]map[string]interface{}, 0)
+
+	// Aggregates for analytics
+	totalArgsAll := 0
+	totalRespAll := 0.0
+	analyticsCount := 0
 	for i, transcript := range transcripts {
 		if i >= 10 { // Only get last 10 debates
 			break
@@ -960,8 +1060,7 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 			draws++
 		}
 
-		// Add to recent debates
-		recentDebates = append(recentDebates, map[string]interface{}{
+		rd := map[string]interface{}{
 			"id":         transcript.ID.Hex(),
 			"topic":      transcript.Topic,
 			"result":     transcript.Result,
@@ -969,7 +1068,14 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 			"debateType": transcript.DebateType,
 			"date":       transcript.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			"eloChange":  0, // TODO: Add actual Elo change tracking
-		})
+		}
+		if transcript.Analytics != nil {
+			rd["analytics"] = transcript.Analytics
+			totalArgsAll += transcript.Analytics.TotalArguments
+			totalRespAll += transcript.Analytics.AvgResponseTimeSecs
+			analyticsCount++
+		}
+		recentDebates = append(recentDebates, rd)
 	}
 
 	winRate := 0.0
@@ -977,12 +1083,21 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 		winRate = float64(wins) / float64(totalDebates) * 100
 	}
 
+	avgArgumentsPerDebate := 0.0
+	avgResponseTimeSecs := 0.0
+	if analyticsCount > 0 {
+		avgArgumentsPerDebate = float64(totalArgsAll) / float64(analyticsCount)
+		avgResponseTimeSecs = totalRespAll / float64(analyticsCount)
+	}
+
 	return map[string]interface{}{
-		"totalDebates":  totalDebates,
-		"wins":          wins,
-		"losses":        losses,
-		"draws":         draws,
-		"winRate":       winRate,
-		"recentDebates": recentDebates,
+		"totalDebates":           totalDebates,
+		"wins":                   wins,
+		"losses":                 losses,
+		"draws":                  draws,
+		"winRate":                winRate,
+		"recentDebates":          recentDebates,
+		"avgArgumentsPerDebate":  avgArgumentsPerDebate,
+		"avgResponseTimeSecs":    avgResponseTimeSecs,
 	}, nil
 }
