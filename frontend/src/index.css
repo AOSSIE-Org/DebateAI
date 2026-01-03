@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 @layer base {
-  
   :root {
     --background: 0 0% 100%;
     --foreground: 20 14.3% 4.1%;
@@ -91,6 +90,8 @@
     @apply border-border;
   }
   body {
+    font-family: "Outfit", system-ui, -apple-system, BlinkMacSystemFont,
+      sans-serif;
     @apply bg-background text-foreground;
   }
 }
