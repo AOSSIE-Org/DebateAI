@@ -109,3 +109,8 @@
 .animate-floating {
   animation: floatUp 2s ease-out forwards;
 }
+
+body {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+}
