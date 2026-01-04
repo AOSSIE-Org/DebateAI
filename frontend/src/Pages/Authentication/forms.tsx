@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/authContext';
+import { useCallback } from "react";
 
 interface LoginFormProps {
   startForgotPassword: () => void;
@@ -21,16 +22,30 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
 
   const { login, googleLogin, error, loading } = authContext;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await login(email, password);
-  };
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleGoogleLogin = (response: { credential: string; select_by: string }) => {
+
+const MIN_PASSWORD_LENGTH = 8;
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    return;
+  }
+setLocalError(null);
+  await login(email, password);
+};
+
+
+
+
+const handleGoogleLogin = useCallback(
+  (response: { credential: string; select_by: string }) => {
     const idToken = response.credential;
     googleLogin(idToken);
-  };
-
+  },
+  [googleLogin]
+);
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
@@ -55,7 +70,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     return () => {
       google.accounts.id.cancel();
     };
-  }, []);
+  }, [handleGoogleLogin]);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -74,6 +89,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         onChange={(e) => setPassword(e.target.value)}
         className="mb-1"
       />
+      {localError && (
+        <p className="text-red-500 text-sm mt-2">
+          {localError}
+        </p>
+)}
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
           <Input
@@ -128,10 +148,14 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     startOtpVerification(email);
   };
 
-  const handleGoogleLogin = (response: { credential: string; select_by: string }) => {
+ const handleGoogleLogin = useCallback(
+  (response: { credential: string; select_by: string }) => {
     const idToken = response.credential;
     googleLogin(idToken);
-  };
+  },
+  [googleLogin]
+);
+
 
   useEffect(() => {
     const google = window.google;
@@ -157,7 +181,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     return () => {
       google.accounts.id.cancel();
     };
-  }, []);
+  }, [handleGoogleLogin]);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
