@@ -17,4 +17,5 @@ COPY . .
 EXPOSE 1313
 
 # Run air for live reloading
-CMD ["air"]
+# Run directly without air
+CMD ["go", "run", "cmd/server/main.go"]
