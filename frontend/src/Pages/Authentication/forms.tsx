@@ -32,7 +32,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
     return;
   }
-setLocalError(null);
+  setLocalError(null);
   await login(email, password);
 };
 
