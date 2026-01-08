@@ -69,5 +69,24 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal yaml: %w", err)
 	}
 
+	// Override with environment variables if present
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		fmt.Sscanf(envPort, "%d", &cfg.Server.Port)
+	}
+
+	if envDB := os.Getenv("DATABASE_URI"); envDB != "" {
+		cfg.Database.URI = envDB
+	}
+	if envGemini := os.Getenv("GEMINI_API_KEY"); envGemini != "" {
+		cfg.Gemini.ApiKey = envGemini
+	}
+	if envJWT := os.Getenv("JWT_SECRET"); envJWT != "" {
+		cfg.JWT.Secret = envJWT
+	}
+	if envGoogleClient := os.Getenv("GOOGLE_CLIENT_ID"); envGoogleClient != "" {
+		cfg.GoogleOAuth.ClientID = envGoogleClient
+	}
+	// Add other overrides as needed
+
 	return &cfg, nil
 }
