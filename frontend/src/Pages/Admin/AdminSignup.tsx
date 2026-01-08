@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminLogin } from '@/services/adminService';
 import { Button } from '@/components/ui/button';
@@ -12,38 +12,23 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Check, X, Eye, EyeOff } from 'lucide-react'; // Added Eye icons
+import { Eye, EyeOff } from 'lucide-react';
+// Import shared logic and component
+import { PasswordStrengthMeter, isPasswordValid } from '../Authentication/forms';
 
 export default function AdminSignup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Toggle state
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // 1. Password Strength Logic
-  const requirements = useMemo(() => [
-    { label: 'At least 8 characters', test: (pw: string) => pw.length >= 8 },
-    { label: 'One uppercase letter', test: (pw: string) => /[A-Z]/.test(pw) },
-    { label: 'One lowercase letter', test: (pw: string) => /[a-z]/.test(pw) },
-    { label: 'One number', test: (pw: string) => /[0-9]/.test(pw) },
-    { label: 'One special character (@$!%*?&)', test: (pw: string) => /[@$!%*?&]/.test(pw) },
-  ], []);
-
-  const strengthScore = requirements.filter(req => req.test(password)).length;
-  
-  const getStrengthColor = () => {
-    if (strengthScore <= 2) return 'bg-red-500';
-    if (strengthScore <= 4) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
-  const isPasswordValid = strengthScore === requirements.length;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length > 0 && !isPasswordValid) {
+    
+    // Use the shared helper for validation
+    if (password.length > 0 && !isPasswordValid(password)) {
       setError('Please fulfill all password requirements');
       return;
     }
@@ -53,11 +38,14 @@ export default function AdminSignup() {
 
     try {
       const response = await adminLogin(email, password);
-      localStorage.setItem('adminToken', response.accessToken);
-      localStorage.setItem('admin', JSON.stringify(response.admin));
-      navigate('/admin/dashboard');
+      // Ensure response exists before setting storage
+      if (response?.accessToken) {
+        localStorage.setItem('adminToken', response.accessToken);
+        localStorage.setItem('admin', JSON.stringify(response.admin));
+        navigate('/admin/dashboard');
+      }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || 'An error occurred during login');
     } finally {
       setLoading(false);
     }
@@ -84,21 +72,22 @@ export default function AdminSignup() {
                 placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
                 required
               />
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              {/* --- Show/Hide Toggle Container --- */}
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"} // Dynamic type
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pr-10" // Space for the icon
+                  className="pr-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
                   required
                 />
                 <button
@@ -109,32 +98,9 @@ export default function AdminSignup() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              {/* ----------------------------------- */}
               
-              {/* Visual Strength Meter */}
-              {password.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-300 ${getStrengthColor()}`} 
-                      style={{ width: `${(strengthScore / requirements.length) * 100}%` }}
-                    />
-                  </div>
-                  
-                  {/* Real-time Checklist */}
-                  <div className="grid grid-cols-1 gap-1">
-                    {requirements.map((req, index) => {
-                      const met = req.test(password);
-                      return (
-                        <div key={index} className={`flex items-center text-xs space-x-2 ${met ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
-                          {met ? <Check size={12} /> : <X size={12} />}
-                          <span>{req.label}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Shared Strength Meter with Toast & Animation */}
+              <PasswordStrengthMeter password={password} />
             </div>
 
             {error && (
@@ -146,7 +112,7 @@ export default function AdminSignup() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || (password.length > 0 && !isPasswordValid)}
+              disabled={loading || (password.length > 0 && !isPasswordValid(password))}
             >
               {loading ? 'Processing...' : 'Sign In'}
             </Button>
