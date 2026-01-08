@@ -366,7 +366,6 @@ package websocket
 // 	}
 // }
 
-package websocket
 
 import (
 	"arguehub/services"
@@ -402,8 +401,8 @@ const (
 
 // Global room storage
 var (
-	rooms  = make(map[string]*structs.Room)
-	roomMu sync.Mutex
+	debaterooms  = make(map[string]*structs.Room)
+	debateeroomMu sync.Mutex
 )
 
 func toJSON(data interface{}) (string, error) {
@@ -548,9 +547,13 @@ func startDebate(room *structs.Room) {
 					continue
 				}
 
-				// --- TRANSLATION LOGIC START ---
 				
-				translatedText, err := services.TranslateContent(transcript, "en", "es")
+				
+				
+				// --- TRANSLATION LOGIC START ---
+                receiverLang := getUserPreferredLanguage(receiverUserID) 
+                senderLang := "en" 
+                translatedText, err := services.TranslateContent(transcript, senderLang, receiverLang)
 				finalMessage := transcript
 				isTranslated := false
 				
@@ -577,19 +580,34 @@ func startDebate(room *structs.Room) {
 func generateTranscript(mediaFilePath string) (string, error) {
 	serverURL := "http://localhost:8000/transcribe/batch"
 	payload := map[string]string{"file_path": mediaFilePath}
-	payloadBytes, _ := json.Marshal(payload)
-
-	resp, err := http.Post(serverURL, "application/json", bytes.NewReader(payloadBytes))
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal payload: %w", err)
+	}
+	
+	// Use client with timeout
+	client := &http.Client{Timeout: 30 * time.Second}
++	resp, err := client.Post(serverURL, "application/json", bytes.NewReader(payloadBytes))
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
+    if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("transcription service returned status %d", resp.StatusCode)
+	}
+
 	var result struct {
 		Transcription string `json:"transcription"`
 		Error         string `json:"error"`
 	}
-	json.NewDecoder(resp.Body).Decode(&result)
+	
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+	if result.Error != "" {
+		return "", fmt.Errorf("transcription error: %s", result.Error)
+	}
 	return result.Transcription, nil
 }
 
@@ -619,9 +637,13 @@ func saveUserMedia(conn *websocket.Conn, userID, sectionName string, mediaFileCh
 	filename := fmt.Sprintf("media_%s_%s.webm", userID, sectionName)
 	file, err := os.Create(filename)
 	if err != nil {
+		log.Printf("Failed to create media file %s: %v", filename, err)
+		mediaFileChan <- ""
 		return
 	}
 	defer file.Close()
+
+	writeError := false
 
 	for {
 		room.Mutex.Lock()
@@ -636,8 +658,17 @@ func saveUserMedia(conn *websocket.Conn, userID, sectionName string, mediaFileCh
 			break
 		}
 		if messageType == websocket.BinaryMessage {
-			file.Write(data)
+						
+ 		if _, err := file.Write(data); err != nil {
+			log.Printf("Failed to write media data: %v", err)
+			writeError = true
+				break
+			}
 		}
 	}
-	mediaFileChan <- filename
+	if writeError {
+		mediaFileChan <- ""
+	} else {
+		mediaFileChan <- filename
+	}
 }

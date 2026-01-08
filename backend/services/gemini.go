@@ -11,7 +11,7 @@ import (
 const defaultGeminiModel = "gemini-2.0-flash" // Recommended version for 2026
 
 
-var geminiClient *genai.Client
+var GeminiInstance *genai.Client
 
 // InitGemini (Capitalized) so it can be called from main.go
 func InitGemini(apiKey string) error {
@@ -25,7 +25,7 @@ func InitGemini(apiKey string) error {
 		return err
 	}
 
-	geminiClient = client // Assign to the global variable
+	GeminiInstance = client // Assign to the global variable
 	return nil
 }
 

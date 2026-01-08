@@ -159,14 +159,19 @@ const Chatbox: React.FC<{
     onTypingChange(text.length > 0, text);
   };
 
+  const userLanguage?: string;
+  const opponentLanguage?: string;
+
   const handleSendMessage = () => {
   if (!inputText.trim() || disabled || !isMyTurn) return;
-
+   
   // 1. Get the languages. 
   // In a real app, these should come from your settings state or props.
   // For now, we use "en" and "es" as placeholders.
   const senderLang = "en"; 
   const targetLang = "es";
+  const senderLang = userLanguage || "en"; 
++ const targetLang = opponentLanguage || "en";
 
   // 2. Pass the new arguments to onSendMessage
   // This matches the update we need to make in your WebSocket handler

@@ -4,19 +4,9 @@ import (
 	"arguehub/services"
 	"net/http"
 	"github.com/gin-gonic/gin"
+	"arguehub/dto"
 )
 
-// TranslationRequest defines the incoming JSON from the React frontend
-type TranslationRequest struct {
-	Text       string `json:"text"`
-	TargetLang string `json:"target_lang"`
-}
-
-// TranslationResponse defines the outgoing JSON back to the frontend
-type TranslationResponse struct {
-	TranslatedText string `json:"translatedText"`
-	Error          string `json:"error,omitempty"`
-}
 
 func TranslationHandler(c *gin.Context) {
 	var req TranslationRequest
@@ -29,7 +19,11 @@ func TranslationHandler(c *gin.Context) {
 
 	// 2. Call the Gemini translation service
 	// We assume source is "en" as the bot generates English by default
-	translated, err := services.TranslateContent(req.Text, "en", req.TargetLang)
+	sourceLang := req.SourceLang
+    if sourceLang == "" {
+		sourceLang = "en" // Default to English for bot responses
+	}
+	translated, err := services.TranslateContent(req.Text, sourceLang, req.TargetLang)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Translation service failed"})
 		return

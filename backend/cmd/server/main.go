@@ -13,6 +13,7 @@ import (
 	"arguehub/services"
 	"arguehub/utils"
 	"arguehub/websocket"
+	"arguehub/dto"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -27,8 +28,7 @@ func main() {
         log.Println("No .env file found")
     }
 
-    // Now os.Getenv("GEMINI_API_KEY") will work!
-    apiKey := os.Getenv("GEMINI_API_KEY")
+    
     // 1. Load the configuration
     cfg, err := config.LoadConfig("./config/config.prod.yml")
     if err != nil {
@@ -37,7 +37,7 @@ func main() {
 
     // Initialize Gemini for Translation
     // Assuming your cfg has an APIKey field, or use os.Getenv
-    geminiKey := os.Getenv("GEMINI_API_KEY") 
+    // geminiKey := os.Getenv("GEMINI_API_KEY") 
     if err := services.InitGemini(geminiKey); err != nil {
         log.Printf("⚠️ Warning: Gemini failed to initialize: %v", err)
     } else {
@@ -122,7 +122,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
-    router.POST("/api/translate", TranslationHandler)
+    
 
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
@@ -146,6 +146,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.POST("/api/update-score", routes.UpdateScoreRouteHandler)
 		auth.GET("/api/leaderboard", routes.GetGamificationLeaderboardRouteHandler)
 
+		auth.POST("/api/translate", websocket.TranslationHandler) 
 		routes.SetupDebateVsBotRoutes(auth)
 
 		// WebSocket signaling endpoint (handles auth internally)
@@ -185,37 +186,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	log.Println("Admin routes registered")
 
 	// Debate spectator WebSocket handler (no auth required for anonymous spectators)
-	// FIX: Use websocket.DebateWebsocketHandler (moved to websocket package)
+	
 	router.GET("/ws/debate/:debateID", websocket.DebateWebsocketHandler)
 
 	return router
 }
 
 
-type TranslationRequest struct {
-	Text       string `json:"text"`
-	TargetLang string `json:"target_lang"`
-}
-
-type TranslationResponse struct {
-	TranslatedText string `json:"translatedText"`
-}
-
-func TranslationHandler(c *gin.Context) {
-	var req TranslationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request"})
-		return
-	}
-
-	// This calls the TranslateContent function we created in services/gemini.go
-	translated, err := services.TranslateContent(req.Text, "en", req.TargetLang)
-	if err != nil {
-		c.JSON(500, gin.H{"error": "Translation failed"})
-		return
-	}
-
-	c.JSON(200, TranslationResponse{
-		TranslatedText: translated,
-	})
-}

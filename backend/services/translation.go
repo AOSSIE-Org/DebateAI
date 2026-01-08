@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"github.com/debateai/DebateAI/backend/services/gemini"
+	"arguehub/services/gemini" 
+	
 )
 
 func TranslateContent(content, fromLang, toLang string) (string, error) {

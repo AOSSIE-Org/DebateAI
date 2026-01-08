@@ -485,11 +485,23 @@ const DebateRoom: React.FC = () => {
     setInterimInput("");
     if (isRecognizing) stopRecognition();
   };
+
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
 const handleBotTurn = async () => {
   try {
     const turnType = turnTypes[state.currentPhase][state.phaseStep];
+    
+    
     let context = "";
-    // ... (Your context logic is perfect)
+    if (turnType === "statement") {
+      context = "Make your statement";
+    } else if (turnType === "question") {
+      context = "Ask a clear and concise question challenging your opponent.";
+    } else if (turnType === "answer") {
+      const lastMsg = state.messages[state.messages.length - 1];
+      context = lastMsg ? `Answer this question: ${lastMsg.text}` : "Provide your answer";
+    }
 
     // 1. Get Bot logic
     const { response } = await sendDebateMessage({
@@ -507,13 +519,22 @@ const handleBotTurn = async () => {
     // 2. Translation layer
     if (targetLang !== "en") {
       try {
-        const translatedResponse = await fetch("http://localhost:8080/api/translate", {
+        const token = localStorage.getItem("token"); // Get your Auth token
+        const translatedResponse = await fetch(`${API_BASE}/api/translate`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+          },
           body: JSON.stringify({ text: botText, target_lang: targetLang }),
         });
-        const data = await translatedResponse.json();
-        if (data.translatedText) botText = data.translatedText;
+         if (!translatedResponse.ok) {
+          throw new Error(`Translation failed: ${translatedResponse.status}`);
+        }
+        if (translatedResponse.ok) { // CHECK RESPONSE STATUS
+          const data = await translatedResponse.json();
+          if (data.translatedText) botText = data.translatedText;
+        }
       } catch (err) {
         console.error("Translation failed, using English:", err);
       }
@@ -525,16 +546,23 @@ const handleBotTurn = async () => {
       phase: phases[state.currentPhase].name,
     };
 
-    // 3. Single state update & Turn advance
-    setState((prev) => {
-      const updatedState = { ...prev, messages: [...prev.messages, botMessage] };
-      setTimeout(() => advanceTurn(updatedState), 100);
-      return updatedState;
-    });
+    // 3. CLEAN STATE UPDATE (No setTimeout inside setState)
+    
+    setState((prev) => ({
+  ...prev,
+  messages: [...prev.messages, botMessage]
+}));
+
+
+    setTimeout(() => {
+  setState((currentState) => {
+    advanceTurn(currentState);
+    return currentState;
+  });
+}, 100);
 
   } catch (error) {
     console.error("Bot error:", error);
-    // Handle catastrophic bot failure (e.g., API down)
     const errorMessage: Message = {
       sender: "Bot",
       text: "I encountered an error. Please continue.",
@@ -549,7 +577,6 @@ const handleBotTurn = async () => {
     botTurnRef.current = false;
   }
 };
-
   const judgeDebateResult = async (messages: Message[]) => {
     try {
       console.log("Starting judgment with messages:", messages);
