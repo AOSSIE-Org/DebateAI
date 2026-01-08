@@ -8,6 +8,7 @@ import (
 
 	"arguehub/db"
 	"arguehub/models"
+	"arguehub/services"
 	"arguehub/utils"
 
 	"github.com/gin-gonic/gin"
@@ -95,6 +96,51 @@ func CreateCommentHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
 		return
 	}
+
+	// Notify the owner of the transcript or parent comment
+	go func() {
+		if req.ParentID != nil && *req.ParentID != "" {
+			// Notify parent comment author
+			var parent models.Comment
+			if err := db.MongoDatabase.Collection("comments").FindOne(context.Background(), bson.M{"_id": comment.ParentID}).Decode(&parent); err == nil {
+				if parent.UserID != userID {
+					services.CreateNotification(
+						parent.UserID,
+						models.NotificationTypeComment,
+						"New Reply",
+						user.DisplayName+" replied to your comment",
+						"/debate/"+req.TranscriptID,
+					)
+				}
+			}
+		} else {
+			// Notify transcript owner
+			var transcript models.SavedDebateTranscript
+			if err := db.MongoDatabase.Collection("saved_debate_transcripts").FindOne(context.Background(), bson.M{"_id": transcriptObjectID}).Decode(&transcript); err == nil {
+				if transcript.UserID != userID {
+					// Check if it's a post to customize the message
+					var post models.DebatePost
+					isPost := false
+					if err := db.MongoDatabase.Collection("debate_posts").FindOne(context.Background(), bson.M{"transcriptId": transcriptObjectID}).Decode(&post); err == nil {
+						isPost = true
+					}
+
+					msg := "commented on your debate"
+					if isPost {
+						msg = "commented on your post"
+					}
+
+					services.CreateNotification(
+						transcript.UserID,
+						models.NotificationTypeComment,
+						"New Comment",
+						user.DisplayName+" "+msg,
+						"/view-debate/"+req.TranscriptID,
+					)
+				}
+			}
+		}
+	}()
 
 	// Update comment count
 	db.MongoDatabase.Collection("debate_posts").UpdateOne(ctx,
