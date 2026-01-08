@@ -485,69 +485,70 @@ const DebateRoom: React.FC = () => {
     setInterimInput("");
     if (isRecognizing) stopRecognition();
   };
+const handleBotTurn = async () => {
+  try {
+    const turnType = turnTypes[state.currentPhase][state.phaseStep];
+    let context = "";
+    // ... (Your context logic is perfect)
 
-  const handleBotTurn = async () => {
-    try {
-      const turnType = turnTypes[state.currentPhase][state.phaseStep];
-      let context = "";
-      if (turnType === "statement") {
-        context = "Make your statement";
-      } else if (turnType === "question") {
-        context = "Ask a clear and concise question challenging your opponent.";
-      } else if (turnType === "answer") {
-        const lastMessage = state.messages[state.messages.length - 1];
-        context = lastMessage
-          ? `Answer this question: ${lastMessage.text}`
-          : "Provide your answer";
+    // 1. Get Bot logic
+    const { response } = await sendDebateMessage({
+      botLevel: debateData.botLevel,
+      topic: debateData.topic,
+      history: state.messages,
+      botName: debateData.botName,
+      stance: state.botStance,
+      context,
+    });
+
+    let botText = response || "I need to think about that...";
+    const targetLang = user?.language || "en";
+
+    // 2. Translation layer
+    if (targetLang !== "en") {
+      try {
+        const translatedResponse = await fetch("http://localhost:8080/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: botText, target_lang: targetLang }),
+        });
+        const data = await translatedResponse.json();
+        if (data.translatedText) botText = data.translatedText;
+      } catch (err) {
+        console.error("Translation failed, using English:", err);
       }
-
-      const { response } = await sendDebateMessage({
-        botLevel: debateData.botLevel,
-        topic: debateData.topic,
-        history: state.messages,
-        botName: debateData.botName,
-        stance: state.botStance,
-        context,
-      });
-
-      const botMessage: Message = {
-        sender: "Bot",
-        text: response || "I need to think about that...",
-        phase: phases[state.currentPhase].name,
-      };
-
-      setState((prev) => {
-        const updatedState = {
-          ...prev,
-          messages: [...prev.messages, botMessage],
-        };
-        // Advance turn after bot responds
-        setTimeout(() => {
-          advanceTurn(updatedState);
-        }, 100); // Small delay to ensure state is updated
-        return updatedState;
-      });
-    } catch (error) {
-      console.error("Bot error:", error);
-      // Even on error, advance turn to prevent getting stuck
-      setState((prev) => {
-        const errorMessage: Message = {
-          sender: "Bot",
-          text: "I encountered an error. Please continue.",
-          phase: phases[prev.currentPhase].name,
-        };
-        const updatedState = {
-          ...prev,
-          messages: [...prev.messages, errorMessage],
-          isBotTurn: false, // Reset bot turn on error
-        };
-        advanceTurn(updatedState);
-        return updatedState;
-      });
-    } finally {
-      botTurnRef.current = false;
     }
-  };
+
+    const botMessage: Message = {
+      sender: "Bot",
+      text: botText,
+      phase: phases[state.currentPhase].name,
+    };
+
+    // 3. Single state update & Turn advance
+    setState((prev) => {
+      const updatedState = { ...prev, messages: [...prev.messages, botMessage] };
+      setTimeout(() => advanceTurn(updatedState), 100);
+      return updatedState;
+    });
+
+  } catch (error) {
+    console.error("Bot error:", error);
+    // Handle catastrophic bot failure (e.g., API down)
+    const errorMessage: Message = {
+      sender: "Bot",
+      text: "I encountered an error. Please continue.",
+      phase: phases[state.currentPhase].name,
+    };
+    setState((prev) => {
+      const updatedState = { ...prev, messages: [...prev.messages, errorMessage], isBotTurn: false };
+      setTimeout(() => advanceTurn(updatedState), 100);
+      return updatedState;
+    });
+  } finally {
+    botTurnRef.current = false;
+  }
+};
 
   const judgeDebateResult = async (messages: Message[]) => {
     try {

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"arguehub/services"
 	"arguehub/db"
 	"arguehub/utils"
 	"github.com/gin-gonic/gin"
@@ -73,6 +74,11 @@ type Message struct {
 	UserID   string          `json:"userId,omitempty"`
 	Content  string          `json:"content,omitempty"`
 	Extra    json.RawMessage `json:"extra,omitempty"`
+    // Translation-related fields
+	OriginalText   string `json:"originalText,omitempty"`   // Stores the untranslated text
+	SenderLanguage string `json:"senderLanguage,omitempty"` // The language the sender used
+	TargetLanguage string `json:"targetLanguage,omitempty"` // The language the receiver wants
+	IsTranslated   bool   `json:"isTranslated,omitempty"`   // Tells the UI to show the toggle
 	// New fields for real-time communication
 	IsTyping    bool   `json:"isTyping,omitempty"`
 	IsSpeaking  bool   `json:"isSpeaking,omitempty"`
@@ -448,8 +454,7 @@ func WebsocketHandler(c *gin.Context) {
 		switch message.Type {
 		case "join":
 			// Handle join message - just acknowledge it
-		case "message":
-			handleChatMessage(room, conn, message, client, roomID)
+		
 		case "typing":
 			handleTypingIndicator(room, conn, message, client, roomID)
 		case "speaking":
@@ -470,6 +475,28 @@ func WebsocketHandler(c *gin.Context) {
 			handleMuteRequest(room, conn, message, client, roomID)
 		case "unmute":
 			handleUnmuteRequest(room, conn, message, client, roomID)
+        case "message":
+            // Check if translation is requested and necessary
+            if message.SenderLanguage != "" && message.TargetLanguage != "" && 
+               !strings.EqualFold(message.SenderLanguage, message.TargetLanguage) {
+                
+                // Call the translation service (Ensure you created services.TranslateContent)
+                translated, err := services.TranslateContent(
+                    message.Content, 
+                    message.SenderLanguage, 
+                    message.TargetLanguage,
+                )
+                
+                if err == nil {
+                    // Store original for the "View Original" toggle feature
+                    message.OriginalText = message.Content 
+                    message.Content = translated
+                    message.IsTranslated = true
+                } else {
+                    log.Printf("[translation] Error translating message: %v", err)
+                }
+            }
+            handleChatMessage(room, conn, message, client, roomID)
 		default:
 			if message.Type == "requestOffer" && client.IsSpectator {
 				var req map[string]interface{}
@@ -500,33 +527,34 @@ func WebsocketHandler(c *gin.Context) {
 	}
 }
 
-// handleChatMessage handles chat messages with enhanced features
 func handleChatMessage(room *Room, conn *websocket.Conn, message Message, client *Client, roomID string) {
-	// Add timestamp if not provided
-	if message.Timestamp == 0 {
-		message.Timestamp = time.Now().Unix()
-	}
+    if message.Timestamp == 0 {
+        message.Timestamp = time.Now().Unix()
+    }
 
-	// Reset typing/speaking indicators
-	room.Mutex.Lock()
-	client.IsTyping = false
-	client.IsSpeaking = false
-	client.PartialText = ""
-	room.Mutex.Unlock()
+    room.Mutex.Lock()
+    client.IsTyping = false
+    client.IsSpeaking = false
+    client.PartialText = ""
+    room.Mutex.Unlock()
 
-	// Broadcast to other clients
-	for _, r := range snapshotRecipients(room, conn) {
-		response := map[string]interface{}{
-			"type":      "message",
-			"userId":    client.UserID,
-			"username":  client.Username,
-			"content":   message.Content,
-			"timestamp": message.Timestamp,
-			"mode":      message.Mode,
-		}
-		if err := r.SafeWriteJSON(response); err != nil {
-		}
-	}
+    // Broadcast to other clients
+    for _, r := range snapshotRecipients(room, conn) {
+        response := map[string]interface{}{
+            "type":           "message",
+            "userId":         client.UserID,
+            "username":       client.Username,
+            "content":        message.Content,      // The translated text
+            "originalText":   message.OriginalText, // The raw text for the "show original" button
+            "isTranslated":   message.IsTranslated, // Boolean flag for UI
+            "senderLanguage": message.SenderLanguage,
+            "timestamp":      message.Timestamp,
+            "mode":           message.Mode,
+        }
+        if err := r.SafeWriteJSON(response); err != nil {
+            log.Printf("Error sending message: %v", err)
+        }
+    }
 }
 
 // handleTypingIndicator handles typing indicators

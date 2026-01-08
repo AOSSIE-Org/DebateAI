@@ -365,3 +365,279 @@ package websocket
 // 		mediaFileChan <- ""
 // 	}
 // }
+
+package websocket
+
+import (
+	"arguehub/services"
+	"arguehub/structs"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+)
+
+// Constants for message types
+const (
+	MessageTypeDebateStart          = "DEBATE_START"
+	MessageTypeDebateEnd            = "DEBATE_END"
+	MessageTypeSectionStart         = "SECTION_START"
+	MessageTypeSectionEnd           = "SECTION_END"
+	MessageTypeTurnStart            = "TURN_START"
+	MessageTypeTurnEnd              = "TURN_END"
+	MessageTypeGeneratingTranscript = "GENERATING_TRANSCRIPT"
+	MessageTypeChatMessage          = "CHAT_MESSAGE"
+	PingMessage                     = "PING"
+
+	ReadBufferSize  = 131022
+	WriteBufferSize = 131022
+)
+
+// Global room storage
+var (
+	rooms  = make(map[string]*structs.Room)
+	roomMu sync.Mutex
+)
+
+func toJSON(data interface{}) (string, error) {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+func sendMessage(conn *websocket.Conn, messageType string, data interface{}) error {
+	content, err := toJSON(data)
+	if err != nil {
+		return fmt.Errorf("error marshaling data: %w", err)
+	}
+
+	message := structs.Message{
+		Type:    messageType,
+		Content: content,
+	}
+	return conn.WriteJSON(message)
+}
+
+func broadcastMessage(room *structs.Room, messageType string, data interface{}) {
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	for userID, conn := range room.Users {
+		if err := sendMessage(conn, messageType, data); err != nil {
+			conn.Close()
+			delete(room.Users, userID)
+		}
+	}
+}
+
+func createOrJoinRoom(userID string, conn *websocket.Conn) (*structs.Room, error) {
+	roomMu.Lock()
+	defer roomMu.Unlock()
+
+	for _, room := range rooms {
+		room.Mutex.Lock()
+		if existingConn, exists := room.Users[userID]; exists {
+			existingConn.Close()
+			room.Users[userID] = conn
+			room.Mutex.Unlock()
+			return room, nil
+		}
+		if len(room.Users) < 2 {
+			room.Users[userID] = conn
+			room.Mutex.Unlock()
+			return room, nil
+		}
+		room.Mutex.Unlock()
+	}
+
+	newRoom := &structs.Room{
+		Users:      map[string]*websocket.Conn{userID: conn},
+		DebateFmt:  getDebateFormat(),
+		TurnActive: make(map[string]bool),
+	}
+	roomID := generateRoomID()
+	rooms[roomID] = newRoom
+	return newRoom, nil
+}
+
+func WebsocketHandler(ctx *gin.Context) {
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+
+	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	userID := ctx.Query("userId")
+	if userID == "" {
+		return
+	}
+
+	room, err := createOrJoinRoom(userID, conn)
+	if err != nil {
+		return
+	}
+
+	for {
+		room.Mutex.Lock()
+		if len(room.Users) == 2 && !room.DebateStarted {
+			room.DebateStarted = true
+			room.Mutex.Unlock()
+			break
+		}
+		room.Mutex.Unlock()
+		time.Sleep(1 * time.Second)
+	}
+
+	startDebate(room)
+	closeConnectionsAndExpireRoom(room)
+}
+
+func startDebate(room *structs.Room) {
+	broadcastMessage(room, MessageTypeDebateStart, nil)
+
+	for _, section := range room.DebateFmt.Sections {
+		broadcastMessage(room, MessageTypeSectionStart, structs.CurrentStatus{Section: section.Name})
+
+		for userID, conn := range room.Users {
+			room.Mutex.Lock()
+			room.CurrentTurn = userID
+			room.TurnActive[userID] = true
+			room.Mutex.Unlock()
+
+			turnStatus := structs.CurrentStatus{
+				CurrentTurn: userID,
+				Section:     section.Name,
+				Duration:    int(section.Duration.Seconds()),
+			}
+
+			time.Sleep(time.Second * 2)
+			broadcastMessage(room, MessageTypeTurnStart, turnStatus)
+
+			mediaFileChan := make(chan string)
+			go saveUserMedia(conn, userID, section.Name, mediaFileChan, room)
+
+			time.Sleep(section.Duration)
+			broadcastMessage(room, MessageTypeTurnEnd, nil)
+
+			room.Mutex.Lock()
+			room.TurnActive[userID] = false
+			room.Mutex.Unlock()
+
+			mediaFilePath := <-mediaFileChan
+			if mediaFilePath != "" {
+				broadcastMessage(room, MessageTypeGeneratingTranscript, structs.ChatMessage{
+					Sender:  userID,
+					Message: "Transcript is being generated...",
+				})
+
+				transcript, err := generateTranscript(mediaFilePath)
+				if err != nil {
+					log.Printf("Transcript error: %v", err)
+					continue
+				}
+
+				// --- TRANSLATION LOGIC START ---
+				
+				translatedText, err := services.TranslateContent(transcript, "en", "es")
+				finalMessage := transcript
+				isTranslated := false
+				
+				if err == nil && translatedText != "" {
+					finalMessage = translatedText
+					isTranslated = true
+				}
+				// --- TRANSLATION LOGIC END ---
+
+				broadcastMessage(room, MessageTypeChatMessage, structs.ChatMessage{
+					Sender:       userID,
+					Message:      finalMessage,    // Show translated text by default
+					OriginalText: transcript,      // Keep original for the "See Original" button
+					IsTranslated: isTranslated,
+				})
+			}
+		}
+		broadcastMessage(room, MessageTypeSectionEnd, nil)
+	}
+
+	broadcastMessage(room, MessageTypeDebateEnd, nil)
+}
+
+func generateTranscript(mediaFilePath string) (string, error) {
+	serverURL := "http://localhost:8000/transcribe/batch"
+	payload := map[string]string{"file_path": mediaFilePath}
+	payloadBytes, _ := json.Marshal(payload)
+
+	resp, err := http.Post(serverURL, "application/json", bytes.NewReader(payloadBytes))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Transcription string `json:"transcription"`
+		Error         string `json:"error"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+	return result.Transcription, nil
+}
+
+func generateRoomID() string {
+	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+func getDebateFormat() structs.DebateFormat {
+	return structs.DebateFormat{
+		Sections: []structs.Section{
+			{Name: "Opening", Duration: 30 * time.Second},
+		},
+	}
+}
+
+func closeConnectionsAndExpireRoom(room *structs.Room) {
+	room.Mutex.Lock()
+	for userID, conn := range room.Users {
+		conn.Close()
+		delete(room.Users, userID)
+	}
+	room.Mutex.Unlock()
+}
+
+func saveUserMedia(conn *websocket.Conn, userID, sectionName string, mediaFileChan chan<- string, room *structs.Room) {
+	defer close(mediaFileChan)
+	filename := fmt.Sprintf("media_%s_%s.webm", userID, sectionName)
+	file, err := os.Create(filename)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	for {
+		room.Mutex.Lock()
+		active := room.TurnActive[userID]
+		room.Mutex.Unlock()
+		if !active {
+			break
+		}
+
+		messageType, data, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		if messageType == websocket.BinaryMessage {
+			file.Write(data)
+		}
+	}
+	mediaFileChan <- filename
+}

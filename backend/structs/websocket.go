@@ -7,9 +7,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+
 type Message struct {
-	Type    string `json:"type"`
-	Content string `json:"content,omitempty"`
+	Type           string `json:"type"`
+	Room           string `json:"room,omitempty"`
+	Username       string `json:"username,omitempty"`
+	UserID         string `json:"userId,omitempty"`
+	Content        string `json:"content,omitempty"`
+	OriginalText   string `json:"originalText,omitempty"`   
+	SenderLanguage string `json:"senderLanguage,omitempty"` 
+	TargetLanguage string `json:"targetLanguage,omitempty"` 
+	IsTranslated   bool   `json:"isTranslated,omitempty"`   
+	Timestamp      int64  `json:"timestamp,omitempty"`
 }
 
 type CurrentStatus struct {

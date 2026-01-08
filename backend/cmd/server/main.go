@@ -18,16 +18,36 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func main() {
-	// Load the configuration from the specified YAML file
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
-	if err != nil {
-		panic("Failed to load config: " + err.Error())
-	}
 
-	services.InitDebateVsBotService(cfg)
-	services.InitCoachService()
-	services.InitRatingService(cfg)
+import "github.com/joho/godotenv"
+
+func main() {
+    // Load .env file
+    if err := godotenv.Load(); err != nil {
+        log.Println("No .env file found")
+    }
+
+    // Now os.Getenv("GEMINI_API_KEY") will work!
+    apiKey := os.Getenv("GEMINI_API_KEY")
+    // 1. Load the configuration
+    cfg, err := config.LoadConfig("./config/config.prod.yml")
+    if err != nil {
+        panic("Failed to load config: " + err.Error())
+    }
+
+    // Initialize Gemini for Translation
+    // Assuming your cfg has an APIKey field, or use os.Getenv
+    geminiKey := os.Getenv("GEMINI_API_KEY") 
+    if err := services.InitGemini(geminiKey); err != nil {
+        log.Printf("⚠️ Warning: Gemini failed to initialize: %v", err)
+    } else {
+        log.Println("✅ Gemini AI initialized for translations")
+    }
+    // ---------------------------
+
+    services.InitDebateVsBotService(cfg)
+    services.InitCoachService()
+    services.InitRatingService(cfg)
 
 	// Connect to MongoDB using the URI from the configuration
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
@@ -42,7 +62,7 @@ func main() {
 	log.Println("Casbin RBAC initialized")
 
 	// Connect to Redis if configured
-	// FIX: Changed .URL to .Addr to match config.go definition
+	
 	if cfg.Redis.Addr != "" {
 		redisURL := cfg.Redis.Addr
 		if redisURL == "" {
@@ -84,7 +104,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
 
-	// Configure CORS for your frontend (e.g., localhost:5173 for Vite)
+	// Configure CORS for  frontend (e.g., localhost:5173 for Vite)
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -102,6 +122,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
+    router.POST("/api/translate", TranslationHandler)
 
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
@@ -110,6 +131,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.GET("/ws/matchmaking", websocket.MatchmakingHandler)
 	router.GET("/ws/gamification", websocket.GamificationWebSocketHandler)
 
+	
 	// Protected routes (JWT auth)
 	auth := router.Group("/")
 	auth.Use(middlewares.AuthMiddleware("./config/config.prod.yml"))
@@ -167,4 +189,33 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.GET("/ws/debate/:debateID", websocket.DebateWebsocketHandler)
 
 	return router
+}
+
+
+type TranslationRequest struct {
+	Text       string `json:"text"`
+	TargetLang string `json:"target_lang"`
+}
+
+type TranslationResponse struct {
+	TranslatedText string `json:"translatedText"`
+}
+
+func TranslationHandler(c *gin.Context) {
+	var req TranslationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// This calls the TranslateContent function we created in services/gemini.go
+	translated, err := services.TranslateContent(req.Text, "en", req.TargetLang)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Translation failed"})
+		return
+	}
+
+	c.JSON(200, TranslationResponse{
+		TranslatedText: translated,
+	})
 }

@@ -4,7 +4,9 @@ import { Mic, MicOff, Type, Volume2 } from 'lucide-react';
 
 export interface ChatMessage {
   isUser: boolean;
-  text: string;
+  text: string; // This will hold the translated text
+  originalText?: string; 
+  isTranslated?: boolean; 
   timestamp?: number;
   isTyping?: boolean;
   isSpeaking?: boolean;
@@ -43,10 +45,28 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognition;
 }
 
+const MessageContent: React.FC<{ message: ChatMessage }> = ({ message }) => {
+  const [showOriginal, setShowOriginal] = useState(false);
+
+  if (!message.isTranslated) return <>{message.text}</>;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p>{showOriginal ? message.originalText : message.text}</p>
+      <button 
+        onClick={() => setShowOriginal(!showOriginal)}
+        className="text-[10px] underline text-left opacity-80 hover:opacity-100 transition-opacity"
+      >
+        {showOriginal ? "Show Translation" : "See Original"}
+      </button>
+    </div>
+  );
+};
+
 const Chatbox: React.FC<{
   messages: ChatMessage[];
   transcriptStatus: { loading: boolean; isUser: boolean };
-  onSendMessage: (message: string, mode: 'type' | 'speak') => void;
+  onSendMessage: (message: string, mode: 'type' | 'speak', senderLang: string, targetLang: string) => void;
   onTypingChange: (isTyping: boolean, partialText?: string) => void;
   onSpeakingChange: (isSpeaking: boolean) => void;
   typingIndicators: TypingIndicator[];
@@ -140,18 +160,28 @@ const Chatbox: React.FC<{
   };
 
   const handleSendMessage = () => {
-    if (!inputText.trim() || disabled || !isMyTurn) return;
+  if (!inputText.trim() || disabled || !isMyTurn) return;
 
-    onSendMessage(inputText.trim(), inputMode);
-    setInputText('');
-    setFinalText('');
-    setInterimText('');
-    onTypingChange(false);
+  // 1. Get the languages. 
+  // In a real app, these should come from your settings state or props.
+  // For now, we use "en" and "es" as placeholders.
+  const senderLang = "en"; 
+  const targetLang = "es";
 
-    if (isRecognizing) {
-      stopRecognition();
-    }
-  };
+  // 2. Pass the new arguments to onSendMessage
+  // This matches the update we need to make in your WebSocket handler
+  onSendMessage(inputText.trim(), inputMode, senderLang, targetLang);
+
+  // 3. Reset the UI
+  setInputText('');
+  setFinalText('');
+  setInterimText('');
+  onTypingChange(false);
+
+  if (isRecognizing) {
+    stopRecognition();
+  }
+};
 
   const startRecognition = () => {
     if (recognitionRef.current && !isRecognizing) {
@@ -252,7 +282,7 @@ const Chatbox: React.FC<{
                   </div>
                 )}
               </div>
-              {message.text}
+              <MessageContent message={message} />
               {message.timestamp && (
                 <div className='text-xs opacity-70 mt-1'>
                   {new Date(message.timestamp).toLocaleTimeString()}
