@@ -9,6 +9,7 @@ import (
 
 	"arguehub/db"
 	"arguehub/models"
+	"arguehub/services"
 	"arguehub/websocket"
 
 	"github.com/gin-gonic/gin"
@@ -85,11 +86,11 @@ func AwardBadge(c *gin.Context) {
 
 	// Validate badge name
 	validBadges := map[string]bool{
-		"Novice":    true,
-		"Streak5":   true,
+		"Novice":     true,
+		"Streak5":    true,
 		"FactMaster": true,
-		"FirstWin":  true,
-		"Debater10": true,
+		"FirstWin":   true,
+		"Debater10":  true,
 	}
 
 	if !validBadges[req.BadgeName] {
@@ -145,6 +146,17 @@ func AwardBadge(c *gin.Context) {
 		// Don't fail the request, badge was already awarded
 	}
 
+	// Create notification for the badge
+	go func() {
+		services.CreateNotification(
+			targetUserID,
+			models.NotificationTypeBadge,
+			"New Badge Earned!",
+			fmt.Sprintf("You have earned the %s badge!", req.BadgeName),
+			"/profile",
+		)
+	}()
+
 	// Broadcast badge award via WebSocket
 	websocket.BroadcastGamificationEvent(models.GamificationEvent{
 		Type:      "badge_awarded",
@@ -154,9 +166,9 @@ func AwardBadge(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "Badge awarded successfully",
-		"badge":    req.BadgeName,
-		"userId":   targetUserID.Hex(),
+		"message": "Badge awarded successfully",
+		"badge":   req.BadgeName,
+		"userId":  targetUserID.Hex(),
 	})
 }
 
@@ -250,8 +262,8 @@ func UpdateScore(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Score updated successfully",
-		"points":  req.Points,
+		"message":  "Score updated successfully",
+		"points":   req.Points,
 		"newScore": updatedUser.Score,
 	})
 }
@@ -436,4 +448,3 @@ func parseInt(s string) (int, error) {
 	_, err := fmt.Sscanf(s, "%d", &result)
 	return result, err
 }
-

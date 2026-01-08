@@ -10,6 +10,7 @@ import (
 
 	"arguehub/db"
 	"arguehub/models"
+	"arguehub/services"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -380,6 +381,17 @@ func JoinTeam(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join team"})
 		return
 	}
+
+	// Notify team captain
+	go func() {
+		services.CreateNotification(
+			team.CaptainID,
+			models.NotificationTypeSystem,
+			"New Team Member",
+			user.DisplayName+" has joined your team "+team.Name,
+			"/team/"+teamID,
+		)
+	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully joined team"})
 }
