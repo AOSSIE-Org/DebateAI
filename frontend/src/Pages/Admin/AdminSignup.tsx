@@ -27,11 +27,7 @@ export default function AdminSignup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Use the shared helper for validation
-    if (password.length > 0 && !isPasswordValid(password)) {
-      setError('Please fulfill all password requirements');
-      return;
-    }
+    
     
     setError('');
     setLoading(true);
@@ -99,8 +95,7 @@ export default function AdminSignup() {
                 </button>
               </div>
               
-              {/* Shared Strength Meter with Toast & Animation */}
-              <PasswordStrengthMeter password={password} />
+              
             </div>
 
             {error && (
@@ -112,7 +107,8 @@ export default function AdminSignup() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || (password.length > 0 && !isPasswordValid(password))}
+              disabled={loading}
+
             >
               {loading ? 'Processing...' : 'Sign In'}
             </Button>

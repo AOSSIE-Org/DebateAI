@@ -92,12 +92,12 @@ export const LoginForm = ({ startForgotPassword, infoMessage }: { startForgotPas
 
   useEffect(() => {
     const google = window.google;
-    if (!google?.accounts) return;
+     if (!google?.accounts) return;
     google.accounts.id.initialize({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       callback: (res: any) => googleLogin(res.credential),
     });
-    const btn = document.getElementById('googleSignInButton');
+     const btn = document.getElementById('googleSignInButton');
     if (btn) google.accounts.id.renderButton(btn, { theme: 'outline', size: 'large', text: 'signin_with', width: '300' });
   }, [googleLogin]);
 
@@ -129,21 +129,23 @@ export const SignUpForm = ({ startOtpVerification }: { startOtpVerification: (em
   const [passwordVisible, setPasswordVisible] = useState(false);
   const authContext = useContext(AuthContext);
 
-  if (!authContext) throw new Error('SignUpForm must be used within an AuthProvider');
-  const { signup, googleLogin, error, loading } = authContext;
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) { authContext.handleError('Passwords do not match'); return; }
+    setLocalError('');
+    if (password !== confirmPassword) { setLocalError('Passwords do not match'); return; }
     
-    // FIX: Only proceed to OTP if signup actually succeeds
+    
     try {
-      const success = await signup(email, password);
-      if (success) {
-        startOtpVerification(email);
+      const resetSuccess = await authContext?.confirmForgotPassword(email, code, newPassword);
+      if (resetSuccess) {
+        const loginSuccess = await authContext?.login(email, newPassword);
+        if (loginSuccess) {
+          handlePasswordReset();
+        }
       }
-    } catch (err) {
-      console.error("Signup failed", err);
+    } catch (err: any) {
+      setLocalError(err.message || 'Failed to reset password');
     }
   };
 
