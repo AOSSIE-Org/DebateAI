@@ -100,6 +100,23 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
   return { response: result.response }; // Adjusted to return bot's response directly
 };
 
+export const concedeDebate = async (debateId: string, history: DebateMessage[] = []): Promise<void> => {
+  const token = getAuthToken();
+  const response = await fetch(`${baseURL}/vsbot/concede`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    credentials: "include",
+    body: JSON.stringify({ debateId, history }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to concede debate");
+  }
+};
+
 // Function to judge a debate
 export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> => {
   const token = getAuthToken();

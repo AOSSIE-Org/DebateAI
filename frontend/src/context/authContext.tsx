@@ -194,15 +194,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Verification failed');
+        throw new Error(data.error || 'Verification failed');
       }
-      // Optionally update userAtom with isVerified: true
-      setUser((prev: User | null) => {
-        if (!prev) return null;
-        const updatedUser = { ...prev, isVerified: true, verificationCode: undefined };
-        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(updatedUser));
-        return updatedUser;
-      });
+
+      const data = await response.json();
+
+      // User is now verified and logged in
+      if (data.accessToken) {
+        setToken(data.accessToken);
+        localStorage.setItem('token', data.accessToken);
+
+        // Set user details
+        const normalizedUser: User = {
+          id: data.user?.id || data.user?._id || undefined,
+          email: data.user?.email || email,
+          displayName: data.user?.displayName || 'User',
+          bio: data.user?.bio || '',
+          rating: data.user?.rating || 1200,
+          rd: data.user?.rd || 350,
+          volatility: data.user?.volatility || 0.06,
+          lastRatingUpdate: data.user?.lastRatingUpdate || new Date().toISOString(),
+          avatarUrl: data.user?.avatarUrl || 'https://avatar.iran.liara.run/public/10',
+          twitter: data.user?.twitter || undefined,
+          instagram: data.user?.instagram || undefined,
+          linkedin: data.user?.linkedin || undefined,
+          password: '',
+          nickname: data.user?.nickname || 'User',
+          isVerified: true,
+          verificationCode: undefined,
+          resetPasswordCode: undefined,
+          createdAt: data.user?.createdAt || new Date().toISOString(),
+          updatedAt: data.user?.updatedAt || new Date().toISOString(),
+        };
+        setUser(normalizedUser);
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+        navigate('/');
+      }
     } catch (error) {
       handleError(error);
     } finally {

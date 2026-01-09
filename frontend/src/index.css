@@ -129,3 +129,8 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--foreground) / 0.7);
 }
+
+body {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+}
