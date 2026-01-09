@@ -103,6 +103,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
 
+    // Frontend error reporting endpoint (best-effort): accepts lightweight error payloads
+    router.POST("/api/frontend/errors", routes.HandleFrontendError)
+
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
 

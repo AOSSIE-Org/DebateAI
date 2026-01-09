@@ -2,6 +2,7 @@ import { useContext } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/authContext';
 import { ThemeProvider } from './context/theme-provider';
+import ErrorBoundary from './components/ErrorBoundary';
 // Pages
 import Home from './Pages/Home';
 import Authentication from './Pages/Authentication';
@@ -70,7 +71,7 @@ function AppRoutes() {
           <Route path='community' element={<CommunityFeed />} />
           <Route path='about' element={<About />} />
           <Route path='team-builder' element={<TeamBuilder />} />
-          <Route path='game/:userId' element={<DebateApp />} />
+          <Route path='game/:userId' element={<ErrorBoundary><DebateApp /></ErrorBoundary>} />
           <Route path='bot-selection' element={<BotSelection />} />
           <Route path='/tournaments' element={<TournamentHub />} />
           <Route path='/coach' element={<CoachPage />} />
@@ -90,12 +91,12 @@ function AppRoutes() {
           {/* Add this route */}
           <Route path='coach/pros-cons' element={<ProsConsChallenge />} />
         </Route>
-        <Route path='/debate/:roomId' element={<DebateRoom />} />
-        <Route path='/debate-room/:roomId' element={<OnlineDebateRoom />} />
-        <Route path='/team-debate/:debateId' element={<TeamDebateRoom />} />
-        <Route path='/spectator/:roomId' element={<ChatRoom />} />
-        <Route path='/debate/:debateID/view' element={<ViewDebate />} />
-        <Route path='/view-debate/:debateID' element={<ViewDebate />} />
+  <Route path='/debate/:roomId' element={<ErrorBoundary><DebateRoom /></ErrorBoundary>} />
+  <Route path='/debate-room/:roomId' element={<ErrorBoundary><OnlineDebateRoom /></ErrorBoundary>} />
+  <Route path='/team-debate/:debateId' element={<ErrorBoundary><TeamDebateRoom /></ErrorBoundary>} />
+  <Route path='/spectator/:roomId' element={<ErrorBoundary><ChatRoom /></ErrorBoundary>} />
+  <Route path='/debate/:debateID/view' element={<ErrorBoundary><ViewDebate /></ErrorBoundary>} />
+  <Route path='/view-debate/:debateID' element={<ErrorBoundary><ViewDebate /></ErrorBoundary>} />
         <Route path='/speech-test' element={<SpeechTest />} />
       </Route>
       {/* Redirect unknown routes */}
