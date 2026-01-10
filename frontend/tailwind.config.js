@@ -10,6 +10,15 @@ export default {
       fontFamily: {
         sans: ["Outfit", "sans-serif"],
       },
+      textShadow: {
+        'sm': '0 1px 2px rgb(0 0 0 / 0.05)',
+        'DEFAULT': '0 1px 3px rgb(0 0 0 / 0.1), 0 1px 2px rgb(0 0 0 / 0.06)',
+        'md': '0 4px 6px rgb(0 0 0 / 0.07), 0 2px 4px rgb(0 0 0 / 0.06)',
+        'lg': '0 10px 15px rgb(0 0 0 / 0.1), 0 4px 6px rgb(0 0 0 / 0.05)',
+        'xl': '0 20px 25px rgb(0 0 0 / 0.1), 0 10px 10px rgb(0 0 0 / 0.04)',
+        '2xl': '0 25px 50px rgb(0 0 0 / 0.25)',
+        'none': 'none',
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
@@ -62,5 +71,15 @@ export default {
   plugins: [
     require("tailwindcss-animate"),
     require("tailwind-scrollbar-hide"),
+    function({ matchUtilities, theme }) {
+      matchUtilities(
+        {
+          'text-shadow': (value) => ({
+            textShadow: value,
+          }),
+        },
+        { values: theme('textShadow') }
+      )
+    },
   ],
 }
