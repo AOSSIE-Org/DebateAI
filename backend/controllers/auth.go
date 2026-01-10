@@ -188,7 +188,6 @@ func SignUp(ctx *gin.Context) {
 	newUser.ID = result.InsertedID.(primitive.ObjectID)
 
 	// Send verification email
-	log.Printf("DEMO MODE: Verification code for %s is %s", request.Email, verificationCode)
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})

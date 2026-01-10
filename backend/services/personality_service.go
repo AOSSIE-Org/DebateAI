@@ -55,18 +55,12 @@ func GeneratePersonalityProfiles(debateID string) ([]models.PersonalityProfile, 
 		}
 	} else {
 		// User vs User
-		// Map phases to participants (For/Against)
-		for phase, text := range debate.Transcripts {
-			participant := "Opponent"
-			if strings.Contains(strings.ToLower(phase), "for") {
-				participant = "User"
+		// Map phases to participants using explicit metadata
+		for _, entry := range debate.Transcripts {
+			if entry.Email == "" {
+				continue
 			}
-			// Note: This is an approximation since we don't know who is 'For' and who is 'Against'
-			// without checking the UserID vs the transcript's email.
-			// But for personality analysis, we just need to group the text.
-			// However, Transcript model has Role if it was submitted individually...
-			// In SavedDebateTranscript, it seems it's merged.
-			participants[participant] += text + "\n"
+			participants[entry.Email] += entry.Text + "\n"
 		}
 	}
 
@@ -89,10 +83,18 @@ func GeneratePersonalityProfiles(debateID string) ([]models.PersonalityProfile, 
 
 		profile.DebateID = objID
 		profile.ParticipantID = name
-		if name == "User" {
-			profile.ParticipantID = debate.Email
-		} else if name == "Bot" || name == "Opponent" {
-			profile.ParticipantID = debate.Opponent
+
+		// Map "User" and "Bot" keys to actual identifiers for user_vs_bot
+		if debate.DebateType == "user_vs_bot" {
+			if name == "User" {
+				profile.ParticipantID = debate.Email
+			} else if name == "Bot" {
+				profile.ParticipantID = debate.Opponent
+			} else if name == "Judge" {
+				continue // Skip analyzing the judge
+			}
+		} else {
+			// For user_vs_user, ParticipantID is already the email
 		}
 		profile.CreatedAt = time.Now()
 

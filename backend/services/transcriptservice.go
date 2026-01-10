@@ -10,6 +10,7 @@ import (
 
 	"arguehub/db"
 	"arguehub/models"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -176,6 +177,48 @@ func SubmitTranscripts(
 				// Determine the actual debate topic
 				topic := resolveDebateTopic(ctx, roomID, forSubmission, againstSubmission)
 
+				// Construct TranscriptEntry maps for both sides
+				forTranscriptsMap := make(map[string]models.TranscriptEntry)
+				for _, phase := range []string{"openingFor", "crossForQuestion", "crossForAnswer", "closingFor"} {
+					if text, ok := forSubmission.Transcripts[phase]; ok {
+						forTranscriptsMap[phase] = models.TranscriptEntry{
+							Text:  text,
+							Email: forSubmission.Email,
+							Role:  "for",
+						}
+					}
+				}
+				// Also include against transcripts in the 'for' user's view
+				for _, phase := range []string{"openingAgainst", "crossAgainstQuestion", "crossAgainstAnswer", "closingAgainst"} {
+					if text, ok := againstSubmission.Transcripts[phase]; ok {
+						forTranscriptsMap[phase] = models.TranscriptEntry{
+							Text:  text,
+							Email: againstSubmission.Email,
+							Role:  "against",
+						}
+					}
+				}
+
+				againstTranscriptsMap := make(map[string]models.TranscriptEntry)
+				for _, phase := range []string{"openingAgainst", "crossAgainstQuestion", "crossAgainstAnswer", "closingAgainst"} {
+					if text, ok := againstSubmission.Transcripts[phase]; ok {
+						againstTranscriptsMap[phase] = models.TranscriptEntry{
+							Text:  text,
+							Email: againstSubmission.Email,
+							Role:  "against",
+						}
+					}
+				}
+				for _, phase := range []string{"openingFor", "crossForQuestion", "crossForAnswer", "closingFor"} {
+					if text, ok := forSubmission.Transcripts[phase]; ok {
+						againstTranscriptsMap[phase] = models.TranscriptEntry{
+							Text:  text,
+							Email: forSubmission.Email,
+							Role:  "for",
+						}
+					}
+				}
+
 				// Save transcript for "for" user
 				err = SaveDebateTranscript(
 					forUser.ID,
@@ -184,8 +227,8 @@ func SubmitTranscripts(
 					topic,
 					againstUser.Email,
 					resultFor,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					forSubmission.Transcripts,
+					[]models.Message{},
+					forTranscriptsMap,
 				)
 				if err != nil {
 				}
@@ -198,8 +241,8 @@ func SubmitTranscripts(
 					topic,
 					forUser.Email,
 					resultAgainst,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					againstSubmission.Transcripts,
+					[]models.Message{},
+					againstTranscriptsMap,
 				)
 				if err != nil {
 				}
@@ -659,7 +702,7 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 }
 
 // SaveDebateTranscript saves a debate transcript for later viewing
-func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]models.TranscriptEntry) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

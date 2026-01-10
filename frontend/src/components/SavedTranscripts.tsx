@@ -461,13 +461,16 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                       <h4 className='font-semibold mb-3'>Phase Transcripts</h4>
                       <div className='space-y-3'>
                         {Object.entries(selectedTranscript.transcripts).map(
-                          ([phase, transcript]) => (
+                          ([phase, entry]) => (
                             <div key={phase} className='border rounded-lg p-3'>
                               <h5 className='font-medium text-sm mb-2 capitalize'>
                                 {phase.replace(/([A-Z])/g, ' $1').trim()}
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  ({entry.email} - {entry.role})
+                                </span>
                               </h5>
                               <p className='text-sm text-muted-foreground whitespace-pre-wrap'>
-                                {transcript}
+                                {entry.text}
                               </p>
                             </div>
                           )

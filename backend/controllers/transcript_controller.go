@@ -11,10 +11,11 @@ import (
 	"arguehub/services"
 	"arguehub/utils"
 
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"os"
 )
 
 // SubmitTranscriptsRequest represents the request to submit debate transcripts
@@ -30,12 +31,12 @@ type SubmitTranscriptsRequest struct {
 
 // SaveTranscriptRequest represents the request to save a debate transcript
 type SaveTranscriptRequest struct {
-	DebateType  string            `json:"debateType" binding:"required"`
-	Topic       string            `json:"topic" binding:"required"`
-	Opponent    string            `json:"opponent" binding:"required"`
-	Result      string            `json:"result"`
-	Messages    []models.Message  `json:"messages"`
-	Transcripts map[string]string `json:"transcripts,omitempty"`
+	DebateType  string                            `json:"debateType" binding:"required"`
+	Topic       string                            `json:"topic" binding:"required"`
+	Opponent    string                            `json:"opponent" binding:"required"`
+	Result      string                            `json:"result"`
+	Messages    []models.Message                  `json:"messages"`
+	Transcripts map[string]models.TranscriptEntry `json:"transcripts,omitempty"`
 }
 
 // SubmitTranscripts handles the submission of debate transcripts
@@ -48,7 +49,7 @@ func SubmitTranscripts(c *gin.Context) {
 
 	token = strings.TrimPrefix(token, "Bearer ")
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
- 	if err != nil || !valid || email == "" {
+	if err != nil || !valid || email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}

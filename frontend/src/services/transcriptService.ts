@@ -15,7 +15,11 @@ export interface SavedDebateTranscript {
     text: string;
     phase?: string;
   }>;
-  transcripts?: Record<string, string>;
+  transcripts?: Record<string, {
+    text: string;
+    email: string;
+    role: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,7 +46,11 @@ export interface SaveTranscriptRequest {
     text: string;
     phase?: string;
   }>;
-  transcripts?: Record<string, string>;
+  transcripts?: Record<string, {
+    text: string;
+    email: string;
+    role: string;
+  }>;
 }
 
 export interface DebateStats {

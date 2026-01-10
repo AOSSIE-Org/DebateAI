@@ -20,8 +20,8 @@ import (
 )
 
 type transcriptPreview struct {
-	Messages    []models.Message  `json:"messages"`
-	Transcripts map[string]string `json:"transcripts,omitempty"`
+	Messages    []models.Message                  `json:"messages"`
+	Transcripts map[string]models.TranscriptEntry `json:"transcripts,omitempty"`
 }
 
 type postWithTranscript struct {
