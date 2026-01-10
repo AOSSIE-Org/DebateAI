@@ -29,8 +29,10 @@ import {
 } from '@/services/transcriptService';
 import { format } from 'date-fns';
 import CommentTree from './CommentTree';
-import { Share2 } from 'lucide-react';
+import { Share2, BrainCircuit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PersonalityProfile } from './PersonalityProfile';
+import { PersonalityProfileData } from '@/services/transcriptService';
 
 interface SavedTranscriptsProps {
   className?: string;
@@ -46,6 +48,8 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [creatingPost, setCreatingPost] = useState(false);
+  const [personalityProfiles, setPersonalityProfiles] = useState<PersonalityProfileData[]>([]);
+  const [loadingPersonality, setLoadingPersonality] = useState(false);
 
   useEffect(() => {
     fetchTranscripts();
@@ -92,6 +96,27 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   const handleViewTranscript = (transcript: SavedDebateTranscript) => {
     setSelectedTranscript(transcript);
     setIsViewDialogOpen(true);
+    fetchPersonalityProfiles(transcript.id);
+  };
+
+  const fetchPersonalityProfiles = async (debateId: string) => {
+    try {
+      setLoadingPersonality(true);
+      // Try to GET first
+      let profiles = await transcriptService.getPersonalityProfiles(debateId);
+
+      // If none found and debate is completed, trigger POST
+      if (profiles.length === 0) {
+        profiles = await transcriptService.generatePersonalityProfiles(debateId);
+      }
+
+      setPersonalityProfiles(profiles);
+    } catch (err) {
+      console.error('Error fetching personality profiles:', err);
+      setPersonalityProfiles([]);
+    } finally {
+      setLoadingPersonality(false);
+    }
   };
 
   const handleCreatePost = async () => {
@@ -388,18 +413,16 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                     {selectedTranscript.messages.map((message, index) => (
                       <div
                         key={index}
-                        className={`flex gap-3 ${
-                          message.sender === 'User'
-                            ? 'justify-end'
-                            : 'justify-start'
-                        }`}
+                        className={`flex gap-3 ${message.sender === 'User'
+                          ? 'justify-end'
+                          : 'justify-start'
+                          }`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg p-3 ${
-                            message.sender === 'User'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted'
-                          }`}
+                          className={`max-w-[80%] rounded-lg p-3 ${message.sender === 'User'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                            }`}
                         >
                           <div className='flex items-center gap-2 mb-1'>
                             <span className='text-xs font-medium'>
@@ -438,13 +461,16 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                       <h4 className='font-semibold mb-3'>Phase Transcripts</h4>
                       <div className='space-y-3'>
                         {Object.entries(selectedTranscript.transcripts).map(
-                          ([phase, transcript]) => (
+                          ([phase, entry]) => (
                             <div key={phase} className='border rounded-lg p-3'>
                               <h5 className='font-medium text-sm mb-2 capitalize'>
                                 {phase.replace(/([A-Z])/g, ' $1').trim()}
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  ({entry.email} - {entry.role})
+                                </span>
                               </h5>
                               <p className='text-sm text-muted-foreground whitespace-pre-wrap'>
-                                {transcript}
+                                {entry.text}
                               </p>
                             </div>
                           )
@@ -466,6 +492,25 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                   <Share2 className='w-4 h-4' />
                   {creatingPost ? 'Creating Post...' : 'Create Post'}
                 </Button>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className='font-semibold mb-3 flex items-center gap-2'>
+                  <BrainCircuit className="w-5 h-5 text-blue-500" />
+                  Personality Profiles
+                </h4>
+                {loadingPersonality ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-2"></div>
+                    <p className="text-sm text-muted-foreground">Analyzing personalities...</p>
+                  </div>
+                ) : personalityProfiles.length > 0 ? (
+                  <PersonalityProfile profiles={personalityProfiles} />
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No personality profiles available for this debate.</p>
+                )}
               </div>
 
               <Separator />

@@ -28,6 +28,7 @@ func main() {
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
+	services.InitPersonalityService(cfg)
 
 	// Connect to MongoDB using the URI from the configuration
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
@@ -159,6 +160,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.PUT("/notifications/:id/read", routes.MarkNotificationAsReadRouteHandler)
 		auth.PUT("/notifications/read-all", routes.MarkAllNotificationsAsReadRouteHandler)
 		auth.DELETE("/notifications/:id", routes.DeleteNotificationRouteHandler)
+
+		// Personality Profile routes
+		routes.SetupPersonalityRoutes(auth)
 	}
 
 	// Team WebSocket handler

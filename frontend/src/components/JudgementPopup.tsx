@@ -1,6 +1,10 @@
-import React from 'react';
-import { Button } from './ui/button'; // Adjust the path as needed
 import { useNavigate } from 'react-router-dom';
+import { PersonalityProfile } from './PersonalityProfile';
+import { transcriptService, PersonalityProfileData } from '@/services/transcriptService';
+import { BrainCircuit } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Button } from './ui/button';
+import React from 'react';
 
 // Define both possible JudgmentData types
 type JudgmentDataUserBot = {
@@ -81,6 +85,7 @@ type JudgmentPopupProps = {
   opponentDisplayName?: string | null;
   opponentAvatarUrl?: string | null;
   ratingSummary?: RatingSummary | null;
+  debateId?: string;
   onClose: () => void;
 };
 
@@ -113,6 +118,7 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   botName,
   userStance,
   botStance,
+  botDesc,
   forRole,
   againstRole,
   localRole = null,
@@ -121,10 +127,36 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   opponentDisplayName,
   opponentAvatarUrl,
   ratingSummary,
+  debateId,
   onClose,
 }) => {
   const navigate = useNavigate();
   const userName = 'You';
+
+  const [personalityProfiles, setPersonalityProfiles] = useState<PersonalityProfileData[]>([]);
+  const [loadingPersonality, setLoadingPersonality] = useState(false);
+
+  useEffect(() => {
+    if (debateId) {
+      fetchPersonalityProfiles(debateId);
+    }
+  }, [debateId]);
+
+  const fetchPersonalityProfiles = async (id: string) => {
+    try {
+      setLoadingPersonality(true);
+      // Try to GET first, then POST if none found
+      let profiles = await transcriptService.getPersonalityProfiles(id).catch(() => []);
+      if (profiles.length === 0) {
+        profiles = await transcriptService.generatePersonalityProfiles(id).catch(() => []);
+      }
+      setPersonalityProfiles(profiles);
+    } catch (err) {
+      console.error('Error fetching personality profiles:', err);
+    } finally {
+      setLoadingPersonality(false);
+    }
+  };
 
   const localAvatar =
     localStorage.getItem('userAvatar') ||
@@ -133,64 +165,64 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
     localStorage.getItem('opponentAvatar') ||
     'https://avatar.iran.liara.run/public/31';
 
-const isUserBotFormat = 'user' in judgment.opening_statement;
+  const isUserBotFormat = 'user' in judgment.opening_statement;
 
-const defaultForName = forRole || 'For Debater';
-const defaultAgainstName = againstRole || 'Against Debater';
-const resolvedLocalName = localDisplayName || userName;
-const resolvedOpponentName = opponentDisplayName || 'Opponent';
-const derivedLocalAvatar = localAvatarUrl || localAvatar;
-const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
+  const defaultForName = forRole || 'For Debater';
+  const defaultAgainstName = againstRole || 'Against Debater';
+  const resolvedLocalName = localDisplayName || userName;
+  const resolvedOpponentName = opponentDisplayName || 'Opponent';
+  const derivedLocalAvatar = localAvatarUrl || localAvatar;
+  const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
 
-const resolvedForName = isUserBotFormat
-  ? defaultForName
-  : localRole === 'for'
-  ? resolvedLocalName
-  : localRole === 'against'
-  ? resolvedOpponentName
-  : defaultForName;
+  const resolvedForName = isUserBotFormat
+    ? defaultForName
+    : localRole === 'for'
+      ? resolvedLocalName
+      : localRole === 'against'
+        ? resolvedOpponentName
+        : defaultForName;
 
-const resolvedAgainstName = isUserBotFormat
-  ? defaultAgainstName
-  : localRole === 'against'
-  ? resolvedLocalName
-  : localRole === 'for'
-  ? resolvedOpponentName
-  : defaultAgainstName;
+  const resolvedAgainstName = isUserBotFormat
+    ? defaultAgainstName
+    : localRole === 'against'
+      ? resolvedLocalName
+      : localRole === 'for'
+        ? resolvedOpponentName
+        : defaultAgainstName;
 
-const player1Name = isUserBotFormat ? userName : resolvedForName;
-const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
-const player1Stance = isUserBotFormat ? userStance : 'For';
-const player2Stance = isUserBotFormat ? botStance : 'Against';
+  const player1Name = isUserBotFormat ? userName : resolvedForName;
+  const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
+  const player1Stance = isUserBotFormat ? userStance : 'For';
+  const player2Stance = isUserBotFormat ? botStance : 'Against';
 
-const resolvedForAvatar = isUserBotFormat
-  ? userAvatar
-  : localRole === 'for'
-  ? derivedLocalAvatar
-  : localRole === 'against'
-  ? derivedOpponentAvatar
-  : derivedLocalAvatar || derivedOpponentAvatar;
+  const resolvedForAvatar = isUserBotFormat
+    ? userAvatar
+    : localRole === 'for'
+      ? derivedLocalAvatar
+      : localRole === 'against'
+        ? derivedOpponentAvatar
+        : derivedLocalAvatar || derivedOpponentAvatar;
 
-const resolvedAgainstAvatar = isUserBotFormat
-  ? botAvatar
-  : localRole === 'against'
-  ? derivedLocalAvatar
-  : localRole === 'for'
-  ? derivedOpponentAvatar
-  : derivedOpponentAvatar || derivedLocalAvatar;
+  const resolvedAgainstAvatar = isUserBotFormat
+    ? botAvatar
+    : localRole === 'against'
+      ? derivedLocalAvatar
+      : localRole === 'for'
+        ? derivedOpponentAvatar
+        : derivedOpponentAvatar || derivedLocalAvatar;
 
-const player1Avatar = resolvedForAvatar || localAvatar;
-const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
-const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
+  const player1Avatar = resolvedForAvatar || localAvatar;
+  const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
+  const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
 
-const formatChange = (value: number) =>
-  `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
-const formatRating = (value: number) => value.toFixed(2);
+  const formatChange = (value: number) =>
+    `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+  const formatRating = (value: number) => value.toFixed(2);
 
-const player1RatingSummary =
-  !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
-const player2RatingSummary =
-  !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
+  const player1RatingSummary =
+    !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
+  const player2RatingSummary =
+    !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
 
   const handleGoHome = () => {
     navigate('/startdebate');
@@ -283,15 +315,15 @@ const player2RatingSummary =
       cross_questions: isUserBotFormat
         ? getScoreAndReason('cross_examination', 'player1').reason.toLowerCase()
         : getScoreAndReason(
-            'cross_examination_questions',
-            'player1'
-          ).reason.toLowerCase(),
+          'cross_examination_questions',
+          'player1'
+        ).reason.toLowerCase(),
       cross_answers: isUserBotFormat
         ? getScoreAndReason('answers', 'player1').reason.toLowerCase()
         : getScoreAndReason(
-            'cross_examination_answers',
-            'player1'
-          ).reason.toLowerCase(),
+          'cross_examination_answers',
+          'player1'
+        ).reason.toLowerCase(),
       closing: getScoreAndReason('closing', 'player1').reason.toLowerCase(),
     };
 
@@ -650,11 +682,10 @@ const player2RatingSummary =
                   </span>
                 </p>
                 <p
-                  className={`text-sm font-semibold ${
-                    player1RatingSummary.change >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}
+                  className={`text-sm font-semibold ${player1RatingSummary.change >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                    }`}
                 >
                   Change: {formatChange(player1RatingSummary.change)}
                 </p>
@@ -670,11 +701,10 @@ const player2RatingSummary =
                   </span>
                 </p>
                 <p
-                  className={`text-sm font-semibold ${
-                    player2RatingSummary.change >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}
+                  className={`text-sm font-semibold ${player2RatingSummary.change >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                    }`}
                 >
                   Change: {formatChange(player2RatingSummary.change)}
                 </p>
@@ -694,6 +724,24 @@ const player2RatingSummary =
             {judgment.verdict.opponent_analysis}
           </p>
         </div>
+
+        {/* Personality Profiles */}
+        {(loadingPersonality || personalityProfiles.length > 0) && (
+          <div className='mt-10 bg-white p-6 rounded-lg shadow-md border border-blue-100'>
+            <h3 className='text-2xl font-bold text-gray-800 text-center mb-6 flex items-center justify-center gap-2'>
+              <BrainCircuit className="w-6 h-6 text-blue-500" />
+              Personality Analysis
+            </h3>
+            {loadingPersonality ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                <p className="text-sm text-muted-foreground">AI is analyzing your debate style...</p>
+              </div>
+            ) : (
+              <PersonalityProfile profiles={personalityProfiles} />
+            )}
+          </div>
+        )}
 
         {/* Skills to Improve */}
         <div className='mt-10 bg-white p-6 rounded-lg shadow-md'>

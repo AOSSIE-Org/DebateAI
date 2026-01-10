@@ -2,9 +2,16 @@ package models
 
 import (
 	"encoding/json"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type TranscriptEntry struct {
+	Text  string `bson:"text" json:"text"`
+	Email string `bson:"email" json:"email"`
+	Role  string `bson:"role" json:"role"`
+}
 
 type DebateTranscript struct {
 	RoomID      string            `bson:"roomId" json:"roomId"`
@@ -23,17 +30,17 @@ type DebateResult struct {
 
 // SavedDebateTranscript represents a saved debate transcript that users can view later
 type SavedDebateTranscript struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	UserID      primitive.ObjectID `bson:"userId" json:"userId,omitempty"`
-	Email       string             `bson:"email" json:"email"`
-	DebateType  string             `bson:"debateType" json:"debateType"` // "user_vs_bot" or "user_vs_user"
-	Topic       string             `bson:"topic" json:"topic"`
-	Opponent    string             `bson:"opponent" json:"opponent"` // Bot name or opponent email
-	Result      string             `bson:"result" json:"result"`     // "win", "loss", "draw", "pending"
-	Messages    []Message          `bson:"messages" json:"messages"`
-	Transcripts map[string]string  `bson:"transcripts,omitempty" json:"transcripts,omitempty"` // For user vs user debates
-	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
-	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
+	ID          primitive.ObjectID         `bson:"_id,omitempty" json:"id,omitempty"`
+	UserID      primitive.ObjectID         `bson:"userId" json:"userId,omitempty"`
+	Email       string                     `bson:"email" json:"email"`
+	DebateType  string                     `bson:"debateType" json:"debateType"` // "user_vs_bot" or "user_vs_user"
+	Topic       string                     `bson:"topic" json:"topic"`
+	Opponent    string                     `bson:"opponent" json:"opponent"` // Bot name or opponent email
+	Result      string                     `bson:"result" json:"result"`     // "win", "loss", "draw", "pending"
+	Messages    []Message                  `bson:"messages" json:"messages"`
+	Transcripts map[string]TranscriptEntry `bson:"transcripts,omitempty" json:"transcripts,omitempty"` // For user vs user debates
+	CreatedAt   time.Time                  `bson:"createdAt" json:"createdAt"`
+	UpdatedAt   time.Time                  `bson:"updatedAt" json:"updatedAt"`
 }
 
 func (s SavedDebateTranscript) MarshalJSON() ([]byte, error) {
