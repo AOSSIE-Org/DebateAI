@@ -187,17 +187,44 @@ func SignUp(ctx *gin.Context) {
 	}
 	newUser.ID = result.InsertedID.(primitive.ObjectID)
 
-	// Send verification email
-	err = utils.SendVerificationEmail(request.Email, verificationCode)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
-		return
+	// Send verification email (skip in development if SMTP not configured)
+	if cfg.SMTP.Username != "" && cfg.SMTP.Password != "" {
+		err = utils.SendVerificationEmail(request.Email, verificationCode)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
+			return
+		}
+		// Return success response - email verification required
+		ctx.JSON(200, gin.H{
+			"message": "Sign-up successful. Please verify your email.",
+		})
+	} else {
+		// Development mode: auto-verify user
+		_, err = db.MongoDatabase.Collection("users").UpdateOne(
+			dbCtx,
+			bson.M{"_id": newUser.ID},
+			bson.M{"$set": bson.M{"isVerified": true}},
+		)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to verify user", "message": err.Error()})
+			return
+		}
+		
+		// Generate JWT token
+		token, err := generateJWT(newUser.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
+			return
+		}
+		
+		// Return success response with token (auto-login)
+		newUser.IsVerified = true
+		ctx.JSON(200, gin.H{
+			"message":     "Sign-up successful. You are now logged in.",
+			"accessToken": token,
+			"user":        buildUserResponse(newUser),
+		})
 	}
-
-	// Return success response
-	ctx.JSON(200, gin.H{
-		"message": "Sign-up successful. Please verify your email.",
-	})
 }
 
 func VerifyEmail(ctx *gin.Context) {
