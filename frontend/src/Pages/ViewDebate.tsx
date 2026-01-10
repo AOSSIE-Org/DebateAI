@@ -14,6 +14,9 @@ import {
 } from "../atoms/debateAtoms";
 import { Button } from "../components/ui/button";
 import { getAuthToken } from "../utils/auth";
+import { PersonalityProfile } from "../components/PersonalityProfile";
+import { transcriptService, PersonalityProfileData } from "../services/transcriptService";
+import { BrainCircuit } from "lucide-react";
 
 type DebateParticipant = {
   id: string;
@@ -41,6 +44,8 @@ export const ViewDebate: React.FC = () => {
   const remoteStream1Ref = useRef<MediaStream | null>(null);
   const remoteStream2Ref = useRef<MediaStream | null>(null);
   const [participants, setParticipants] = useState<DebateParticipant[]>([]);
+  const [personalityProfiles, setPersonalityProfiles] = useState<PersonalityProfileData[]>([]);
+  const [loadingPersonality, setLoadingPersonality] = useState(false);
   const participantsRef = useRef<DebateParticipant[]>([]);
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
   const [pollQuestion, setPollQuestion] = useState<string>("");
@@ -68,8 +73,21 @@ export const ViewDebate: React.FC = () => {
   useEffect(() => {
     if (debateID) {
       setDebateId(debateID);
+      fetchPersonalityProfiles(debateID);
     }
   }, [debateID, setDebateId]);
+
+  const fetchPersonalityProfiles = async (id: string) => {
+    try {
+      setLoadingPersonality(true);
+      const profiles = await transcriptService.getPersonalityProfiles(id).catch(() => []);
+      setPersonalityProfiles(profiles);
+    } catch (err) {
+      console.error("Error fetching personality profiles:", err);
+    } finally {
+      setLoadingPersonality(false);
+    }
+  };
 
   // Connect to room WebSocket to receive video streams
   useEffect(() => {
@@ -389,8 +407,8 @@ export const ViewDebate: React.FC = () => {
       }
     };
 
-    ws.onerror = () => {};
-    ws.onclose = () => {};
+    ws.onerror = () => { };
+    ws.onclose = () => { };
 
     return () => {
       ws.close();
@@ -413,11 +431,11 @@ export const ViewDebate: React.FC = () => {
   useEffect(() => {
     if (video1Ref.current && remoteStream1) {
       video1Ref.current.srcObject = remoteStream1;
-      video1Ref.current.play().catch(() => {});
+      video1Ref.current.play().catch(() => { });
     }
     if (video2Ref.current && remoteStream2) {
       video2Ref.current.srcObject = remoteStream2;
-      video2Ref.current.play().catch(() => {});
+      video2Ref.current.play().catch(() => { });
     }
   }, [remoteStream1, remoteStream2]);
 
@@ -726,8 +744,8 @@ export const ViewDebate: React.FC = () => {
                       wsStatus === "connected"
                         ? "font-medium text-emerald-500"
                         : wsStatus === "connecting"
-                        ? "font-medium text-amber-500"
-                        : "font-medium text-destructive"
+                          ? "font-medium text-amber-500"
+                          : "font-medium text-destructive"
                     }
                   >
                     {wsStatus}
@@ -745,6 +763,24 @@ export const ViewDebate: React.FC = () => {
             </div>
           </aside>
         </section>
+
+        {/* Personality Profiles View */}
+        {(loadingPersonality || personalityProfiles.length > 0) && (
+          <div className="mt-8 rounded-2xl border border-border bg-card/40 p-6 shadow-sm shadow-black/5">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-6">
+              <BrainCircuit className="w-6 h-6 text-blue-500" />
+              Personality Analysis
+            </h2>
+            {loadingPersonality ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                <p className="text-sm text-muted-foreground">Fetching analysis...</p>
+              </div>
+            ) : (
+              <PersonalityProfile profiles={personalityProfiles} />
+            )}
+          </div>
+        )}
 
         <ReactionBar />
       </div>

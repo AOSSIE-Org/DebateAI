@@ -20,6 +20,18 @@ export interface SavedDebateTranscript {
   updatedAt: string;
 }
 
+export interface PersonalityProfileData {
+  id: string;
+  debateId: string;
+  participantId: string;
+  argument_style: string;
+  tone: string;
+  evidence_usage: number;
+  clarity: number;
+  responsiveness: number;
+  summary: string;
+}
+
 export interface SaveTranscriptRequest {
   debateType: 'user_vs_bot' | 'user_vs_user';
   topic: string;
@@ -216,5 +228,63 @@ export const transcriptService = {
 
     const data = await response.json();
     return data.stats;
+  },
+
+  // Get personality profiles for a debate
+  async getPersonalityProfiles(
+    debateId: string
+  ): Promise<PersonalityProfileData[]> {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/debates/${debateId}/personality`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch personality profiles');
+    }
+
+    const data = await response.json();
+    return data.profiles || [];
+  },
+
+  // Generate personality profiles for a debate
+  async generatePersonalityProfiles(
+    debateId: string
+  ): Promise<PersonalityProfileData[]> {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/debates/${debateId}/personality`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || 'Failed to generate personality profiles'
+      );
+    }
+
+    const data = await response.json();
+    return data.profiles || [];
   },
 };
