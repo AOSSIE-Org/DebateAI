@@ -4,8 +4,9 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { useAtom } from "jotai";
+import { speak, cancelSpeech } from "../utils/tts";
 import { userAtom } from "@/state/userAtom";
 
 // Bot type definition (same as in BotSelection)
@@ -250,6 +251,8 @@ const DebateRoom: React.FC = () => {
   const [showJudgment, setShowJudgment] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
+  const [concedeModalOpen, setConcedeModalOpen] = useState(false);
+  const [isTTSEnabled, setIsTTSEnabled] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const botTurnRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -259,23 +262,27 @@ const DebateRoom: React.FC = () => {
   const userAvatar =
     user?.avatarUrl || "https://avatar.iran.liara.run/public/10";
 
-  const handleConcede = async () => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
-      try {
-        if (debateData.debateId) {
-            await concedeDebate(debateData.debateId, state.messages);
-        }
-        
-        setState(prev => ({ ...prev, isDebateEnded: true }));
-        setPopup({
-            show: true,
-            message: "You have conceded the debate.",
-            isJudging: false
-        });
-        
-        setTimeout(() => {
-            navigate("/game");
-        }, 2000);
+  const handleConcede = () => {
+    setConcedeModalOpen(true);
+  };
+
+  const confirmConcede = async () => {
+    try {
+      cancelSpeech(); // Stop any ongoing speech
+      if (debateData.debateId) {
+          await concedeDebate(debateData.debateId, state.messages);
+      }
+      
+      setState(prev => ({ ...prev, isDebateEnded: true }));
+      setPopup({
+          show: true,
+          message: "You have conceded the debate.",
+          isJudging: false
+      });
+      
+      setTimeout(() => {
+          navigate("/game");
+      }, 2000);
 
       } catch (error) {
         console.error("Error conceding:", error);
@@ -283,6 +290,24 @@ const DebateRoom: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (state.isDebateEnded) {
+      cancelSpeech();
+    }
+  }, [state.isDebateEnded]);
+
+  useEffect(() => {
+    if (isTTSEnabled && state.messages.length > 0) {
+      const lastMsg = state.messages[state.messages.length - 1];
+      if (lastMsg.sender === "Bot") {
+        speak(lastMsg.text);
+      }
+    } else if (!isTTSEnabled) {
+      cancelSpeech();
+    }
+  }, [state.messages, isTTSEnabled]);
+
+  
   // Initialize SpeechRecognition
   useEffect(() => {
     if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
@@ -775,6 +800,15 @@ const DebateRoom: React.FC = () => {
                 {bot.rating ? `Rating: ${bot.rating}` : "Ready to argue!"}
               </div>
             </div>
+            <Button
+              onClick={() => setIsTTSEnabled(!isTTSEnabled)}
+              className={`ml-2 p-2 rounded-full hover:bg-gray-200 ${
+                isTTSEnabled ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
+              }`}
+              title={isTTSEnabled ? "Disable specific TTS" : "Enable specific TTS - reads opponent statements"}
+            >
+              {isTTSEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </Button>
             {nextTurnPending && (
               <Button
                 onClick={handleNextTurn}

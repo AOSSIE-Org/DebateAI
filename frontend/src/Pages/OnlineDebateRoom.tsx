@@ -1,3 +1,5 @@
+import { Volume2, VolumeX } from "lucide-react";
+import { speak, cancelSpeech } from "@/utils/tts";
 import React, {
   useCallback,
   useEffect,
@@ -441,6 +443,16 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   // Popup and countdown state
   const [showSetupPopup, setShowSetupPopup] = useState(true);
+  const [isTTSEnabled, setIsTTSEnabled] = useState(false);
+  const isTTSEnabledRef = useRef(false);
+
+  useEffect(() => {
+    isTTSEnabledRef.current = isTTSEnabled;
+    if (!isTTSEnabled) {
+      cancelSpeech();
+    }
+  }, [isTTSEnabled]);
+
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -798,22 +810,25 @@ const OnlineDebateRoom = (): JSX.Element => {
   ]);
 
   const handleConcede = useCallback(() => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
-      if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({
-          type: "concede",
-          room: roomId,
-          userId: currentUserId,
-          username: currentUser?.displayName || "User"
-        }));
-      }
-      setDebatePhase(DebatePhase.Finished);
-      setPopup({
-        show: true,
-        message: "You have conceded the debate.",
-        isJudging: false,
-      });
+    setConcedeModalOpen(true);
+  }, []);
+
+  const confirmConcede = useCallback(() => {
+    cancelSpeech(); // Stop any ongoing speech
+    if (wsRef.current) {
+      wsRef.current.send(JSON.stringify({
+        type: "concede",
+        room: roomId,
+        userId: currentUserId,
+        username: currentUser?.displayName || "User"
+      }));
     }
+    setDebatePhase(DebatePhase.Finished);
+    setPopup({
+      show: true,
+      message: "You have conceded the debate.",
+      isJudging: false,
+    });
   }, [roomId, currentUserId, currentUser, setDebatePhase, setPopup]);
 
   const handlePhaseDone = useCallback(() => {
@@ -1149,6 +1164,10 @@ const OnlineDebateRoom = (): JSX.Element => {
             console.debug(
               `Received phase change to ${data.phase}. Local role: ${localRole}`
             );
+            
+            if (isTTSEnabledRef.current) {
+               speak(data.message);
+            }
             setDebatePhase(data.phase);
           }
           break;
@@ -1186,6 +1205,10 @@ const OnlineDebateRoom = (): JSX.Element => {
               };
               return updated;
             });
+
+            if (isTTSEnabledRef.current && data.userId !== currentUser?.id) {
+               speak(data.speechText);
+            }
           }
           break;
         case "liveTranscript":
@@ -1964,6 +1987,9 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   // Trigger logMessageHistory when debatePhase changes to Finished
   useEffect(() => {
+    if (debatePhase === DebatePhase.Finished) {
+      cancelSpeech();
+    }
     if (debatePhase === DebatePhase.Finished && localRole) {
       logMessageHistory();
     }
@@ -2468,6 +2494,15 @@ const OnlineDebateRoom = (): JSX.Element => {
                 {opponentUser?.elo || 1500}
               </div>
             </div>
+            <Button
+              onClick={() => setIsTTSEnabled(!isTTSEnabled)}
+              className={`ml-2 p-2 rounded-full hover:bg-gray-200 ${
+                isTTSEnabled ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
+              }`}
+              title={isTTSEnabled ? "Disable specific TTS" : "Enable specific TTS - reads opponent statements"}
+            >
+              {isTTSEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </Button>
           </div>
           <div className="p-3 flex-1 overflow-y-auto">
             <p className="text-sm font-semibold text-orange-600 mb-1">
