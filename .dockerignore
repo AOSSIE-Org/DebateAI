@@ -1,40 +1,9 @@
-# Dependencies
 node_modules
-
-# Build outputs
 dist
-frontend/dist
+.git
+.DS_Store
 backend/tmp
-backend/main
-backend/server
-
-# Environment files
+frontend/dist
 .env
 backend/.env
 frontend/.env
-
-# Git
-.git
-
-# IDE files
-.vscode
-.idea
-.DS_Store
-
-# Logs
-*.log
-logs
-
-# Docker files
-docker-compose.yml
-Dockerfile*
-.dockerignore
-
-# CI/CD
-.github
-
-# TypeScript build info
-*.tsbuildinfo
-
-# Go hot reload config
-.air.toml
