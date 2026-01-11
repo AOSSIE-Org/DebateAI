@@ -9,7 +9,7 @@ export interface SavedDebateTranscript {
   debateType: 'user_vs_bot' | 'user_vs_user';
   topic: string;
   opponent: string;
-  result: 'win' | 'loss' | 'draw' | 'pending';
+  result: 'win' | 'loss' | 'draw' | 'pending' | 'concede';
   messages: Array<{
     sender: string;
     text: string;
