@@ -10,7 +10,7 @@ services:
     environment:
       - PORT=1313
       - CONFIG_PATH=./config/config.prod.yml
-    # comment this if you're using mongo db atlas
+    # Uncomment this if you're using local MongoDB
     # depends_on:
     #   - mongo
 
@@ -28,7 +28,7 @@ services:
     environment:
       - VITE_BASE_URL=http://localhost:1313
 
-# comment this mongo service when you're using monogoDB atlas
+# Uncomment this mongo service when you're using local MongoDB
 #   mongo:
 #     image: mongo:latest
 #     volumes:
