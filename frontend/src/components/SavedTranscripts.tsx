@@ -141,6 +141,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
       case 'win':
         return <Trophy className='w-4 h-4 text-yellow-500' />;
       case 'loss':
+      case 'concede':
         return <XCircle className='w-4 h-4 text-red-500' />;
       case 'draw':
         return <MinusCircle className='w-4 h-4 text-gray-500' />;
@@ -154,6 +155,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
       case 'win':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'loss':
+      case 'concede':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'draw':
         return 'bg-gray-100 text-gray-800 border-gray-200';

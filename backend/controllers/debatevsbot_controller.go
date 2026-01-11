@@ -349,6 +349,9 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	case "loss":
 		pointsToAdd = 10 // Participation points
 		action = "debate_loss"
+	case "concede":
+		pointsToAdd = 0 // No points for conceding
+		action = "debate_concede"
 	case "draw":
 		pointsToAdd = 25 // Points for draw
 		action = "debate_complete"
@@ -448,7 +451,9 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	}
 
 	// Check for automatic badges (Novice, Streak5, FactMaster, etc.)
-	checkAndAwardAutomaticBadges(ctx, userID, updatedUser)
+	if resultStatus != "concede" {
+		checkAndAwardAutomaticBadges(ctx, userID, updatedUser)
+	}
 
 	// Broadcast score update via WebSocket
 	websocket.BroadcastGamificationEvent(models.GamificationEvent{
@@ -589,7 +594,7 @@ func ConcedeDebate(c *gin.Context) {
 		"user_vs_bot",
 		debate.Topic,
 		debate.BotName,
-		"loss",
+		"concede",
 		historyToSave,
 		nil,
 	)
@@ -602,7 +607,7 @@ func ConcedeDebate(c *gin.Context) {
 				log.Printf("Panic in updateGamificationAfterBotDebate (concede): %v", r)
 			}
 		}()
-		updateGamificationAfterBotDebate(user.ID, "loss", debate.Topic)
+		updateGamificationAfterBotDebate(user.ID, "concede", debate.Topic)
 	}()
 
 	c.JSON(200, gin.H{"message": "Debate conceded successfully"})
