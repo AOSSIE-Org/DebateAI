@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
-
+import ConfirmationModal from "@/components/ConfirmationModal";
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { useUser } from "@/hooks/useUser";
@@ -2625,6 +2625,14 @@ const OnlineDebateRoom = (): JSX.Element => {
       {mediaError && (
         <p className="text-red-500 mt-4 text-center">{mediaError}</p>
       )}
+
+      <ConfirmationModal
+        isOpen={concedeModalOpen}
+        onClose={() => setConcedeModalOpen(false)}
+        onConfirm={confirmConcede}
+        title="Concede Debate"
+        description="Are you sure you want to concede? This will count as a loss."
+      />
 
       <style>{`
         @keyframes glow {

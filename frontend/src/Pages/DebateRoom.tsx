@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
@@ -284,9 +285,8 @@ const DebateRoom: React.FC = () => {
           navigate("/game");
       }, 2000);
 
-      } catch (error) {
-        console.error("Error conceding:", error);
-      }
+    } catch (error) {
+      console.error("Error conceding:", error);
     }
   };
 
@@ -761,6 +761,15 @@ const DebateRoom: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+      {!state.isDebateEnded && (
+        <ConfirmationModal
+          isOpen={concedeModalOpen}
+          onClose={() => setConcedeModalOpen(false)}
+          onConfirm={confirmConcede}
+          title="Concede Debate"
+          description="Are you sure you want to concede? This will count as a loss."
+        />
       )}
 
       {showJudgment && judgmentData && (
