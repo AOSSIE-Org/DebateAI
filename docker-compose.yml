@@ -22,6 +22,7 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     env_file:
       - ./frontend/.env
     environment:
