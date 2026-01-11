@@ -21,6 +21,8 @@ type Debate struct {
 	PreRD         float64            `bson:"preRD" json:"preRD"`
 	PostRating    float64            `bson:"postRating" json:"postRating"`
 	PostRD        float64            `bson:"postRD" json:"postRD"`
+	Role          string             `bson:"role" json:"role"`                 // User's role
+	OpponentRole  string             `bson:"opponentRole" json:"opponentRole"` // Opponent's role
 	Date          time.Time          `bson:"date" json:"date"`
 }
 

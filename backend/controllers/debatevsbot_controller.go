@@ -23,6 +23,7 @@ type DebateRequest struct {
 	BotLevel     string           `json:"botLevel" binding:"required"`
 	Topic        string           `json:"topic" binding:"required"`
 	Stance       string           `json:"stance" binding:"required"`
+	Role         string           `json:"role"`
 	History      []models.Message `json:"history"`
 	PhaseTimings []PhaseTiming    `json:"phaseTimings"`
 	Context      string           `json:"context"`
@@ -43,6 +44,7 @@ type DebateResponse struct {
 	BotLevel     string               `json:"botLevel"`
 	Topic        string               `json:"topic"`
 	Stance       string               `json:"stance"`
+	Role         string               `json:"role"`
 	PhaseTimings []models.PhaseTiming `json:"phaseTimings,omitempty"` // Backend format
 }
 
@@ -52,6 +54,7 @@ type DebateMessageResponse struct {
 	BotLevel string `json:"botLevel"`
 	Topic    string `json:"topic"`
 	Stance   string `json:"stance"`
+	Role     string `json:"role"`
 	Response string `json:"response"`
 }
 
@@ -97,6 +100,7 @@ func CreateDebate(c *gin.Context) {
 		BotLevel:     req.BotLevel,
 		Topic:        req.Topic,
 		Stance:       req.Stance,
+		Role:         req.Role,
 		History:      req.History,
 		PhaseTimings: backendPhaseTimings,
 		CreatedAt:    time.Now().Unix(),
@@ -114,6 +118,7 @@ func CreateDebate(c *gin.Context) {
 		BotLevel:     req.BotLevel,
 		Topic:        req.Topic,
 		Stance:       req.Stance,
+		Role:         req.Role,
 		PhaseTimings: backendPhaseTimings,
 	}
 	c.JSON(200, response)
@@ -139,8 +144,8 @@ func SendDebateMessage(c *gin.Context) {
 		return
 	}
 
-	// Generate bot response with the additional context field.
-	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
+	// Generate bot response with the additional context and role field.
+	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, req.Role, 150)
 
 	// Update debate history with the bot's response.
 	updatedHistory := append(req.History, models.Message{
@@ -155,6 +160,7 @@ func SendDebateMessage(c *gin.Context) {
 		BotLevel:  req.BotLevel,
 		Topic:     req.Topic,
 		Stance:    req.Stance,
+		Role:      req.Role,
 		History:   updatedHistory,
 		CreatedAt: time.Now().Unix(),
 	}
@@ -172,6 +178,7 @@ func SendDebateMessage(c *gin.Context) {
 		BotLevel: req.BotLevel,
 		Topic:    req.Topic,
 		Stance:   req.Stance,
+		Role:     req.Role,
 		Response: botResponse,
 	}
 	c.JSON(200, response)
