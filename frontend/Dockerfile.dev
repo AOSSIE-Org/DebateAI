@@ -2,18 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files first for better caching
+# Copy only package files to leverage the cache
+# Dependencies are downloaded only when these files are modified
 COPY package.json package-lock.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
-
-# Copy the rest of the application code
-COPY . .
-
-# Expose the frontend port
 EXPOSE 5173
 
-# Start the development server
-# --host 0.0.0.0 is crucial for docker container access
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev", "--", "--host"]
