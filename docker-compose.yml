@@ -9,12 +9,10 @@ services:
       - ./backend:/app
     environment:
       - PORT=1313
-      - DATABASE_URI=mongodb://mongo:27017/debateai
       - CONFIG_PATH=./config/config.prod.yml
-    env_file:
-      - ./backend/.env
-    depends_on:
-      - mongo
+    # comment this if you're using mongo db atlas
+    # depends_on:
+    #   - mongo
 
   frontend:
     build:
@@ -24,18 +22,22 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      - /app/node_modules
     env_file:
       - ./frontend/.env
     environment:
       - VITE_BASE_URL=http://localhost:1313
 
-  mongo:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
+# comment this mongo service when you're using monogoDB atlas
+#   mongo:
+#     image: mongo:latest
+#     volumes:
+#       - mongo_data:/data/db
 
-volumes:
-  mongo_data:
+# volumes:
+#   mongo_data:
+
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
