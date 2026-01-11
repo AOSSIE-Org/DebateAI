@@ -325,15 +325,15 @@ const BotSelection: React.FC = () => {
         {/* Main Content Grid */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Bot Selection Section */}
-          <div className="bg-white border border-gray-300 rounded-md shadow-md p-4">
-            <h2 className="text-xl font-light text-gray-800 mb-4">
+          <div className="bg-card border border-border rounded-md shadow-md p-4">
+            <h2 className="text-xl font-light text-foreground mb-4">
               Pick Your <span className="text-primary">Bot</span>
             </h2>
 
             {/* Selected Bot Preview */}
             {selectedBotObj && (
-              <div className="border border-gray-300 rounded-md mb-4 p-3 bg-gray-50">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">
+              <div className="border border-border rounded-md mb-4 p-3 bg-muted">
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">
                   Selected Bot
                 </h3>
                 <div className="flex items-center">
@@ -345,14 +345,14 @@ const BotSelection: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800">
+                    <h4 className="font-semibold text-foreground">
                       {selectedBotObj.name}
                     </h4>
-                    <p className="text-xs text-gray-600 italic">
+                    <p className="text-xs text-muted-foreground italic">
                       "{selectedBotObj.quote}"
                     </p>
                     <div className="flex mt-1">
-                      <span className="text-xs bg-gray-200 px-2 py-1 rounded mr-2">
+                      <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded mr-2">
                         {selectedBotObj.level}
                       </span>
                       <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
@@ -365,24 +365,24 @@ const BotSelection: React.FC = () => {
             )}
 
             {/* Difficulty Cards (Fixed Height Scroller) */}
-            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-muted/50">
               {levels.map((level) => (
                 <div
                   key={level.name}
                   className={`border rounded-md cursor-pointer transition-all ${expandedLevel === level.name
                       ? "border-primary shadow-sm"
-                      : "border-gray-300 hover:border-gray-400"
+                      : "border-border hover:border-muted-foreground"
                     }`}
                 >
                   <div
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-t-md"
+                    className="flex justify-between items-center p-3 bg-muted rounded-t-md"
                     onClick={() => toggleLevel(level.name)}
                   >
                     <div className="flex items-center">
-                      <span className="font-medium text-gray-800">
+                      <span className="font-medium text-foreground">
                         {level.name}
                       </span>
-                      <span className="ml-2 bg-gray-200 rounded-full px-2 py-1 text-xs">
+                      <span className="ml-2 bg-primary/20 text-primary rounded-full px-2 py-1 text-xs">
                         {level.count} bots
                       </span>
                     </div>
@@ -392,7 +392,7 @@ const BotSelection: React.FC = () => {
                   </div>
 
                   {expandedLevel === level.name && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-white border-t border-gray-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-card border-t border-border">
                       {allBots
                         .filter((bot) => bot.level === level.name)
                         .map((bot) => (
@@ -400,8 +400,8 @@ const BotSelection: React.FC = () => {
                             key={bot.name}
                             onClick={() => setSelectedBot(bot.name)}
                             className={`relative flex flex-col items-center p-2 rounded-md border transition-colors cursor-pointer group ${selectedBot === bot.name
-                                ? "border-2 border-primary bg-blue-50"
-                                : "border-gray-200 hover:bg-gray-50"
+                                ? "border-2 border-primary bg-primary/10"
+                                : "border-border hover:bg-muted"
                               }`}
                           >
                             <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary">
@@ -430,10 +430,10 @@ const BotSelection: React.FC = () => {
           </div>
 
           {/* Debate Setup Section */}
-          <div className="bg-white border border-gray-300 rounded-md shadow-md flex flex-col">
+          <div className="bg-card border border-border rounded-md shadow-md flex flex-col">
             <div className="p-3">
-              <h2 className="text-xl font-light text-gray-800">Debate Setup</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-xl font-light text-foreground">Debate Setup</h2>
+              <p className="text-sm text-muted-foreground">
                 Configure your topic, stance, and phase timings.
               </p>
               {selectedBot && (
@@ -447,11 +447,11 @@ const BotSelection: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 {/* Topic Selection */}
                 <div className="flex flex-col">
-                  <label className="block text-sm text-gray-500 mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     Debate Topic
                   </label>
                   <Select onValueChange={setTopic} defaultValue="custom">
-                    <SelectTrigger className="w-full bg-white text-gray-800">
+                    <SelectTrigger className="w-full bg-background text-foreground border-border">
                       <SelectValue placeholder="Select a topic" />
                     </SelectTrigger>
                     <SelectContent>
@@ -470,18 +470,18 @@ const BotSelection: React.FC = () => {
                         setCustomTopic(e.target.value)
                       }
                       placeholder="Enter your custom topic"
-                      className="mt-2 bg-white text-gray-800"
+                      className="mt-2 bg-background text-foreground border-border"
                     />
                   )}
                 </div>
 
                 {/* Stance Selection */}
                 <div className="flex flex-col">
-                  <label className="block text-sm text-gray-500 mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     Your Stance
                   </label>
                   <Select onValueChange={setStance} defaultValue="random">
-                    <SelectTrigger className="w-full bg-white text-gray-800">
+                    <SelectTrigger className="w-full bg-background text-foreground border-border">
                       <SelectValue placeholder="Choose your stance" />
                     </SelectTrigger>
                     <SelectContent>
@@ -494,11 +494,11 @@ const BotSelection: React.FC = () => {
 
                 {/* Role Selection */}
                 <div className="flex flex-col">
-                  <label className="block text-sm text-gray-500 mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     Your Role
                   </label>
                   <Select onValueChange={setRole} defaultValue="neutral">
-                    <SelectTrigger className="w-full bg-white text-gray-800">
+                    <SelectTrigger className="w-full bg-background text-foreground border-border">
                       <SelectValue placeholder="Choose your role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -513,16 +513,16 @@ const BotSelection: React.FC = () => {
 
               {/* Responsive Timer Section */}
               <div className="flex flex-col">
-                <label className="block text-sm text-gray-500 mb-2">
+                <label className="block text-sm text-muted-foreground mb-2">
                   Phase Timings (seconds)
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {phaseTimings.map((phase, index) => (
                     <div
                       key={phase.name}
-                      className="flex flex-col p-2 rounded-md border border-gray-200"
+                      className="flex flex-col p-2 rounded-md border border-border"
                     >
-                      <span className="text-xs font-medium text-gray-700 mb-1">
+                      <span className="text-xs font-medium text-muted-foreground mb-1">
                         {phase.name}
                       </span>
                       <Input
@@ -531,7 +531,7 @@ const BotSelection: React.FC = () => {
                         onChange={(e) =>
                           updatePhaseTiming(index, e.target.value)
                         }
-                        className="text-xs bg-white text-gray-800"
+                        className="text-xs bg-background text-foreground border-border"
                         min="60"
                         max="600"
                       />
@@ -550,7 +550,7 @@ const BotSelection: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div >
     </>
   );
 };
