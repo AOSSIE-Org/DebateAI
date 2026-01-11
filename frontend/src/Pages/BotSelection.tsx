@@ -209,6 +209,7 @@ const BotSelection: React.FC = () => {
   const [stance, setStance] = useState<string>("random");
   const [phaseTimings, setPhaseTimings] =
     useState<{ name: string; time: number }[]>(defaultPhaseTimings);
+  const [role, setRole] = useState<string>("neutral");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [user] = useAtom(userAtom);
   const [error, setError] = useState<string | null>(null);
@@ -280,6 +281,7 @@ const BotSelection: React.FC = () => {
       botLevel: bot.level,
       topic: effectiveTopic,
       stance: finalStance,
+      role,
       history: [],
       phaseTimings,
     };
@@ -291,6 +293,7 @@ const BotSelection: React.FC = () => {
         ...data,
         phaseTimings,
         stance: finalStance,
+        role,
         userId: user?.email || "guest@example.com",
         botName: bot.name,
         botLevel: bot.level,
@@ -366,11 +369,10 @@ const BotSelection: React.FC = () => {
               {levels.map((level) => (
                 <div
                   key={level.name}
-                  className={`border rounded-md cursor-pointer transition-all ${
-                    expandedLevel === level.name
+                  className={`border rounded-md cursor-pointer transition-all ${expandedLevel === level.name
                       ? "border-primary shadow-sm"
                       : "border-border hover:border-muted-foreground"
-                  }`}
+                    }`}
                 >
                   <div
                     className="flex justify-between items-center p-3 bg-muted rounded-t-md"
@@ -397,11 +399,10 @@ const BotSelection: React.FC = () => {
                           <div
                             key={bot.name}
                             onClick={() => setSelectedBot(bot.name)}
-                            className={`relative flex flex-col items-center p-2 rounded-md border transition-colors cursor-pointer group ${
-                              selectedBot === bot.name
+                            className={`relative flex flex-col items-center p-2 rounded-md border transition-colors cursor-pointer group ${selectedBot === bot.name
                                 ? "border-2 border-primary bg-primary/10"
                                 : "border-border hover:bg-muted"
-                            }`}
+                              }`}
                           >
                             <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary">
                               <img
@@ -490,6 +491,24 @@ const BotSelection: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Role Selection */}
+                <div className="flex flex-col">
+                  <label className="block text-sm text-muted-foreground mb-1">
+                    Your Role
+                  </label>
+                  <Select onValueChange={setRole} defaultValue="neutral">
+                    <SelectTrigger className="w-full bg-background text-foreground border-border">
+                      <SelectValue placeholder="Choose your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="neutral">Neutral (Default)</SelectItem>
+                      <SelectItem value="historian">Historian</SelectItem>
+                      <SelectItem value="scientist">Scientist</SelectItem>
+                      <SelectItem value="lawyer">Lawyer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Responsive Timer Section */}
@@ -531,7 +550,7 @@ const BotSelection: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div >
     </>
   );
 };
