@@ -208,10 +208,8 @@ If you find a bug or have a feature request:
 
 We look forward to your contributions!
 
----
 
-## License
 
-MIT © [AOSSIE](https://aossie.org)
-
----
+## 📜 License
+This project is licensed under the MIT License.
+See the LICENSE file for details.
