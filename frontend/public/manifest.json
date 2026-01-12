@@ -3,7 +3,12 @@
   "name": "DebateAI - Argue-Hub",
   "icons": [
     {
-      "src": "/images/logo.png",
+      "src": "/images/logo-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/images/logo-512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
