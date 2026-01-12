@@ -1129,35 +1129,28 @@ const OnlineDebateRoom = (): JSX.Element => {
     rws.onerror = (error: any) => {
       console.error('[WS] WebSocket error:', error);
       setWsLastError('WebSocket connection error');
-      setWsRetryCount(prev => {
-        const newCount = prev + 1;
-        if (newCount >= WS_MAX_RETRIES) {
-          setWsConnectionState('error');
-        } else {
-          setWsConnectionState('reconnecting');
-        }
-        return newCount;
-      });
     };
 
-    rws.onclose = (event: any) => {
-      console.log('[WS] WebSocket closed:', event.code, event.reason);
-      const errorMessage = event.code === 1006 ? 'Abnormal closure' : 
-                          event.code === 1008 ? 'Policy violation' :
-                          event.code === 1011 ? 'Server error' :
-                          `Connection closed (code: ${event.code})`;
-      setWsLastError(errorMessage);
-      
-      if (wsRetryCount < WS_MAX_RETRIES) {
-        setWsRetryCount(prev => prev + 1);
-        setWsConnectionState('reconnecting');
-        console.log(`[Connection] Retrying (${wsRetryCount + 1}/${WS_MAX_RETRIES})...`);
-      } else {
-        setWsConnectionState('error');
-        console.log('[Connection] Max retries exceeded');
-      }
-    };
-
+   rws.onclose = (event: any) => {
+	      console.log('[WS] WebSocket closed:', event.code, event.reason);
+	      const errorMessage = event.code === 1006 ? 'Abnormal closure' : 
+	                          event.code === 1008 ? 'Policy violation' :
+	                          event.code === 1011 ? 'Server error' :
+	                          `Connection closed (code: ${event.code})`;
+	      setWsLastError(errorMessage);
+	      
+	      setWsRetryCount(prev => {
+	        const newCount = prev + 1;
+	        if (newCount >= WS_MAX_RETRIES) {
+	          setWsConnectionState('error');
+	          console.log('[Connection] Max retries exceeded');
+	        } else {
+	          setWsConnectionState('reconnecting');
+	          console.log(`[Connection] Retrying (${newCount}/${WS_MAX_RETRIES})...`);
+	        }
+	        return newCount;
+	      });
+	    };
     rws.onmessage = async (event) => {
       const data: WSMessage = JSON.parse(event.data);
       switch (data.type) {
@@ -1403,20 +1396,22 @@ const OnlineDebateRoom = (): JSX.Element => {
       setRemoteStream(event.streams[0]);
     };
 
-    pc.onconnectionstatechange = () => {
-      console.log('[RTC] Connection state changed:', pc.connectionState);
-      switch (pc.connectionState) {
-        case 'connected':
-          setRtcConnectionState('connected');
-          break;
-        case 'disconnected':
-        case 'failed':
-          setRtcConnectionState('failed');
-          break;
-        default:
-          setRtcConnectionState('disconnected');
-      }
-    };
+     pc.onconnectionstatechange = () => {
+	      console.log('[RTC] Connection state changed:', pc.connectionState);
+	      switch (pc.connectionState) {
+	        case 'connected':
+	          setRtcConnectionState('connected');
+	          break;
+	        case 'failed':
+	          setRtcConnectionState('failed');
+	          break;
+	        case 'disconnected':
+	          setRtcConnectionState('disconnected');
+	          break;
+	        default:
+	          setRtcConnectionState('disconnected');
+	      }
+	    };
 
     pc.oniceconnectionstatechange = () => {
       console.log('[RTC] ICE connection state changed:', pc.iceConnectionState);
@@ -1944,18 +1939,25 @@ const OnlineDebateRoom = (): JSX.Element => {
     }
   }, []);
 
-  const handleLeaveDebate = useCallback(() => {
-    console.log('[Connection] Leaving debate room');
-    // Clean up connections
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    if (pcRef.current) {
-      pcRef.current.close();
-    }
-    // Navigate away
-    navigate('/game');
-  }, [navigate]);
+   const handleLeaveDebate = useCallback(() => {
+	    console.log('[Connection] Leaving debate room');
+	    // Stop local media tracks
+	    if (localStreamRef.current) {
+	      localStreamRef.current.getTracks().forEach(track => track.stop());
+	    }
+	    if (audioStream) {
+	      audioStream.getTracks().forEach(track => track.stop());
+	    }
+	    // Clean up connections
+	    if (wsRef.current) {
+	      wsRef.current.close();
+	    }
+	    if (pcRef.current) {
+	      pcRef.current.close();
+	    }
+	    // Navigate away
+	    navigate('/game');
+	  }, [navigate, audioStream]);
 
   useEffect(() => {
     if (!manualRecordingRef.current) {
