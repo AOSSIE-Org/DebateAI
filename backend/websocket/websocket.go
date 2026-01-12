@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"arguehub/db"
+	"arguehub/services"
 	"arguehub/utils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -470,6 +472,8 @@ func WebsocketHandler(c *gin.Context) {
 			handleMuteRequest(room, conn, message, client, roomID)
 		case "unmute":
 			handleUnmuteRequest(room, conn, message, client, roomID)
+		case "concede":
+			handleConcede(room, conn, message, client, roomID)
 		default:
 			if message.Type == "requestOffer" && client.IsSpectator {
 				var req map[string]interface{}
@@ -749,4 +753,44 @@ func getUserDetails(email string) (string, string, string, int, error) {
 
 	rating := int(math.Round(user.Rating))
 	return user.ID.Hex(), user.DisplayName, user.AvatarURL, rating, nil
+}
+
+// handleConcede handles concede requests
+func handleConcede(room *Room, conn *websocket.Conn, message Message, client *Client, roomID string) {
+	// Broadcast concede message to all clients (including spectators)
+	broadcastMessage := Message{
+		Type:     "concede",
+		Room:     roomID,
+		Username: client.Username,
+		UserID:   client.UserID,
+		Content:  "User conceded the debate",
+	}
+
+	// Send to all clients
+	for _, r := range snapshotRecipients(room, nil) {
+		r.SafeWriteJSON(broadcastMessage)
+	}
+
+	// Find opponent
+	var opponent *Client
+	room.Mutex.Lock()
+	for _, c := range room.Clients {
+		if !c.IsSpectator && c.UserID != client.UserID {
+			opponent = c
+			break
+		}
+	}
+	room.Mutex.Unlock()
+
+	if opponent != nil {
+		// Update ratings
+		// User lost (0.0), Opponent won (1.0)
+		userID, _ := primitive.ObjectIDFromHex(client.UserID)
+		opponentID, _ := primitive.ObjectIDFromHex(opponent.UserID)
+
+		_, _, err := services.UpdateRatings(userID, opponentID, 0.0, time.Now())
+		if err != nil {
+			log.Printf("Error updating ratings after concede: %v", err)
+		}
+	}
 }

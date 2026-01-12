@@ -385,7 +385,7 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 		return
 	}
 
-	log.Printf("Successfully updated score. New score: %d (was %d, added %d)", 
+	log.Printf("Successfully updated score. New score: %d (was %d, added %d)",
 		updatedUser.Score, user.Score, pointsToAdd)
 
 	// Save score update record
@@ -418,11 +418,11 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	if resultStatus == "win" && !hasBadge["FirstWin"] {
 		badgeUpdate := bson.M{"$addToSet": bson.M{"badges": "FirstWin"}}
 		userCollection.UpdateOne(ctx, bson.M{"_id": userID}, badgeUpdate)
-		
+
 		// Update the updatedUser object to include the new badge
 		updatedUser.Badges = append(updatedUser.Badges, "FirstWin")
 		hasBadge["FirstWin"] = true
-		
+
 		// Save badge record
 		badgeCollection := db.MongoDatabase.Collection("user_badges")
 		userBadge := models.UserBadge{
@@ -460,7 +460,7 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 		Timestamp: time.Now(),
 	})
 
-	log.Printf("Updated gamification for user %s: +%d points (new score: %d), result: %s", 
+	log.Printf("Updated gamification for user %s: +%d points (new score: %d), result: %s",
 		userID.Hex(), pointsToAdd, updatedUser.Score, resultStatus)
 }
 
@@ -513,4 +513,97 @@ func checkAndAwardAutomaticBadges(ctx context.Context, userID primitive.ObjectID
 
 	// Check for Debater10 badge (10 debates completed)
 	// Note: This would require tracking debate count, which might need to be added
+}
+
+type ConcedeRequest struct {
+	DebateId string           `json:"debateId" binding:"required"`
+	History  []models.Message `json:"history"`
+}
+
+func ConcedeDebate(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		c.JSON(401, gin.H{"error": "Authorization token required"})
+		return
+	}
+
+	token = strings.TrimPrefix(token, "Bearer ")
+	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	if err != nil || !valid {
+		c.JSON(401, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+
+	var req ConcedeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+
+	objID, err := primitive.ObjectIDFromHex(req.DebateId)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid debate ID"})
+		return
+	}
+
+	// Fetch the debate to get details
+	var debate models.DebateVsBot
+	err = db.DebateVsBotCollection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&debate)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Debate not found"})
+		return
+	}
+
+	// Update debate outcome
+	filter := bson.M{"_id": objID}
+	update := bson.M{"$set": bson.M{"outcome": "User conceded"}}
+
+	_, err = db.DebateVsBotCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to update debate: " + err.Error()})
+		return
+	}
+
+	// Get user ID from email
+	userCollection := db.GetCollection("users")
+	var user models.User
+	err = userCollection.FindOne(context.Background(), bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		// Log error but don't fail the request as the main action succeeded
+		log.Printf("Error finding user for concede updates: %v", err)
+		c.JSON(200, gin.H{"message": "Debate conceded successfully"})
+		return
+	}
+
+	// Save transcript to history
+	// We treat concession as a loss
+	// Use history from request if available, otherwise fall back to debate record history
+	historyToSave := debate.History
+	if len(req.History) > 0 {
+		historyToSave = req.History
+	}
+
+	_ = services.SaveDebateTranscript(
+		user.ID,
+		email,
+		"user_vs_bot",
+		debate.Topic,
+		debate.BotName,
+		"loss",
+		historyToSave,
+		nil,
+	)
+
+	// Update gamification (score, badges, streaks)
+	// Call synchronously but with recover to prevent panics
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in updateGamificationAfterBotDebate (concede): %v", r)
+			}
+		}()
+		updateGamificationAfterBotDebate(user.ID, "loss", debate.Topic)
+	}()
+
+	c.JSON(200, gin.H{"message": "Debate conceded successfully"})
 }

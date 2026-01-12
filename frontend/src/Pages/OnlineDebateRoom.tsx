@@ -806,6 +806,25 @@ const OnlineDebateRoom = (): JSX.Element => {
     startJudgmentPolling,
   ]);
 
+  const handleConcede = useCallback(() => {
+    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
+      if (wsRef.current) {
+        wsRef.current.send(JSON.stringify({
+          type: "concede",
+          room: roomId,
+          userId: currentUserId,
+          username: currentUser?.displayName || "User"
+        }));
+      }
+      setDebatePhase(DebatePhase.Finished);
+      setPopup({
+        show: true,
+        message: "You have conceded the debate.",
+        isJudging: false,
+      });
+    }
+  }, [roomId, currentUserId, currentUser, setDebatePhase, setPopup]);
+
   const handlePhaseDone = useCallback(() => {
     const currentIndex = phaseOrder.indexOf(debatePhase);
     console.debug(
@@ -1278,6 +1297,14 @@ const OnlineDebateRoom = (): JSX.Element => {
               }
             }
           }
+          break;
+        case "concede":
+          setDebatePhase(DebatePhase.Finished);
+          setPopup({
+            show: true,
+            message: `${data.username || "Opponent"} has conceded the debate. You win!`,
+            isJudging: false,
+          });
           break;
         case "spectatorJoined":
           if (data.spectator?.connectionId) {
@@ -2193,6 +2220,16 @@ const OnlineDebateRoom = (): JSX.Element => {
               </span>
             )}
           </p>
+          {debatePhase !== DebatePhase.Finished && debatePhase !== DebatePhase.Setup && (
+            <div className="mt-2">
+              <Button
+                onClick={handleConcede}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-md px-3 text-sm"
+              >
+                Concede
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
