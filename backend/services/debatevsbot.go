@@ -200,7 +200,7 @@ Your stance is: %s.
 %s
 Provide an opening statement that embodies your persona and stance.
 [Your opening argument]
-%s %s`,
+%s`,
 			bot.Name, bot.Level, stance, topic,
 			levelInstructions,
 			personalityInstructions,
