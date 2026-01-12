@@ -14,6 +14,8 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'join' | 'matchmaking'>(
     'create'
   );
+  const [devilAdvocateEnabled, setDevilAdvocateEnabled] = useState(false);
+  const [devilAdvocateFrequency, setDevilAdvocateFrequency] = useState(5);
 
   // Handler to join a debate room by sending the room code via navigation.
   const handleJoinRoom = () => {
@@ -35,7 +37,11 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
           Authorization: `Bearer ${token}`,
         },
         // Here we send an example payload with the room type.
-        body: JSON.stringify({ type: 'public' }),
+        body: JSON.stringify({
+          type: 'public',
+          devilAdvocateEnabled,
+          devilAdvocateFrequency,
+        }),
       });
       if (!response.ok) {
         alert('Error creating room.');
@@ -64,31 +70,28 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
         <div className='flex mb-6 border-b border-border'>
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-4 py-2 font-medium transition ${
-              activeTab === 'create'
+            className={`px-4 py-2 font-medium transition ${activeTab === 'create'
                 ? 'text-primary border-b-2 border-primary'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             Create Room
           </button>
           <button
             onClick={() => setActiveTab('join')}
-            className={`px-4 py-2 font-medium transition ${
-              activeTab === 'join'
+            className={`px-4 py-2 font-medium transition ${activeTab === 'join'
                 ? 'text-primary border-b-2 border-primary'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             Join Room
           </button>
           <button
             onClick={() => setActiveTab('matchmaking')}
-            className={`px-4 py-2 font-medium transition ${
-              activeTab === 'matchmaking'
+            className={`px-4 py-2 font-medium transition ${activeTab === 'matchmaking'
                 ? 'text-primary border-b-2 border-primary'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             🎯 Matchmaking
           </button>
@@ -101,6 +104,49 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
             <p className='text-muted-foreground text-sm text-center mb-6'>
               Start a new debate and invite others with a unique room code.
             </p>
+
+            {/* AI Devil's Advocate Settings */}
+            <div className='w-full mb-6 p-4 border border-border rounded-lg bg-secondary/10'>
+              <div className='flex items-center justify-between mb-4'>
+                <div className='flex flex-col'>
+                  <span className='font-medium'>AI Devil's Advocate</span>
+                  <span className='text-xs text-muted-foreground'>
+                    AI periodically asks neutral, critical questions.
+                  </span>
+                </div>
+                <label className='relative inline-flex items-center cursor-pointer'>
+                  <input
+                    type='checkbox'
+                    className='sr-only peer'
+                    checked={devilAdvocateEnabled}
+                    onChange={(e) => setDevilAdvocateEnabled(e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+
+              {devilAdvocateEnabled && (
+                <div className='flex items-center justify-between animate-in fade-in slide-in-from-top-1'>
+                  <span className='text-sm font-medium'>Frequency</span>
+                  <div className='flex items-center space-x-2'>
+                    <input
+                      type='number'
+                      min='3'
+                      max='20'
+                      value={devilAdvocateFrequency}
+                      onChange={(e) =>
+                        setDevilAdvocateFrequency(parseInt(e.target.value))
+                      }
+                      className='w-16 p-1 text-center bg-input border border-border rounded'
+                    />
+                    <span className='text-xs text-muted-foreground'>
+                      messages
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleCreateRoom}
               className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full'
