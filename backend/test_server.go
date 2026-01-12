@@ -35,7 +35,7 @@ func main() {
 	// Check pool - should have 2 users now
 	pool = ms.GetPool()
 
-	for _, user := range pool {
+	for range pool {
 	}
 
 	// Wait a bit for matching
@@ -44,7 +44,7 @@ func main() {
 	// Check pool after matching
 	pool = ms.GetPool()
 
-	for _, user := range pool {
+	for range pool {
 	}
 
 }

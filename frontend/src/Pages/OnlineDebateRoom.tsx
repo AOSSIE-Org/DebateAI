@@ -78,6 +78,7 @@ interface UserDetails {
   avatarUrl?: string;
   displayName?: string;
   email?: string;
+  persona?: string;
 }
 
 // Define WebSocket message structure
@@ -85,6 +86,7 @@ interface WSMessage {
   type: string;
   topic?: string;
   role?: DebateRole;
+  persona?: string;
   ready?: boolean;
   phase?: DebatePhase;
   offer?: RTCSessionDescriptionInit;
@@ -140,7 +142,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
 
 const WS_BASE_URL = BASE_URL.replace(
   /^https?/,
-  (match) => (match === "https" ? "wss" : "ws")
+  (match: string) => (match === "https" ? "wss" : "ws")
 );
 
 
@@ -205,7 +207,9 @@ const OnlineDebateRoom = (): JSX.Element => {
   // State for debate setup and signaling
   const [topic, setTopic] = useState("");
   const [localRole, setLocalRole] = useState<DebateRole | null>(null);
+  const [localPersonaRole, setLocalPersonaRole] = useState<string>("neutral");
   const [peerRole, setPeerRole] = useState<DebateRole | null>(null);
+  const [peerPersonaRole, setPeerPersonaRole] = useState<string>("neutral");
   const [localReady, setLocalReady] = useState(false);
   const [peerReady, setPeerReady] = useState(false);
   const [debatePhase, setDebatePhase] = useState<DebatePhase>(
@@ -492,8 +496,8 @@ const OnlineDebateRoom = (): JSX.Element => {
     (debatePhase.includes("For")
       ? "for"
       : debatePhase.includes("Against")
-      ? "against"
-      : null);
+        ? "against"
+        : null);
 
   const startJudgmentPolling = useCallback(
     (role: DebateRole) => {
@@ -701,17 +705,17 @@ const OnlineDebateRoom = (): JSX.Element => {
       const rolePhases =
         role === "for"
           ? [
-              DebatePhase.OpeningFor,
-              DebatePhase.CrossForQuestion,
-              DebatePhase.CrossForAnswer,
-              DebatePhase.ClosingFor,
-            ]
+            DebatePhase.OpeningFor,
+            DebatePhase.CrossForQuestion,
+            DebatePhase.CrossForAnswer,
+            DebatePhase.ClosingFor,
+          ]
           : [
-              DebatePhase.OpeningAgainst,
-              DebatePhase.CrossAgainstAnswer,
-              DebatePhase.CrossAgainstQuestion,
-              DebatePhase.ClosingAgainst,
-            ];
+            DebatePhase.OpeningAgainst,
+            DebatePhase.CrossAgainstAnswer,
+            DebatePhase.CrossAgainstQuestion,
+            DebatePhase.ClosingAgainst,
+          ];
 
       return rolePhases.reduce((acc, phase) => {
         const storageKey = `${roomId}_${phase}_${role}`;
@@ -940,8 +944,8 @@ const OnlineDebateRoom = (): JSX.Element => {
           const participants: UserDetails[] = Array.isArray(data)
             ? data
             : Array.isArray(data?.participants)
-            ? data.participants
-            : [];
+              ? data.participants
+              : [];
           const ownerIdFromServer: string | null = Array.isArray(data)
             ? null
             : data?.ownerId ?? null;
@@ -1040,8 +1044,7 @@ const OnlineDebateRoom = (): JSX.Element => {
           // If room not found (404), it might still be being created
           if (response.status === 404 && retryCount < 5) {
             console.warn(
-              `Room not found, might still be creating. Retry ${
-                retryCount + 1
+              `Room not found, might still be creating. Retry ${retryCount + 1
               }/5 in 2 seconds...`
             );
 
@@ -1111,7 +1114,7 @@ const OnlineDebateRoom = (): JSX.Element => {
     const token = getAuthToken();
     if (!token || !roomId) return;
 
-   const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
+    const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
 
     const rws = new ReconnectingWebSocket(wsUrl, [], {
       connectionTimeout: 4000,
@@ -1143,6 +1146,9 @@ const OnlineDebateRoom = (): JSX.Element => {
           break;
         case "ready":
           if (data.ready !== undefined) setPeerReady(data.ready);
+          break;
+        case "personaSelection":
+          if (data.persona) setPeerPersonaRole(data.persona);
           break;
         case "phaseChange":
           if (data.phase) {
@@ -1254,6 +1260,9 @@ const OnlineDebateRoom = (): JSX.Element => {
                     opponentParticipant.avatarUrl ||
                     "https://avatar.iran.liara.run/public/31",
                 });
+                if (opponentParticipant.persona) {
+                  setPeerPersonaRole(opponentParticipant.persona);
+                }
               } else {
                 setOpponentUser(null);
               }
@@ -1311,7 +1320,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                   for (const candidate of pending) {
                     try {
                       await spectatorPc.addIceCandidate(candidate);
-                    } catch (err) {}
+                    } catch (err) { }
                   }
                   spectatorPendingCandidatesRef.current.delete(
                     data.connectionId
@@ -1998,6 +2007,12 @@ const OnlineDebateRoom = (): JSX.Element => {
     wsRef.current?.send(message);
   };
 
+  const handlePersonaRoleSelection = (persona: string) => {
+    setLocalPersonaRole(persona);
+    const message = JSON.stringify({ type: "personaSelection", persona });
+    wsRef.current?.send(message);
+  };
+
   const toggleReady = () => {
     const newReadyState = !localReady;
     setLocalReady(newReadyState);
@@ -2057,9 +2072,8 @@ const OnlineDebateRoom = (): JSX.Element => {
       .padStart(2, "0")}`;
     return (
       <span
-        className={`font-mono ${
-          seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
-        }`}
+        className={`font-mono ${seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
+          }`}
       >
         {timeStr}
       </span>
@@ -2072,10 +2086,10 @@ const OnlineDebateRoom = (): JSX.Element => {
       debatePhase !== DebatePhase.Setup &&
       debatePhase !== DebatePhase.Finished &&
       !isAutoMuted
-    ? "Click start when you're ready to speak."
-    : isAutoMuted
-    ? "Auto-muted while the opponent is speaking."
-    : "Waiting for your turn...";
+      ? "Click start when you're ready to speak."
+      : isAutoMuted
+        ? "Auto-muted while the opponent is speaking."
+        : "Waiting for your turn...";
 
   const canStartSpeaking =
     isMyTurn &&
@@ -2108,8 +2122,8 @@ const OnlineDebateRoom = (): JSX.Element => {
               {debatePhase.includes("Question")
                 ? "ask a question"
                 : debatePhase.includes("Answer")
-                ? "answer"
-                : "make a statement"}
+                  ? "answer"
+                  : "make a statement"}
             </span>
             {isAutoMuted && (
               <span className="ml-2 text-red-500 font-medium">
@@ -2189,9 +2203,8 @@ const OnlineDebateRoom = (): JSX.Element => {
                         className="w-20 h-20 rounded-full object-cover"
                       />
                       <div
-                        className={`absolute top-0 right-0 w-4 h-4 rounded-full border-2 border-card ${
-                          localReady ? "bg-green-500" : "bg-red-500"
-                        }`}
+                        className={`absolute top-0 right-0 w-4 h-4 rounded-full border-2 border-card ${localReady ? "bg-green-500" : "bg-red-500"
+                          }`}
                         title={
                           localReady ? "You are Ready" : "You are Not Ready"
                         }
@@ -2210,21 +2223,19 @@ const OnlineDebateRoom = (): JSX.Element => {
                     <div className="mt-2 flex space-x-2">
                       <button
                         onClick={() => handleRoleSelection("for")}
-                        className={`px-2 py-1 rounded text-xs border transition ${
-                          localRole === "for"
-                            ? "bg-primary text-primary-foreground border-transparent"
-                            : "bg-muted text-muted-foreground border-border"
-                        }`}
+                        className={`px-2 py-1 rounded text-xs border transition ${localRole === "for"
+                          ? "bg-primary text-primary-foreground border-transparent"
+                          : "bg-muted text-muted-foreground border-border"
+                          }`}
                       >
                         For
                       </button>
                       <button
                         onClick={() => handleRoleSelection("against")}
-                        className={`px-2 py-1 rounded text-xs border transition ${
-                          localRole === "against"
-                            ? "bg-primary text-primary-foreground border-transparent"
-                            : "bg-muted text-muted-foreground border-border"
-                        }`}
+                        className={`px-2 py-1 rounded text-xs border transition ${localRole === "against"
+                          ? "bg-primary text-primary-foreground border-transparent"
+                          : "bg-muted text-muted-foreground border-border"
+                          }`}
                       >
                         Against
                       </button>
@@ -2236,6 +2247,17 @@ const OnlineDebateRoom = (): JSX.Element => {
                           : "Against"
                         : "Not selected"}
                     </div>
+                    {/* Persona Role Selection */}
+                    <select
+                      value={localPersonaRole}
+                      onChange={(e) => handlePersonaRoleSelection(e.target.value)}
+                      className="mt-2 text-[10px] border border-border rounded p-1 bg-input text-foreground w-full"
+                    >
+                      <option value="neutral">Neutral Persona</option>
+                      <option value="historian">Historian</option>
+                      <option value="scientist">Scientist</option>
+                      <option value="lawyer">Lawyer</option>
+                    </select>
                   </div>
                   {/* Opponent Avatar */}
                   <div className="flex flex-col items-center">
@@ -2249,9 +2271,8 @@ const OnlineDebateRoom = (): JSX.Element => {
                         className="w-20 h-20 rounded-full object-cover"
                       />
                       <div
-                        className={`absolute top-0 right-0 w-4 h-4 rounded-full border-2 border-card ${
-                          peerReady ? "bg-green-500" : "bg-red-500"
-                        }`}
+                        className={`absolute top-0 right-0 w-4 h-4 rounded-full border-2 border-card ${peerReady ? "bg-green-500" : "bg-red-500"
+                          }`}
                         title={
                           peerReady ? "Opponent Ready" : "Opponent Not Ready"
                         }
@@ -2281,17 +2302,21 @@ const OnlineDebateRoom = (): JSX.Element => {
                           : "Against"
                         : "Not selected"}
                     </div>
+                    {peerPersonaRole !== "neutral" && (
+                      <div className="text-[10px] uppercase font-bold text-primary mt-1">
+                        {peerPersonaRole}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Ready Button */}
                 <div>
                   <Button
                     onClick={toggleReady}
-                    className={`w-full py-2 rounded-lg transition ${
-                      localReady
-                        ? "bg-destructive text-destructive-foreground"
-                        : "bg-accent text-accent-foreground"
-                    }`}
+                    className={`w-full py-2 rounded-lg transition ${localReady
+                      ? "bg-destructive text-destructive-foreground"
+                      : "bg-accent text-accent-foreground"
+                      }`}
                   >
                     {localReady ? "Cancel Ready" : "I'm Ready"}
                   </Button>
@@ -2375,11 +2400,10 @@ const OnlineDebateRoom = (): JSX.Element => {
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Local User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            isMyTurn && debatePhase !== DebatePhase.Finished
-              ? "animate-glow"
-              : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${isMyTurn && debatePhase !== DebatePhase.Finished
+            ? "animate-glow"
+            : ""
+            } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -2397,9 +2421,14 @@ const OnlineDebateRoom = (): JSX.Element => {
               <div className="text-sm font-medium text-gray-800">
                 {localUser?.displayName || currentUser?.displayName || "You"}
               </div>
-              <div className="text-xs text-gray-500">
-                Role: {localRole || "Not selected"} | Rating:{" "}
-                {localUser?.elo || currentUser?.rating || 1500}
+              <div className="text-xs text-gray-500 flex items-center gap-1">
+                Role: {localRole || "Not selected"}
+                {localPersonaRole !== "neutral" && (
+                  <span className="bg-primary/20 text-primary text-[8px] px-1 rounded uppercase font-bold">
+                    {localPersonaRole}
+                  </span>
+                )}
+                | Rating: {localUser?.elo || currentUser?.rating || 1500}
               </div>
             </div>
           </div>
@@ -2440,11 +2469,10 @@ const OnlineDebateRoom = (): JSX.Element => {
 
         {/* Remote User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            !isMyTurn && debatePhase !== DebatePhase.Finished
-              ? "animate-glow"
-              : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${!isMyTurn && debatePhase !== DebatePhase.Finished
+            ? "animate-glow"
+            : ""
+            } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -2463,9 +2491,14 @@ const OnlineDebateRoom = (): JSX.Element => {
                   opponentUser?.username ||
                   "Opponent"}
               </div>
-              <div className="text-xs text-gray-500">
-                Role: {peerRole || "Not selected"} | Rating:{" "}
-                {opponentUser?.elo || 1500}
+              <div className="text-xs text-gray-500 flex items-center gap-1">
+                Role: {peerRole || "Not selected"}
+                {peerPersonaRole !== "neutral" && (
+                  <span className="bg-primary/20 text-primary text-[8px] px-1 rounded uppercase font-bold">
+                    {peerPersonaRole}
+                  </span>
+                )}
+                | Rating: {opponentUser?.elo || 1500}
               </div>
             </div>
           </div>
