@@ -123,11 +123,7 @@ VITE_GOOGLE_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>
    npm install
    ```
 
-3. Create a `.env` file and add:
-
-   ```
-   VITE_BASE_URL=http://localhost:1313
-   ```
+3. See the earlier "Frontend Configuration" section for required environment variables.
 
 4. Start the development server:
    ```
