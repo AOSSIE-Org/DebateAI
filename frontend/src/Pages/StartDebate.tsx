@@ -30,43 +30,47 @@ const StartDebate = () => {
   };
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-center flex-1">
-        <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
-          <div className="w-full md:w-2/3 p-4 md:p-16">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-center flex-1 min-h-0">
+        <div className="flex flex-col xl:flex-row items-center justify-center w-full h-full px-4 xl:px-8 gap-4 xl:gap-8">
+          {/* Image container - constrained height */}
+          <div className="flex items-center justify-center w-full xl:w-1/2 flex-shrink min-h-0">
             <img
               src={DebateCover}
               alt="Debate Cover"
-              className="w-full object-cover"
+              className="w-full max-h-[45vh] xl:max-h-[70vh] object-contain"
             />
           </div>
-          <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
-            <h3 className="text-xl md:text-4xl font-bold text-center">
+          {/* Content container */}
+          <div className="flex w-full xl:w-1/2 flex-col items-center justify-center gap-3 xl:gap-4 flex-shrink-0">
+            <h3 className="text-lg md:text-xl xl:text-3xl font-bold text-center">
               Play Debate Online on the <span className="text-primary">#1</span>{" "}
               Site!
             </h3>
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full max-w-md gap-2">
               <Button
-                className="my-2 h-auto rounded text-xl flex items-center justify-start"
+                className="h-auto py-3 rounded text-base md:text-lg flex items-center justify-start whitespace-normal text-left"
                 onClick={handlePlayDebateClick}
               >
-                <FaHandshakeSimpleSlash className="text-4xl" />
-                <div className="flex flex-col items-start ml-4">
-                  <span className="font-bold">Play Online</span>
-                  <span className="text-sm text-primary-foreground font-thin">
+                <FaHandshakeSimpleSlash className="text-2xl md:text-3xl shrink-0" />
+                <div className="flex flex-col items-start ml-3">
+                  <span className="font-bold leading-tight">Play Online</span>
+                  <span className="text-xs md:text-sm text-primary-foreground font-thin leading-tight">
                     Play with someone at your level
                   </span>
                 </div>
               </Button>
               <Button
-                className="my-2 h-auto rounded text-xl flex items-center justify-start"
+                className="h-auto py-3 rounded text-base md:text-lg flex items-center justify-start whitespace-normal text-left"
                 variant="outline"
                 onClick={handlePlayBotClick}
               >
-                <RiRobot2Fill className="text-4xl" />
-                <div className="flex flex-col items-start ml-4">
-                  <span className="font-bold">Practice with Bot</span>
-                  <span className="text-sm text-muted-foreground font-thin">
+                <RiRobot2Fill className="text-2xl md:text-3xl shrink-0" />
+                <div className="flex flex-col items-start ml-3">
+                  <span className="font-bold leading-tight">
+                    Practice with Bot
+                  </span>
+                  <span className="text-xs md:text-sm text-muted-foreground font-thin leading-tight">
                     Improve your skills with AI guidance
                   </span>
                 </div>
