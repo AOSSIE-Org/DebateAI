@@ -756,7 +756,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col md:flex-row gap-4 p-2 sm:p-4 bg-background min-h-[calc(100vh-4rem)]">
-      <div className="w-full md:w-1/4 lg:w-1/5 bg-card p-4 border border-border rounded-md shadow max-h-[calc(100vh-4rem)] overflow-y-auto">
+      <div className="w-full md:w-1/2 xl:w-1/4 bg-card p-4 border border-border rounded-md shadow md:overflow-y-auto md:max-h-[calc(100vh-4rem)]">
         {successMessage && (
           <div className="mb-2 p-2 rounded bg-green-100 text-green-700 text-xs animate-in fade-in duration-300">
             {successMessage}
@@ -827,7 +827,7 @@ const Profile: React.FC = () => {
               </div>
             </form>
           ) : (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center w-full justify-center space-x-2">
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground truncate">
                 {profile.displayName || "Steve"}
               </h2>
@@ -949,7 +949,7 @@ const Profile: React.FC = () => {
       </div>
 
       <div className="flex-1 flex flex-col space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardContent className="flex-1 p-4">
               {totalMatches === 0 ? (
@@ -1169,7 +1169,7 @@ const Profile: React.FC = () => {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardHeader className="p-2 flex-shrink-0">
               <CardTitle className="text-foreground text-base sm:text-lg">
