@@ -74,27 +74,27 @@ const handleGoogleLogin = useCallback(
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
-      {infoMessage && <p className="text-sm text-green-500 mb-2">{infoMessage}</p>}
+      {infoMessage && <p className="text-xl text-green-500 mb-6">{infoMessage}</p>}
       <Input
         type="email"
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 dark:border-white"
+        className="mb-6 dark:border-white text-xl py-6 shadow-md"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-1 dark:border-white"
+        className="mb-6 dark:border-white text-xl py-6 shadow-md"
       />
       {localError && (
-        <p className="text-red-500 text-sm mt-2">
+        <p className="text-red-500 text-xl mt-2">
           {localError}
         </p>
 )}
-      <div className='w-full flex justify-start items-center pl-1'>
+      <div className='w-full flex justify-start items-center pl-1 mb-6'>
         <div className='w-4'>
           <Input
             type='checkbox'
@@ -103,16 +103,16 @@ const handleGoogleLogin = useCallback(
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 text-xl'>show password</div>
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted-foreground dark:text-white mb-4">
+      {error && <p className="text-xl text-red-500 mb-6">{error}</p>}
+      <p className="text-xl text-muted-foreground dark:text-white mb-6">
         Forgot your password?{' '}
         <span className="underline cursor-pointer" onClick={startForgotPassword}>
           Reset Password
         </span>
       </p>
-      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
+      <Button type="submit" className="w-full mb-6 border dark:border-white text-xl" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
       <div id="googleSignInButton" className="w-full"></div>
@@ -191,23 +191,23 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 dark:border-white"
+        className="mb-6 dark:border-white text-xl py-6 shadow-md"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-2 dark:border-white"
+        className="mb-6 dark:border-white text-xl py-6 shadow-md"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="confirm password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4 dark:border-white"
+        className="mb-8 dark:border-white text-xl py-6 shadow-md"
       />
-      <div className='w-full flex justify-start items-center pl-1'>
+      <div className='w-full flex justify-start items-center pl-1 mb-6'>
         <div className='w-4'>
           <Input
             type='checkbox'
@@ -216,10 +216,10 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
             onChange={(e) => setPasswordVisible(e.target.checked)}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 text-xl'>show password</div>
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
+      {error && <p className="text-xl text-red-500 mb-6">{error}</p>}
+      <Button type="submit" className="w-full mb-6 border dark:border-white text-xl py-4" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
       <div id="googleSignUpButton" className="w-full"></div>
@@ -389,7 +389,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
               onChange={(e) => setPasswordVisible(e.target.checked)}
             />
           </div>
-          <div className='pl-2'>show password</div>
+          <div className='pl-2 text-lg'>show password</div>
         </div>
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
