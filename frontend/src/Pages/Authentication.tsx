@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import DebateCover from '../assets/DebateCover4.svg';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -102,10 +102,11 @@ const RightSection: React.FC<RightSectionProps> = ({
 
 
 const Authentication = () => {
+  const location = useLocation();
   // Extend authMode to include 'resetPassword'
   const [authMode, setAuthMode] = useState<
     'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
-  >('login');
+  >(location.state?.isSignUp ? 'signup' : 'login');
 
   const [emailForOTP, setEmailForOTP] = useState('');
   const [emailForPasswordReset, setEmailForPasswordReset] = useState('');
