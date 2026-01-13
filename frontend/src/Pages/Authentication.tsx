@@ -1,30 +1,23 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
-import { Link } from 'react-router-dom';
 import DebateCover from '../assets/DebateCover4.svg';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
-    <div className="flex items-center text-lg font-medium">
-      <Link to="/" className="flex items-center">
-        <svg>
-          {/* SVG Content */}
-        </svg>
-        Arguehub
-      </Link>
+  <div className="hidden md:flex w-full h-full flex-col justify-start items-center bg-muted p-10 text-black dark:text-white">
+    <div className="flex flex-col items-center text-center gap-8 mb-8 mt-8">
+      <div className="flex flex-col items-center">
+        <span className="text-5xl md:text-7xl font-extrabold text-gray-500 drop-shadow-2xl text-center" style={{ textShadow: '0 4px 8px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)' }}>
+          Debate Ai
+        </span>
+      </div>
+      <p className="text-2xl md:text-4xl text-gray-400 max-w-4xl text-center leading-tight">
+        An online debate isn't won by the <span className="text-orange-500 font-bold" style={{ textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)' }}>loudest voice</span>, <br />but by the clearest <span className="text-orange-500 font-bold" style={{ textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)' }}>reasoning</span>.
+      </p>
     </div>
-    <div className="flex justify-center items-center flex-1 p-10">
-      <img src={DebateCover} alt="Debate Cover" className="max-w-full max-h-full object-contain" />
-    </div>
-    <div>
-      <blockquote className="space-y-2">
-        <p className="text-lg text-black dark:text-white">
-          "We cannot solve our problems with the same thinking we used when we created them."
-        </p>
-        <footer className="text-sm text-black dark:text-white">Albert Einstein</footer>
-      </blockquote>
+    <div className="flex justify-center items-center flex-1">
+      <img src={DebateCover} alt="Debate Cover" className="max-w-full max-h-full w-auto object-contain scale-130" />
     </div>
   </div>
 );
@@ -71,16 +64,16 @@ const RightSection: React.FC<RightSectionProps> = ({
         </Button>
       )}
     </div>
-    <div className="flex flex-col items-center justify-center h-full w-4/5 md:w-3/5 text-center">
+    <div className="flex flex-col items-center justify-center h-full w-4/5 md:w-3/5 text-center font-serif text-lg">
       {authMode === 'login' && (
         <>
-          <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
+          <h3 className="text-4xl font-semibold my-10" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1)' }}>Sign in to your account</h3>
           <LoginForm startForgotPassword={startForgotPassword} infoMessage={infoMessage} />
         </>
       )}
       {authMode === 'signup' && (
         <>
-          <h3 className="text-2xl font-medium my-4">Create an account</h3>
+          <h3 className="text-5xl font-semibold my-11" style={{ textShadow: '0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1)' }}>Create an account</h3>
           <SignUpForm startOtpVerification={startOtpVerification} />
         </>
       )}
@@ -105,7 +98,7 @@ const Authentication = () => {
   // Extend authMode to include 'resetPassword'
   const [authMode, setAuthMode] = useState<
     'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
-  >('login');
+  >('signup');
 
   const [emailForOTP, setEmailForOTP] = useState('');
   const [emailForPasswordReset, setEmailForPasswordReset] = useState('');
