@@ -78,6 +78,7 @@ import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
 import ProfileHover from "../components/ProfileHover";
 import { useUser } from "../hooks/useUser";
+import { useToast } from "@/hooks/use-toast";
 import {
   transcriptService,
   SavedDebateTranscript,
@@ -139,8 +140,7 @@ interface DashboardData {
 const Profile: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [eloFilter, setEloFilter] = useState<
     "7days" | "30days" | "all" | "custom"
@@ -176,13 +176,18 @@ const Profile: React.FC = () => {
     from: undefined,
     to: undefined,
   });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchDashboard = async () => {
       const token = getAuthToken();
       if (!token) {
-        setErrorMessage("Please log in to view your profile.");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please log in to view your profile.",
+        });
         setLoading(false);
         return;
       }
@@ -197,7 +202,11 @@ const Profile: React.FC = () => {
         }
         setDebateStatsLoading(false);
       } catch (err) {
-        setErrorMessage("Failed to load dashboard data.");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load dashboard data.",
+        });
       } finally {
         setLoading(false);
       }
@@ -216,7 +225,11 @@ const Profile: React.FC = () => {
     eloChange?: number;
   }) => {
     if (!debate.id) {
-      setErrorMessage("Transcript not available for this debate.");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Transcript not available for this debate.",
+      });
       return;
     }
     setSelectedDebate(debate);
@@ -239,21 +252,16 @@ const Profile: React.FC = () => {
     }
   }, [editingField]);
 
-  useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage("");
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage]);
-
   const handleSubmit = async (e: React.FormEvent, field: string) => {
     e.preventDefault();
     if (!dashboard?.profile) return;
     const token = getAuthToken();
     if (!token) {
-      setErrorMessage("Authentication token is missing.");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Authentication token is missing.",
+      });
       return;
     }
     try {
@@ -266,15 +274,19 @@ const Profile: React.FC = () => {
         dashboard.profile.linkedin,
         dashboard.profile.avatarUrl
       );
-      setSuccessMessage(
-        `${
+      toast({
+        title: "Success",
+        description: `${
           field.charAt(0).toUpperCase() + field.slice(1)
-        } updated successfully!`
-      );
-      setErrorMessage("");
+        } updated successfully!`,
+      });
       setEditingField(null);
     } catch (err) {
-      setErrorMessage(`Failed to update ${field}.`);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to update ${field}.`,
+      });
     }
   };
 
@@ -282,7 +294,11 @@ const Profile: React.FC = () => {
     if (!dashboard?.profile) return;
     const token = getAuthToken();
     if (!token) {
-      setErrorMessage("Authentication token is missing.");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Authentication token is missing.",
+      });
       return;
     }
     try {
@@ -300,10 +316,16 @@ const Profile: React.FC = () => {
         dashboard.profile.linkedin,
         avatarUrl
       );
-      setSuccessMessage("Avatar updated successfully!");
-      setErrorMessage("");
+      toast({
+        title: "Success",
+        description: "Avatar updated successfully!",
+      });
     } catch (err) {
-      setErrorMessage("Failed to update avatar.");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update avatar.",
+      });
       // Optionally revert state on failure
       setDashboard({
         ...dashboard,
@@ -328,7 +350,7 @@ const Profile: React.FC = () => {
 
   if (!dashboard) {
     return (
-      <div className="p-4 text-red-500 text-center text-sm">{errorMessage}</div>
+      <div className="p-4 text-center text-sm">Failed to load profile.</div>
     );
   }
 
@@ -476,7 +498,7 @@ const Profile: React.FC = () => {
 
   if (!dashboard) {
     return (
-      <div className="p-4 text-red-500 text-center text-sm">{errorMessage}</div>
+      <div className="p-4 text-center text-sm">Failed to load profile.</div>
     );
   }
 
@@ -626,7 +648,7 @@ const Profile: React.FC = () => {
     const [following, setFollowing] = useState<any[]>([]);
     const [loadingFollowers, setLoadingFollowers] = useState(false);
     const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
     useEffect(() => {
       if (user?.id) {
@@ -650,7 +672,7 @@ const Profile: React.FC = () => {
           setFollowers(data.followers || []);
         }
       } catch (err) {
-        console.error('Error fetching followers:', err);
+        console.error("Error fetching followers:", err);
       } finally {
         setLoadingFollowers(false);
       }
@@ -671,7 +693,7 @@ const Profile: React.FC = () => {
           setFollowing(data.following || []);
         }
       } catch (err) {
-        console.error('Error fetching following:', err);
+        console.error("Error fetching following:", err);
       } finally {
         setLoadingFollowing(false);
       }
@@ -682,7 +704,7 @@ const Profile: React.FC = () => {
         <h3 className="text-xs sm:text-sm font-semibold text-foreground">
           Connections
         </h3>
-        
+
         {/* Followers Section */}
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-medium text-foreground">
@@ -700,15 +722,18 @@ const Profile: React.FC = () => {
               </div>
             ) : (
               followers.map((follower: any) => (
-                <ProfileHover key={follower.id || follower._id} userId={follower.id || follower._id}>
+                <ProfileHover
+                  key={follower.id || follower._id}
+                  userId={follower.id || follower._id}
+                >
                   <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
                     <img
                       src={follower.avatarUrl || defaultAvatar}
-                      alt={follower.displayName || 'User'}
+                      alt={follower.displayName || "User"}
                       className="w-5 h-5 rounded-full object-cover"
                     />
                     <span className="text-xs truncate">
-                      {follower.displayName || follower.email || 'User'}
+                      {follower.displayName || follower.email || "User"}
                     </span>
                   </div>
                 </ProfileHover>
@@ -734,15 +759,18 @@ const Profile: React.FC = () => {
               </div>
             ) : (
               following.map((followed: any) => (
-                <ProfileHover key={followed.id || followed._id} userId={followed.id || followed._id}>
+                <ProfileHover
+                  key={followed.id || followed._id}
+                  userId={followed.id || followed._id}
+                >
                   <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
                     <img
                       src={followed.avatarUrl || defaultAvatar}
-                      alt={followed.displayName || 'User'}
+                      alt={followed.displayName || "User"}
                       className="w-5 h-5 rounded-full object-cover"
                     />
                     <span className="text-xs truncate">
-                      {followed.displayName || followed.email || 'User'}
+                      {followed.displayName || followed.email || "User"}
                     </span>
                   </div>
                 </ProfileHover>
@@ -757,16 +785,6 @@ const Profile: React.FC = () => {
   return (
     <div className="w-full h-full flex flex-col md:flex-row gap-4 p-2 sm:p-4 bg-background min-h-[calc(100vh-4rem)]">
       <div className="w-full md:w-1/4 lg:w-1/5 bg-card p-4 border border-border rounded-md shadow max-h-[calc(100vh-4rem)] overflow-y-auto">
-        {successMessage && (
-          <div className="mb-2 p-2 rounded bg-green-100 text-green-700 text-xs animate-in fade-in duration-300">
-            {successMessage}
-          </div>
-        )}
-        {errorMessage && (
-          <div className="mb-2 p-2 rounded bg-red-100 text-red-700 text-xs animate-in fade-in duration-300">
-            {errorMessage}
-          </div>
-        )}
         <div className="flex flex-col items-center mb-4">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md group">
             <img
@@ -918,9 +936,12 @@ const Profile: React.FC = () => {
                   FirstWin: "First victory earned",
                   Debater10: "10 debates completed",
                 };
-                const badgeIcon = badgeIcons[badge] || <FaAward className="w-6 h-6 text-primary" />;
-                const badgeDescription = badgeDescriptions[badge] || "Achievement unlocked";
-                
+                const badgeIcon = badgeIcons[badge] || (
+                  <FaAward className="w-6 h-6 text-primary" />
+                );
+                const badgeDescription =
+                  badgeDescriptions[badge] || "Achievement unlocked";
+
                 return (
                   <div
                     key={index}
