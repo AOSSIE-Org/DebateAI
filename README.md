@@ -97,8 +97,10 @@ The server will start on the port defined in the config file (default: `1313`).
 2. Add the following environment variables to the `.env` file:
 
 ```
-VITE_BASE_URL="http://localhost:1313"
-VITE_GOOGLE_CLIENT_ID="<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
+VITE_BASE_URL=http://localhost:1313
+VITE_GOOGLE_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>
+
+> **Note:** Do NOT wrap values in quotes. Restart frontend after changes.
 ```
 
 - Replace `<YOUR_GOOGLE_OAUTH_CLIENT_ID>` with your actual Google OAuth Client ID from Google Cloud Console.
@@ -124,7 +126,7 @@ VITE_GOOGLE_CLIENT_ID="<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
 3. Create a `.env` file and add:
 
    ```
-   VITE_BASE_URL="http://localhost:1313"
+   VITE_BASE_URL=http://localhost:1313
    ```
 
 4. Start the development server:
@@ -133,6 +135,46 @@ VITE_GOOGLE_CLIENT_ID="<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
    ```
 
 ---
+
+### Google OAuth Setup (Local Development)
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project or select an existing one.
+3. Enable the Google OAuth2 API.
+4. Go to "Credentials" in the left sidebar.
+5. Click "Create Credentials" > "OAuth 2.0 Client IDs".
+6. Set Application type to "Web application".
+7. In the "Authorized JavaScript origins", add:
+   - http://localhost:5173
+   - http://127.0.0.1:5173
+   - http://localhost:1313
+   - http://127.0.0.1:1313
+8. In the "Authorized redirect URIs", add the same URLs as above.
+9. Download the credentials JSON file and note your Client ID.
+10. Exact match of URLs is required for proper functioning.
+
+### Email Verification Setup (Gmail SMTP App Password)
+
+For email verification functionality, DebateAI uses SMTP for sending emails. If using Gmail:
+
+1. Enable 2-Factor Authentication on your Gmail account.
+2. Go to Google Account settings.
+3. Navigate to Security > 2-Step Verification > App passwords.
+4. Generate a new app password for "Mail".
+5. Use this app password in your SMTP configuration instead of your regular Gmail password.
+
+Example SMTP configuration in config.prod.yml:
+``yaml
+smtp:
+  host: "smtp.gmail.com"
+  port: 587
+  username: "your-email@gmail.com"
+  password: "your-app-password-here"
+  senderEmail: "your-email@gmail.com"
+`
+`
+
+> **Warning:** Never commit credentials to version control.
 
 ## Contribution Guidelines
 
