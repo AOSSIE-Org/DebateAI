@@ -5,7 +5,10 @@ import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/authContext';
 import { useCallback } from "react";
 
-const MIN_PASSWORD_LENGTH = 6;
+// NIST SP 800-63B requires minimum 8 characters for memorized secrets.
+// We enforce 15 characters as a stricter policy for new passwords.
+// (Login does not enforce minimum to allow existing users with shorter passwords)
+const MIN_PASSWORD_LENGTH = 15;
 
 interface LoginFormProps {
   startForgotPassword: () => void;
@@ -28,10 +31,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-      return;
-    }
+    // No minimum length validation on login to allow existing users with shorter passwords
     setLocalError(null);
     await login(email, password);
   };

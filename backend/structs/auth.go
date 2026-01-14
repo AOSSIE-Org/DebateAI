@@ -2,7 +2,7 @@ package structs
 
 type SignUpRequest struct {
 	Email string `json:"email" binding:"required,email"`
-	// NIST SP 800-63B: minimum 15 characters for password-only authentication
+	// NIST SP 800-63B requires minimum 8 characters; enforcing 15 as stricter policy
 	Password string `json:"password" binding:"required,min=15"`
 }
 
@@ -13,8 +13,8 @@ type VerifyEmailRequest struct {
 
 type LoginRequest struct {
 	Email string `json:"email" binding:"required,email"`
-	// NIST SP 800-63B: minimum 15 characters for password-only authentication
-	Password string `json:"password" binding:"required,min=15"`
+	// No minimum length on login to allow existing users with shorter passwords
+	Password string `json:"password" binding:"required"`
 }
 
 type ForgotPasswordRequest struct {
@@ -24,6 +24,6 @@ type ForgotPasswordRequest struct {
 type VerifyForgotPasswordRequest struct {
 	Email string `json:"email" binding:"required,email"`
 	Code  string `json:"code" binding:"required"`
-	// NIST SP 800-63B: minimum 15 characters for password-only authentication
+	// NIST SP 800-63B requires minimum 8 characters; enforcing 15 as stricter policy
 	NewPassword string `json:"newPassword" binding:"required,min=15"`
 }
