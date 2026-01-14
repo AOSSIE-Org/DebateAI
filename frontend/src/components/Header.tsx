@@ -8,8 +8,7 @@ import {
   BarChart,
   User,
   Info,
-  LogOut,
-  Check,
+  LogOut
 } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
