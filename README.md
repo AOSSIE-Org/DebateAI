@@ -1,4 +1,4 @@
-<p align="left">
+﻿<p align="left">
   <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRpPlI1P7SK3pemg67VMPbvNzxYyk0UtlmJiQ&s" alt="Aossie Logo" height="120"/>
 </p>
 
@@ -88,7 +88,7 @@ The server will start on the port defined in the config file (default: `1313`).
 ### Notes
 - Do **not** commit `config.prod.yml` to version control.
 - Only `config.prod.sample.yml` should remain committed.
-
+`
 
 ### Frontend Configuration
 
@@ -160,15 +160,14 @@ For email verification functionality, DebateAI uses SMTP for sending emails. If 
 5. Use this app password in your SMTP configuration instead of your regular Gmail password.
 
 Example SMTP configuration in config.prod.yml:
-``yaml
+```yaml
 smtp:
   host: "smtp.gmail.com"
   port: 587
   username: "your-email@gmail.com"
   password: "your-app-password-here"
   senderEmail: "your-email@gmail.com"
-`
-`
+```
 
 > **Warning:** Never commit credentials to version control.
 
@@ -250,6 +249,8 @@ We look forward to your contributions!
 
 ## License
 
-MIT © [AOSSIE](https://aossie.org)
+MIT Â© [AOSSIE](https://aossie.org)
 
 ---
+`
+
