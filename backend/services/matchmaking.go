@@ -82,8 +82,9 @@ func (ms *MatchmakingService) StartMatchmaking(userID string) error {
 		poolEntry.JoinedAt = time.Now() // Reset join time when actually starting
 		poolEntry.LastActivity = time.Now()
 
-		// Try to find a match immediately
-		go ms.findMatch(userID)
+		// ✅ FIX: Removed immediate findMatch() call to prevent race conditions.
+		// The periodic matchmaking worker will handle matching for this user.
+		// This eliminates the bug where concurrent goroutines would race to match the same users.
 		return nil
 	}
 	return fmt.Errorf("user not found in pool")
@@ -123,52 +124,11 @@ func (ms *MatchmakingService) GetPool() []MatchmakingPool {
 	return pool
 }
 
-// findMatch attempts to find a suitable opponent for the given user
-func (ms *MatchmakingService) findMatch(userID string) {
-	ms.mutex.Lock()
-	user, exists := ms.pool[userID]
-	if !exists || !user.StartedMatchmaking {
-		ms.mutex.Unlock()
-		return
-	}
-	// Find potential opponents
-	var bestMatch *MatchmakingPool
-	bestScore := math.Inf(1)
-	for _, opponent := range ms.pool {
-		if opponent.UserID == userID {
-			continue // Skip self
-		}
-		// Only consider opponents who have started matchmaking
-		if !opponent.StartedMatchmaking {
-			continue
-		}
-		// Check if Elo ranges overlap
-		if user.MinElo <= opponent.MaxElo && user.MaxElo >= opponent.MinElo {
-			// Calculate match quality score (lower is better)
-			eloDiff := math.Abs(float64(user.Elo - opponent.Elo))
-			waitTime := time.Since(opponent.JoinedAt).Seconds()
-
-			// Score based on Elo difference and wait time
-			score := eloDiff - (waitTime * 0.1) // Prefer closer Elo, but consider wait time
-
-			if bestMatch == nil || score < bestScore {
-				bestMatch = opponent
-				bestScore = score
-			}
-		}
-	}
-	// Reserve/remove both under lock to avoid duplicate room creation
-	if bestMatch != nil {
-		delete(ms.pool, user.UserID)
-		delete(ms.pool, bestMatch.UserID)
-		// Capture locals and unlock before I/O
-		u1, u2 := user, bestMatch
-		ms.mutex.Unlock()
-		ms.createRoomForMatch(u1, u2)
-		return
-	}
-	ms.mutex.Unlock()
-}
+// ❌ REMOVED: findMatch() function (lines 127-171)
+// This function was the root cause of the race condition bug.
+// It has been replaced by the global pairwise matching algorithm in processMatchingPairs().
+// The old approach of spawning concurrent goroutines for each user led to race conditions
+// where multiple goroutines would try to match the same users simultaneously.
 
 // createRoomForMatch creates a room for two matched users
 func (ms *MatchmakingService) createRoomForMatch(user1, user2 *MatchmakingPool) {
@@ -262,23 +222,89 @@ func SetRoomCreatedCallback(callback RoomCreatedCallback) {
 }
 
 // periodicMatchmaking runs periodically to find matches for waiting users
+// ✅ FIX: Replaced per-user concurrent goroutines with global pairwise matching.
+// This eliminates the race condition where multiple findMatch() goroutines would
+// compete to match the same users, causing matches to fail.
 func (ms *MatchmakingService) periodicMatchmaking() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second) // Faster matching checks (was 5s)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		ms.mutex.RLock()
-		var usersToMatch []string
-		for userID, poolEntry := range ms.pool {
-			if poolEntry.StartedMatchmaking {
-				usersToMatch = append(usersToMatch, userID)
+		ms.processMatchingPairs()
+	}
+}
+
+// processMatchingPairs implements global pairwise matching algorithm.
+// It finds all compatible pairs in a single pass under one mutex lock,
+// removes them atomically, then creates rooms outside the critical section.
+// This prevents race conditions and ensures matches are created reliably.
+func (ms *MatchmakingService) processMatchingPairs() {
+	ms.mutex.Lock()
+
+	// Find all users ready for matching
+	var candidates []*MatchmakingPool
+	for _, poolEntry := range ms.pool {
+		if poolEntry.StartedMatchmaking {
+			candidates = append(candidates, poolEntry)
+		}
+	}
+
+	// Track which users have been matched in this iteration
+	matched := make(map[string]bool)
+	var pairs [][2]*MatchmakingPool
+
+	// Global pairwise matching - O(n²) but n is typically small (<100 users)
+	for i, user1 := range candidates {
+		if matched[user1.UserID] {
+			continue
+		}
+
+		var bestMatch *MatchmakingPool
+		bestScore := math.Inf(1)
+
+		// Find the best match for user1 among remaining candidates
+		for j := i + 1; j < len(candidates); j++ {
+			user2 := candidates[j]
+			if matched[user2.UserID] {
+				continue
+			}
+
+			// Check if Elo ranges overlap (symmetric check)
+			if user1.MinElo <= user2.MaxElo && user1.MaxElo >= user2.MinElo {
+				// Calculate match quality score (lower is better)
+				eloDiff := math.Abs(float64(user1.Elo - user2.Elo))
+				waitTime := time.Since(user2.JoinedAt).Seconds()
+
+				// Score: prefer closer Elo, but consider wait time
+				score := eloDiff - (waitTime * 0.1)
+
+				if score < bestScore {
+					bestMatch = user2
+					bestScore = score
+				}
 			}
 		}
-		ms.mutex.RUnlock()
 
-		// Try to find matches for each user
-		for _, userID := range usersToMatch {
-			go ms.findMatch(userID)
+		// If we found a match, record the pair
+		if bestMatch != nil {
+			pairs = append(pairs, [2]*MatchmakingPool{user1, bestMatch})
+			matched[user1.UserID] = true
+			matched[bestMatch.UserID] = true
 		}
+	}
+
+	// ✅ CRITICAL: Atomically remove all matched users from pool while still holding lock
+	// This prevents other goroutines from trying to match these users
+	for _, pair := range pairs {
+		delete(ms.pool, pair[0].UserID)
+		delete(ms.pool, pair[1].UserID)
+	}
+
+	ms.mutex.Unlock()
+
+	// Create rooms for all matched pairs (I/O outside lock to reduce contention)
+	for _, pair := range pairs {
+		// Each room creation runs in its own goroutine for parallel I/O
+		go ms.createRoomForMatch(pair[0], pair[1])
 	}
 }
