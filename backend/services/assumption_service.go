@@ -86,10 +86,60 @@ func ExtractAssumptions(roomID string) ([]models.DebateAssumption, error) {
 }
 
 // aggregateDebateTranscript retrieves and combines all messages from a debate
-func aggregateDebateTranscript(ctx context.Context, roomID string) (string, error) {
-	// Try to get from DebateTranscript collection (user vs user debates)
+func aggregateDebateTranscript(ctx context.Context, debateID string) (string, error) {
+	log.Printf("📋 Attempting to aggregate transcript for ID: %s", debateID)
+
+	// Try to convert debateID to ObjectID - it might be a SavedDebateTranscript ID
+	savedCollection := db.GetCollection("savedDebateTranscripts")
+	objID, err := primitive.ObjectIDFromHex(debateID)
+
+	if err == nil {
+		log.Printf("🔍 Valid ObjectID detected, searching SavedDebateTranscript by ID")
+		// It's a valid ObjectID, try to find SavedDebateTranscript by ID
+		var savedTranscript models.SavedDebateTranscript
+		err := savedCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&savedTranscript)
+		if err == nil {
+			log.Printf("✅ Found SavedDebateTranscript - Messages: %d, Transcripts: %d",
+				len(savedTranscript.Messages), len(savedTranscript.Transcripts))
+
+			// Check if it has transcript sections (user vs user debates)
+			if len(savedTranscript.Transcripts) > 0 {
+				log.Printf("✅ Using Transcripts field (user vs user format)")
+				return buildTranscriptFromTranscriptMap(savedTranscript.Transcripts), nil
+			}
+
+			// Check if it has messages (bot debates or other formats)
+			if len(savedTranscript.Messages) > 0 {
+				log.Printf("✅ Using Messages field")
+				return buildTranscriptFromMessages(savedTranscript.Messages), nil
+			}
+
+			// If SavedDebateTranscript exists but has no content, create a fallback
+			log.Printf("⚠️  SavedDebateTranscript found but has no content - using metadata as fallback")
+			fallbackTranscript := fmt.Sprintf(`
+=== DEBATE SUMMARY ===
+
+Topic: %s
+Debate Type: %s
+Opponent: %s
+Result: %s
+
+[This debate record exists but detailed transcript content is not available.
+The system will analyze based on the available metadata.]
+`, savedTranscript.Topic, savedTranscript.DebateType, savedTranscript.Opponent, savedTranscript.Result)
+
+			return fallbackTranscript, nil
+		} else {
+			log.Printf("⚠️  SavedDebateTranscript not found by ID: %v", err)
+		}
+	} else {
+		log.Printf("🔍 Not a valid ObjectID, will try as roomID")
+	}
+
+	// Not an ObjectID or not found - try as roomID in DebateTranscript collection
+	log.Printf("🔍 Searching DebateTranscript collection by roomId")
 	transcriptCollection := db.GetCollection("debateTranscripts")
-	cursor, err := transcriptCollection.Find(ctx, bson.M{"roomId": roomID})
+	cursor, err := transcriptCollection.Find(ctx, bson.M{"roomId": debateID})
 	if err != nil && err != mongo.ErrNoDocuments {
 		return "", err
 	}
@@ -98,44 +148,12 @@ func aggregateDebateTranscript(ctx context.Context, roomID string) (string, erro
 	if cursor != nil {
 		defer cursor.Close(ctx)
 		if err := cursor.All(ctx, &transcripts); err == nil && len(transcripts) > 0 {
+			log.Printf("✅ Found %d DebateTranscript records by roomId", len(transcripts))
 			return buildTranscriptFromDebateTranscripts(transcripts), nil
 		}
 	}
 
-	// Try to get from SavedDebateTranscript collection (includes bot debates)
-	savedCollection := db.GetCollection("savedDebateTranscripts")
-	var savedTranscript models.SavedDebateTranscript
-
-	// Try to find by matching messages that might contain the roomID in metadata
-	// or by looking for recent debates
-	cursor2, err := savedCollection.Find(ctx, bson.M{})
-	if err != nil {
-		return "", err
-	}
-	defer cursor2.Close(ctx)
-
-	var allSaved []models.SavedDebateTranscript
-	if err := cursor2.All(ctx, &allSaved); err == nil {
-		// Find the most recent matching debate
-		for _, saved := range allSaved {
-			// Check if messages exist and build transcript
-			if len(saved.Messages) > 0 {
-				// Use the first found for now - in production, you'd want better matching
-				return buildTranscriptFromMessages(saved.Messages), nil
-			}
-		}
-	}
-
-	// If still not found, try to query by a more specific approach
-	err = savedCollection.FindOne(ctx, bson.M{}).Decode(&savedTranscript)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return "", err
-	}
-
-	if len(savedTranscript.Messages) > 0 {
-		return buildTranscriptFromMessages(savedTranscript.Messages), nil
-	}
-
+	log.Printf("❌ No transcript found for ID: %s", debateID)
 	return "", errors.New("no transcript found")
 }
 
@@ -152,6 +170,22 @@ func buildTranscriptFromDebateTranscripts(transcripts []models.DebateTranscript)
 			if content, ok := t.Transcripts[section]; ok && content != "" {
 				builder.WriteString(fmt.Sprintf("\n[%s - %s]:\n%s\n", t.Role, t.Email, content))
 			}
+		}
+	}
+
+	return builder.String()
+}
+
+// buildTranscriptFromTranscriptMap builds a formatted transcript from a transcript map (SavedDebateTranscript.Transcripts)
+func buildTranscriptFromTranscriptMap(transcripts map[string]string) string {
+	var builder strings.Builder
+
+	sections := []string{"opening", "constructive argument", "rebuttal", "closing"}
+
+	for _, section := range sections {
+		if content, ok := transcripts[section]; ok && content != "" {
+			builder.WriteString(fmt.Sprintf("\n=== %s ===\n", strings.ToUpper(section)))
+			builder.WriteString(fmt.Sprintf("%s\n", content))
 		}
 	}
 
