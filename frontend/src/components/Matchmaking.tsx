@@ -23,7 +23,6 @@ interface MatchmakingMessage {
   pool?: MatchmakingPool[] | string;
   error?: string;
 }
-
 const Matchmaking: React.FC = () => {
   const [pool, setPool] = useState<MatchmakingPool[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -33,17 +32,22 @@ const Matchmaking: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const navigate = useNavigate();
 
+    // Reset matchmaking UI state on page refresh
+    useEffect(() => {
+      setIsInPool(false);
+      setWaitTime(0);
+    }, []);
+
+
   useEffect(() => {
     // If still loading, wait
     if (isLoading) {
       return;
     }
-
     if (!user) {
       navigate('/login');
       return;
     }
-
     // Get token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
