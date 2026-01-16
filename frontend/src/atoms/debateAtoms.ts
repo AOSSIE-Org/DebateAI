@@ -60,7 +60,9 @@ export const spectatorHashAtom = atom<string>(() => {
 export const transcriptAtom = atom<string>('');
 
 // Questions atom (array of questions)
-export const questionsAtom = atom<Array<{ qId: string; text: string; spectatorHash: string; timestamp: number }>>([]);
+export const questionsAtom = atom<Array<{
+  type: string; qId: string; text: string; spectatorHash: string; timestamp: number 
+}>>([]);
 
 // Reactions atom (array of recent reactions)
 export const reactionsAtom = atom<Array<{ reaction: string; spectatorHash: string; timestamp: number }>>([]);

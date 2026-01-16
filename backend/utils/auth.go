@@ -162,3 +162,13 @@ func GenerateSecretHash(username, clientID, clientSecret string) string {
 	mac.Write([]byte(message))
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
+
+// HashAuthCode securely hashes 6-digit verification or reset codes
+// using HMAC-SHA256 with the JWT secret as the key.
+func HashAuthCode(code string, secret string) string {
+	key := []byte(secret)
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(code))
+	// Using hex encoding for storage in MongoDB as it's cleaner for short codes
+	return fmt.Sprintf("%x", mac.Sum(nil))
+}
