@@ -156,6 +156,7 @@ func SignUp(ctx *gin.Context) {
 
 	// Generate verification code
 	verificationCode := utils.GenerateRandomCode(6)
+	hashedVerificationCode := utils.HashAuthCode(verificationCode, cfg.JWT.Secret)
 
 	// Create new user (unverified)
 	now := time.Now()
@@ -171,7 +172,7 @@ func SignUp(ctx *gin.Context) {
 		AvatarURL:        "https://avatar.iran.liara.run/public/10",
 		Password:         string(hashedPassword),
 		IsVerified:       false,
-		VerificationCode: verificationCode,
+		VerificationCode: hashedVerificationCode, // Store hashed code
 		Score:            0,
 		Badges:           []string{},
 		CurrentStreak:    0,
@@ -215,10 +216,14 @@ func VerifyEmail(ctx *gin.Context) {
 	// Find user with matching email and verification code
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Hash the incoming code before comparing it with the database
+	hashedCode := utils.HashAuthCode(request.ConfirmationCode, cfg.JWT.Secret)
+
 	var user models.User
 	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{
 		"email":            request.Email,
-		"verificationCode": request.ConfirmationCode,
+		"verificationCode": hashedCode,
 	}).Decode(&user)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": "Invalid email or verification code"})
@@ -423,12 +428,13 @@ func ForgotPassword(ctx *gin.Context) {
 
 	// Generate reset code
 	resetCode := utils.GenerateRandomCode(6)
+	hashedResetCode := utils.HashAuthCode(resetCode, cfg.JWT.Secret)
 
 	// Update user with reset code
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
-			"resetPasswordCode": resetCode,
+			"resetPasswordCode": hashedResetCode, // Store hashed code
 			"updatedAt":         now,
 		},
 	}
@@ -463,8 +469,12 @@ func VerifyForgotPassword(ctx *gin.Context) {
 	// Find user with reset code
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Hash the incoming code before comparing it with the database
+	hashedCode := utils.HashAuthCode(request.Code, cfg.JWT.Secret)
+
 	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email, "resetPasswordCode": request.Code}).Decode(&user)
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email, "resetPasswordCode": hashedCode}).Decode(&user)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": "Invalid email or reset code"})
 		return
