@@ -30,6 +30,7 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<void>;
   googleLogin: (idToken: string) => Promise<void>;
+  clearError: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -42,6 +43,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
   const navigate = useNavigate();
   const setUser = useSetAtom(userAtom);
 
@@ -353,6 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         forgotPassword,
         confirmForgotPassword,
         googleLogin,
+        clearError,
       }}
     >
       {children}
