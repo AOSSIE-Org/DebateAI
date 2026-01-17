@@ -7,6 +7,11 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
+import { useNavigate } from "react-router-dom";
+
+
+const judgingRef = useRef(false);
+const navigate = useNavigate();
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -549,50 +554,56 @@ const DebateRoom: React.FC = () => {
     }
   };
 
-  const judgeDebateResult = async (messages: Message[]) => {
+    const judgeDebateResult = async (messages: Message[]) => {
+    if (judgingRef.current) {
+      console.log("Judging already in progress, skipping duplicate call");
+      return;
+    }
+
+    judgingRef.current = true;
+
     try {
       console.log("Starting judgment with messages:", messages);
       const { result } = await judgeDebate({
         history: messages,
         userId: debateData.userId,
       });
+
       console.log("Raw judge result:", result);
-      
+
       const jsonString = extractJSON(result);
       console.log("Extracted JSON string:", jsonString);
-      
+
       let judgment: JudgmentData;
       try {
         judgment = JSON.parse(jsonString);
       } catch (parseError) {
         console.error("JSON parse error:", parseError, "Trying to fix JSON...");
-        // Try to fix common JSON issues
         const fixedJson = jsonString
-          .replace(/'/g, '"') // Replace single quotes with double quotes
-          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
-          .replace(/,\s*}/g, '}') // Remove trailing commas
-          .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-        try {
-          judgment = JSON.parse(fixedJson);
-        } catch (e) {
-          throw new Error(`Failed to parse JSON: ${e}`);
-        }
+          .replace(/'/g, '"')
+          .replace(/(\w+):/g, '"$1":')
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']');
+
+        judgment = JSON.parse(fixedJson);
       }
-      
+
       console.log("Parsed judgment:", judgment);
       setJudgmentData(judgment);
       setPopup({ show: false, message: "" });
       setShowJudgment(true);
+
     } catch (error) {
       console.error("Judging error:", error);
-      // Show error to user
+
       setPopup({
         show: true,
-        message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
+        message: `Judgment error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Showing default results.`,
         isJudging: false,
       });
-      
-      // Set default judgment data
+
       setJudgmentData({
         opening_statement: {
           user: { score: 0, reason: "Error occurred during judgment" },
@@ -618,12 +629,17 @@ const DebateRoom: React.FC = () => {
           opponent_analysis: "",
         },
       });
+
       setTimeout(() => {
         setPopup({ show: false, message: "" });
         setShowJudgment(true);
       }, 3000);
+
+    } finally {
+      judgingRef.current = false;
     }
   };
+
 
   const formatTime = (seconds: number) => {
     const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60)
@@ -722,7 +738,10 @@ const DebateRoom: React.FC = () => {
           userStance={state.userStance}
           botStance={state.botStance}
           botDesc={bot.desc}
-          onClose={() => setShowJudgment(false)}
+          onClose={() => {
+            setShowJudgment(false);
+            navigate("/"); 
+          }}
         />
       )}
 
