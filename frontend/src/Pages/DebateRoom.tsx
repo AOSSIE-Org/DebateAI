@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { sendDebateMessage, judgeDebate } from "@/services/vsbot";
+import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
@@ -223,6 +223,7 @@ const extractJSON = (response: string): string => {
 
 const DebateRoom: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const debateData = location.state as DebateProps;
   const phases = debateData.phaseTimings;
   const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
@@ -262,6 +263,30 @@ const DebateRoom: React.FC = () => {
   const bot = allBots.find((b) => b.name === debateData.botName) || allBots[0];
   const userAvatar =
     user?.avatarUrl || "https://avatar.iran.liara.run/public/10";
+
+  const handleConcede = async () => {
+    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
+      try {
+        if (debateData.debateId) {
+            await concedeDebate(debateData.debateId, state.messages);
+        }
+        
+        setState(prev => ({ ...prev, isDebateEnded: true }));
+        setPopup({
+            show: true,
+            message: "You have conceded the debate.",
+            isJudging: false
+        });
+        
+        setTimeout(() => {
+            navigate("/game");
+        }, 2000);
+
+      } catch (error) {
+        console.error("Error conceding:", error);
+      }
+    }
+  };
 
   // Initialize SpeechRecognition
   useEffect(() => {
@@ -819,6 +844,14 @@ const DebateRoom: React.FC = () => {
                 {user?.rating ? `Rating: ${user.rating}` : "Ready to argue!"}
               </div>
             </div>
+            {!state.isDebateEnded && (
+              <Button
+                onClick={handleConcede}
+                className="ml-auto bg-red-500 hover:bg-red-600 text-white rounded-md px-3 text-sm"
+              >
+                Concede
+              </Button>
+            )}
           </div>
           <div className="p-3 flex-1 overflow-y-auto">
             <p className="text-sm font-semibold text-orange-600 mb-1">
@@ -857,7 +890,7 @@ const DebateRoom: React.FC = () => {
                       ? "Ask your question"
                       : "Provide your answer"
                   }
-                  className="flex-1 border-gray-300 focus:border-orange-400 rounded-md text-sm"
+                  className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-orange-400"
                 />
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}
