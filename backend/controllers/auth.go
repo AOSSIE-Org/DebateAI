@@ -103,6 +103,7 @@ func GoogleLogin(ctx *gin.Context) {
 	// Normalize stats if needed to prevent NaN values
 	if normalizeUserStats(&existingUser) {
 		if err := persistUserStats(dbCtx, &existingUser); err != nil {
+			log.Printf("Error persisting user stats for %s: %v", email, err)
 		}
 	}
 
@@ -291,6 +292,7 @@ func Login(ctx *gin.Context) {
 	// Normalize stats if needed
 	if normalizeUserStats(&user) {
 		if err := persistUserStats(dbCtx, &user); err != nil {
+			log.Printf("Error persisting user stats on login for %s: %v", user.Email, err)
 		}
 	}
 
