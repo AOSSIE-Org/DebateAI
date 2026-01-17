@@ -1,0 +1,21 @@
+FROM golang:1.24-alpine
+
+# Install necessary build tools and air for live reloading
+RUN apk add --no-cache git && \
+    go install github.com/air-verse/air@v1.61.1
+
+WORKDIR /app
+
+# cached layer for dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# copy source code
+COPY . .
+
+# Expose the application port
+EXPOSE 1313
+
+# Run air for live reloading
+# Run directly without air
+CMD ["go", "run", "cmd/server/main.go"]

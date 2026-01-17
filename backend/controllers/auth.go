@@ -157,7 +157,7 @@ func SignUp(ctx *gin.Context) {
 	// Generate verification code
 	verificationCode := utils.GenerateRandomCode(6)
 
-	// Create new user
+	// Create new user (unverified)
 	now := time.Now()
 	newUser := models.User{
 		Email:            request.Email,
@@ -172,9 +172,9 @@ func SignUp(ctx *gin.Context) {
 		Password:         string(hashedPassword),
 		IsVerified:       false,
 		VerificationCode: verificationCode,
-		Score:            0,          // Initialize gamification score
-		Badges:           []string{}, // Initialize badges array
-		CurrentStreak:    0,          // Initialize streak
+		Score:            0,
+		Badges:           []string{},
+		CurrentStreak:    0,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -194,10 +194,9 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Return user details
+	// Return success response
 	ctx.JSON(200, gin.H{
 		"message": "Sign-up successful. Please verify your email.",
-		"user":    buildUserResponse(newUser),
 	})
 }
 
@@ -213,12 +212,22 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
+	// Find user with matching email and verification code
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email, "verificationCode": request.ConfirmationCode}).Decode(&user)
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{
+		"email":            request.Email,
+		"verificationCode": request.ConfirmationCode,
+	}).Decode(&user)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": "Invalid email or verification code"})
+		return
+	}
+
+	// Check if verification code is expired (24 hours)
+	if time.Since(user.CreatedAt) > 24*time.Hour {
+		ctx.JSON(400, gin.H{"error": "Verification code expired. Please sign up again."})
 		return
 	}
 
@@ -237,15 +246,23 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	// Return updated user details
+	// Update local user object
+	user.IsVerified = true
+	user.VerificationCode = ""
+	user.UpdatedAt = now
+
+	// Generate JWT for immediate login
+	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
+		return
+	}
+
+	// Return user details and access token
 	ctx.JSON(200, gin.H{
-		"message": "Email verification successful",
-		"user": func() gin.H {
-			response := buildUserResponse(user)
-			response["isVerified"] = true
-			response["updatedAt"] = now.Format(time.RFC3339)
-			return response
-		}(),
+		"message":     "Email verification successful. You are now logged in.",
+		"accessToken": token,
+		"user":        buildUserResponse(user),
 	})
 }
 
@@ -278,7 +295,7 @@ func Login(ctx *gin.Context) {
 	}
 
 	// Check if user is verified
-	if !user.IsVerified && user.Password == "" {
+	if !user.IsVerified {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified"})
 		return
 	}
