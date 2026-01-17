@@ -153,6 +153,12 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		// Community routes
 		routes.SetupCommunityRoutes(auth)
 		log.Println("Community routes registered")
+
+		// Notification routes
+		auth.GET("/notifications", routes.GetNotificationsRouteHandler)
+		auth.PUT("/notifications/:id/read", routes.MarkNotificationAsReadRouteHandler)
+		auth.PUT("/notifications/read-all", routes.MarkAllNotificationsAsReadRouteHandler)
+		auth.DELETE("/notifications/:id", routes.DeleteNotificationRouteHandler)
 	}
 
 	// Team WebSocket handler

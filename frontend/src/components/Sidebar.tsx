@@ -28,7 +28,7 @@ function Sidebar() {
         </div>
       </div>
       {/* Nav links */}
-      <nav className='flex-1 px-2 py-4 space-y-2'>
+      <nav className='flex-1 px-2 py-4 space-y-2 overflow-y-auto'>
         <NavItem
           to='/startDebate'
           label='Start Debate'
@@ -81,10 +81,9 @@ function NavItem({ to, label, icon }: NavItemProps) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-          isActive
-            ? 'bg-secondary text-secondary-foreground'
-            : 'text-foreground hover:bg-muted hover:text-foreground'
+        `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive
+          ? 'bg-secondary text-secondary-foreground'
+          : 'text-foreground hover:bg-muted hover:text-foreground'
         }`
       }
     >
