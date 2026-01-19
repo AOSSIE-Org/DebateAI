@@ -15,8 +15,12 @@ var (
 	keyOnce       sync.Once
 )
 
-// SetEncryptionKey sets the key used for AES-GCM encryption
-func SetEncryptionKey(key string) {
+// SetEncryptionKey sets the key used for AES-GCM encryption. It returns an error if the key is empty.
+func SetEncryptionKey(key string) error {
+	if key == "" {
+		return fmt.Errorf("encryption key cannot be empty")
+	}
+
 	keyOnce.Do(func() {
 		b := []byte(key)
 		if len(b) > 32 {
@@ -29,6 +33,8 @@ func SetEncryptionKey(key string) {
 			encryptionKey = b
 		}
 	})
+
+	return nil
 }
 
 func getEncryptionKey() ([]byte, error) {

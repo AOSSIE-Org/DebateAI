@@ -103,7 +103,7 @@ func GoogleLogin(ctx *gin.Context) {
 	// Normalize stats if needed to prevent NaN values
 	if normalizeUserStats(&existingUser) {
 		if err := persistUserStats(dbCtx, &existingUser); err != nil {
-			log.Printf("Error persisting user stats for %s: %v", email, err)
+			log.Printf("Error persisting user stats for %s: %v", RedactEmail(email), err)
 		}
 	}
 
@@ -295,7 +295,7 @@ func Login(ctx *gin.Context) {
 	// Normalize stats if needed
 	if normalizeUserStats(&user) {
 		if err := persistUserStats(dbCtx, &user); err != nil {
-			log.Printf("Error persisting user stats on login for %s: %v", user.Email, err)
+			log.Printf("Error persisting user stats on login for %s: %v", RedactEmail(user.Email), err)
 		}
 	}
 
@@ -315,12 +315,21 @@ func Login(ctx *gin.Context) {
 	// MFA Hook: Check if MFA is enabled for the user
 	if user.MFAEnabled {
 		// Log MFA requirement for security audits
-		log.Printf("MFA required for user: %s", user.Email)
+		log.Printf("MFA required for user: %s", RedactEmail(user.Email))
+
+		// Generate a short-lived pending MFA token
+		// This token persists the authenticated email but doesn't grant full access yet.
+		pendingToken, err := generateJWT(user.Email, cfg.JWT.Secret, 5) // 5 minutes expiry
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate MFA"})
+			return
+		}
+
 		// Return 202 Accepted to signal that MFA is required to completion
 		ctx.JSON(http.StatusAccepted, gin.H{
-			"message": "MFA required",
-			"mfaType": user.MFAType,
-			"userId":  user.ID.Hex(),
+			"message":      "MFA required",
+			"mfaType":      user.MFAType,
+			"pendingToken": pendingToken,
 		})
 		return
 	}
@@ -578,7 +587,7 @@ func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 	now := time.Now()
 	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
 
-	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", email, now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
+	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", RedactEmail(email), now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
 
 	claims := jwt.MapClaims{
 		"sub": email,
@@ -615,30 +624,40 @@ func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 
 func VerifyTOTP(ctx *gin.Context) {
 	var request struct {
-		Email string `json:"email"`
-		Code  string `json:"code" binding:"required"`
+		PendingToken string `json:"pendingToken" binding:"required"`
+		Code         string `json:"code" binding:"required"`
 	}
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	email := ctx.GetString("email")
-	if email == "" {
-		email = request.Email
-	}
-
-	if email == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
+	cfg := loadConfig(ctx)
+	if cfg == nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
+
+	// Validate the pending token to ensure this MFA check follows a successful password check
+	claims, err := utils.ParseJWTToken(request.PendingToken)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired MFA session"})
+		return
+	}
+
+	email := claims.Email
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if !user.MFAEnabled {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "MFA not enabled for this user"})
 		return
 	}
 
@@ -648,8 +667,13 @@ func VerifyTOTP(ctx *gin.Context) {
 		return
 	}
 
-	// If verifying for the first time or for login
-	token, _ := generateJWT(user.Email, loadConfig(ctx).JWT.Secret, loadConfig(ctx).JWT.Expiry)
+	// Issue full access token
+	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate access token"})
+		return
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "MFA verification successful",
 		"accessToken": token,
@@ -728,6 +752,18 @@ func FinalizeEnableMFA(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "MFA enabled successfully"})
+}
+
+func RedactEmail(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return "****"
+	}
+	name := parts[0]
+	if len(name) <= 2 {
+		return "*@" + parts[1]
+	}
+	return name[:2] + "****@" + parts[1]
 }
 
 func loadConfig(ctx *gin.Context) *config.Config {

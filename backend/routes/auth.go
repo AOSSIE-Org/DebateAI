@@ -56,6 +56,11 @@ func FinalizeEnableMFARouteHandler(c *gin.Context) {
 }
 
 func VerifyTOTPRouteHandler(c *gin.Context) {
+	// Apply rate limiting: 3 requests per minute (stricter than login)
+	middlewares.RateLimit(3, time.Minute)(c)
+	if c.IsAborted() {
+		return
+	}
 	controllers.VerifyTOTP(c)
 }
 

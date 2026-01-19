@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"log"
 	"os"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/hkdf"
 )
 
 func main() {
@@ -62,7 +64,21 @@ func main() {
 	go websocket.WatchForNewRooms()
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
-	security.SetEncryptionKey(cfg.JWT.Secret)
+
+	// Derive a separate encryption key from the JWT secret using HKDF
+	hash := sha256.New
+	masterSecret := []byte(cfg.JWT.Secret)
+	info := []byte("mfa-encryption")
+	hkdf := hkdf.New(hash, masterSecret, nil, info)
+
+	derivedKey := make([]byte, 32)
+	if _, err := hkdf.Read(derivedKey); err != nil {
+		log.Fatalf("Failed to derive encryption key: %v", err)
+	}
+
+	if err := security.SetEncryptionKey(string(derivedKey)); err != nil {
+		log.Fatalf("Failed to set encryption key: %v", err)
+	}
 
 	// Seed initial debate-related data
 	utils.SeedDebateData()

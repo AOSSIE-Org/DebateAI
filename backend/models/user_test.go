@@ -7,7 +7,10 @@ import (
 
 func TestUserMFA(t *testing.T) {
 	// Initialize security secret for encryption
-	security.SetEncryptionKey("test-secret-for-mfa-encryption-32bytes-long!!")
+	err := security.SetEncryptionKey("test-secret-for-mfa-encryption-32bytes-long!!")
+	if err != nil {
+		t.Fatalf("Failed to set encryption key: %v", err)
+	}
 
 	user := &User{
 		Email: "test@example.com",
