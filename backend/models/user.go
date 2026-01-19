@@ -28,8 +28,12 @@ type User struct {
 	CreatedAt         time.Time          `bson:"createdAt"`
 	UpdatedAt         time.Time          `bson:"updatedAt"`
 	// Gamification fields
-	Score             int                `bson:"score" json:"score"` // Total gamification score
-	Badges            []string           `bson:"badges,omitempty" json:"badges,omitempty"` // List of badge names earned
-	CurrentStreak     int                `bson:"currentStreak" json:"currentStreak"` // Current daily streak
-	LastActivityDate  time.Time          `bson:"lastActivityDate,omitempty" json:"lastActivityDate,omitempty"` // Last activity date for streak calculation
+	Score            int       `bson:"score" json:"score"`                                           // Total gamification score
+	Badges           []string  `bson:"badges,omitempty" json:"badges,omitempty"`                     // List of badge names earned
+	CurrentStreak    int       `bson:"currentStreak" json:"currentStreak"`                           // Current daily streak
+	LastActivityDate time.Time `bson:"lastActivityDate,omitempty" json:"lastActivityDate,omitempty"` // Last activity date for streak calculation
+	// MFA fields
+	MFAEnabled bool   `bson:"mfaEnabled" json:"mfaEnabled"`
+	MFAType    string `bson:"mfaType,omitempty" json:"mfaType,omitempty"`     // "totp", etc.
+	MFASecret  string `bson:"mfaSecret,omitempty" json:"mfaSecret,omitempty"` // Stored encrypted/hashed
 }

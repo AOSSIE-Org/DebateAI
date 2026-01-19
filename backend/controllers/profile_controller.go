@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -363,55 +364,72 @@ func UpdateEloAfterDebate(ctx *gin.Context) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Start MongoDB session for transaction
+	session, err := db.MongoClient.StartSession()
+	if err != nil {
+		log.Printf("Error starting session: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start database session"})
+		return
+	}
+	defer session.EndSession(dbCtx)
+
 	winnerID, _ := primitive.ObjectIDFromHex(req.WinnerID)
 	loserID, _ := primitive.ObjectIDFromHex(req.LoserID)
 
-	var winner, loser models.User
-	if err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": winnerID}).Decode(&winner); err != nil {
-		log.Printf("Error finding winner %s: %v", req.WinnerID, err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find winner"})
+	var newWinnerElo, newLoserElo float64
+	var winnerChange, loserChange float64
+
+	_, err = session.WithTransaction(dbCtx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		var winner, loser models.User
+		if err := db.MongoDatabase.Collection("users").FindOne(sessCtx, bson.M{"_id": winnerID}).Decode(&winner); err != nil {
+			return nil, fmt.Errorf("failed to find winner: %v", err)
+		}
+		if err := db.MongoDatabase.Collection("users").FindOne(sessCtx, bson.M{"_id": loserID}).Decode(&loser); err != nil {
+			return nil, fmt.Errorf("failed to find loser: %v", err)
+		}
+
+		newWinnerElo, newLoserElo = calculateEloRating(winner.Rating, loser.Rating, 1.0)
+		winnerChange = newWinnerElo - winner.Rating
+		loserChange = newLoserElo - loser.Rating
+
+		// Update users
+		if _, err := db.MongoDatabase.Collection("users").UpdateOne(sessCtx, bson.M{"_id": winnerID}, bson.M{"$set": bson.M{"rating": newWinnerElo}}); err != nil {
+			return nil, fmt.Errorf("failed to update winner Elo: %v", err)
+		}
+		if _, err := db.MongoDatabase.Collection("users").UpdateOne(sessCtx, bson.M{"_id": loserID}, bson.M{"$set": bson.M{"rating": newLoserElo}}); err != nil {
+			return nil, fmt.Errorf("failed to update loser Elo: %v", err)
+		}
+
+		// Log debates
+		now := time.Now()
+		if _, err := db.MongoDatabase.Collection("debates").InsertOne(sessCtx, bson.M{
+			"email":     winner.Email,
+			"topic":     req.Topic,
+			"result":    "win",
+			"eloChange": winnerChange,
+			"rating":    newWinnerElo,
+			"date":      now,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to log debate win: %v", err)
+		}
+		if _, err := db.MongoDatabase.Collection("debates").InsertOne(sessCtx, bson.M{
+			"email":     loser.Email,
+			"topic":     req.Topic,
+			"result":    "loss",
+			"eloChange": loserChange,
+			"rating":    newLoserElo,
+			"date":      now,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to log debate loss: %v", err)
+		}
+
+		return nil, nil
+	})
+
+	if err != nil {
+		log.Printf("Transaction failed: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update ratings", "message": err.Error()})
 		return
-	}
-	if err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": loserID}).Decode(&loser); err != nil {
-		log.Printf("Error finding loser %s: %v", req.LoserID, err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find loser"})
-		return
-	}
-
-	newWinnerElo, newLoserElo := calculateEloRating(winner.Rating, loser.Rating, 1.0)
-
-	winnerChange := newWinnerElo - winner.Rating
-	loserChange := newLoserElo - loser.Rating
-
-	// Update users
-	if _, err := db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": winnerID}, bson.M{"$set": bson.M{"rating": newWinnerElo}}); err != nil {
-		log.Printf("Error updating winner Elo %s: %v", req.WinnerID, err)
-	}
-	if _, err := db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": loserID}, bson.M{"$set": bson.M{"rating": newLoserElo}}); err != nil {
-		log.Printf("Error updating loser Elo %s: %v", req.LoserID, err)
-	}
-
-	// Log debates
-	now := time.Now()
-	if _, err := db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
-		"email":     winner.Email,
-		"topic":     req.Topic,
-		"result":    "win",
-		"eloChange": winnerChange,
-		"rating":    newWinnerElo,
-		"date":      now,
-	}); err != nil {
-		log.Printf("Error logging debate win for %s: %v", winner.Email, err)
-	}
-	if _, err := db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
-		"email":     loser.Email,
-		"topic":     req.Topic,
-		"result":    "loss",
-		"eloChange": loserChange,
-		"rating":    newLoserElo,
-		"date":      now,
-	}); err != nil {
-		log.Printf("Error logging debate loss for %s: %v", loser.Email, err)
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{

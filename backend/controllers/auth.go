@@ -178,6 +178,9 @@ func SignUp(ctx *gin.Context) {
 		CurrentStreak:    0,
 		CreatedAt:        now,
 		UpdatedAt:        now,
+		// MFA Initialization Hook
+		MFAEnabled: false,
+		MFAType:    "totp", // Default type
 	}
 
 	// Insert user into MongoDB
@@ -306,6 +309,19 @@ func Login(ctx *gin.Context) {
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	// MFA Hook: Check if MFA is enabled for the user
+	if user.MFAEnabled {
+		// Log MFA requirement for security audits
+		log.Printf("MFA required for user: %s", user.Email)
+		// Return 202 Accepted to signal that MFA is required to completion
+		ctx.JSON(http.StatusAccepted, gin.H{
+			"message": "MFA required",
+			"mfaType": user.MFAType,
+			"userId":  user.ID.Hex(),
+		})
 		return
 	}
 
