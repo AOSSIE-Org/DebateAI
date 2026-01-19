@@ -613,6 +613,123 @@ func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
+func VerifyTOTP(ctx *gin.Context) {
+	var request struct {
+		Email string `json:"email"`
+		Code  string `json:"code" binding:"required"`
+	}
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	email := ctx.GetString("email")
+	if email == "" {
+		email = request.Email
+	}
+
+	if email == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
+		return
+	}
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	valid, err := user.VerifyTOTP(request.Code)
+	if err != nil || !valid {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid MFA code"})
+		return
+	}
+
+	// If verifying for the first time or for login
+	token, _ := generateJWT(user.Email, loadConfig(ctx).JWT.Secret, loadConfig(ctx).JWT.Expiry)
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":     "MFA verification successful",
+		"accessToken": token,
+		"user":        buildUserResponse(user),
+	})
+}
+
+func EnableMFA(ctx *gin.Context) {
+	email := ctx.GetString("email")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	secret, qrUrl, err := user.GenerateMFASecret()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate MFA secret"})
+		return
+	}
+
+	if err := user.SetEncryptedMFASecret(secret); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store MFA secret"})
+		return
+	}
+
+	// Update user in DB with secret (but not enabled yet)
+	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": email}, bson.M{"$set": bson.M{"mfaSecret": user.MFASecret}})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"secret":    secret,
+		"qrCodeUrl": qrUrl,
+		"message":   "MFA secret generated. Please verify to enable MFA.",
+	})
+}
+
+func FinalizeEnableMFA(ctx *gin.Context) {
+	var request struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	email := ctx.GetString("email")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	valid, err := user.VerifyTOTP(request.Code)
+	if err != nil || !valid {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid MFA code"})
+		return
+	}
+
+	// Enable MFA
+	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": email}, bson.M{"$set": bson.M{"mfaEnabled": true, "mfaType": "totp"}})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enable MFA"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "MFA enabled successfully"})
+}
+
 func loadConfig(ctx *gin.Context) *config.Config {
 	cfgPath := os.Getenv("CONFIG_PATH")
 	if cfgPath == "" {

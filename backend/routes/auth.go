@@ -47,6 +47,18 @@ func VerifyForgotPasswordRouteHandler(c *gin.Context) {
 	controllers.VerifyForgotPassword(c)
 }
 
+func EnableMFARouteHandler(c *gin.Context) {
+	controllers.EnableMFA(c)
+}
+
+func FinalizeEnableMFARouteHandler(c *gin.Context) {
+	controllers.FinalizeEnableMFA(c)
+}
+
+func VerifyTOTPRouteHandler(c *gin.Context) {
+	controllers.VerifyTOTP(c)
+}
+
 func VerifyTokenRouteHandler(c *gin.Context) {
 	controllers.VerifyToken(c)
 }

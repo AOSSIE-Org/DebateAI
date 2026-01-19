@@ -10,6 +10,7 @@ import (
 	"arguehub/internal/debate"
 	"arguehub/middlewares"
 	"arguehub/routes"
+	"arguehub/security"
 	"arguehub/services"
 	"arguehub/utils"
 	"arguehub/websocket"
@@ -61,6 +62,7 @@ func main() {
 	go websocket.WatchForNewRooms()
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
+	security.SetEncryptionKey(cfg.JWT.Secret)
 
 	// Seed initial debate-related data
 	utils.SeedDebateData()
@@ -102,6 +104,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
+	router.POST("/login/mfa/verify", routes.VerifyTOTPRouteHandler)
 
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
@@ -116,6 +119,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
+		auth.POST("/user/mfa/enable", routes.EnableMFARouteHandler)
+		auth.POST("/user/mfa/finalize", routes.FinalizeEnableMFARouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 

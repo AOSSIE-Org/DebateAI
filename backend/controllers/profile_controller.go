@@ -373,8 +373,18 @@ func UpdateEloAfterDebate(ctx *gin.Context) {
 	}
 	defer session.EndSession(dbCtx)
 
-	winnerID, _ := primitive.ObjectIDFromHex(req.WinnerID)
-	loserID, _ := primitive.ObjectIDFromHex(req.LoserID)
+	winnerID, err := primitive.ObjectIDFromHex(req.WinnerID)
+	if err != nil {
+		log.Printf("Invalid winner_id %s: %v", req.WinnerID, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid winner_id"})
+		return
+	}
+	loserID, err := primitive.ObjectIDFromHex(req.LoserID)
+	if err != nil {
+		log.Printf("Invalid loser_id %s: %v", req.LoserID, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid loser_id"})
+		return
+	}
 
 	var newWinnerElo, newLoserElo float64
 	var winnerChange, loserChange float64
