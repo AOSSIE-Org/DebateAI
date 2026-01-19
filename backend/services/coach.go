@@ -41,7 +41,7 @@ Provide ONLY the JSON output without additional text or markdown formatting.`,
 	)
 
 	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, err := generateDefaultModelText(ctx, "", prompt)
 	if err != nil {
 		return models.WeakStatement{}, fmt.Errorf("failed to generate weak statement: %v", err)
 	}
@@ -98,7 +98,7 @@ Provide ONLY the JSON output without additional text or markdown formatting.`,
 	)
 
 	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, err := generateDefaultModelText(ctx, "", prompt)
 	if err != nil {
 		return models.Evaluation{}, fmt.Errorf("failed to evaluate argument: %v", err)
 	}

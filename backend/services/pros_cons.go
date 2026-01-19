@@ -32,7 +32,7 @@ Examples:
 	)
 
 	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, err := generateDefaultModelText(ctx, "", prompt)
 	if err != nil {
 		log.Printf("Failed to generate topic: %v", err)
 		return getFallbackTopic(skillLevel), nil
@@ -96,7 +96,7 @@ Required Output Format (JSON):
 	)
 
 	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, err := generateDefaultModelText(ctx, "", prompt)
 	if err != nil {
 		return models.ProsConsEvaluation{}, err
 	}
