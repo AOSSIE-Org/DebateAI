@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -45,13 +46,13 @@ func GetProfile(c *gin.Context) {
 	// This must be checked FIRST before any auth context is used
 	// Read query parameter using standard Gin methods
 	userIDParam := strings.TrimSpace(c.Query("userId"))
-	
+
 	// Log detailed request information for debugging
 	log.Printf("GetProfile: Request URL = '%s'", c.Request.URL.String())
 	log.Printf("GetProfile: Raw Query = '%s'", c.Request.URL.RawQuery)
 	log.Printf("GetProfile: Query params map = %v", c.Request.URL.Query())
 	log.Printf("GetProfile: userId from c.Query() = '%s'", userIDParam)
-	
+
 	// If c.Query() didn't work, try reading from URL.Query() directly
 	if userIDParam == "" {
 		values := c.Request.URL.Query()
@@ -60,7 +61,7 @@ func GetProfile(c *gin.Context) {
 			log.Printf("GetProfile: Got userId from URL.Query(): '%s'", userIDParam)
 		}
 	}
-	
+
 	// If still empty, try parsing raw query string manually
 	if userIDParam == "" && c.Request.URL.RawQuery != "" {
 		rawQuery := c.Request.URL.RawQuery
@@ -77,12 +78,12 @@ func GetProfile(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	log.Printf("GetProfile: Final userId param = '%s'", userIDParam)
-	
+
 	if userIDParam != "" && userIDParam != "undefined" && userIDParam != "null" {
 		log.Printf("GetProfile: Processing userId query param: '%s'", userIDParam)
-		
+
 		userID, err := primitive.ObjectIDFromHex(userIDParam)
 		if err != nil {
 			log.Printf("GetProfile: Invalid ObjectID format: '%s', error: %v", userIDParam, err)
@@ -162,7 +163,7 @@ func GetProfile(c *gin.Context) {
 			}},
 		)
 		if err != nil {
-		} else {
+			log.Printf("Error updating default rating for user %s: %v", user.ID.Hex(), err)
 		}
 	}
 
@@ -281,9 +282,9 @@ func GetProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"profile": gin.H{
-			"id":          user.ID.Hex(),
-			"displayName": displayName,
-			"email":       user.Email,
+			"id":            user.ID.Hex(),
+			"displayName":   displayName,
+			"email":         user.Email,
 			"bio":           user.Bio,
 			"rating":        int(user.Rating),
 			"score":         user.Score,
@@ -363,40 +364,83 @@ func UpdateEloAfterDebate(ctx *gin.Context) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	winnerID, _ := primitive.ObjectIDFromHex(req.WinnerID)
-	loserID, _ := primitive.ObjectIDFromHex(req.LoserID)
+	// Start MongoDB session for transaction
+	session, err := db.MongoClient.StartSession()
+	if err != nil {
+		log.Printf("Error starting session: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start database session"})
+		return
+	}
+	defer session.EndSession(dbCtx)
 
-	var winner, loser models.User
-	_ = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": winnerID}).Decode(&winner)
-	_ = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": loserID}).Decode(&loser)
+	winnerID, err := primitive.ObjectIDFromHex(req.WinnerID)
+	if err != nil {
+		log.Printf("Invalid winner_id %s: %v", req.WinnerID, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid winner_id"})
+		return
+	}
+	loserID, err := primitive.ObjectIDFromHex(req.LoserID)
+	if err != nil {
+		log.Printf("Invalid loser_id %s: %v", req.LoserID, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid loser_id"})
+		return
+	}
 
-	newWinnerElo, newLoserElo := calculateEloRating(winner.Rating, loser.Rating, 1.0)
+	var newWinnerElo, newLoserElo float64
+	var winnerChange, loserChange float64
 
-	winnerChange := newWinnerElo - winner.Rating
-	loserChange := newLoserElo - loser.Rating
+	_, err = session.WithTransaction(dbCtx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		var winner, loser models.User
+		if err := db.MongoDatabase.Collection("users").FindOne(sessCtx, bson.M{"_id": winnerID}).Decode(&winner); err != nil {
+			return nil, fmt.Errorf("failed to find winner: %v", err)
+		}
+		if err := db.MongoDatabase.Collection("users").FindOne(sessCtx, bson.M{"_id": loserID}).Decode(&loser); err != nil {
+			return nil, fmt.Errorf("failed to find loser: %v", err)
+		}
 
-	// Update users
-	db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": winnerID}, bson.M{"$set": bson.M{"rating": newWinnerElo}})
-	db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": loserID}, bson.M{"$set": bson.M{"rating": newLoserElo}})
+		newWinnerElo, newLoserElo = calculateEloRating(winner.Rating, loser.Rating, 1.0)
+		winnerChange = newWinnerElo - winner.Rating
+		loserChange = newLoserElo - loser.Rating
 
-	// Log debates
-	now := time.Now()
-	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
-		"email":     winner.Email,
-		"topic":     req.Topic,
-		"result":    "win",
-		"eloChange": winnerChange,
-		"rating":    newWinnerElo,
-		"date":      now,
+		// Update users
+		if _, err := db.MongoDatabase.Collection("users").UpdateOne(sessCtx, bson.M{"_id": winnerID}, bson.M{"$set": bson.M{"rating": newWinnerElo}}); err != nil {
+			return nil, fmt.Errorf("failed to update winner Elo: %v", err)
+		}
+		if _, err := db.MongoDatabase.Collection("users").UpdateOne(sessCtx, bson.M{"_id": loserID}, bson.M{"$set": bson.M{"rating": newLoserElo}}); err != nil {
+			return nil, fmt.Errorf("failed to update loser Elo: %v", err)
+		}
+
+		// Log debates
+		now := time.Now()
+		if _, err := db.MongoDatabase.Collection("debates").InsertOne(sessCtx, bson.M{
+			"email":     winner.Email,
+			"topic":     req.Topic,
+			"result":    "win",
+			"eloChange": winnerChange,
+			"rating":    newWinnerElo,
+			"date":      now,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to log debate win: %v", err)
+		}
+		if _, err := db.MongoDatabase.Collection("debates").InsertOne(sessCtx, bson.M{
+			"email":     loser.Email,
+			"topic":     req.Topic,
+			"result":    "loss",
+			"eloChange": loserChange,
+			"rating":    newLoserElo,
+			"date":      now,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to log debate loss: %v", err)
+		}
+
+		return nil, nil
 	})
-	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
-		"email":     loser.Email,
-		"topic":     req.Topic,
-		"result":    "loss",
-		"eloChange": loserChange,
-		"rating":    newLoserElo,
-		"date":      now,
-	})
+
+	if err != nil {
+		log.Printf("Transaction failed: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update ratings", "message": err.Error()})
+		return
+	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"winnerNewElo": int(newWinnerElo),

@@ -103,6 +103,7 @@ func GoogleLogin(ctx *gin.Context) {
 	// Normalize stats if needed to prevent NaN values
 	if normalizeUserStats(&existingUser) {
 		if err := persistUserStats(dbCtx, &existingUser); err != nil {
+			log.Printf("Error persisting user stats for %s: %v", RedactEmail(email), err)
 		}
 	}
 
@@ -177,6 +178,9 @@ func SignUp(ctx *gin.Context) {
 		CurrentStreak:    0,
 		CreatedAt:        now,
 		UpdatedAt:        now,
+		// MFA Initialization Hook
+		MFAEnabled: false,
+		MFAType:    "totp", // Default type
 	}
 
 	// Insert user into MongoDB
@@ -291,6 +295,7 @@ func Login(ctx *gin.Context) {
 	// Normalize stats if needed
 	if normalizeUserStats(&user) {
 		if err := persistUserStats(dbCtx, &user); err != nil {
+			log.Printf("Error persisting user stats on login for %s: %v", RedactEmail(user.Email), err)
 		}
 	}
 
@@ -304,6 +309,28 @@ func Login(ctx *gin.Context) {
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	// MFA Hook: Check if MFA is enabled for the user
+	if user.MFAEnabled {
+		// Log MFA requirement for security audits
+		log.Printf("MFA required for user: %s", RedactEmail(user.Email))
+
+		// Generate a short-lived pending MFA token
+		// This token persists the authenticated email but doesn't grant full access yet.
+		pendingToken, err := generateJWT(user.Email, cfg.JWT.Secret, 5) // 5 minutes expiry
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate MFA"})
+			return
+		}
+
+		// Return 202 Accepted to signal that MFA is required to completion
+		ctx.JSON(http.StatusAccepted, gin.H{
+			"message":      "MFA required",
+			"mfaType":      user.MFAType,
+			"pendingToken": pendingToken,
+		})
 		return
 	}
 
@@ -560,7 +587,7 @@ func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 	now := time.Now()
 	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
 
-	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", email, now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
+	log.Printf("JWT Generation - Email: %s, Now: %s, Expiry: %s (in %d minutes)", RedactEmail(email), now.Format(time.RFC3339), expirationTime.Format(time.RFC3339), expiryMinutes)
 
 	claims := jwt.MapClaims{
 		"sub": email,
@@ -593,6 +620,150 @@ func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 		return claims, nil
 	}
 	return nil, fmt.Errorf("invalid token")
+}
+
+func VerifyTOTP(ctx *gin.Context) {
+	var request struct {
+		PendingToken string `json:"pendingToken" binding:"required"`
+		Code         string `json:"code" binding:"required"`
+	}
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	cfg := loadConfig(ctx)
+	if cfg == nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	// Validate the pending token to ensure this MFA check follows a successful password check
+	claims, err := utils.ParseJWTToken(request.PendingToken)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired MFA session"})
+		return
+	}
+
+	email := claims.Email
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if !user.MFAEnabled {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "MFA not enabled for this user"})
+		return
+	}
+
+	valid, err := user.VerifyTOTP(request.Code)
+	if err != nil || !valid {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid MFA code"})
+		return
+	}
+
+	// Issue full access token
+	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate access token"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":     "MFA verification successful",
+		"accessToken": token,
+		"user":        buildUserResponse(user),
+	})
+}
+
+func EnableMFA(ctx *gin.Context) {
+	email := ctx.GetString("email")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	secret, qrUrl, err := user.GenerateMFASecret()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate MFA secret"})
+		return
+	}
+
+	if err := user.SetEncryptedMFASecret(secret); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store MFA secret"})
+		return
+	}
+
+	// Update user in DB with secret (but not enabled yet)
+	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": email}, bson.M{"$set": bson.M{"mfaSecret": user.MFASecret}})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"secret":    secret,
+		"qrCodeUrl": qrUrl,
+		"message":   "MFA secret generated. Please verify to enable MFA.",
+	})
+}
+
+func FinalizeEnableMFA(ctx *gin.Context) {
+	var request struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	email := ctx.GetString("email")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	valid, err := user.VerifyTOTP(request.Code)
+	if err != nil || !valid {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid MFA code"})
+		return
+	}
+
+	// Enable MFA
+	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": email}, bson.M{"$set": bson.M{"mfaEnabled": true, "mfaType": "totp"}})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enable MFA"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "MFA enabled successfully"})
+}
+
+func RedactEmail(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return "****"
+	}
+	name := parts[0]
+	if len(name) <= 2 {
+		return "*@" + parts[1]
+	}
+	return name[:2] + "****@" + parts[1]
 }
 
 func loadConfig(ctx *gin.Context) *config.Config {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"log"
 	"os"
 	"strconv"
@@ -10,12 +11,14 @@ import (
 	"arguehub/internal/debate"
 	"arguehub/middlewares"
 	"arguehub/routes"
+	"arguehub/security"
 	"arguehub/services"
 	"arguehub/utils"
 	"arguehub/websocket"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/hkdf"
 )
 
 func main() {
@@ -60,7 +63,27 @@ func main() {
 	// Start the room watching service for matchmaking after DB connection
 	go websocket.WatchForNewRooms()
 
+	// Validate JWT Secret strength
+	if cfg.JWT.Secret == "" || len(cfg.JWT.Secret) < 32 {
+		log.Fatalf("FATAL: cfg.JWT.Secret validation failed. Secret must be non-empty and at least 32 characters/bytes for security. Current length: %d", len(cfg.JWT.Secret))
+	}
+
 	utils.SetJWTSecret(cfg.JWT.Secret)
+
+	// Derive a separate encryption key from the JWT secret using HKDF
+	hash := sha256.New
+	masterSecret := []byte(cfg.JWT.Secret)
+	info := []byte("mfa-encryption")
+	hkdf := hkdf.New(hash, masterSecret, nil, info)
+
+	derivedKey := make([]byte, 32)
+	if _, err := hkdf.Read(derivedKey); err != nil {
+		log.Fatalf("Failed to derive encryption key: %v", err)
+	}
+
+	if err := security.SetEncryptionKey(string(derivedKey)); err != nil {
+		log.Fatalf("Failed to set encryption key: %v", err)
+	}
 
 	// Seed initial debate-related data
 	utils.SeedDebateData()
@@ -102,6 +125,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
+	router.POST("/login/mfa/verify", routes.VerifyTOTPRouteHandler)
 
 	// Debug endpoint for matchmaking pool status
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
@@ -116,6 +140,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
+		auth.POST("/user/mfa/enable", routes.EnableMFARouteHandler)
+		auth.POST("/user/mfa/finalize", routes.FinalizeEnableMFARouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 
