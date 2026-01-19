@@ -63,6 +63,11 @@ func main() {
 	// Start the room watching service for matchmaking after DB connection
 	go websocket.WatchForNewRooms()
 
+	// Validate JWT Secret strength
+	if cfg.JWT.Secret == "" || len(cfg.JWT.Secret) < 32 {
+		log.Fatalf("FATAL: cfg.JWT.Secret validation failed. Secret must be non-empty and at least 32 characters/bytes for security. Current length: %d", len(cfg.JWT.Secret))
+	}
+
 	utils.SetJWTSecret(cfg.JWT.Secret)
 
 	// Derive a separate encryption key from the JWT secret using HKDF
