@@ -6,7 +6,7 @@ import DebateCover from '../assets/DebateCover4.svg';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted dark:bg-gray-950 p-10 text-black dark:text-white">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
         <svg>
