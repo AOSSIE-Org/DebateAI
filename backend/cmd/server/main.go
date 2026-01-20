@@ -83,6 +83,9 @@ func main() {
 	}
 }
 
+// setupRouter initializes the HTTP routes for the backend server.
+// It includes a lightweight /health endpoint used to verify server availability
+// without depending on external services such as databases or caches.
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
