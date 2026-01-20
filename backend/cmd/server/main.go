@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -21,19 +22,23 @@ import (
 func main() {
 	// Load the configuration from the specified YAML file
 	cfg, err := config.LoadConfig("./config/config.prod.yml")
+
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
-
+	// Initialize services
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
 
-	// Connect to MongoDB using the URI from the configuration
+	// Connect to MongoDB using the configured URI
+	// MongoDB is optional so the server (and /health) can start without it
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
-		panic("Failed to connect to MongoDB: " + err.Error())
+		log.Printf("⚠️ Warning: Failed to connect to MongoDB: %v", err)
+		log.Println("⚠️ Continuing without MongoDB")
+	} else {
+		log.Println("Connected to MongoDB")
 	}
-	log.Println("Connected to MongoDB")
 
 	// Initialize Casbin RBAC
 	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
@@ -78,8 +83,17 @@ func main() {
 	}
 }
 
+// setupRouter initializes the HTTP routes for the backend server.
+// It includes a lightweight /health endpoint used to verify server availability
+// without depending on external services such as databases or caches.
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+		})
+	})
 
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
