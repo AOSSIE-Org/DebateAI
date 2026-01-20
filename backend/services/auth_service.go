@@ -53,19 +53,20 @@ func (s *authServiceImpl) SignUp(ctx context.Context, email, password string) er
 	now := time.Now()
 
 	user := &models.User{
-		Email:            email,
-		DisplayName:      utils.ExtractNameFromEmail(email),
-		Nickname:         utils.ExtractNameFromEmail(email),
-		Password:         string(hashedPassword),
-		VerificationCode: verificationCode,
-		IsVerified:       false,
-		Score:            0,
-		Rating:           1200.0,
-		RD:               350.0,
-		Volatility:       0.06,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-		Badges:           []string{},
+		Email:                  email,
+		DisplayName:            utils.ExtractNameFromEmail(email),
+		Nickname:               utils.ExtractNameFromEmail(email),
+		Password:               string(hashedPassword),
+		VerificationCode:       verificationCode,
+		VerificationCodeSentAt: now,
+		IsVerified:             false,
+		Score:                  0,
+		Rating:                 1200.0,
+		RD:                     350.0,
+		Volatility:             0.06,
+		CreatedAt:              now,
+		UpdatedAt:              now,
+		Badges:                 []string{},
 	}
 
 	_, err = s.userRepo.Create(ctx, user)
@@ -109,7 +110,7 @@ func (s *authServiceImpl) VerifyEmail(ctx context.Context, email, code string) (
 		return nil, "", errors.New("invalid email or code")
 	}
 
-	if time.Since(user.CreatedAt) > 24*time.Hour {
+	if time.Since(user.VerificationCodeSentAt) > 24*time.Hour {
 		return nil, "", errors.New("verification code expired")
 	}
 
@@ -120,7 +121,7 @@ func (s *authServiceImpl) VerifyEmail(ctx context.Context, email, code string) (
 			"updatedAt":        time.Now(),
 		},
 	}
-	
+
 	err = s.userRepo.UpdateByEmail(ctx, email, update)
 	if err != nil {
 		return nil, "", err
@@ -128,7 +129,7 @@ func (s *authServiceImpl) VerifyEmail(ctx context.Context, email, code string) (
 
 	user.IsVerified = true // Update local object
 	token, err := GenerateJWT(user.Email, s.config.JWT.Secret, s.config.JWT.Expiry)
-	
+
 	return user, token, err
 }
 

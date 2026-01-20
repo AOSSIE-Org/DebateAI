@@ -69,7 +69,11 @@ func (r *MongoUserRepository) Create(ctx context.Context, user *models.User) (*m
 	if err != nil {
 		return nil, err
 	}
-	user.ID = result.InsertedID.(primitive.ObjectID)
+	oid, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		return nil, errors.New("failed to convert inserted ID to ObjectID")
+	}
+	user.ID = oid
 	return user, nil
 }
 

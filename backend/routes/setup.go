@@ -19,8 +19,11 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 	router := gin.Default()
 
-	// Set trusted proxies (adjust as needed)
-	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
+	// Set trusted proxies
+	// Trust localhost (adjust if using a specific proxy)
+	if err := router.SetTrustedProxies([]string{"127.0.0.1"}); err != nil {
+		log.Fatalf("Failed to set trusted proxies: %v", err)
+	}
 
 	// Configure CORS for your frontend (e.g., localhost:5173 for Vite)
 	router.Use(cors.New(cors.Config{

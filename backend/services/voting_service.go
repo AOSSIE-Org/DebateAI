@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"arguehub/models"
@@ -40,11 +41,12 @@ func (s *votingServiceImpl) JudgeDebate(ctx context.Context, history []models.Me
 	}
 
 	// BotPersonality is defined in services/personalities.go, so we can use it directly
-	// And GetBotPersonality is also in services/personalities.go
-	_ = GetBotPersonality(botName) 
+	// BotPersonality is defined in services/personalities.go
+	personality := GetBotPersonality(botName)
 
-	// Construct Prompt (simplified for brevity, logic adapted from original JudgeDebate)
-	prompt := "Act as a professional debate judge...\n" + FormatHistory(history) // simplified
+	// Construct Prompt
+	prompt := fmt.Sprintf("Act as a professional debate judge. Personality: %s. Level: %s. Topic: %s.\n%s",
+		personality.Tone, botLevel, topic, FormatHistory(history))
 
 	response, err := s.gemini.GenerateContent(ctx, prompt)
 	if err != nil {
@@ -63,12 +65,12 @@ func ParseJudgeResult(jsonResult string) (string, error) {
 	if err := json.Unmarshal([]byte(jsonResult), &result); err != nil {
 		return "", err
 	}
-	
+
 	verdict, ok := result["verdict"].(map[string]interface{})
 	if !ok {
 		return "loss", nil // Default failure
 	}
-	
+
 	winner, ok := verdict["winner"].(string)
 	if !ok {
 		return "loss", nil
@@ -81,6 +83,6 @@ func ParseJudgeResult(jsonResult string) (string, error) {
 	} else if strings.EqualFold(winner, "Draw") {
 		return "draw", nil
 	}
-	
+
 	return "loss", nil
 }

@@ -1,12 +1,13 @@
 package services
 
 import (
+	"arguehub/models"
 	"context"
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"arguehub/models"
-	
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -35,6 +36,9 @@ func (m *MockDebateRepository) UpdateOutcome(ctx context.Context, email, outcome
 
 func (m *MockDebateRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*models.DebateVsBot, error) {
 	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*models.DebateVsBot), args.Error(1)
 }
 
@@ -58,13 +62,13 @@ func TestVotingService_JudgeDebate(t *testing.T) {
 	mockGemini := new(MockGeminiClient)
 	service := NewVotingService(mockRepo, mockGemini)
 	ctx := context.Background()
-	
+
 	t.Run("Success", func(t *testing.T) {
 		history := []models.Message{{Sender: "User", Text: "Hello"}}
 		expectedResponse := `{"verdict": {"winner": "User"}}`
-		
+
 		mockGemini.On("GenerateContent", ctx, mock.AnythingOfType("string")).Return(expectedResponse, nil)
-		
+
 		resp, err := service.JudgeDebate(ctx, history, "Bot", "Medium", "Topic")
 		assert.NoError(t, err)
 		assert.Equal(t, expectedResponse, resp)
@@ -95,18 +99,19 @@ func TestParseJudgeResult(t *testing.T) {
 		{
 			name:     "Invalid JSON",
 			input:    `Invalid`,
-			expected: "loss", // Or error
+			expected: "", // Or error
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, _ := ParseJudgeResult(tt.input)
+			result, err := ParseJudgeResult(tt.input)
 			if tt.name == "Invalid JSON" {
-				// ParseJudgeResult returns error on invalid json, so we expect error or handled default
-				// In our impl we return error, so let's check strict
-				return 
+				assert.Error(t, err)
+				assert.Equal(t, tt.expected, result)
+				return
 			}
+			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

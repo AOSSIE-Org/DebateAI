@@ -45,7 +45,10 @@ func (r *MongoDebateRepository) Create(ctx context.Context, debate *models.Debat
 	if err != nil {
 		return "", err
 	}
-	id := result.InsertedID.(primitive.ObjectID)
+	id, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		return "", errors.New("failed to convert inserted ID to ObjectID")
+	}
 	return id.Hex(), nil
 }
 
@@ -63,12 +66,11 @@ func (r *MongoDebateRepository) FindLatestByEmail(ctx context.Context, email str
 	return &debate, nil
 }
 
-func (r *MongoDebateRepository) UpdateOutcome(ctx context.Context, userId, outcome string) error {
+func (r *MongoDebateRepository) UpdateOutcome(ctx context.Context, email, outcome string) error {
 	if r.Collection == nil {
 		return errors.New("database not initialized")
 	}
-	filter := bson.M{"userId": userId} // Note: This logic existed in db.go, but userId might mean user ID hex or email context dependent.
-	// Looking at db.go logic: UpdateDebateVsBotOutcome uses userId string field.
+	filter := bson.M{"email": email}
 	update := bson.M{"$set": bson.M{"outcome": outcome}}
 	_, err := r.Collection.UpdateOne(ctx, filter, update, nil)
 	return err
