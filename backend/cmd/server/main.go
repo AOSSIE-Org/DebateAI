@@ -13,9 +13,6 @@ import (
 	"arguehub/services"
 	"arguehub/utils"
 	"arguehub/websocket"
-
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -64,113 +61,16 @@ func main() {
 
 	// Seed initial debate-related data
 	utils.SeedDebateData()
-	utils.PopulateTestUsers()
+
 
 	// Create uploads directory
 	os.MkdirAll("uploads", os.ModePerm)
 
 	// Set up the Gin router and configure routes
-	router := setupRouter(cfg)
+	router := routes.SetupRouter(cfg)
 	port := strconv.Itoa(cfg.Server.Port)
 
 	if err := router.Run(":" + port); err != nil {
 		panic("Failed to start server: " + err.Error())
 	}
-}
-
-func setupRouter(cfg *config.Config) *gin.Engine {
-	router := gin.Default()
-
-	// Set trusted proxies (adjust as needed)
-	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
-
-	// Configure CORS for your frontend (e.g., localhost:5173 for Vite)
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-	router.OPTIONS("/*path", func(c *gin.Context) { c.Status(204) })
-
-	// Public routes for authentication
-	router.POST("/signup", routes.SignUpRouteHandler)
-	router.POST("/verifyEmail", routes.VerifyEmailRouteHandler)
-	router.POST("/login", routes.LoginRouteHandler)
-	router.POST("/googleLogin", routes.GoogleLoginRouteHandler)
-	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
-	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
-	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
-
-	// Debug endpoint for matchmaking pool status
-	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
-
-	// WebSocket routes (handle auth internally)
-	router.GET("/ws/matchmaking", websocket.MatchmakingHandler)
-	router.GET("/ws/gamification", websocket.GamificationWebSocketHandler)
-
-	// Protected routes (JWT auth)
-	auth := router.Group("/")
-	auth.Use(middlewares.AuthMiddleware("./config/config.prod.yml"))
-	{
-		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
-		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
-		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
-		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
-
-		// Gamification routes
-		auth.POST("/api/award-badge", routes.AwardBadgeRouteHandler)
-		auth.POST("/api/update-score", routes.UpdateScoreRouteHandler)
-		auth.GET("/api/leaderboard", routes.GetGamificationLeaderboardRouteHandler)
-
-		routes.SetupDebateVsBotRoutes(auth)
-
-		// WebSocket signaling endpoint (handles auth internally)
-		router.GET("/ws", websocket.WebsocketHandler)
-
-		// Set up transcript routes
-		routes.SetupTranscriptRoutes(auth)
-
-		auth.GET("/coach/strengthen-argument/weak-statement", routes.GetWeakStatement)
-		auth.POST("/coach/strengthen-argument/evaluate", routes.EvaluateStrengthenedArgument)
-
-		// Add Room routes.
-		auth.GET("/rooms", routes.GetRoomsHandler)
-		auth.POST("/rooms", routes.CreateRoomHandler)
-		auth.POST("/rooms/:id/join", routes.JoinRoomHandler)
-		auth.GET("/rooms/:id/participants", routes.GetRoomParticipantsHandler)
-
-		// Chat functionality is now handled by the main WebSocket handler
-
-		// Team routes
-		routes.SetupTeamRoutes(auth)
-		routes.SetupTeamDebateRoutes(auth)
-		routes.SetupTeamChatRoutes(auth)
-		routes.SetupTeamMatchmakingRoutes(auth)
-		log.Println("Team routes registered")
-
-		// Community routes
-		routes.SetupCommunityRoutes(auth)
-		log.Println("Community routes registered")
-
-		// Notification routes
-		auth.GET("/notifications", routes.GetNotificationsRouteHandler)
-		auth.PUT("/notifications/:id/read", routes.MarkNotificationAsReadRouteHandler)
-		auth.PUT("/notifications/read-all", routes.MarkAllNotificationsAsReadRouteHandler)
-		auth.DELETE("/notifications/:id", routes.DeleteNotificationRouteHandler)
-	}
-
-	// Team WebSocket handler
-	router.GET("/ws/team", websocket.TeamWebsocketHandler)
-
-	// Admin routes
-	routes.SetupAdminRoutes(router, "./config/config.prod.yml")
-	log.Println("Admin routes registered")
-
-	// Debate spectator WebSocket handler (no auth required for anonymous spectators)
-	// FIX: Use websocket.DebateWebsocketHandler (moved to websocket package)
-	router.GET("/ws/debate/:debateID", websocket.DebateWebsocketHandler)
-
-	return router
 }

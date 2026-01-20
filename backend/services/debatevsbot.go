@@ -201,7 +201,9 @@ Provide an opening statement that embodies your persona and stance.
 				return ""
 			}(),
 			phaseInstruction,
-			limitInstruction, baseInstruction,
+			limitInstruction,
+			baseInstruction,
+			"",
 		)
 	}
 
