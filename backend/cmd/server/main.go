@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -25,18 +26,19 @@ func main() {
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
-	log.Println("DEBUG Mongo URI =", cfg.Database.URI)
-
-	
+	// Initialize services
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
 
-	// Connect to MongoDB using the URI from the configuration
-	if err := db.ConnectMongoDB("mongodb://localhost:27017/debateai"); err != nil {
-		panic("Failed to connect to MongoDB: " + err.Error())
+	// Connect to MongoDB using the configured URI
+	// MongoDB is optional so the server (and /health) can start without it
+	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
+		log.Printf("⚠️ Warning: Failed to connect to MongoDB: %v", err)
+		log.Println("⚠️ Continuing without MongoDB")
+	} else {
+		log.Println("Connected to MongoDB")
 	}
-	log.Println("Connected to MongoDB")
 
 	// Initialize Casbin RBAC
 	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
@@ -84,11 +86,9 @@ func main() {
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
-	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "ok",
-			"version": "1.0.0",
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
 		})
 	})
 
