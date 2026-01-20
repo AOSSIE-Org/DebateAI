@@ -1,7 +1,8 @@
-package utils
+package main
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"arguehub/config"
@@ -12,23 +13,29 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// PopulateTestUsers creates test users with Glicko-2 ratings
-func PopulateTestUsers() {
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
+func main() {
+	cfg, err := config.LoadConfig("../../config/config.prod.yml")
 	if err != nil {
-		panic("Failed to load config: " + err.Error())
+		log.Fatal("Failed to load config: " + err.Error())
+	}
+
+	// Initialize DB
+	err = db.ConnectMongoDB(cfg.Database.URI)
+	if err != nil {
+		log.Fatal("Failed to connect to DB: " + err.Error())
 	}
 
 	collection := db.MongoDatabase.Collection("users")
 	count, _ := collection.CountDocuments(context.Background(), bson.M{})
 
 	if count > 0 {
+		log.Println("Users already exist, skipping seed.")
 		return
 	}
 
-	// Initialize rating system (no return value)
+	// Initialize rating system
 	services.InitRatingService(cfg)
-	ratingSystem := services.GetRatingSystem() // <- add a getter in services package
+	ratingSystem := services.GetRatingSystem()
 
 	testUsers := []models.User{
 		{
@@ -58,6 +65,7 @@ func PopulateTestUsers() {
 
 	_, err = collection.InsertMany(context.Background(), documents)
 	if err != nil {
-		return
+		log.Fatal("Failed to seed users: " + err.Error())
 	}
+	log.Println("Seeded users successfully.")
 }
