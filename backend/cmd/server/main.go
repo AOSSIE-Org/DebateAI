@@ -21,16 +21,19 @@ import (
 func main() {
 	// Load the configuration from the specified YAML file
 	cfg, err := config.LoadConfig("./config/config.prod.yml")
+
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
+	log.Println("DEBUG Mongo URI =", cfg.Database.URI)
 
+	
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
 
 	// Connect to MongoDB using the URI from the configuration
-	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
+	if err := db.ConnectMongoDB("mongodb://localhost:27017/debateai"); err != nil {
 		panic("Failed to connect to MongoDB: " + err.Error())
 	}
 	log.Println("Connected to MongoDB")
@@ -80,6 +83,14 @@ func main() {
 
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
+
+	// Health check endpoint
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":  "ok",
+			"version": "1.0.0",
+		})
+	})
 
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
