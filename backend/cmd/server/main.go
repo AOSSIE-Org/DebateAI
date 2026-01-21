@@ -15,7 +15,6 @@ import (
 	"arguehub/utils"
 	"arguehub/websocket"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -83,30 +82,41 @@ func main() {
 	}
 }
 
+// CORSMiddleware handles CORS preflight and actual requests
+func CORSMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+        c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        c.Writer.Header().Set("Access-Control-Allow-Headers", 
+            "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+        
+        // Handle preflight requests
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatusJSON(http.StatusOK, gin.H{"ok": true})
+            return
+        }
+        
+        c.Next()
+    }
+}
+
 // setupRouter initializes the HTTP routes for the backend server.
 // It includes a lightweight /health endpoint used to verify server availability
 // without depending on external services such as databases or caches.
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
+	// Set trusted proxies (adjust as needed)
+	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
+
+	// Apply CORS middleware globally
+	router.Use(CORSMiddleware())
+
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
 	})
-
-	// Set trusted proxies (adjust as needed)
-	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
-
-	// Configure CORS for your frontend (e.g., localhost:5173 for Vite)
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-	router.OPTIONS("/*path", func(c *gin.Context) { c.Status(204) })
 
 	// Public routes for authentication
 	router.POST("/signup", routes.SignUpRouteHandler)
