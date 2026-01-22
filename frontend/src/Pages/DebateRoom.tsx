@@ -10,9 +10,6 @@ import { userAtom } from "@/state/userAtom";
 import { useNavigate } from "react-router-dom";
 
 
-const judgingRef = useRef(false);
-const navigate = useNavigate();
-
 // Bot type definition (same as in BotSelection)
 interface Bot {
   name: string;
@@ -222,6 +219,8 @@ const extractJSON = (response: string): string => {
 };
 
 const DebateRoom: React.FC = () => {
+  const judgingRef = useRef(false);
+  const navigate = useNavigate();
   const location = useLocation();
   const navigate = useNavigate();
   const debateData = location.state as DebateProps;
