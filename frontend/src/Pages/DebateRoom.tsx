@@ -7,8 +7,6 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
-import { useNavigate } from "react-router-dom";
-
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
