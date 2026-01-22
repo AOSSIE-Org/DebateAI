@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -98,9 +99,10 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 		PreRating:     preUserRating,
 		PreRD:         preUserRD,
 		PostRating:    userPlayer.Rating,
-		PostRD:        userPlayer.RD,
-		RatingChange:  sanitizeFloatMetric(userPlayer.Rating - preUserRating),
-		RDChange:      sanitizeFloatMetric(userPlayer.RD - preUserRD),
+
+		PostRD:       userPlayer.RD,
+		RatingChange: sanitizeFloatMetric(userPlayer.Rating - preUserRating),
+		RDChange:     sanitizeFloatMetric(userPlayer.RD - preUserRD),
 	}
 
 	// Update user in database
@@ -112,6 +114,29 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 	if err := updateUserRating(opponentID, opponentPlayer); err != nil {
 		return nil, nil, err
 	}
+
+	// Notify users about rating updates
+	go func() {
+		if userPlayer.Rating > preUserRating {
+			CreateNotification(
+				userID,
+				models.NotificationTypeLeaderboard,
+				"Rating Increased",
+				fmt.Sprintf("Your rating increased by %.1f points!", userPlayer.Rating-preUserRating),
+				"/leaderboard",
+			)
+		}
+
+		if opponentPlayer.Rating > preOpponentRating {
+			CreateNotification(
+				opponentID,
+				models.NotificationTypeLeaderboard,
+				"Rating Increased",
+				fmt.Sprintf("Your rating increased by %.1f points!", opponentPlayer.Rating-preOpponentRating),
+				"/leaderboard",
+			)
+		}
+	}()
 
 	opponentDebate := &models.Debate{
 		UserID:        opponentID,

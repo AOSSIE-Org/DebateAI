@@ -95,6 +95,20 @@ func CreateTeamDebate(c *gin.Context) {
 	services.RemoveFromMatchmaking(req.Team1ID)
 	services.RemoveFromMatchmaking(req.Team2ID)
 
+	// Notify all members of both teams
+	go func() {
+		allMembers := append(team1.Members, team2.Members...)
+		for _, member := range allMembers {
+			services.CreateNotification(
+				member.UserID,
+				models.NotificationTypeTournament,
+				"Team Debate Started",
+				"Your team debate on '"+req.Topic+"' has started!",
+				"/team-debate/"+debate.ID.Hex(),
+			)
+		}
+	}()
+
 	c.JSON(http.StatusOK, debate)
 }
 
