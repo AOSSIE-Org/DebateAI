@@ -113,6 +113,7 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   botName,
   userStance,
   botStance,
+  botDesc,       
   forRole,
   againstRole,
   localRole = null,
