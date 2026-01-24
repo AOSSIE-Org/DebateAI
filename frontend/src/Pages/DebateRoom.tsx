@@ -220,7 +220,6 @@ const DebateRoom: React.FC = () => {
   const judgingRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const navigate = useNavigate();
   const debateData = location.state as DebateProps;
   const phases = debateData.phaseTimings;
   const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
