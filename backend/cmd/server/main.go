@@ -82,20 +82,39 @@ func main() {
 	}
 }
 
-// CORSMiddleware handles CORS preflight and actual requests
+// CORSMiddleware handles CORS preflight and actual requests with enhanced security
 func CORSMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
-        c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+        // Get the origin from the request
+        origin := c.GetHeader("Origin")
+        if origin != "" {
+            c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+            c.Writer.Header().Set("Vary", "Origin")
+        } else {
+            c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+        }
+
+        // Set allowed methods for all responses
         c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        c.Writer.Header().Set("Access-Control-Allow-Headers", 
-            "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
         
         // Handle preflight requests
         if c.Request.Method == "OPTIONS" {
+            // Allow requested headers
+            if reqHeaders := c.GetHeader("Access-Control-Request-Headers"); reqHeaders != "" {
+                c.Writer.Header().Set("Access-Control-Allow-Headers", reqHeaders)
+            } else {
+                c.Writer.Header().Set("Access-Control-Allow-Headers", 
+                    "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+            }
+            
+            // Cache preflight response for 24 hours
+            c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+            
+            // End preflight request
             c.AbortWithStatusJSON(http.StatusOK, gin.H{"ok": true})
             return
         }
-        
+
         c.Next()
     }
 }
