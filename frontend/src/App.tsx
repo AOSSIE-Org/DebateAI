@@ -82,11 +82,6 @@ function AppRoutes() {
             path='coach/strengthen-argument'
             element={<StrengthenArgument />}
           />
-          <Route path='/coach' element={<CoachPage />} />
-          <Route
-            path='coach/strengthen-argument'
-            element={<StrengthenArgument />}
-          />{' '}
           {/* Add this route */}
           <Route path='coach/pros-cons' element={<ProsConsChallenge />} />
         </Route>

@@ -62,8 +62,7 @@ const handleGoogleLogin = useCallback(
       google.accounts.id.renderButton(buttonElement, {
         theme: 'outline',
         size: 'large',
-        text: 'signin_with',
-        width: '100%',
+        text: 'signin_with'
       });
     }
 
@@ -71,6 +70,7 @@ const handleGoogleLogin = useCallback(
       google.accounts.id.cancel();
     };
   }, [handleGoogleLogin]);
+  
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
