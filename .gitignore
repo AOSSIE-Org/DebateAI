@@ -1,3 +1,4 @@
 *.local
 *.log
 *.env
+config.prod.yml
