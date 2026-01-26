@@ -133,6 +133,10 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
+	// normalize email FIRST
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+
+
 	// Check if user already exists
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -212,6 +216,10 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
+	// normalize email FIRST
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+
+
 	// Find user with matching email and verification code
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -274,53 +282,60 @@ func Login(ctx *gin.Context) {
 
 	var request structs.LoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": "Check email and password format"})
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid input",
+			"message": "Check email and password format",
+		})
 		return
 	}
 
-	// Find user in MongoDB
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&user)
+	err := db.MongoDatabase.
+		Collection("users").
+		FindOne(dbCtx, bson.M{"email": request.Email}).
+		Decode(&user)
+
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	// Normalize stats if needed
-	if normalizeUserStats(&user) {
-		if err := persistUserStats(dbCtx, &user); err != nil {
-		}
+	// 🔐 Verify password FIRST
+	if err := bcrypt.CompareHashAndPassword(
+		[]byte(user.Password),
+		[]byte(request.Password),
+	); err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
 	}
 
-	// Check if user is verified
+	// 📧 Check verification AFTER password
 	if !user.IsVerified {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified"})
 		return
 	}
 
-	// Verify password
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
-		return
-	}
-
-	// Generate JWT
 	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "message": err.Error()})
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to generate token",
+			"message": err.Error(),
+		})
 		return
 	}
 
-	// Return user details
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Sign-in successful",
 		"accessToken": token,
 		"user":        buildUserResponse(user),
 	})
 }
+
 
 func normalizeUserStats(user *models.User) bool {
 	updated := false
