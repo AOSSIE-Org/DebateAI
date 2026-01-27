@@ -702,9 +702,12 @@ const DebateRoom: React.FC = () => {
   const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
+    <div className="min-h-screen p-4 bg-gradient-to-br from-gray-50 to-gray-200
+  dark:from-zinc-900 dark:to-zinc-800">
       <div className="w-full max-w-5xl mx-auto py-2">
-        <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
+       <div className="rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg bg-gradient-to-r from-orange-100 via-white to-orange-100
+    dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800
+       ">
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Debate: {debateData.topic}
           </h1>
@@ -728,7 +731,7 @@ const DebateRoom: React.FC = () => {
 
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 border border-orange-200">
+         <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 max-w-m w-full transform transition-all duration-300 scale-105 shadow-2xl border border-orange-200 dark:border-orange-400/30">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue500 mb-4"></div>
@@ -768,11 +771,7 @@ const DebateRoom: React.FC = () => {
 
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
-        <div
-          className={`relative w-full md:w-1/2 ${
-            state.isBotTurn ? "animate-glow" : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
-        >
+        <div className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""} h-[540px] flex flex-col shadow-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700`}>
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
               <img
@@ -922,7 +921,7 @@ const DebateRoom: React.FC = () => {
             box-shadow: 0 0 5px rgba(255, 149, 0, 0.5);
           }
           50% {
-            box-shadow: 0 0 20px rgba(255, 149, 0, 0.8);
+            box-shadow: 0 0 20px rgba(255, 180, 80, 0.9);
           }
           100% {
             box-shadow: 0 0 5px rgba(255, 149, 0, 0.5);
