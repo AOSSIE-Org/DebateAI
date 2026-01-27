@@ -194,99 +194,15 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Return success response
 	ctx.JSON(200, gin.H{
 		"message": "Sign-up successful. Please verify your email.",
 	})
 }
 
-func SignUp(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
-	if cfg == nil {
-		ctx.JSON(500, gin.H{
-			"error": "Server configuration error",
-		})
-		return
-	}
-
-	var request structs.SignUpRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
-		return
-	}
-
-	// Check if user already exists
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var existingUser models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&existingUser)
-	if err == nil {
-		ctx.JSON(400, gin.H{"error": "User already exists"})
-		return
-	}
-	if err != mongo.ErrNoDocuments {
-		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
-		return
-	}
-
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
-		return
-	}
-
-	// Generate verification code
-	verificationCode := utils.GenerateRandomCode(6)
-
-	// Create new user (unverified)
-	now := time.Now()
-	newUser := models.User{
-		Email:            request.Email,
-		DisplayName:      utils.ExtractNameFromEmail(request.Email),
-		Nickname:         utils.ExtractNameFromEmail(request.Email),
-		Bio:              "",
-		Rating:           1200.0,
-		RD:               350.0,
-		Volatility:       0.06,
-		LastRatingUpdate: now,
-		AvatarURL:        "https://avatar.iran.liara.run/public/10",
-		Password:         string(hashedPassword),
-		IsVerified:       false,
-		VerificationCode: verificationCode,
-		Score:            0,
-		Badges:           []string{},
-		CurrentStreak:    0,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-
-	// Insert user into MongoDB
-	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
-		return
-	}
-	newUser.ID = result.InsertedID.(primitive.ObjectID)
-
-	// Send verification email
-	err = utils.SendVerificationEmail(request.Email, verificationCode)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
-		return
-	}
-
-	ctx.JSON(200, gin.H{
-		"message": "Sign-up successful. Please verify your email.",
-	})
-}
 
 func Login(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
-		ctx.JSON(500, gin.H{
-			"error": "Server configuration error",
-		})
 		return
 	}
 
@@ -338,55 +254,6 @@ func Login(ctx *gin.Context) {
 		"accessToken": token,
 		"user":        buildUserResponse(user),
 	})
-}
-
-func ForgotPassword(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
-	if cfg == nil {
-		return
-	}
-
-	var request structs.ForgotPasswordRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Check email format"})
-		return
-	}
-
-	// Find user
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&user)
-	if err != nil {
-		ctx.JSON(400, gin.H{"error": "User not found"})
-		return
-	}
-
-	// Generate reset code
-	resetCode := utils.GenerateRandomCode(6)
-
-	// Update user with reset code
-	now := time.Now()
-	update := bson.M{
-		"$set": bson.M{
-			"resetPasswordCode": resetCode,
-			"updatedAt":         now,
-		},
-	}
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to initiate password reset", "message": err.Error()})
-		return
-	}
-
-	// Send reset email
-	err = utils.SendPasswordResetEmail(request.Email, resetCode)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to send reset email", "message": err.Error()})
-		return
-	}
-
-	ctx.JSON(200, gin.H{"message": "Password reset initiated. Check your email for further instructions."})
 }
 
 func VerifyForgotPassword(ctx *gin.Context) {
