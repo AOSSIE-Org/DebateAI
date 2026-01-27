@@ -200,75 +200,93 @@ func SignUp(ctx *gin.Context) {
 	})
 }
 
-func VerifyEmail(ctx *gin.Context) {
+func SignUp(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
+		ctx.JSON(500, gin.H{
+			"error": "Server configuration error",
+		})
 		return
 	}
 
-	var request structs.VerifyEmailRequest
+	var request structs.SignUpRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
 
-	// Find user with matching email and verification code
+	// Check if user already exists
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{
-		"email":            request.Email,
-		"verificationCode": request.ConfirmationCode,
-	}).Decode(&user)
+	var existingUser models.User
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&existingUser)
+	if err == nil {
+		ctx.JSON(400, gin.H{"error": "User already exists"})
+		return
+	}
+	if err != mongo.ErrNoDocuments {
+		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid email or verification code"})
+		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
 		return
 	}
 
-	// Check if verification code is expired (24 hours)
-	if time.Since(user.CreatedAt) > 24*time.Hour {
-		ctx.JSON(400, gin.H{"error": "Verification code expired. Please sign up again."})
-		return
-	}
+	// Generate verification code
+	verificationCode := utils.GenerateRandomCode(6)
 
-	// Update user verification status
+	// Create new user (unverified)
 	now := time.Now()
-	update := bson.M{
-		"$set": bson.M{
-			"isVerified":       true,
-			"verificationCode": "",
-			"updatedAt":        now,
-		},
+	newUser := models.User{
+		Email:            request.Email,
+		DisplayName:      utils.ExtractNameFromEmail(request.Email),
+		Nickname:         utils.ExtractNameFromEmail(request.Email),
+		Bio:              "",
+		Rating:           1200.0,
+		RD:               350.0,
+		Volatility:       0.06,
+		LastRatingUpdate: now,
+		AvatarURL:        "https://avatar.iran.liara.run/public/10",
+		Password:         string(hashedPassword),
+		IsVerified:       false,
+		VerificationCode: verificationCode,
+		Score:            0,
+		Badges:           []string{},
+		CurrentStreak:    0,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
+
+	// Insert user into MongoDB
+	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to verify email", "message": err.Error()})
+		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
+		return
+	}
+	newUser.ID = result.InsertedID.(primitive.ObjectID)
+
+	// Send verification email
+	err = utils.SendVerificationEmail(request.Email, verificationCode)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
 		return
 	}
 
-	// Update local user object
-	user.IsVerified = true
-	user.VerificationCode = ""
-	user.UpdatedAt = now
-
-	// Generate JWT for immediate login
-	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
-		return
-	}
-
-	// Return user details and access token
 	ctx.JSON(200, gin.H{
-		"message":     "Email verification successful. You are now logged in.",
-		"accessToken": token,
-		"user":        buildUserResponse(user),
+		"message": "Sign-up successful. Please verify your email.",
 	})
 }
 
 func Login(ctx *gin.Context) {
 	cfg := loadConfig(ctx)
 	if cfg == nil {
+		ctx.JSON(500, gin.H{
+			"error": "Server configuration error",
+		})
 		return
 	}
 
@@ -320,83 +338,6 @@ func Login(ctx *gin.Context) {
 		"accessToken": token,
 		"user":        buildUserResponse(user),
 	})
-}
-
-func normalizeUserStats(user *models.User) bool {
-	updated := false
-	if math.IsNaN(user.Rating) || math.IsInf(user.Rating, 0) {
-		user.Rating = 1200.0
-		updated = true
-	}
-	if math.IsNaN(user.RD) || math.IsInf(user.RD, 0) {
-		user.RD = 350.0
-		updated = true
-	}
-	if math.IsNaN(user.Volatility) || math.IsInf(user.Volatility, 0) || user.Volatility <= 0 {
-		user.Volatility = 0.06
-		updated = true
-	}
-	if user.LastRatingUpdate.IsZero() {
-		user.LastRatingUpdate = time.Now()
-		updated = true
-	}
-	if updated {
-		user.UpdatedAt = time.Now()
-	}
-	return updated
-}
-
-func persistUserStats(ctx context.Context, user *models.User) error {
-	if user.ID.IsZero() {
-		return nil
-	}
-	collection := db.MongoDatabase.Collection("users")
-	update := bson.M{
-		"$set": bson.M{
-			"rating":           user.Rating,
-			"rd":               user.RD,
-			"volatility":       user.Volatility,
-			"lastRatingUpdate": user.LastRatingUpdate,
-			"updatedAt":        user.UpdatedAt,
-		},
-	}
-	_, err := collection.UpdateByID(ctx, user.ID, update)
-	return err
-}
-
-func sanitizeFloat(value, fallback float64) float64 {
-	if math.IsNaN(value) || math.IsInf(value, 0) {
-		return fallback
-	}
-	return value
-}
-
-func formatTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.Format(time.RFC3339)
-}
-
-func buildUserResponse(user models.User) gin.H {
-	return gin.H{
-		"id":               user.ID.Hex(),
-		"email":            user.Email,
-		"displayName":      user.DisplayName,
-		"nickname":         user.Nickname,
-		"bio":              user.Bio,
-		"rating":           sanitizeFloat(user.Rating, 1200.0),
-		"rd":               sanitizeFloat(user.RD, 350.0),
-		"volatility":       sanitizeFloat(user.Volatility, 0.06),
-		"lastRatingUpdate": formatTime(user.LastRatingUpdate),
-		"avatarUrl":        user.AvatarURL,
-		"twitter":          user.Twitter,
-		"instagram":        user.Instagram,
-		"linkedin":         user.LinkedIn,
-		"isVerified":       user.IsVerified,
-		"createdAt":        formatTime(user.CreatedAt),
-		"updatedAt":        formatTime(user.UpdatedAt),
-	}
 }
 
 func ForgotPassword(ctx *gin.Context) {
