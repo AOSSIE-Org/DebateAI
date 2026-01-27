@@ -7,6 +7,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
+import JSON5 from "json5";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -597,16 +598,9 @@ const DebateRoom: React.FC = () => {
 
       let judgment: JudgmentData;
       try {
-        judgment = JSON.parse(jsonString);
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError, "Trying to fix JSON...");
-        const fixedJson = jsonString
-          .replace(/'/g, '"')
-          .replace(/(\w+):/g, '"$1":')
-          .replace(/,\s*}/g, '}')
-          .replace(/,\s*]/g, ']');
-
-        judgment = JSON.parse(fixedJson);
+        judgment = JSON5.parse(jsonString);
+      }catch (e) {
+        throw new Error(`Failed to parse judgment JSON: ${e}`);
       }
 
       console.log("Parsed judgment:", judgment);
