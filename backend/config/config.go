@@ -54,6 +54,10 @@ type Config struct {
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
 	} `yaml:"googleOAuth"`
+
+	CORS struct {
+		AllowedOrigins []string `yaml:"allowedOrigins"`
+	} `yaml:"cors"`
 }
 
 // LoadConfig reads the configuration file
