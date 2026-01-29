@@ -7,6 +7,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
+import { Textarea } from "@/components/ui/textarea";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -860,6 +861,12 @@ const DebateRoom: React.FC = () => {
                   onChange={(e) =>
                     !isRecognizing && setFinalInput(e.target.value)
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
                   readOnly={isRecognizing}
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
