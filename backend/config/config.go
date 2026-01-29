@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -60,7 +61,6 @@ type Config struct {
 	} `yaml:"cors"`
 }
 
-// LoadConfig reads the configuration file
 func LoadConfig(path string) (*Config, error) {
 
 	data, err := os.ReadFile(path)
@@ -113,6 +113,18 @@ func validateConfig(cfg *Config) error {
 	}
 	if cfg.GoogleOAuth.ClientID == "" {
 		return fmt.Errorf("googleOAuth.clientID is required")
+	}
+
+	for _, origin := range cfg.CORS.AllowedOrigins {
+		if strings.TrimSpace(origin) == "" {
+			return fmt.Errorf("cors.allowedOrigins cannot contain empty values")
+		}
+		if origin == "*" {
+			return fmt.Errorf("cors.allowedOrigins cannot contain '*' when credentials are enabled")
+		}
+		if !strings.HasPrefix(origin, "http://") && !strings.HasPrefix(origin, "https://") {
+			return fmt.Errorf("cors.allowedOrigins must include scheme")
+		}
 	}
 
 	return nil
