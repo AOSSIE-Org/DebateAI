@@ -129,6 +129,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
@@ -139,14 +141,45 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError(null);
+    setIsSubmitting(true);
 
-    if (password !== confirmPassword) {
-      authContext.handleError('Passwords do not match');
+    // Basic validation
+    if (!email || !password || !confirmPassword) {
+      setLocalError('All fields are required');
+      setIsSubmitting(false);
       return;
     }
 
-    await signup(email, password);
-    startOtpVerification(email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLocalError('Please enter a valid email address');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setLocalError('Password must be at least 8 characters long');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setLocalError('Passwords do not match');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const { success } = await signup(email, password);
+      if (success) {
+        startOtpVerification(email);
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      setLocalError('Failed to create account. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
  const handleGoogleLogin = useCallback(
@@ -156,8 +189,6 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   },
   [googleLogin]
 );
-
-
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
@@ -186,41 +217,55 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
+      {localError && <p className="text-red-500 text-sm mb-2">{localError}</p>}
+      {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
+      
       <Input
         type="email"
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="mb-2 dark:border-white"
+        disabled={isSubmitting}
       />
+      
       <Input
         type={passwordVisible ? "text" : "password"}
-        placeholder="password"
+        placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         className="mb-2 dark:border-white"
+        disabled={isSubmitting}
       />
+      
       <Input
         type={passwordVisible ? "text" : "password"}
-        placeholder="confirm password"
+        placeholder="Confirm Password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4 dark:border-white"
+        className="mb-2 dark:border-white"
+        disabled={isSubmitting}
       />
-      <div className='w-full flex justify-start items-center pl-1'>
+      
+      <div className='w-full flex justify-start items-center pl-1 mb-4'>
         <div className='w-4'>
           <Input
             type='checkbox'
             className="dark:border-white"
             checked={passwordVisible}
             onChange={(e) => setPasswordVisible(e.target.checked)}
+            disabled={isSubmitting}
           />
         </div>
-        <div className='pl-2'>show password</div>
+        <div className='pl-2 text-sm'>Show password</div>
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
-        {loading ? 'Creating Account...' : 'Sign Up With Email'}
+      
+      <Button 
+        type="submit" 
+        className="w-full mb-2 border dark:border-white" 
+        disabled={isSubmitting || loading}
+      >
+        {isSubmitting || loading ? 'Creating Account...' : 'Create Account'}
       </Button>
       <div id="googleSignUpButton" className="w-full"></div>
     </form>
@@ -244,8 +289,10 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await verifyEmail(email, otp);
-    handleOtpVerified();
+    const { success } = await verifyEmail(email, otp);
+    if (success) {
+      handleOtpVerified();
+    }
   };
 
   return (
@@ -334,6 +381,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
@@ -344,15 +392,21 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError(null);
 
     if (newPassword !== confirmNewPassword) {
-      authContext.handleError('Passwords do not match');
+      setLocalError('Passwords do not match');
       return;
     }
 
-    await confirmForgotPassword(email, code, newPassword);
-    await login(email, newPassword);
-    handlePasswordReset();
+    try {
+      await confirmForgotPassword(email, code, newPassword);
+      await login(email, newPassword);
+      handlePasswordReset();
+    } catch (err) {
+      console.error('Password reset error:', err);
+      setLocalError('Failed to reset password. Please try again.');
+    }
   };
 
   return (
@@ -391,6 +445,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
           </div>
           <div className='pl-2'>show password</div>
         </div>
+        {localError && <p className="text-sm text-red-500 mb-2">{localError}</p>}
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
           {loading ? 'Resetting Password...' : 'Reset Password'}
