@@ -129,6 +129,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
@@ -139,14 +141,43 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError(null);
+    setIsSubmitting(true);
 
-    if (password !== confirmPassword) {
-      authContext.handleError('Passwords do not match');
+    // Basic validation
+    if (!email || !password || !confirmPassword) {
+      setLocalError('All fields are required');
+      setIsSubmitting(false);
       return;
     }
 
-    await signup(email, password);
-    startOtpVerification(email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLocalError('Please enter a valid email address');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setLocalError('Password must be at least 8 characters long');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setLocalError('Passwords do not match');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      await signup(email, password);
+      startOtpVerification(email);
+    } catch (err) {
+      console.error('Signup error:', err);
+      setLocalError('Failed to create account. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
  const handleGoogleLogin = useCallback(
@@ -218,9 +249,18 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         </div>
         <div className='pl-2'>show password</div>
       </div>
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
-        {loading ? 'Creating Account...' : 'Sign Up With Email'}
+      {localError && (
+        <p className="text-sm text-red-500 mb-2">
+          {localError}
+        </p>
+      )}
+      {error && !localError && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      <Button
+        type="submit"
+        className="w-full mb-2 border dark:border-white"
+        disabled={loading || isSubmitting}
+      >
+        {loading || isSubmitting ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
       <div id="googleSignUpButton" className="w-full"></div>
     </form>
@@ -244,8 +284,13 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await verifyEmail(email, otp);
-    handleOtpVerified();
+    try {
+      await verifyEmail(email, otp);
+      handleOtpVerified();
+    } catch {
+      // Error is handled via AuthContext error state
+      // Do not advance UI on failure
+    }
   };
 
   return (
@@ -263,61 +308,6 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
           {loading ? 'Verifying...' : 'Verify OTP'}
-        </Button>
-      </form>
-    </div>
-  );
-};
-
-interface ForgotPasswordFormProps {
-  startResetPassword: (email: string) => void;
-}
-
-export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
-  startResetPassword,
-}) => {
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
-
-  const baseURL = import.meta.env.VITE_BASE_URL;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    try {
-      const response = await fetch(`${baseURL}/forgotPassword`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        setError('Failed to send reset password code. Please try again.');
-        return;
-      }
-
-      startResetPassword(email);
-    } catch {
-      setError('An unexpected error occurred. Please try again later.');
-    }
-  };
-
-  return (
-    <div className="w-full flex flex-col items-center">
-      <h3 className="text-2xl font-medium my-4">Reset Password</h3>
-      <p className="mb-4">Enter your email to receive a password reset code.</p>
-      <form onSubmit={handleSubmit} className="w-full">
-        <Input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@example.com"
-          className="w-full mb-4 dark:border-white"
-        />
-        {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-        <Button type="submit" className="w-full border dark:border-white">
-          Send Reset Code
         </Button>
       </form>
     </div>
@@ -350,9 +340,14 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
       return;
     }
 
-    await confirmForgotPassword(email, code, newPassword);
-    await login(email, newPassword);
-    handlePasswordReset();
+    try {
+      await confirmForgotPassword(email, code, newPassword);
+      await login(email, newPassword);
+      handlePasswordReset();
+    } catch {
+      // Stop flow if reset or login fails
+      // Error is already set in AuthContext
+    }
   };
 
   return (
