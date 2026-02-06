@@ -860,6 +860,12 @@ const DebateRoom: React.FC = () => {
                   onChange={(e) =>
                     !isRecognizing && setFinalInput(e.target.value)
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
                   readOnly={isRecognizing}
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
