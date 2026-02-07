@@ -145,12 +145,13 @@ func GetDebateTranscriptHandler(c *gin.Context) {
 func persistDebateRoom(room *DebateRoom) {
 	room.Mutex.Lock()
 	defer room.Mutex.Unlock()
-	data, err := json.MarshalIndent(room, "", "  ")
-	if err != nil {
-		return
-	}
-	// Note: Ensure roomID is sanitized in production to prevent path traversal
-	filename := fmt.Sprintf("room_%s.json", room.RoomID)
+ 	data, err := json.MarshalIndent(room, "", "  ")
+ 	if err != nil {
+		log.Printf("[Persist] Failed to marshal room %s: %v", room.RoomID, err)
+ 		return
+ 	}
+ 	filename := fmt.Sprintf("room_%s.json", room.RoomID)
 	if err := os.WriteFile(filename, data, 0644); err != nil {
-	}
+		log.Printf("[Persist] Failed to write %s: %v", filename, err)
+ 	}
 }
