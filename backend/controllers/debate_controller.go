@@ -3,12 +3,19 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+)
+
+// --- CONFIGURATION ---
+const (
+	CleanupInterval = 1 * time.Hour  // Run the cleanup task every hour
+	RoomTTL         = 24 * time.Hour // Delete rooms inactive for more than 24 hours
 )
 
 // DebateMessage holds a single text message in the debate.
@@ -21,13 +28,57 @@ type DebateMessage struct {
 
 // DebateRoom stores all messages for a debate room.
 type DebateRoom struct {
-	RoomID   string          `json:"roomId"`
-	Messages []DebateMessage `json:"messages"`
-	Mutex    sync.Mutex      `json:"-"`
+	RoomID       string          `json:"roomId"`
+	Messages     []DebateMessage `json:"messages"`
+	LastActivity time.Time       `json:"-"` // Field to track when the room was last used
+	Mutex        sync.Mutex      `json:"-"`
 }
 
 var debateRooms = make(map[string]*DebateRoom)
 var debateRoomsMutex sync.Mutex
+
+// --- AUTOMATIC CLEANUP SYSTEM ---
+
+// init() runs automatically when the server starts
+func init() {
+	go cleanupRoutine()
+}
+
+// cleanupRoutine runs in the background forever
+func cleanupRoutine() {
+	ticker := time.NewTicker(CleanupInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		cleanupOldRooms()
+	}
+}
+
+// cleanupOldRooms locks the map and removes dead rooms
+func cleanupOldRooms() {
+	debateRoomsMutex.Lock()
+	defer debateRoomsMutex.Unlock()
+
+	now := time.Now()
+	deletedCount := 0
+
+	for id, room := range debateRooms {
+		// If the room has been untouched for longer than RoomTTL (24h)
+		if now.Sub(room.LastActivity) > RoomTTL {
+			delete(debateRooms, id)
+			deletedCount++
+			
+			// Optional: Also delete the JSON file to save disk space
+			// os.Remove(fmt.Sprintf("room_%s.json", id))
+		}
+	}
+
+	if deletedCount > 0 {
+		log.Printf("[Memory Cleanup] Removed %d inactive debate rooms to free up RAM.", deletedCount)
+	}
+}
+
+// --- HANDLERS ---
 
 // SubmitDebateMessageHandler handles the POST request for a new debate message.
 func SubmitDebateMessageHandler(c *gin.Context) {
@@ -49,11 +100,13 @@ func SubmitDebateMessageHandler(c *gin.Context) {
 	room, exists := debateRooms[roomID]
 	if !exists {
 		room = &DebateRoom{
-			RoomID:   roomID,
-			Messages: []DebateMessage{},
+			RoomID:       roomID,
+			Messages:     []DebateMessage{},
+			LastActivity: time.Now(), // Initialize timestamp
 		}
 		debateRooms[roomID] = room
 	}
+	room.LastActivity = time.Now() // Update timestamp on new message
 	debateRoomsMutex.Unlock()
 
 	// Append the new message safely.
@@ -76,7 +129,13 @@ func GetDebateTranscriptHandler(c *gin.Context) {
 	}
 	debateRoomsMutex.Lock()
 	room, exists := debateRooms[roomID]
+	
+	// If the room is being read, mark it as active so it doesn't get deleted immediately
+	if exists {
+		room.LastActivity = time.Now()
+	}
 	debateRoomsMutex.Unlock()
+
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "room not found"})
 		return
@@ -91,6 +150,7 @@ func persistDebateRoom(room *DebateRoom) {
 	if err != nil {
 		return
 	}
+	// Note: Ensure roomID is sanitized in production to prevent path traversal
 	filename := fmt.Sprintf("room_%s.json", room.RoomID)
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 	}
