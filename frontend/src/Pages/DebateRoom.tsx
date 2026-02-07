@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
@@ -851,7 +851,7 @@ const DebateRoom: React.FC = () => {
             </div>
             {!state.isDebateEnded && (
               <div className="mt-3 flex gap-2 items-center">
-                <Input
+                <Textarea
                   value={
                     isRecognizing
                       ? finalInput + (interimInput ? " " + interimInput : "")
