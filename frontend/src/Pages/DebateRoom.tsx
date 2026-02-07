@@ -226,18 +226,30 @@ const DebateRoom: React.FC = () => {
 
   const [state, setState] = useState<DebateState>(() => {
     const savedState = localStorage.getItem(debateKey);
-    return savedState
-      ? JSON.parse(savedState)
-      : {
-          messages: [],
-          currentPhase: 0,
-          phaseStep: 0,
-          isBotTurn: false,
-          userStance: "",
-          botStance: "",
-          timer: phases[0].time,
-          isDebateEnded: false,
-        };
+    // Define default state to avoid duplication
+    const defaultState = {
+      messages: [],
+      currentPhase: 0,
+      phaseStep: 0,
+      isBotTurn: false,
+      userStance: "",
+      botStance: "",
+      timer: phases[0].time,
+      isDebateEnded: false,
+    };
+
+    if (savedState) {
+      try {
+        return JSON.parse(savedState);
+      } catch (error) {
+        console.error("Failed to parse saved debate state:", error);
+        // Optional: clear the corrupted state so it doesn't persist
+        localStorage.removeItem(debateKey);
+        return defaultState;
+      }
+    }
+    
+    return defaultState;
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
