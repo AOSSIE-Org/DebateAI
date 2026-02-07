@@ -67,9 +67,8 @@ func cleanupOldRooms() {
 		if now.Sub(room.LastActivity) > RoomTTL {
 			delete(debateRooms, id)
 			deletedCount++
-			
-			// Optional: Also delete the JSON file to save disk space
-			// os.Remove(fmt.Sprintf("room_%s.json", id))
+			// Clean up the persisted file as well
+			os.Remove(fmt.Sprintf("room_%s.json", id))
 		}
 	}
 
