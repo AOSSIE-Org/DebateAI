@@ -207,13 +207,13 @@ func (ms *MatchmakingService) createRoomForMatch(user1, user2 *MatchmakingPool) 
 	}
 	// Insert the room directly
 	_, err := roomCollection.InsertOne(ctx, room)
-	if err != nil {
-		ms.mutex.Lock()
-		ms.pool[user1.UserID] = user1
-		ms.pool[user2.UserID] = user2
-		ms.mutex.Unlock()
-		return
-	}
+	 	if err != nil {
+ 		ms.mutex.Lock()
+		user1.IsMatching = false
+		user2.IsMatching = false
+ 		ms.mutex.Unlock()
+ 		return
+ 	}
 	// Remove both users from the pool
 	ms.RemoveFromPool(user1.UserID)
 	ms.RemoveFromPool(user2.UserID)
