@@ -443,6 +443,7 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   // Popup and countdown state
   const [showSetupPopup, setShowSetupPopup] = useState(true);
+  const [concedeModalOpen, setConcedeModalOpen] = useState(false);
   const [isTTSEnabled, setIsTTSEnabled] = useState(false);
   const isTTSEnabledRef = useRef(false);
 
