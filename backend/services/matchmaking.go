@@ -22,6 +22,7 @@ type MatchmakingPool struct {
 	JoinedAt           time.Time `json:"joinedAt" bson:"joinedAt"`
 	LastActivity       time.Time `json:"lastActivity" bson:"lastActivity"`
 	StartedMatchmaking bool      `json:"startedMatchmaking" bson:"startedMatchmaking"`
+	IsMatching         bool      `json:"-" bson:"-"` // New field to reserve users
 }
 
 // MatchmakingService handles the matchmaking logic
@@ -127,7 +128,9 @@ func (ms *MatchmakingService) GetPool() []MatchmakingPool {
 func (ms *MatchmakingService) findMatch(userID string) {
 	ms.mutex.Lock()
 	user, exists := ms.pool[userID]
-	if !exists || !user.StartedMatchmaking {
+	
+	// Skip if user doesn't exist, isn't searching, or is ALREADY being matched
+	if !exists || !user.StartedMatchmaking || user.IsMatching {
 		ms.mutex.Unlock()
 		return
 	}
@@ -138,8 +141,8 @@ func (ms *MatchmakingService) findMatch(userID string) {
 		if opponent.UserID == userID {
 			continue // Skip self
 		}
-		// Only consider opponents who have started matchmaking
-		if !opponent.StartedMatchmaking {
+		// Skip opponents who aren't searching or are already reserved
+		if !opponent.StartedMatchmaking || opponent.IsMatching {
 			continue
 		}
 		// Check if Elo ranges overlap
@@ -159,8 +162,10 @@ func (ms *MatchmakingService) findMatch(userID string) {
 	}
 	// Reserve/remove both under lock to avoid duplicate room creation
 	if bestMatch != nil {
-		delete(ms.pool, user.UserID)
-		delete(ms.pool, bestMatch.UserID)
+		// FIX: Reserve them instead of deleting
+		user.IsMatching = true
+		bestMatch.IsMatching = true
+
 		// Capture locals and unlock before I/O
 		u1, u2 := user, bestMatch
 		ms.mutex.Unlock()
@@ -179,6 +184,7 @@ func (ms *MatchmakingService) createRoomForMatch(user1, user2 *MatchmakingPool) 
 
 	// If DB is not initialized, skip persistence but still complete the match.
 	if db.MongoDatabase == nil {
+		// Test mode cleanup
 		ms.RemoveFromPool(user1.UserID)
 		ms.RemoveFromPool(user2.UserID)
 		if roomCreatedCallback != nil {
@@ -193,19 +199,11 @@ func (ms *MatchmakingService) createRoomForMatch(user1, user2 *MatchmakingPool) 
 		"_id":  roomID,
 		"type": "public",
 		"participants": []bson.M{
-			{
-				"id":       user1.UserID,
-				"username": user1.Username,
-				"elo":      user1.Elo,
-			},
-			{
-				"id":       user2.UserID,
-				"username": user2.Username,
-				"elo":      user2.Elo,
-			},
+			{"id": user1.UserID, "username": user1.Username, "elo": user1.Elo},
+			{"id": user2.UserID, "username": user2.Username, "elo": user2.Elo},
 		},
 		"createdAt": time.Now(),
-		"status":    "waiting", // waiting, active, completed
+		"status":    "waiting",
 	}
 	// Insert the room directly
 	_, err := roomCollection.InsertOne(ctx, room)
@@ -219,12 +217,13 @@ func (ms *MatchmakingService) createRoomForMatch(user1, user2 *MatchmakingPool) 
 	// Remove both users from the pool
 	ms.RemoveFromPool(user1.UserID)
 	ms.RemoveFromPool(user2.UserID)
-	// Broadcast room creation to WebSocket clients
-	participantUserIDs := []string{user1.UserID, user2.UserID}
+
 	if roomCreatedCallback != nil {
+		participantUserIDs := []string{user1.UserID, user2.UserID}
 		roomCreatedCallback(roomID, participantUserIDs)
 	}
-}
+
+	}
 
 // cleanupInactiveUsers removes users who have been inactive for too long
 func (ms *MatchmakingService) cleanupInactiveUsers() {
