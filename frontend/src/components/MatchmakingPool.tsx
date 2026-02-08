@@ -76,7 +76,7 @@ const MatchmakingPool: React.FC = () => {
       <CardHeader>
         <CardTitle className='flex items-center justify-between'>
           <div className='flex items-center gap-2'>
-            <FaUsers className='text-orange-500' />
+            <FaUsers className='text-primary' />
             Matchmaking Pool
           </div>
           <div className='flex items-center gap-2'>
