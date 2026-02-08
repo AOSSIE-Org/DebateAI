@@ -335,7 +335,7 @@ const TeamBuilder: React.FC = () => {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Team Builder</h1>
+        <h1 className="text-3xl font-bold text-primary mb-2">Team Builder</h1>
         <p className="text-gray-600">
           Create or join a team to participate in team debates
         </p>
