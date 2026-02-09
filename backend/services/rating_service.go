@@ -61,8 +61,12 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 
 	// Update ratings
 	ratingSystem.UpdateMatch(userPlayer, opponentPlayer, outcome, debateTime)
-	sanitizePlayerStats(userPlayer, preUserRating, preUserRD)
-	sanitizePlayerStats(opponentPlayer, preOpponentRating, preOpponentRD)
+	if err := sanitizePlayerStats(userPlayer, preUserRating, preUserRD); err != nil {
+		return nil, nil, fmt.Errorf("user stats validation failed: %w", err)
+	}
+	if err := sanitizePlayerStats(opponentPlayer, preOpponentRating, preOpponentRD); err != nil {
+		return nil, nil, fmt.Errorf("opponent stats validation failed: %w", err)
+	}
 
 	// Sanitize rating outputs to avoid NaN/Inf values
 	sanitizePlayerMetrics := func(player *rating.Player) {
@@ -88,6 +92,12 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 	}
 	sanitizePlayerMetrics(userPlayer)
 	sanitizePlayerMetrics(opponentPlayer)
+	if err := validatePlayerMetrics(userPlayer); err != nil {
+		return nil, nil, fmt.Errorf("user Rating calculation error: %w", err)
+	}
+	if err := validatePlayerMetrics(opponentPlayer); err != nil {
+		return nil, nil, fmt.Errorf("opponent Rating calculation error: %w", err)
+	}
 
 	// Create debate record
 	debate := &models.Debate{
@@ -162,6 +172,27 @@ func sanitizeFloatMetric(value float64) float64 {
 	return value
 }
 
+// validatePlayerMetrics checks for invalid math results and returns an error
+// instead of silently resetting values (fail closed, not fail open)
+func validatePlayerMetrics(player *rating.Player) error {
+	if math.IsNaN(player.Rating) || math.IsInf(player.Rating, 0) {
+		return fmt.Errorf("invalid rating value detected (NaN or Inf)")
+	}
+	if math.IsNaN(player.RD) || math.IsInf(player.RD, 0) {
+		return fmt.Errorf("invalid RD value detected (NaN or Inf)")
+	}
+	if math.IsNaN(player.Volatility) || math.IsInf(player.Volatility, 0) {
+		return fmt.Errorf("invalid volatility value detected (NaN or Inf)")
+	}
+	if player.RD <= 0 {
+		return fmt.Errorf("invalid RD value: must be positive, got %f", player.RD)
+	}
+	if player.Volatility <= 0 {
+		return fmt.Errorf("invalid volatility value: must be positive, got %f", player.Volatility)
+	}
+	return nil
+}
+
 // Helper function to get user by ID
 func getUserByID(id primitive.ObjectID) (*models.User, error) {
 	var user models.User
@@ -173,7 +204,9 @@ func getUserByID(id primitive.ObjectID) (*models.User, error) {
 // Helper function to update user rating
 func updateUserRating(id primitive.ObjectID, player *rating.Player) error {
 	collection := db.MongoDatabase.Collection("users")
-	sanitizePlayerStats(player, 1200.0, 350.0)
+	if err := sanitizePlayerStats(player, 1200.0, 350.0); err != nil {
+		return fmt.Errorf("player stats validation failed before update: %w", err)
+	}
 	update := bson.M{
 		"$set": bson.M{
 			"rating":           player.Rating,
@@ -186,17 +219,18 @@ func updateUserRating(id primitive.ObjectID, player *rating.Player) error {
 	return err
 }
 
-func sanitizePlayerStats(player *rating.Player, fallbackRating, fallbackRD float64) {
+func sanitizePlayerStats(player *rating.Player, fallbackRating, fallbackRD float64) error {
 	if math.IsNaN(player.Rating) || math.IsInf(player.Rating, 0) {
-		player.Rating = fallbackRating
+		return fmt.Errorf("invalid rating: NaN or Inf detected")
 	}
 	if math.IsNaN(player.RD) || math.IsInf(player.RD, 0) {
-		player.RD = fallbackRD
+		return fmt.Errorf("invalid RD: NaN or Inf detected")
 	}
 	if math.IsNaN(player.Volatility) || math.IsInf(player.Volatility, 0) || player.Volatility <= 0 {
-		player.Volatility = 0.06
+		return fmt.Errorf("invalid volatility: NaN, Inf, or non-positive")
 	}
 	if player.LastUpdate.IsZero() {
 		player.LastUpdate = time.Now()
 	}
+	return nil
 }

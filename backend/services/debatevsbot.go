@@ -185,7 +185,6 @@ Your debating style must strictly adhere to the following guidelines:
 Your stance is: %s.
 %s
 %s
-%s
 Provide an opening statement that embodies your persona and stance.
 [Your opening argument]
 %s %s`,
