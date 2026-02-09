@@ -133,102 +133,106 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
     localStorage.getItem('opponentAvatar') ||
     'https://avatar.iran.liara.run/public/31';
 
-const isUserBotFormat = 'user' in judgment.opening_statement;
+  const isUserBotFormat = judgment?.opening_statement && 'user' in judgment.opening_statement;
 
-const defaultForName = forRole || 'For Debater';
-const defaultAgainstName = againstRole || 'Against Debater';
-const resolvedLocalName = localDisplayName || userName;
-const resolvedOpponentName = opponentDisplayName || 'Opponent';
-const derivedLocalAvatar = localAvatarUrl || localAvatar;
-const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
+  const defaultForName = forRole || 'For Debater';
+  const defaultAgainstName = againstRole || 'Against Debater';
+  const resolvedLocalName = localDisplayName || userName;
+  const resolvedOpponentName = opponentDisplayName || 'Opponent';
+  const derivedLocalAvatar = localAvatarUrl || localAvatar;
+  const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
 
-const resolvedForName = isUserBotFormat
-  ? defaultForName
-  : localRole === 'for'
-  ? resolvedLocalName
-  : localRole === 'against'
-  ? resolvedOpponentName
-  : defaultForName;
+  const resolvedForName = isUserBotFormat
+    ? defaultForName
+    : localRole === 'for'
+      ? resolvedLocalName
+      : localRole === 'against'
+        ? resolvedOpponentName
+        : defaultForName;
 
-const resolvedAgainstName = isUserBotFormat
-  ? defaultAgainstName
-  : localRole === 'against'
-  ? resolvedLocalName
-  : localRole === 'for'
-  ? resolvedOpponentName
-  : defaultAgainstName;
+  const resolvedAgainstName = isUserBotFormat
+    ? defaultAgainstName
+    : localRole === 'against'
+      ? resolvedLocalName
+      : localRole === 'for'
+        ? resolvedOpponentName
+        : defaultAgainstName;
 
-const player1Name = isUserBotFormat ? userName : resolvedForName;
-const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
-const player1Stance = isUserBotFormat ? userStance : 'For';
-const player2Stance = isUserBotFormat ? botStance : 'Against';
+  const player1Name = isUserBotFormat ? userName : resolvedForName;
+  const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
+  const player1Stance = isUserBotFormat ? userStance : 'For';
+  const player2Stance = isUserBotFormat ? botStance : 'Against';
 
-const resolvedForAvatar = isUserBotFormat
-  ? userAvatar
-  : localRole === 'for'
-  ? derivedLocalAvatar
-  : localRole === 'against'
-  ? derivedOpponentAvatar
-  : derivedLocalAvatar || derivedOpponentAvatar;
+  const resolvedForAvatar = isUserBotFormat
+    ? userAvatar
+    : localRole === 'for'
+      ? derivedLocalAvatar
+      : localRole === 'against'
+        ? derivedOpponentAvatar
+        : derivedLocalAvatar || derivedOpponentAvatar;
 
-const resolvedAgainstAvatar = isUserBotFormat
-  ? botAvatar
-  : localRole === 'against'
-  ? derivedLocalAvatar
-  : localRole === 'for'
-  ? derivedOpponentAvatar
-  : derivedOpponentAvatar || derivedLocalAvatar;
+  const resolvedAgainstAvatar = isUserBotFormat
+    ? botAvatar
+    : localRole === 'against'
+      ? derivedLocalAvatar
+      : localRole === 'for'
+        ? derivedOpponentAvatar
+        : derivedOpponentAvatar || derivedLocalAvatar;
 
-const player1Avatar = resolvedForAvatar || localAvatar;
-const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
-const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
+  const player1Avatar = resolvedForAvatar || localAvatar;
+  const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
+  const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
 
-const formatChange = (value: number) =>
-  `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
-const formatRating = (value: number) => value.toFixed(2);
+  const formatChange = (value: number) =>
+    `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+  const formatRating = (value: number) => value.toFixed(2);
 
-const player1RatingSummary =
-  !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
-const player2RatingSummary =
-  !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
+  const player1RatingSummary =
+    !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
+  const player2RatingSummary =
+    !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
 
   const handleGoHome = () => {
     navigate('/startdebate');
   };
 
-  // Helper function to safely access scores and reasons
+  // Helper function to safely access scores and reasons with defensive checks
   const getScoreAndReason = (
     section: string,
     player: 'player1' | 'player2'
   ) => {
+    const defaultResult = { score: 0, reason: 'Data not available' };
+
+    if (!judgment) return defaultResult;
+
     if (isUserBotFormat) {
       const data = judgment as JudgmentDataUserBot;
       const key = player === 'player1' ? 'user' : 'bot';
       switch (section) {
         case 'opening_statement':
           return {
-            score: data.opening_statement[key].score,
-            reason: data.opening_statement[key].reason,
+            score: data.opening_statement?.[key]?.score ?? 0,
+            reason: data.opening_statement?.[key]?.reason ?? 'Data not available',
           };
         case 'cross_examination':
           return {
-            score: data.cross_examination[key].score,
-            reason: data.cross_examination[key].reason,
+            score: data.cross_examination?.[key]?.score ?? 0,
+            reason: data.cross_examination?.[key]?.reason ?? 'Data not available',
           };
         case 'answers':
           return {
-            score: data.answers[key].score,
-            reason: data.answers[key].reason,
+            score: data.answers?.[key]?.score ?? 0,
+            reason: data.answers?.[key]?.reason ?? 'Data not available',
           };
         case 'closing':
           return {
-            score: data.closing[key].score,
-            reason: data.closing[key].reason,
+            score: data.closing?.[key]?.score ?? 0,
+            reason: data.closing?.[key]?.reason ?? 'Data not available',
           };
         case 'total':
-          return { score: data.total[key], reason: '' };
+          return { score: data.total?.[key] ?? 0, reason: '' };
         default:
-          return { score: 0, reason: 'Data not available' };
+          return defaultResult;
       }
     } else {
       const data = judgment as JudgmentDataForAgainst;
@@ -236,28 +240,28 @@ const player2RatingSummary =
       switch (section) {
         case 'opening_statement':
           return {
-            score: data.opening_statement[key].score,
-            reason: data.opening_statement[key].reason,
+            score: data.opening_statement?.[key]?.score ?? 0,
+            reason: data.opening_statement?.[key]?.reason ?? 'Data not available',
           };
         case 'cross_examination_questions':
           return {
-            score: data.cross_examination_questions[key].score,
-            reason: data.cross_examination_questions[key].reason,
+            score: data.cross_examination_questions?.[key]?.score ?? 0,
+            reason: data.cross_examination_questions?.[key]?.reason ?? 'Data not available',
           };
         case 'cross_examination_answers':
           return {
-            score: data.cross_examination_answers[key].score,
-            reason: data.cross_examination_answers[key].reason,
+            score: data.cross_examination_answers?.[key]?.score ?? 0,
+            reason: data.cross_examination_answers?.[key]?.reason ?? 'Data not available',
           };
         case 'closing':
           return {
-            score: data.closing[key].score,
-            reason: data.closing[key].reason,
+            score: data.closing?.[key]?.score ?? 0,
+            reason: data.closing?.[key]?.reason ?? 'Data not available',
           };
         case 'total':
-          return { score: data.total[key], reason: '' };
+          return { score: data.total?.[key] ?? 0, reason: '' };
         default:
-          return { score: 0, reason: 'Data not available' };
+          return defaultResult;
       }
     }
   };
@@ -283,15 +287,15 @@ const player2RatingSummary =
       cross_questions: isUserBotFormat
         ? getScoreAndReason('cross_examination', 'player1').reason.toLowerCase()
         : getScoreAndReason(
-            'cross_examination_questions',
-            'player1'
-          ).reason.toLowerCase(),
+          'cross_examination_questions',
+          'player1'
+        ).reason.toLowerCase(),
       cross_answers: isUserBotFormat
         ? getScoreAndReason('answers', 'player1').reason.toLowerCase()
         : getScoreAndReason(
-            'cross_examination_answers',
-            'player1'
-          ).reason.toLowerCase(),
+          'cross_examination_answers',
+          'player1'
+        ).reason.toLowerCase(),
       closing: getScoreAndReason('closing', 'player1').reason.toLowerCase(),
     };
 
@@ -650,11 +654,10 @@ const player2RatingSummary =
                   </span>
                 </p>
                 <p
-                  className={`text-sm font-semibold ${
-                    player1RatingSummary.change >= 0
+                  className={`text-sm font-semibold ${player1RatingSummary.change >= 0
                       ? 'text-green-600'
                       : 'text-red-600'
-                  }`}
+                    }`}
                 >
                   Change: {formatChange(player1RatingSummary.change)}
                 </p>
@@ -670,11 +673,10 @@ const player2RatingSummary =
                   </span>
                 </p>
                 <p
-                  className={`text-sm font-semibold ${
-                    player2RatingSummary.change >= 0
+                  className={`text-sm font-semibold ${player2RatingSummary.change >= 0
                       ? 'text-green-600'
                       : 'text-red-600'
-                  }`}
+                    }`}
                 >
                   Change: {formatChange(player2RatingSummary.change)}
                 </p>
@@ -687,11 +689,11 @@ const player2RatingSummary =
         <div className='mt-10 bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg shadow-md text-white text-center'>
           <h3 className='text-2xl font-bold'>Verdict</h3>
           <p className='mt-4 text-3xl font-bold'>
-            {judgment.verdict.winner} Wins!
+            {judgment?.verdict?.winner ?? 'Unknown'} Wins!
           </p>
-          <p className='mt-3 text-lg'>{judgment.verdict.congratulations}</p>
+          <p className='mt-3 text-lg'>{judgment?.verdict?.congratulations ?? ''}</p>
           <p className='mt-2 text-md leading-relaxed'>
-            {judgment.verdict.opponent_analysis}
+            {judgment?.verdict?.opponent_analysis ?? ''}
           </p>
         </div>
 
