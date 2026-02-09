@@ -61,10 +61,10 @@ func UpdateRatings(userID, opponentID primitive.ObjectID, outcome float64, debat
 
 	// Update ratings
 	ratingSystem.UpdateMatch(userPlayer, opponentPlayer, outcome, debateTime)
-	if err := sanitizePlayerStats(userPlayer, preUserRating, preUserRD); err != nil {
+	if err := sanitizePlayerStats(userPlayer); err != nil {
 		return nil, nil, fmt.Errorf("user stats validation failed: %w", err)
 	}
-	if err := sanitizePlayerStats(opponentPlayer, preOpponentRating, preOpponentRD); err != nil {
+	if err := sanitizePlayerStats(opponentPlayer); err != nil {
 		return nil, nil, fmt.Errorf("opponent stats validation failed: %w", err)
 	}
 
@@ -204,7 +204,7 @@ func getUserByID(id primitive.ObjectID) (*models.User, error) {
 // Helper function to update user rating
 func updateUserRating(id primitive.ObjectID, player *rating.Player) error {
 	collection := db.MongoDatabase.Collection("users")
-	if err := sanitizePlayerStats(player, 1200.0, 350.0); err != nil {
+	if err := sanitizePlayerStats(player); err != nil {
 		return fmt.Errorf("player stats validation failed before update: %w", err)
 	}
 	update := bson.M{
@@ -219,7 +219,7 @@ func updateUserRating(id primitive.ObjectID, player *rating.Player) error {
 	return err
 }
 
-func sanitizePlayerStats(player *rating.Player, fallbackRating, fallbackRD float64) error {
+func sanitizePlayerStats(player *rating.Player) error {
 	if math.IsNaN(player.Rating) || math.IsInf(player.Rating, 0) {
 		return fmt.Errorf("invalid rating: NaN or Inf detected")
 	}
