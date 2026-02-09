@@ -217,19 +217,18 @@ const extractJSON = (response: string): string => {
   return "{}";
 };
 
+// Wrapper component to handle missing state (safe for hooks)
 const DebateRoom: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const debateData = location.state as DebateProps | null;
 
-  // Redirect if no debate data exists (prevents blank screen crash)
   useEffect(() => {
     if (!debateData) {
       navigate('/game');
     }
   }, [debateData, navigate]);
 
-  // Early return if no debate data (show loading while redirecting)
   if (!debateData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center">
@@ -241,6 +240,12 @@ const DebateRoom: React.FC = () => {
     );
   }
 
+  return <DebateRoomInner debateData={debateData} />;
+};
+
+// Inner component with all hooks (safe - no early returns before hooks)
+function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
+  const navigate = useNavigate();
   const phases = debateData.phaseTimings;
   const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
   const [user] = useAtom(userAtom);
@@ -936,6 +941,6 @@ const DebateRoom: React.FC = () => {
       `}</style>
     </div>
   );
-};
+}
 
 export default DebateRoom;
