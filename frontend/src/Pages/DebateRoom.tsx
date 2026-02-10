@@ -619,7 +619,7 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
         // Try to fix common JSON issues
         const fixedJson = jsonString
           .replace(/'/g, '"') // Replace single quotes with double quotes
-          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
+          .replace(/(?<=[\{,]\s*)(\w+)\s*:/g, '"$1":') // Only quote keys after { or ,
           .replace(/,\s*}/g, '}') // Remove trailing commas
           .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
         try {
@@ -743,7 +743,7 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 border border-orange-200">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue500 mb-4"></div>
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
                 <h2 className="text-xl font-semibold text-gray-800">
                   {popup.message}
                 </h2>
