@@ -719,7 +719,7 @@ const DebateRoom: React.FC = () => {
           <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-primary mb-4"></div>
                 <h2 className="text-xl font-semibold text-foreground">
                   {popup.message}
                 </h2>
@@ -778,7 +778,7 @@ const DebateRoom: React.FC = () => {
             {nextTurnPending && (
               <Button
                 onClick={handleNextTurn}
-                className="ml-auto bg-primary hover:bg-primary/90 text-white rounded-md px-3 text-sm"
+                className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
               >
                 Next Turn
               </Button>
@@ -828,7 +828,7 @@ const DebateRoom: React.FC = () => {
             {!state.isDebateEnded && (
               <Button
                 onClick={handleConcede}
-                className="ml-auto bg-destructive hover:bg-destructive/90 text-white rounded-md px-3 text-sm"
+                className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md px-3 text-sm"
               >
                 Concede
               </Button>
@@ -878,7 +878,7 @@ const DebateRoom: React.FC = () => {
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-secondary hover:bg-secondary/90 text-white rounded-md p-2"
+                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-md p-2"
                 >
                   {isRecognizing ? (
                     <MicOff className="w-5 h-5" />
@@ -891,7 +891,7 @@ const DebateRoom: React.FC = () => {
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-primary hover:bg-primary/90 text-black rounded-md px-3 text-sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
                 >
                   Send
                 </Button>
