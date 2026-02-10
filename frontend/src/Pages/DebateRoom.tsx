@@ -225,7 +225,7 @@ const DebateRoom: React.FC = () => {
 
   useEffect(() => {
     if (!debateData) {
-      navigate('/game');
+      navigate('/game', { replace: true });
     }
   }, [debateData, navigate]);
 
@@ -252,18 +252,24 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
 
   const [state, setState] = useState<DebateState>(() => {
     const savedState = localStorage.getItem(debateKey);
-    return savedState
-      ? JSON.parse(savedState)
-      : {
-        messages: [],
-        currentPhase: 0,
-        phaseStep: 0,
-        isBotTurn: false,
-        userStance: "",
-        botStance: "",
-        timer: phases[0].time,
-        isDebateEnded: false,
-      };
+    if (savedState) {
+      try {
+        return JSON.parse(savedState);
+      } catch (e) {
+        console.warn("Corrupted debate state in localStorage, resetting.");
+        localStorage.removeItem(debateKey);
+      }
+    }
+    return {
+      messages: [],
+      currentPhase: 0,
+      phaseStep: 0,
+      isBotTurn: false,
+      userStance: "",
+      botStance: "",
+      timer: phases[0].time,
+      isDebateEnded: false,
+    };
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
@@ -619,7 +625,7 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
         // Try to fix common JSON issues
         const fixedJson = jsonString
           .replace(/'/g, '"') // Replace single quotes with double quotes
-          .replace(/(?<=[\{,]\s*)(\w+)\s*:/g, '"$1":') // Only quote keys after { or ,
+          .replace(/([\{,]\s*)(\w+)\s*:/g, '$1"$2":') // Quote unquoted keys after { or ,
           .replace(/,\s*}/g, '}') // Remove trailing commas
           .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
         try {
