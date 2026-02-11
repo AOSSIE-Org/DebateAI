@@ -71,7 +71,8 @@ const RightSection: React.FC<RightSectionProps> = ({
         </Button>
       )}
     </div>
-    <div className="flex flex-col items-center justify-center h-full w-4/5 md:w-3/5 text-center">
+    <div className="flex flex-col items-center justify-center w-full px-6">
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-xl p-8 backdrop-blur-sm">
       {authMode === 'login' && (
         <>
           <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
@@ -96,6 +97,7 @@ const RightSection: React.FC<RightSectionProps> = ({
           handlePasswordReset={handlePasswordReset}
         />
       )}
+      </div>
     </div>
   </div>
 );
