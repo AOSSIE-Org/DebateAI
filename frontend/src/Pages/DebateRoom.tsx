@@ -267,7 +267,7 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
       isBotTurn: false,
       userStance: "",
       botStance: "",
-      timer: phases[0].time,
+      timer: phases?.[0]?.time ?? 60,
       isDebateEnded: false,
     };
   });
@@ -306,7 +306,7 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
         });
 
         setTimeout(() => {
-          navigate("/game");
+          navigate("/game", { replace: true });
         }, 2000);
 
       } catch (error) {
