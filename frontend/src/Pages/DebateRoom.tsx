@@ -254,7 +254,25 @@ function DebateRoomInner({ debateData }: { debateData: DebateProps }) {
     const savedState = localStorage.getItem(debateKey);
     if (savedState) {
       try {
-        return JSON.parse(savedState);
+        const parsed = JSON.parse(savedState);
+        if (
+          parsed &&
+          Array.isArray(parsed.messages) &&
+          typeof parsed.currentPhase === "number" &&
+          parsed.currentPhase >= 0 &&
+          parsed.currentPhase < (phases?.length || 1) &&
+          typeof parsed.phaseStep === "number" &&
+          parsed.phaseStep >= 0 &&
+          typeof parsed.timer === "number" &&
+          typeof parsed.isBotTurn === "boolean" &&
+          typeof parsed.isDebateEnded === "boolean" &&
+          typeof parsed.userStance === "string" &&
+          typeof parsed.botStance === "string"
+        ) {
+          return parsed as DebateState;
+        }
+        console.warn("Stale/invalid debate state in localStorage, resetting.");
+        localStorage.removeItem(debateKey);
       } catch (e) {
         console.warn("Corrupted debate state in localStorage, resetting.");
         localStorage.removeItem(debateKey);
