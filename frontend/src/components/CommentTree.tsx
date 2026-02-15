@@ -4,7 +4,6 @@ import { useUser } from '../hooks/useUser';
 import ProfileHover from './ProfileHover';
 import UserProfileModal from './UserProfileModal';
 import {
-  commentsByTranscriptAtom,
   getCommentsForTranscriptAtom,
   setCommentsForTranscriptAtom,
   addCommentToTranscriptAtom,
@@ -229,8 +228,9 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   const { user } = useUser();
   const [commentsAtom] = useAtom(getCommentsForTranscriptAtom(transcriptId));
   const [, setCommentsAtom] = useAtom(setCommentsForTranscriptAtom(transcriptId));
-  const [, addCommentAtom] = useAtom(addCommentToTranscriptAtom(transcriptId));
+  const [, _addCommentAtom] = useAtom(addCommentToTranscriptAtom(transcriptId));
   const [, removeCommentAtom] = useAtom(removeCommentFromTranscriptAtom(transcriptId));
+  void _addCommentAtom; // Reserved for future use
   
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -392,7 +392,8 @@ const CommentTree: React.FC<CommentTreeProps> = ({
       }
 
       const result = await response.json();
-      const newComment: Comment = result.comment;
+      const _newComment: Comment = result.comment;
+      void _newComment; // Result used via fetchComments refresh
       
       // Fetch updated comments (including the new one) and update atom
       await fetchComments();
