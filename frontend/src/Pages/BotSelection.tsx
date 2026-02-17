@@ -522,9 +522,10 @@ const BotSelection: React.FC = () => {
               </div>
 
               <Button
+                variant="default"
                 onClick={startDebate}
                 disabled={!selectedBot || !effectiveTopic || isLoading}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-md transition-colors shadow-md"
+                className="w-full font-semibold shadow-md"
               >
                 Start Debate 🚀
               </Button>
