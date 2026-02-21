@@ -29,13 +29,13 @@ export class SpeechRecognitionTest {
     this.recognition.lang = "en-US";
     this.recognition.maxAlternatives = 1;
 
-    // START EVENT
+    // START
     this.recognition.onstart = () => {
       this.isListening = true;
       console.log("Speech recognition started");
     };
 
-    // RESULT EVENT
+    // RESULTS
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = "";
       let finalTranscript = "";
@@ -44,20 +44,12 @@ export class SpeechRecognitionTest {
         const result = event.results[i];
         const transcript = result[0].transcript;
 
-        if (result.isFinal) {
-          finalTranscript += transcript + " ";
-        } else {
-          interimTranscript += transcript;
-        }
+        if (result.isFinal) finalTranscript += transcript + " ";
+        else interimTranscript += transcript;
       }
 
-      if (finalTranscript) {
-        console.log("✅ Final:", finalTranscript.trim());
-      }
-
-      if (interimTranscript) {
-        console.log("⌛ Interim:", interimTranscript);
-      }
+      if (finalTranscript) console.log("✅ Final:", finalTranscript.trim());
+      if (interimTranscript) console.log("⌛ Interim:", interimTranscript);
     };
 
     // SAFE AUTO RESTART
@@ -67,70 +59,78 @@ export class SpeechRecognitionTest {
 
       if (!this.shouldRestart) return;
 
-      console.log("Restarting recognition...");
-
       this.restartTimeout = window.setTimeout(() => {
-        this.restartTimeout = null;
-
-        if (!this.shouldRestart || this.isListening) return;
+        if (!this.shouldRestart) return;
 
         try {
           this.recognition?.start();
         } catch (error) {
           console.error("Restart failed:", error);
+          this.shouldRestart = false;
+          this.restartTimeout = null;
         }
       }, 500);
     };
 
     // ERROR HANDLING
-    this.recognition.onerror = (event: any) => {
+    this.recognition.onerror = (ev: Event) => {
+      const event = ev as SpeechRecognitionErrorEvent;
+
       console.error("Speech error:", event.error, event.message);
 
-      // stop restart loop on fatal errors
+      // stop restart only on real fatal errors
       if (
         event.error === "not-allowed" ||
         event.error === "service-not-allowed" ||
-        event.error === "audio-capture" ||
-        event.error === "aborted"
+        event.error === "audio-capture"
       ) {
         this.shouldRestart = false;
       }
     };
   }
 
-  // START LISTENING
+  // ===============================
+  // START LISTENING (RACE SAFE)
+  // ===============================
   public async start(): Promise<boolean> {
     if (!this.supported || !this.recognition || this.isListening) {
       return false;
     }
 
+    // 👇 mark start intent FIRST
+    this.shouldRestart = true;
+
     const allowed = await this.checkMicrophonePermission();
-    if (!allowed) {
-      console.warn("Microphone permission denied");
+
+    // 👇 stop() may have been called while waiting
+    if (!this.shouldRestart) {
+      console.log("Start cancelled during permission request");
       return false;
     }
 
-    this.shouldRestart = true;
+    if (!allowed) {
+      console.warn("Microphone permission denied");
+      this.shouldRestart = false;
+      return false;
+    }
 
     try {
       this.recognition.start();
       return true;
     } catch (error) {
       console.error("Start failed:", error);
-
-      // IMPORTANT: prevent unwanted restart
       this.shouldRestart = false;
       this.isListening = false;
-
       return false;
     }
   }
 
-  // STOP LISTENING
+  // ===============================
+  // STOP LISTENING (FULL CANCEL)
+  // ===============================
   public stop() {
     this.shouldRestart = false;
 
-    // cancel pending restart
     if (this.restartTimeout !== null) {
       clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
@@ -149,7 +149,6 @@ export class SpeechRecognitionTest {
     return this.supported;
   }
 
-  // CHECK MICROPHONE PERMISSION
   public async checkMicrophonePermission(): Promise<boolean> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -161,7 +160,9 @@ export class SpeechRecognitionTest {
   }
 }
 
+// ===============================
 // TEST HELPER
+// ===============================
 export const testSpeechRecognition = async () => {
   const test = new SpeechRecognitionTest();
 
@@ -173,7 +174,6 @@ export const testSpeechRecognition = async () => {
   const started = await test.start();
   if (!started) return;
 
-  // stop after 10 seconds
   setTimeout(() => {
     test.stop();
     console.log("⏹ Manually stopped");
