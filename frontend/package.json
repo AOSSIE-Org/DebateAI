@@ -31,6 +31,7 @@
     "date-fns": "^4.1.0",
     "fuse.js": "^7.1.0",
     "jotai": "^2.13.1",
+    "json5": "^2.2.3",
     "lucide-react": "^0.446.0",
     "react": "^18.3.1",
     "react-avatar": "^5.0.4",
@@ -49,7 +50,7 @@
     "tailwind-scrollbar-hide": "^2.0.0",
     "tailwindcss-animate": "^1.0.7"
   },
-"devDependencies": {
+  "devDependencies": {
     "@aws-amplify/backend": "^1.4.0",
     "@aws-amplify/backend-cli": "^1.2.9",
     "@eslint/js": "^9.9.0",

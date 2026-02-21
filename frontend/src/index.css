@@ -85,9 +85,12 @@
     --chart-5: 180 100% 50%;
   }
 }
-.high-contrast {
-  --hc-hover-bg: 48 100% 50%;      
-  --hc-hover-text: 0 0% 0%;       
+
+@layer base {
+  .high-contrast {
+    --hc-hover-bg: 48 100% 50%;
+    --hc-hover-text: 0 0% 0%;
+  }
 }
 
 @layer base {

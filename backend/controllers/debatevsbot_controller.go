@@ -267,16 +267,18 @@ func JudgeDebate(c *gin.Context) {
 	}
 
 	// Save transcript with proper debate information
-	_ = services.SaveDebateTranscript(
-		userID,
-		email,
-		"user_vs_bot",
-		latestDebate.Topic,
-		latestDebate.BotName,
-		resultStatus,
-		req.History,
+	services.SaveDebateTranscript(
+		user.ID,
+		user.Email,
+		"user_vs_ai",
+		topic,
+		"AI",
+		result,
+		messages,
 		nil,
+		0.0,
 	)
+
 
 	// Update gamification (score, badges, streaks) after bot debate
 	log.Printf("About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",

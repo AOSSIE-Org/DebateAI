@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log"
 
 	"arguehub/db"
 	"arguehub/models"
@@ -178,32 +179,36 @@ func SubmitTranscripts(
 
 				// Save transcript for "for" user
 				err = SaveDebateTranscript(
-					forUser.ID,
-					forUser.Email,
-					"user_vs_user",
-					topic,
-					againstUser.Email,
-					resultFor,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					forSubmission.Transcripts,
-					forRecord.RatingChange
-				)
-				if err != nil {
-				}
+				forUser.ID,
+				forUser.Email,
+				"user_vs_user",
+				topic,
+				againstUser.Email,
+				resultFor,
+				[]models.Message{},
+				forSubmission.Transcripts,
+				0.0,
+			)
+			if err != nil {
+				log.Println("Error saving transcript for user:", err)
+			}
 
-				// Save transcript for "against" user
-				err = SaveDebateTranscript(
-					againstUser.ID,
-					againstUser.Email,
-					"user_vs_user",
-					topic,
-					forUser.Email,
-					resultAgainst,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					againstSubmission.Transcripts,
-				)
-				if err != nil {
-				}
+			// Save transcript for "against" user
+			err = SaveDebateTranscript(
+				againstUser.ID,
+				againstUser.Email,
+				"user_vs_user",
+				topic,
+				forUser.Email,
+				resultAgainst,
+				[]models.Message{},
+				againstSubmission.Transcripts,
+				0.0,
+			)
+			if err != nil {
+				log.Println("Error saving transcript for opponent:", err)
+			}
+
 
 				// Update ratings based on the result
 				outcomeFor := 0.5

@@ -758,7 +758,7 @@ const DebateRoom: React.FC = () => {
           botDesc={bot.desc}
           onClose={() => {
             setShowJudgment(false);
-            navigate("/"); 
+            navigate("/startDebate"); 
           }}
         />
       )}
