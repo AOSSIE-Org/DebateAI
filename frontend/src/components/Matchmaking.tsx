@@ -35,13 +35,6 @@ const Matchmaking: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const navigate = useNavigate();
 
-    // Reset matchmaking UI state on page refresh
-    useEffect(() => {
-      setIsInPool(false);
-      setWaitTime(0);
-    }, []);
-
-
   useEffect(() => {
     // If still loading, wait
     if (isLoading) {
