@@ -63,9 +63,7 @@ export default {
     require("tailwindcss-animate"),
     require("tailwind-scrollbar-hide"),
     function ({ addVariant }) {
-    addVariant('high-contrast', '@media (prefers-contrast: more)');
+      addVariant('high-contrast', '@media (prefers-contrast: more)');
     },
-    require("tailwindcss-animate"),
-    require("tailwind-scrollbar-hide"),
-  ],
+  ]
 }

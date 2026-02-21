@@ -3,10 +3,11 @@ export class SpeechRecognitionTest {
   private supported: boolean;
   private shouldRestart = false;
   private isListening = false;
+  private restartTimeout: number | null = null;
 
   constructor() {
     this.supported =
-      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
 
     if (this.supported) {
       const SpeechRecognitionCtor =
@@ -25,26 +26,26 @@ export class SpeechRecognitionTest {
 
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
-    this.recognition.lang = 'en-US';
+    this.recognition.lang = "en-US";
     this.recognition.maxAlternatives = 1;
 
-    // START
+    // START EVENT
     this.recognition.onstart = () => {
       this.isListening = true;
       console.log("Speech recognition started");
     };
 
-    // RESULTS
+    // RESULT EVENT
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
+      let interimTranscript = "";
+      let finalTranscript = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const transcript = result[0].transcript;
 
         if (result.isFinal) {
-          finalTranscript += transcript + ' ';
+          finalTranscript += transcript + " ";
         } else {
           interimTranscript += transcript;
         }
@@ -59,27 +60,39 @@ export class SpeechRecognitionTest {
       }
     };
 
-    // AUTO RESTART WHEN STOPPED
+    // SAFE AUTO RESTART
     this.recognition.onend = () => {
       this.isListening = false;
       console.log("Speech recognition ended");
 
-      if (this.shouldRestart) {
-        console.log("🔁 Restarting recognition...");
-        setTimeout(() => {
-          try {
-            this.recognition?.start();
-          } catch {}
-        }, 500);
-      }
+      if (!this.shouldRestart) return;
+
+      console.log("Restarting recognition...");
+
+      this.restartTimeout = window.setTimeout(() => {
+        this.restartTimeout = null;
+
+        if (!this.shouldRestart || this.isListening) return;
+
+        try {
+          this.recognition?.start();
+        } catch (error) {
+          console.error("Restart failed:", error);
+        }
+      }, 500);
     };
 
     // ERROR HANDLING
     this.recognition.onerror = (event: any) => {
       console.error("Speech error:", event.error, event.message);
 
-      // stop infinite restart loop if permission denied
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      // stop restart loop on fatal errors
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed" ||
+        event.error === "audio-capture" ||
+        event.error === "aborted"
+      ) {
         this.shouldRestart = false;
       }
     };
@@ -104,6 +117,11 @@ export class SpeechRecognitionTest {
       return true;
     } catch (error) {
       console.error("Start failed:", error);
+
+      // IMPORTANT: prevent unwanted restart
+      this.shouldRestart = false;
+      this.isListening = false;
+
       return false;
     }
   }
@@ -112,10 +130,18 @@ export class SpeechRecognitionTest {
   public stop() {
     this.shouldRestart = false;
 
+    // cancel pending restart
+    if (this.restartTimeout !== null) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+
     if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
-      } catch {}
+      } catch (error) {
+        console.error("Stop failed:", error);
+      }
     }
   }
 
@@ -123,7 +149,7 @@ export class SpeechRecognitionTest {
     return this.supported;
   }
 
-  // CHECK MIC PERMISSION
+  // CHECK MICROPHONE PERMISSION
   public async checkMicrophonePermission(): Promise<boolean> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -135,22 +161,21 @@ export class SpeechRecognitionTest {
   }
 }
 
-// TEST FUNCTION
+// TEST HELPER
 export const testSpeechRecognition = async () => {
   const test = new SpeechRecognitionTest();
 
   if (!test.isSpeechRecognitionSupported()) {
-    console.log("Speech recognition not supported");
+    console.log("Speech recognition not supported in this browser");
     return;
   }
 
   const started = await test.start();
-
   if (!started) return;
 
   // stop after 10 seconds
   setTimeout(() => {
     test.stop();
-    console.log("Manually stopped");
+    console.log("⏹ Manually stopped");
   }, 10000);
 };
