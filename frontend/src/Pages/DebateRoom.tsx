@@ -724,7 +724,7 @@ const DebateRoom: React.FC = () => {
 
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-         <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 max-w-m w-full transform transition-all duration-300 scale-105 shadow-2xl border border-orange-200 dark:border-orange-400/30">
+         <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 shadow-2xl border border-orange-200 dark:border-orange-400/30">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
