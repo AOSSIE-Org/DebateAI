@@ -578,7 +578,6 @@ const DebateRoom: React.FC = () => {
 
     const judgeDebateResult = async (messages: Message[]) => {
     if (judgingRef.current) {
-      console.log("Judging already in progress, skipping duplicate call");
       return;
     }
 

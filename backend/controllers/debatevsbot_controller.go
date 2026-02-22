@@ -268,13 +268,13 @@ func JudgeDebate(c *gin.Context) {
 
 	// Save transcript with proper debate information
 	services.SaveDebateTranscript(
-		user.ID,
-		user.Email,
-		"user_vs_ai",
-		topic,
+		userID,
+		email,
+		"user_vs_bot",
+		latestDebate.Topic,
 		"AI",
-		result,
-		messages,
+		resultStatus,
+		req.History,
 		nil,
 		0.0,
 	)

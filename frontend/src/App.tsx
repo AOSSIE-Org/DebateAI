@@ -28,6 +28,7 @@ import CommunityFeed from './Pages/CommunityFeed';
 import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
+import AdminProtectedRoute from './components/ProtectedRoute';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -60,7 +61,14 @@ function AppRoutes() {
         />
         <Route path="/auth" element={<Authentication />} />
         <Route path="/admin/login" element={<AdminSignup />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          }
+        />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
