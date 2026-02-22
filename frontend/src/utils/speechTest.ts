@@ -91,38 +91,43 @@ export class SpeechRecognitionTest {
 
   // START LISTENING (RACE SAFE)
   public async start(): Promise<boolean> {
-    if (!this.supported || !this.recognition || this.isListening) {
-      return false;
-    }
-
-    // mark start intent FIRST
-    this.shouldRestart = true;
-
-    const allowed = await this.checkMicrophonePermission();
-
-    // stop() may have been called while waiting
-    if (!this.shouldRestart) {
-      console.log("Start cancelled during permission request");
-      return false;
-    }
-
-    if (!allowed) {
-      console.warn("Microphone permission denied");
-      this.shouldRestart = false;
-      return false;
-    }
-
-    try {
-      this.recognition.start();
-      return true;
-    } catch (error) {
-      console.error("Start failed:", error);
-      this.shouldRestart = false;
-      this.isListening = false;
-      return false;
-    }
+  if (!this.supported || !this.recognition || this.isListening) {
+    return false;
   }
-  // STOP LISTENING (FULL CANCEL)
+
+  //FIX: cancel any pending auto-restart
+  if (this.restartTimeout) {
+    clearTimeout(this.restartTimeout);
+    this.restartTimeout = null;
+  }
+
+  this.shouldRestart = true;
+
+  const allowed = await this.checkMicrophonePermission();
+
+  if (!this.shouldRestart) {
+    console.log("Start cancelled during permission request");
+    return false;
+  }
+
+  if (!allowed) {
+    console.warn("Microphone permission denied");
+    this.shouldRestart = false;
+    return false;
+  }
+
+  try {
+    this.recognition.start();
+    this.isListening = true;
+    return true;
+  } catch (error) {
+    console.error("Start failed:", error);
+    this.shouldRestart = false;
+    this.isListening = false;
+    return false;
+  }
+}
+
   public stop() {
     this.shouldRestart = false;
 
