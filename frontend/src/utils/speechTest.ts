@@ -48,8 +48,8 @@ export class SpeechRecognitionTest {
         else interimTranscript += transcript;
       }
 
-      if (finalTranscript) console.log("✅ Final:", finalTranscript.trim());
-      if (interimTranscript) console.log("⌛ Interim:", interimTranscript);
+      if (finalTranscript) console.log("Final:", finalTranscript.trim());
+      if (interimTranscript) console.log("Interim:", interimTranscript);
     };
 
     // SAFE AUTO RESTART
@@ -89,20 +89,18 @@ export class SpeechRecognitionTest {
     };
   }
 
-  // ===============================
   // START LISTENING (RACE SAFE)
-  // ===============================
   public async start(): Promise<boolean> {
     if (!this.supported || !this.recognition || this.isListening) {
       return false;
     }
 
-    // 👇 mark start intent FIRST
+    // mark start intent FIRST
     this.shouldRestart = true;
 
     const allowed = await this.checkMicrophonePermission();
 
-    // 👇 stop() may have been called while waiting
+    // stop() may have been called while waiting
     if (!this.shouldRestart) {
       console.log("Start cancelled during permission request");
       return false;
@@ -124,10 +122,7 @@ export class SpeechRecognitionTest {
       return false;
     }
   }
-
-  // ===============================
   // STOP LISTENING (FULL CANCEL)
-  // ===============================
   public stop() {
     this.shouldRestart = false;
 
@@ -160,9 +155,7 @@ export class SpeechRecognitionTest {
   }
 }
 
-// ===============================
 // TEST HELPER
-// ===============================
 export const testSpeechRecognition = async () => {
   const test = new SpeechRecognitionTest();
 
@@ -176,6 +169,6 @@ export const testSpeechRecognition = async () => {
 
   setTimeout(() => {
     test.stop();
-    console.log("⏹ Manually stopped");
+    console.log("Manually stopped");
   }, 10000);
 };
