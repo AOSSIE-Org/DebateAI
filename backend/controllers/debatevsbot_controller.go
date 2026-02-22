@@ -272,7 +272,7 @@ func JudgeDebate(c *gin.Context) {
 		email,
 		"user_vs_bot",
 		latestDebate.Topic,
-		"AI",
+		latestDebate.BotName,
 		resultStatus,
 		req.History,
 		nil,
