@@ -10,6 +10,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -69,14 +70,25 @@ func SaveDebateVsBot(debate models.DebateVsBot) error {
 	return nil
 }
 
-// UpdateDebateVsBotOutcome updates the outcome of the most recent bot debate for a user
-func UpdateDebateVsBotOutcome(userId, outcome string) error {
-	filter := bson.M{"userId": userId}
-	update := bson.M{"$set": bson.M{"outcome": outcome}}
-	_, err := DebateVsBotCollection.UpdateOne(context.Background(), filter, update, nil)
+// UpdateDebateVsBotOutcome updates the outcome of a specific bot debate by its ID
+func UpdateDebateVsBotOutcome(debateId, outcome string) error {
+	objID, err := primitive.ObjectIDFromHex(debateId)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid debate ID: %w", err)
 	}
+
+	filter := bson.M{"_id": objID}
+	update := bson.M{"$set": bson.M{"outcome": outcome}}
+
+	result, err := DebateVsBotCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update debate outcome: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("no debate found with ID: %s", debateId)
+	}
+
 	return nil
 }
 

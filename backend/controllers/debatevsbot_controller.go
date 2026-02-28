@@ -34,7 +34,8 @@ type PhaseTiming struct {
 }
 
 type JudgeRequest struct {
-	History []models.Message `json:"history" binding:"required"`
+	DebateId string           `json:"debateId" binding:"required"`
+	History  []models.Message `json:"history" binding:"required"`
 }
 
 type DebateResponse struct {
@@ -207,8 +208,10 @@ func JudgeDebate(c *gin.Context) {
 	// Judge the debate
 	result := services.JudgeDebate(req.History)
 
-	// Update debate outcome
-	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
+	// Update debate outcome using the provided debateId
+	if err := db.UpdateDebateVsBotOutcome(req.DebateId, result); err != nil {
+		log.Printf("Warning: Failed to update debate outcome for %s: %v", req.DebateId, err)
+		// We don't return here because the judging itself succeeded
 	}
 
 	// Get the latest debate information to extract proper details
