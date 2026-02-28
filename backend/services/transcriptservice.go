@@ -10,6 +10,7 @@ import (
 
 	"arguehub/db"
 	"arguehub/models"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -475,7 +476,7 @@ Debate Transcript:
 Provide ONLY the JSON output without any additional text.`, transcript.String())
 
 	ctx := context.Background()
-	text, err := generateDefaultModelText(ctx, prompt)
+	text, err := generateDefaultModelText(ctx, "", prompt)
 	if err != nil {
 		return "Unable to judge."
 	}

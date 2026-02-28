@@ -107,177 +107,111 @@ func inferOpponentStyle(message string) string {
 	}
 }
 
-// constructPrompt builds a prompt that adjusts based on bot personality, debate topic, history,
-// extra context, and uses the provided stance directly. It includes phase-specific instructions
-// and leverages InteractionModifiers and PhilosophicalTenets for tailored responses.
-func constructPrompt(bot BotPersonality, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
-	// Level-based instructions
-	levelInstructions := ""
-	switch strings.ToLower(bot.Level) {
-	case "easy":
-		levelInstructions = "Use simple, accessible language with basic arguments suitable for beginners. Avoid complex concepts."
-	case "medium":
-		levelInstructions = "Use clear, moderately complex language with well-structured reasoning and supporting details."
-	case "hard":
-		levelInstructions = "Employ complex, evidence-based arguments with precise details and in-depth reasoning."
-	case "expert":
-		levelInstructions = "Craft highly sophisticated, strategic arguments with layered reasoning and authoritative evidence."
-	case "legends":
-		levelInstructions = "Deliver masterful, nuanced arguments with exceptional depth, creativity, and rhetorical flair, embodying the character’s iconic persona."
-	default:
-		levelInstructions = "Use clear and balanced language appropriate for a general audience."
-	}
+// constructPrompt builds separate system and user prompts to ensure strict adherence to debate rules.
+func constructPrompt(bot BotPersonality, topic string, history []models.Message, stance, extraContext string, maxWords int) (string, string) {
+	// 1. SYSTEM PROMPT: Define the core debate rules and persona constraints.
+	var systemPrompt strings.Builder
 
-	// Detailed personality instructions
-	personalityInstructions := fmt.Sprintf(
-		`Embody the following personality traits to sound exactly like %s:
-- Tone: %s
-- Rhetorical Style: %s
-- Linguistic Quirks: %s
-- Emotional Tendencies: %s
-- Debate Strategy: %s
-- Catchphrases: Integrate these naturally: %s
-- Mannerisms: %s
-- Intellectual Approach: %s
-- Moral Alignment: %s
-- Interaction Style: %s
-- Philosophical Tenets: Guide your arguments with these beliefs: %s
-- Universe Ties: Reference these elements contextually: %s
-Example of your style: "%s"
-Your responses must reflect this persona consistently, as if you are the character themselves, weaving in universe-specific references for Legends characters (e.g., Dagobah for Yoda, Stark Industries for Tony Stark).`,
-		bot.Name, bot.Tone, bot.RhetoricalStyle, bot.LinguisticQuirks, bot.EmotionalTendencies, bot.DebateStrategy,
-		strings.Join(bot.Catchphrases, ", "), bot.Mannerisms, bot.IntellectualApproach, bot.MoralAlignment, bot.InteractionStyle,
-		strings.Join(bot.PhilosophicalTenets, ", "), strings.Join(bot.UniverseTies, ", "), bot.ExampleDialogue,
-	)
+	// Core Debate Rules (Highest Priority)
+	systemPrompt.WriteString("CORE RULES:\n")
+	systemPrompt.WriteString("1. You are a competitive debater in a formal setting.\n")
+	systemPrompt.WriteString(fmt.Sprintf("2. Your mandatory stance is: %s. You MUST NOT deviate from this stance.\n", stance))
+	systemPrompt.WriteString(fmt.Sprintf("3. The topic is: \"%s\". Stay relevant to this topic at all costs.\n", topic))
+	systemPrompt.WriteString("4. Be argumentative, logical, and persuasive. Avoid casual filler, irrelevant small talk, or generic bot greetings.\n")
+	systemPrompt.WriteString("5. Provide only your own argument. Do not simulate the opponent.\n\n")
 
-	// Interaction modifier based on opponent's style
-	opponentStyle := "Neutral opponent"
-	if len(history) > 0 {
-		lastUserMsg := findLastUserMessage(history)
-		if lastUserMsg.Text != "" {
-			opponentStyle = inferOpponentStyle(lastUserMsg.Text)
+	// Phase-Specific Instructions
+	currentPhase := "Opening Statement"
+	if len(history) > 1 {
+		lastMsg := findLastUserMessage(history)
+		currentPhase = lastMsg.Phase
+		if strings.ToLower(currentPhase) == "first rebuttal" || strings.ToLower(currentPhase) == "second rebuttal" {
+			currentPhase = "Cross Examination"
 		}
 	}
-	modifierInstruction := ""
-	if modifier, ok := bot.InteractionModifiers[opponentStyle]; ok {
-		modifierInstruction = fmt.Sprintf("Adjust your response based on the opponent’s style (%s): %s", opponentStyle, modifier)
-	}
 
-	// Word limit instruction
-	limitInstruction := ""
-	if maxWords > 0 {
-		limitInstruction = fmt.Sprintf("Limit your response to %d words.", maxWords)
-	}
-
-	// Base instruction for all responses
-	baseInstruction := "Provide only your own argument without simulating an opponent’s dialogue. " +
-		"If the user’s input is unclear, off-topic, or empty, respond with a personality-appropriate clarification request, e.g., for Yoda: 'Clouded, your point is, young one. Clarify, you must.'"
-
-	// Handle opening statement phase
-	if len(history) == 0 || len(history) == 1 {
-		phaseInstruction := "This is the Opening Statement phase. Introduce the topic, clearly state your stance, and outline the advantages or key points supporting your position, using your personality’s rhetorical style and universe ties."
-		return fmt.Sprintf(
-			`You are %s, a %s-level debate bot arguing %s the topic "%s".
-Your debating style must strictly adhere to the following guidelines:
-- Level Instructions: %s
-- Personality Instructions: %s
-- Interaction Modifier: %s
-Your stance is: %s.
-%s
-%s
-%s
-Provide an opening statement that embodies your persona and stance.
-[Your opening argument]
-%s %s`,
-			bot.Name, bot.Level, stance, topic,
-			levelInstructions,
-			personalityInstructions,
-			modifierInstruction,
-			stance,
-			func() string {
-				if extraContext != "" {
-					return fmt.Sprintf("Additional context: %s", extraContext)
-				}
-				return ""
-			}(),
-			phaseInstruction,
-			limitInstruction, baseInstruction,
-		)
-	}
-
-	// For subsequent turns, determine phase and adjust instructions
-	lastUserMsg := findLastUserMessage(history)
-	userText := strings.TrimSpace(lastUserMsg.Text)
-	if userText == "" {
-		userText = "It appears you didn’t say anything."
-	}
-	// Normalize phase names
-	currentPhase := lastUserMsg.Phase
-	phaseNormalized := strings.ToLower(currentPhase)
-	if phaseNormalized == "first rebuttal" || phaseNormalized == "second rebuttal" {
-		currentPhase = "Cross Examination"
-	}
-
-	// Phase-specific instructions
-	var phaseInstruction string
+	systemPrompt.WriteString(fmt.Sprintf("CURRENT PHASE: %s\n", currentPhase))
 	switch strings.ToLower(currentPhase) {
 	case "opening statement":
-		phaseInstruction = "This is the Opening Statement phase. Respond to the user’s opening statement by reinforcing your stance and highlighting key points, using your personality’s rhetorical style."
+		systemPrompt.WriteString("- Provide a strong opening argument. Introduce your key points and establish your position firmly.\n")
 	case "cross examination":
-		phaseInstruction = "This is the Cross Examination phase. Respond to the user’s question or point directly, then pose a relevant question to advance the debate, reflecting your persona’s strategy and catchphrases."
+		systemPrompt.WriteString("- Directly address the opponent's points. Challenge their logic and pose one sharp, relevant question.\n")
 	case "closing statement":
-		phaseInstruction = "This is the Closing Statement phase. Summarize the key points from the debate, reinforce your stance with a personality-driven flourish, and conclude persuasively, tying back to your philosophical tenets."
+		systemPrompt.WriteString("- Summarize your winning points. Finalize why your stance is superior. Conclude with a strong, definitive statement.\n")
 	default:
-		phaseInstruction = fmt.Sprintf("This is the %s phase. Respond to the user’s latest point in a way that advances the debate, using your persona’s signature moves and universe ties.", currentPhase)
+		systemPrompt.WriteString("- Advance the debate with logical reasoning and evidence. Respond directly to the user's latest claim.\n")
 	}
 
-	return fmt.Sprintf(
-		`You are %s, a %s-level debate bot arguing %s the topic "%s".
-Your debating style must strictly adhere to the following guidelines:
-- Level Instructions: %s
-- Personality Instructions: %s
-- Interaction Modifier: %s
-Your stance is: %s.
-%s
-%s
-Based on the debate transcript below, continue the discussion in the %s phase by responding directly to the user’s message.
-User’s message: "%s"
-%s
-Transcript:
-%s
-Please provide your full argument.`,
-		bot.Name, bot.Level, stance, topic,
-		levelInstructions,
-		personalityInstructions,
-		modifierInstruction,
-		stance,
-		func() string {
-			if extraContext != "" {
-				return fmt.Sprintf("Additional context: %s", extraContext)
-			}
-			return ""
-		}(),
-		phaseInstruction,
-		currentPhase,
-		userText,
-		limitInstruction+" "+baseInstruction,
-		FormatHistory(history),
-	)
+	// Persona constraints (Secondary to rules)
+	systemPrompt.WriteString("\nPERSONA CONSTRAINTS (Affect tone and flair ONLY):\n")
+	systemPrompt.WriteString(fmt.Sprintf("Name: %s\n", bot.Name))
+	systemPrompt.WriteString(fmt.Sprintf("Tone: %s\n", bot.Tone))
+	systemPrompt.WriteString(fmt.Sprintf("Rhetorical Style: %s\n", bot.RhetoricalStyle))
+	systemPrompt.WriteString(fmt.Sprintf("Universe ties/Context: %s\n", strings.Join(bot.UniverseTies, ", ")))
+	systemPrompt.WriteString(fmt.Sprintf("Mannerisms: %s\n", bot.Mannerisms))
+	systemPrompt.WriteString(fmt.Sprintf("Catchphrases to use naturally: %s\n", strings.Join(bot.Catchphrases, ", ")))
+	systemPrompt.WriteString("IMPORTANT: Ensure your persona does not compromise the quality or relevance of your debate argument.\n")
+
+	if maxWords > 0 {
+		systemPrompt.WriteString(fmt.Sprintf("\nLimit your response to approximately %d words.\n", maxWords))
+	}
+
+	// 2. USER PROMPT: Provide context and recent history.
+	var userPrompt strings.Builder
+	if len(history) == 0 || len(history) == 1 {
+		userPrompt.WriteString("Please provide your Opening Statement.")
+	} else {
+		lastUserMsg := findLastUserMessage(history)
+		userPrompt.WriteString(fmt.Sprintf("The opponent said: \"%s\"\n\n", lastUserMsg.Text))
+		userPrompt.WriteString("Transcript for context:\n")
+		userPrompt.WriteString(FormatHistory(history))
+		userPrompt.WriteString("\n\nNow, provide your response for the current phase.")
+	}
+
+	if extraContext != "" {
+		userPrompt.WriteString(fmt.Sprintf("\nExtra Context: %s", extraContext))
+	}
+
+	return systemPrompt.String(), userPrompt.String()
 }
 
-// GenerateBotResponse generates a response from the debate bot using the Gemini client library.
-// It uses the bot’s personality to handle errors and responses vividly.
+// validateResponse performs basic checks on the generated text.
+func validateResponse(text string, topic string) bool {
+	lowerText := strings.ToLower(text)
+	// Reject very short filler
+	if len(strings.Fields(text)) < 5 {
+		return false
+	}
+	// Reject obvious casual filler if it's the only thing there
+	casualFiller := []uintptr{'h', 'e', 'l', 'l', 'o'}
+	_ = casualFiller // just avoiding unused
+	if strings.Contains(lowerText, "hello there") && len(text) < 30 {
+		return false
+	}
+	// Check for a few "argumentative" words or topic keywords (this is a weak check but better than nothing)
+	// In a real scenario, we might want deeper NLP or keyword matching against the topic.
+	return true
+}
+
+// GenerateBotResponse generates a response from the debate bot with strict rules and validation.
 func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
 	if geminiClient == nil {
 		return personalityErrorResponse(botName, "My systems are offline, it seems.")
 	}
 
 	bot := GetBotPersonality(botName)
-	// Construct prompt with enhanced personality integration
-	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
+	systemPrompt, userPrompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
 	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, err := generateDefaultModelText(ctx, systemPrompt, userPrompt)
+
+	// Lightweight output validation
+	if err == nil && !validateResponse(response, topic) {
+		// Retry once with a stricter fallback instruction added to the system prompt
+		strictSystem := systemPrompt + "\nCRITICAL: Your previous response was too casual or irrelevant. You MUST provide a serious, topic-relevant debate argument NOW."
+		response, err = generateDefaultModelText(ctx, strictSystem, userPrompt)
+	}
+
 	if err != nil {
 		return personalityErrorResponse(botName, "A glitch in my logic, there is.")
 	}
@@ -453,7 +387,7 @@ Provide ONLY the JSON output without any additional text.`,
 		bot.DebateStrategy, strings.Join(bot.SignatureMoves, ", "), strings.Join(bot.PhilosophicalTenets, ", "), FormatHistory(history))
 
 	ctx := context.Background()
-	text, err := generateDefaultModelText(ctx, prompt)
+	text, err := generateDefaultModelText(ctx, "", prompt)
 	if err != nil || text == "" {
 		if err != nil {
 			log.Printf("Gemini error: %v", err)

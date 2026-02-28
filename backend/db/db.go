@@ -17,6 +17,7 @@ import (
 var MongoClient *mongo.Client
 var MongoDatabase *mongo.Database
 var DebateVsBotCollection *mongo.Collection
+var VotesCollection *mongo.Collection
 var RedisClient *redis.Client
 
 // GetCollection returns a collection by name
@@ -57,6 +58,7 @@ func ConnectMongoDB(uri string) error {
 
 	MongoDatabase = client.Database(dbName)
 	DebateVsBotCollection = MongoDatabase.Collection("debates_vs_bot")
+	VotesCollection = MongoDatabase.Collection("votes")
 	return nil
 }
 

@@ -18,7 +18,7 @@ func initGemini(apiKey string) (*genai.Client, error) {
 	return genai.NewClient(context.Background(), config)
 }
 
-func generateModelText(ctx context.Context, modelName, prompt string) (string, error) {
+func generateModelText(ctx context.Context, modelName, systemInstruction, prompt string) (string, error) {
 	if geminiClient == nil {
 		return "", errors.New("gemini client not initialized")
 	}
@@ -30,6 +30,14 @@ func generateModelText(ctx context.Context, modelName, prompt string) (string, e
 			{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockThresholdBlockNone},
 			{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockThresholdBlockNone},
 		},
+	}
+
+	if systemInstruction != "" {
+		config.SystemInstruction = &genai.Content{
+			Parts: []*genai.Part{
+				{Text: systemInstruction},
+			},
+		}
 	}
 
 	resp, err := geminiClient.Models.GenerateContent(ctx, defaultGeminiModel, genai.Text(prompt), config)
@@ -48,6 +56,6 @@ func cleanModelOutput(text string) string {
 	return strings.TrimSpace(cleaned)
 }
 
-func generateDefaultModelText(ctx context.Context, prompt string) (string, error) {
-	return generateModelText(ctx, defaultGeminiModel, prompt)
+func generateDefaultModelText(ctx context.Context, systemInstruction, prompt string) (string, error) {
+	return generateModelText(ctx, defaultGeminiModel, systemInstruction, prompt)
 }
