@@ -1314,7 +1314,7 @@ const TeamDebateRoom: React.FC = () => {
               if (recognitionRef.current) {
                 try {
                   recognitionRef.current.start();
-      } catch (error) {
+              } catch (error) {
                   console.error("Error restarting speech recognition:", error);
                 }
               }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log"
 
 	"arguehub/db"
 	"arguehub/models"
@@ -178,31 +179,36 @@ func SubmitTranscripts(
 
 				// Save transcript for "for" user
 				err = SaveDebateTranscript(
-					forUser.ID,
-					forUser.Email,
-					"user_vs_user",
-					topic,
-					againstUser.Email,
-					resultFor,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					forSubmission.Transcripts,
-				)
-				if err != nil {
-				}
+				forUser.ID,
+				forUser.Email,
+				"user_vs_user",
+				topic,
+				againstUser.Email,
+				resultFor,
+				[]models.Message{},
+				forSubmission.Transcripts,
+				0.0,
+			)
+			if err != nil {
+				log.Println("Error saving transcript for user:", err)
+			}
 
-				// Save transcript for "against" user
-				err = SaveDebateTranscript(
-					againstUser.ID,
-					againstUser.Email,
-					"user_vs_user",
-					topic,
-					forUser.Email,
-					resultAgainst,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					againstSubmission.Transcripts,
-				)
-				if err != nil {
-				}
+			// Save transcript for "against" user
+			err = SaveDebateTranscript(
+				againstUser.ID,
+				againstUser.Email,
+				"user_vs_user",
+				topic,
+				forUser.Email,
+				resultAgainst,
+				[]models.Message{},
+				againstSubmission.Transcripts,
+				0.0,
+			)
+			if err != nil {
+				log.Println("Error saving transcript for opponent:", err)
+			}
+
 
 				// Update ratings based on the result
 				outcomeFor := 0.5
@@ -659,7 +665,7 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 }
 
 // SaveDebateTranscript saves a debate transcript for later viewing
-func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string, eloChange float64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -682,11 +688,13 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 
 		// If the result has changed or is "pending", update the transcript
 		if existingTranscript.Result != result || existingTranscript.Result == "pending" {
+
 			update := bson.M{
 				"$set": bson.M{
 					"result":      result,
 					"messages":    messages,
 					"transcripts": transcripts,
+					"eloChange":   eloChange,
 					"updatedAt":   time.Now(),
 				},
 			}
@@ -712,6 +720,7 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		Opponent:    opponent,
 		Result:      result,
 		Messages:    messages,
+		EloChange:   eloChange, 
 		Transcripts: transcripts,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
