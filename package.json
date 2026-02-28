@@ -1,0 +1,22 @@
+{
+  "name": "debateai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DebateAI Monorepo - Run frontend and backend together",
+  "scripts": {
+    "dev": "concurrently -n \"FE,BE\" -c \"cyan,yellow\" \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && go run ./cmd/server/",
+    "build": "concurrently \"npm run build:frontend\" \"npm run build:backend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && go build ./cmd/server/",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm install && npm run install:frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

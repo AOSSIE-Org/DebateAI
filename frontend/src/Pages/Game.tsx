@@ -14,7 +14,7 @@ const Game: React.FC = () => {
     gameResult: {
       isReady: false,
       isWinner: false,
-      points: false,
+      points: 0,
       totalPoints: 0,
       evaluationMessage: "no data",
     },
@@ -32,10 +32,12 @@ const Game: React.FC = () => {
   });
 
   const websocketRef = useRef<WebSocket | null>(null);
-  const lastTypingStateRef = useRef<boolean>(false);
-  const lastSpeakingStateRef = useRef<boolean>(false);
+  const _lastTypingStateRef = useRef<boolean>(false);
+  const _lastSpeakingStateRef = useRef<boolean>(false);
+  void _lastTypingStateRef; // Reserved for typing indicator feature
+  void _lastSpeakingStateRef; // Reserved for speaking indicator feature
 
-  const sendWebSocketMessage = useCallback((payload: Record<string, unknown>) => {
+  const _sendWebSocketMessage = useCallback((payload: Record<string, unknown>) => {
     const ws = websocketRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(payload));
@@ -43,6 +45,7 @@ const Game: React.FC = () => {
       console.warn("Attempted to send message while WebSocket was not open.", payload);
     }
   }, []);
+  void _sendWebSocketMessage; // Reserved for future WebSocket messaging
 
   type GameWebSocketMessage = {
     type: string;

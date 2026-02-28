@@ -140,7 +140,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
 
 const WS_BASE_URL = BASE_URL.replace(
   /^https?/,
-  (match) => (match === "https" ? "wss" : "ws")
+  (match: string) => (match === "https" ? "wss" : "ws")
 );
 
 
