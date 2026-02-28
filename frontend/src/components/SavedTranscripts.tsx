@@ -29,6 +29,7 @@ import {
 } from '@/services/transcriptService';
 import { format } from 'date-fns';
 import CommentTree from './CommentTree';
+import Assumptions from './Assumptions';
 import { Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -388,18 +389,16 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                     {selectedTranscript.messages.map((message, index) => (
                       <div
                         key={index}
-                        className={`flex gap-3 ${
-                          message.sender === 'User'
+                        className={`flex gap-3 ${message.sender === 'User'
                             ? 'justify-end'
                             : 'justify-start'
-                        }`}
+                          }`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg p-3 ${
-                            message.sender === 'User'
+                          className={`max-w-[80%] rounded-lg p-3 ${message.sender === 'User'
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-muted'
-                          }`}
+                            }`}
                         >
                           <div className='flex items-center gap-2 mb-1'>
                             <span className='text-xs font-medium'>
@@ -466,6 +465,13 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                   <Share2 className='w-4 h-4' />
                   {creatingPost ? 'Creating Post...' : 'Create Post'}
                 </Button>
+              </div>
+
+              <Separator />
+
+              {/* Assumptions Section */}
+              <div>
+                <Assumptions debateId={selectedTranscript.id} />
               </div>
 
               <Separator />

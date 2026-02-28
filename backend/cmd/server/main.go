@@ -132,6 +132,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		// Set up transcript routes
 		routes.SetupTranscriptRoutes(auth)
 
+		// Set up assumption extraction routes
+		routes.SetupAssumptionRoutes(auth)
+
 		auth.GET("/coach/strengthen-argument/weak-statement", routes.GetWeakStatement)
 		auth.POST("/coach/strengthen-argument/evaluate", routes.EvaluateStrengthenedArgument)
 
