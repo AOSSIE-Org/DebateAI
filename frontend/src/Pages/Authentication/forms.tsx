@@ -5,6 +5,11 @@ import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/authContext';
 import { useCallback } from "react";
 
+// NIST SP 800-63B requires minimum 8 characters for memorized secrets.
+// We enforce 15 characters as a stricter policy for new passwords.
+// (Login does not enforce minimum to allow existing users with shorter passwords)
+const MIN_PASSWORD_LENGTH = 15;
+
 interface LoginFormProps {
   startForgotPassword: () => void;
   infoMessage?: string;
@@ -24,28 +29,23 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
 
   const [localError, setLocalError] = useState<string | null>(null);
 
-
-const MIN_PASSWORD_LENGTH = 8;
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-    return;
-  }
-  setLocalError(null);
-  await login(email, password);
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // No minimum length validation on login to allow existing users with shorter passwords
+    setLocalError(null);
+    await login(email, password);
+  };
 
 
 
 
-const handleGoogleLogin = useCallback(
-  (response: { credential: string; select_by: string }) => {
-    const idToken = response.credential;
-    googleLogin(idToken);
-  },
-  [googleLogin]
-);
+  const handleGoogleLogin = useCallback(
+    (response: { credential: string; select_by: string }) => {
+      const idToken = response.credential;
+      googleLogin(idToken);
+    },
+    [googleLogin]
+  );
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
@@ -93,7 +93,7 @@ const handleGoogleLogin = useCallback(
         <p className="text-red-500 text-sm mt-2">
           {localError}
         </p>
-)}
+      )}
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
           <Input
@@ -140,22 +140,26 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      authContext.handleError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+
     if (password !== confirmPassword) {
       authContext.handleError('Passwords do not match');
       return;
     }
-
     await signup(email, password);
     startOtpVerification(email);
   };
 
- const handleGoogleLogin = useCallback(
-  (response: { credential: string; select_by: string }) => {
-    const idToken = response.credential;
-    googleLogin(idToken);
-  },
-  [googleLogin]
-);
+  const handleGoogleLogin = useCallback(
+    (response: { credential: string; select_by: string }) => {
+      const idToken = response.credential;
+      googleLogin(idToken);
+    },
+    [googleLogin]
+  );
 
 
   useEffect(() => {
@@ -345,11 +349,15 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      authContext.handleError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+
     if (newPassword !== confirmNewPassword) {
       authContext.handleError('Passwords do not match');
       return;
     }
-
     await confirmForgotPassword(email, code, newPassword);
     await login(email, newPassword);
     handlePasswordReset();
