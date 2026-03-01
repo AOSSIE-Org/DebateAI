@@ -1,16 +1,18 @@
 package utils
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"regexp"
 	"time"
-
-	"crypto/sha256"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -161,4 +163,76 @@ func GenerateSecretHash(username, clientID, clientSecret string) string {
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(message))
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// Encrypt encrypts plainText using AES-GCM and the JWT secret as the key
+func Encrypt(plainText string) (string, error) {
+	key := []byte(getJWTSecret())
+	// Use first 32 bytes for AES-256
+	if len(key) > 32 {
+		key = key[:32]
+	} else if len(key) < 32 {
+		// Pad if too short (theoretical, as our secret is long)
+		padded := make([]byte, 32)
+		copy(padded, key)
+		key = padded
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	cipherText := gcm.Seal(nonce, nonce, []byte(plainText), nil)
+	return base64.StdEncoding.EncodeToString(cipherText), nil
+}
+
+// Decrypt decrypts cipherText using AES-GCM and the JWT secret as the key
+func Decrypt(encodedCipherText string) (string, error) {
+	cipherText, err := base64.StdEncoding.DecodeString(encodedCipherText)
+	if err != nil {
+		return "", err
+	}
+
+	key := []byte(getJWTSecret())
+	if len(key) > 32 {
+		key = key[:32]
+	} else if len(key) < 32 {
+		padded := make([]byte, 32)
+		copy(padded, key)
+		key = padded
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(cipherText) < nonceSize {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+
+	nonce, actualCipherText := cipherText[:nonceSize], cipherText[nonceSize:]
+	plainText, err := gcm.Open(nil, nonce, actualCipherText, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(plainText), nil
 }

@@ -4,6 +4,7 @@ import (
 	"arguehub/db"
 	"arguehub/middlewares"
 	"arguehub/models"
+	"arguehub/structs"
 	"context"
 	"fmt"
 	"math"
@@ -18,19 +19,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// AdminSignupRequest represents the signup request
-type AdminSignupRequest struct {
-	Email    string `json:"email" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Name     string `json:"name" binding:"required"`
-	Role     string `json:"role" binding:"required"` // "admin" or "moderator"
-}
-
-// AdminLoginRequest represents the login request
-type AdminLoginRequest struct {
-	Email    string `json:"email" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
+// Admin auth structs moved to structs/auth.go
 
 // AdminSignup handles admin/moderator signup
 func AdminSignup(ctx *gin.Context) {
@@ -39,7 +28,7 @@ func AdminSignup(ctx *gin.Context) {
 		return
 	}
 
-	var request AdminSignupRequest
+	var request structs.AdminSignupRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
@@ -117,7 +106,7 @@ func AdminLogin(ctx *gin.Context) {
 		return
 	}
 
-	var request AdminLoginRequest
+	var request structs.AdminLoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": err.Error()})
 		return

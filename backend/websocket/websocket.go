@@ -190,6 +190,7 @@ func broadcastParticipants(room *Room) {
 	message := buildParticipantsMessage(room)
 	for _, client := range snapshotRecipients(room, nil) {
 		if err := client.SafeWriteJSON(message); err != nil {
+			log.Printf("Error broadcasting participants to %s: %v", client.Email, err)
 		}
 	}
 }
@@ -216,6 +217,7 @@ func notifySpectatorStatus(room *Room, spectator *Client, joined bool) {
 
 	for _, client := range nonSpectatorRecipients(room, nil) {
 		if err := client.SafeWriteJSON(status); err != nil {
+			log.Printf("Error notifying spectator status to %s: %v", client.Email, err)
 		}
 	}
 }
@@ -224,6 +226,7 @@ func broadcastRawToDebaters(room *Room, exclude *websocket.Conn, payload []byte)
 	recipients := nonSpectatorRecipients(room, exclude)
 	for _, client := range recipients {
 		if err := client.SafeWriteMessage(websocket.TextMessage, payload); err != nil {
+			log.Printf("Error broadcasting raw to %s: %v", client.Email, err)
 		}
 	}
 }
@@ -496,6 +499,7 @@ func WebsocketHandler(c *gin.Context) {
 			recipientCount := 0
 			for _, r := range snapshotRecipients(room, conn) {
 				if err := r.SafeWriteMessage(messageType, msg); err != nil {
+					log.Printf("Error forwarding message type %d to %s: %v", messageType, r.Email, err)
 				} else {
 					recipientCount++
 				}
@@ -529,6 +533,7 @@ func handleChatMessage(room *Room, conn *websocket.Conn, message Message, client
 			"mode":      message.Mode,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending chat message to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -550,6 +555,7 @@ func handleTypingIndicator(room *Room, conn *websocket.Conn, message Message, cl
 			"partialText": message.PartialText,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending typing indicator to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -569,6 +575,7 @@ func handleSpeakingIndicator(room *Room, conn *websocket.Conn, message Message, 
 			"isSpeaking": message.IsSpeaking,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending speaking indicator to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -590,6 +597,7 @@ func handleSpeechText(room *Room, conn *websocket.Conn, message Message, client 
 			"role":       client.Role,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending speech text to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -607,6 +615,7 @@ func handleLiveTranscript(room *Room, conn *websocket.Conn, message Message, cli
 			"role":           client.Role,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending live transcript to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -641,6 +650,7 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 				"phase":       message.Phase,
 			}
 			if err := clientConn.WriteJSON(response); err != nil {
+				log.Printf("Error sending autoMuteStatus to %s: %v", client.Email, err)
 			}
 		}
 	}
@@ -649,6 +659,7 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 	// Broadcast phase change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
+			log.Printf("Error broadcasting phase change to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -658,6 +669,7 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 	// Broadcast topic change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
+			log.Printf("Error broadcasting topic change to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -677,6 +689,7 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 	// Broadcast role selection to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
+			log.Printf("Error broadcasting role selection to %s: %v", r.Email, err)
 		}
 	}
 
@@ -689,6 +702,7 @@ func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID
 	// Broadcast ready status to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
+			log.Printf("Error broadcasting ready status to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -708,6 +722,7 @@ func handleMuteRequest(room *Room, conn *websocket.Conn, message Message, client
 			"isMuted":  true,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending mute status to %s: %v", r.Email, err)
 		}
 	}
 }
@@ -727,6 +742,7 @@ func handleUnmuteRequest(room *Room, conn *websocket.Conn, message Message, clie
 			"isMuted":  false,
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
+			log.Printf("Error sending unmute status to %s: %v", r.Email, err)
 		}
 	}
 }

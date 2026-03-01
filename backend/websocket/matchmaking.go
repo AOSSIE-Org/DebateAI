@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -160,6 +161,7 @@ func (c *MatchmakingClient) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Unexpected WebSocket close error for user %s: %v", c.userID, err)
 			}
 			break
 		}
@@ -246,6 +248,7 @@ func sendPoolStatus() {
 
 	poolData, err := json.Marshal(pool)
 	if err != nil {
+		log.Printf("Error marshaling pool data: %v", err)
 		return
 	}
 
@@ -256,6 +259,7 @@ func sendPoolStatus() {
 
 	messageData, err := json.Marshal(message)
 	if err != nil {
+		log.Printf("Error marshaling pool update message: %v", err)
 		return
 	}
 
@@ -280,6 +284,7 @@ func BroadcastRoomCreated(roomID string, participantUserIDs []string) {
 
 	messageData, err := json.Marshal(message)
 	if err != nil {
+		log.Printf("Error marshaling room created message: %v", err)
 		return
 	}
 
@@ -323,6 +328,7 @@ func WatchForNewRooms() {
 	opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
 	changeStream, err := roomCollection.Watch(context.Background(), pipeline, opts)
 	if err != nil {
+		log.Printf("Error watching room collection: %v", err)
 		return
 	}
 	defer changeStream.Close(context.Background())
@@ -330,6 +336,7 @@ func WatchForNewRooms() {
 	for changeStream.Next(context.Background()) {
 		var changeEvent bson.M
 		if err := changeStream.Decode(&changeEvent); err != nil {
+			log.Printf("Error decoding change event: %v", err)
 			continue
 		}
 

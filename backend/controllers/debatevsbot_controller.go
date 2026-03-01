@@ -164,6 +164,7 @@ func SendDebateMessage(c *gin.Context) {
 		debate.ID = primitive.NewObjectID()
 	}
 	if err := db.SaveDebateVsBot(debate); err != nil {
+		log.Printf("Error saving debate vs bot: %v", err)
 	}
 
 	response := DebateMessageResponse{
@@ -209,6 +210,7 @@ func JudgeDebate(c *gin.Context) {
 
 	// Update debate outcome
 	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
+		log.Printf("Error updating debate vs bot outcome for %s: %v", email, err)
 	}
 
 	// Get the latest debate information to extract proper details
@@ -267,7 +269,7 @@ func JudgeDebate(c *gin.Context) {
 	}
 
 	// Save transcript with proper debate information
-	_ = services.SaveDebateTranscript(
+	if err := services.SaveDebateTranscript(
 		userID,
 		email,
 		"user_vs_bot",
@@ -276,7 +278,9 @@ func JudgeDebate(c *gin.Context) {
 		resultStatus,
 		req.History,
 		nil,
-	)
+	); err != nil {
+		log.Printf("Error saving debate transcript for %s: %v", email, err)
+	}
 
 	// Update gamification (score, badges, streaks) after bot debate
 	log.Printf("About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",
@@ -583,7 +587,7 @@ func ConcedeDebate(c *gin.Context) {
 		historyToSave = req.History
 	}
 
-	_ = services.SaveDebateTranscript(
+	if err := services.SaveDebateTranscript(
 		user.ID,
 		email,
 		"user_vs_bot",
@@ -592,7 +596,9 @@ func ConcedeDebate(c *gin.Context) {
 		"loss",
 		historyToSave,
 		nil,
-	)
+	); err != nil {
+		log.Printf("Error saving debate transcript (concede) for %s: %v", email, err)
+	}
 
 	// Update gamification (score, badges, streaks)
 	// Call synchronously but with recover to prevent panics
