@@ -419,7 +419,7 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
 
   return (
     <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-      <div className='bg-background rounded-lg px-6 pb-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <div className='bg-background rounded-lg px-3 sm:px-6 pb-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto'>
         {/* Fixed Preview */}
         <div className='sticky top-0 bg-background z-10 pb-4 border-b border-muted w-full'>
           <div className='flex justify-between items-center mb-4 w-full'>
@@ -432,20 +432,20 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
             <img
               src={selectedAvatar}
               alt='Avatar Preview'
-              className='w-32 h-32 rounded-full border-2 border-primary shadow-md'
+              className='w-24 h-24 sm:w-32 sm:h-32 rounded-full border-2 border-primary shadow-md'
             />
           </div>
         </div>
 
         {/* Character Selection */}
-        <div className='mt-6 ml-6'>
+        <div className='mt-6'>
           <Label className='text-sm font-semibold'>Characters</Label>
-          <div className='grid grid-cols-5 gap-4 mt-2'>
+          <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
             {seeds.map((s) => (
               <button
                 key={s}
                 onClick={() => handleSeedSelect(s)}
-                className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                   seed === s
                     ? 'border-primary scale-110'
                     : 'border-transparent hover:border-muted'
@@ -463,15 +463,15 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
         </div>
 
         {/* Customization Options */}
-        <div className='mt-6 ml-6'>
+        <div className='mt-6'>
           {/* Background Color */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Background Color</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {backgroundColors.map((color) => (
                 <button
                   key={color}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     backgroundColor === color
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -487,12 +487,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Ear Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Ear Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.ear.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setEar, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     ear === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -512,12 +512,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Eyes Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Eyes Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.eyes.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setEyes, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     eyes === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -537,12 +537,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Cheek Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Cheek Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.cheek.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setCheek, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     cheek === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -562,12 +562,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Face Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Face Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.face.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setFace, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     face === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -587,12 +587,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Front Hair Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Front Hair Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.frontHair.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setFrontHair, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     frontHair === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -612,12 +612,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Hair Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Hair Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.hair.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setHair, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     hair === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -637,12 +637,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Mouth Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Mouth Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.mouth.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setMouth, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     mouth === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -662,12 +662,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Sideburn Style */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Sideburn Style</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {judePreviewUrls.sideburn.map(({ option, url }) => (
                 <button
                   key={option}
                   onClick={() => handleStyleSelect(setSideburn, option)}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     sideburn === option
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
@@ -687,11 +687,11 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           {/* Skin Color */}
           <div className='mb-6'>
             <Label className='text-sm font-semibold'>Skin Color</Label>
-            <div className='grid grid-cols-5 gap-4 mt-2'>
+            <div className='grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-4 mt-2'>
               {skinColorOptions.map((color) => (
                 <button
                   key={color}
-                  className={`w-16 h-16 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 transition-all duration-200 ${
                     skinColor === color
                       ? 'border-primary scale-110'
                       : 'border-transparent hover:border-muted'
