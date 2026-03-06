@@ -86,8 +86,8 @@
   }
 }
 
-@layer base {
-  .high-contrast {
+@media (prefers-contrast: more) {
+  :root {
     --hc-hover-bg: 48 100% 50%;
     --hc-hover-text: 0 0% 0%;
   }

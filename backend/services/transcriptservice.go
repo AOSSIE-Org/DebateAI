@@ -187,14 +187,14 @@ func SubmitTranscripts(
 				resultFor,
 				[]models.Message{},
 				forSubmission.Transcripts,
-				0.0,
+				debateRecord.RatingChange, 
 			)
 			if err != nil {
 				log.Println("Error saving transcript for user:", err)
 			}
 
 			// Save transcript for "against" user
-			err = SaveDebateTranscript(
+			err = err = SaveDebateTranscript(
 				againstUser.ID,
 				againstUser.Email,
 				"user_vs_user",
@@ -203,7 +203,7 @@ func SubmitTranscripts(
 				resultAgainst,
 				[]models.Message{},
 				againstSubmission.Transcripts,
-				0.0,
+				opponentRecord.RatingChange,
 			)
 			if err != nil {
 				log.Println("Error saving transcript for opponent:", err)
