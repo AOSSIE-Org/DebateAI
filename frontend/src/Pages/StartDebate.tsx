@@ -10,11 +10,11 @@ import DebatePopup from "@/components/DebatePopup";
 
 const StartDebate = () => {
   const navigate = useNavigate();
-  const authContext = useContext(AuthContext);
+  const { isAuthenticated } = useContext(AuthContext) || {};
   const [showPopup, setShowPopup] = useState(false);
 
   const handlePlayDebateClick = () => {
-    if (authContext?.isAuthenticated) {
+    if (isAuthenticated) {
       setShowPopup(true);
     } else {
       navigate("/auth", { state: { isSignUp: false } });
@@ -22,7 +22,7 @@ const StartDebate = () => {
   };
 
   const handlePlayBotClick = () => {
-    if (authContext?.isAuthenticated) {
+    if (isAuthenticated) {
       navigate("/bot-selection");
     } else {
       navigate("/auth", { state: { isSignUp: false } });

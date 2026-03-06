@@ -116,6 +116,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
             <p className='text-muted-foreground text-sm text-center mb-6'>
               Enter a room code to join an ongoing debate.
             </p>
+
             <input
               type='text'
               value={roomCode}
@@ -123,9 +124,15 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
               placeholder='Enter Room Code'
               className='w-full p-3 border border-border rounded-lg text-center bg-input text-foreground mb-4'
             />
+
             <button
               onClick={handleJoinRoom}
-              className='bg-secondary text-secondary-foreground px-6 py-3 rounded-lg hover:bg-secondary/90 transition w-full'
+              disabled={!roomCode.trim()}
+              className={`px-6 py-3 rounded-lg transition w-full ${
+                roomCode.trim()
+                  ? 'bg-green-500 text-white hover:bg-green-600'
+                  : 'bg-secondary text-secondary-foreground opacity-60 cursor-not-allowed'
+              }`}
             >
               Join Room
             </button>
