@@ -1,19 +1,22 @@
 export class SpeechRecognitionTest {
   private recognition: SpeechRecognition | null = null;
   private supported: boolean;
+  private shouldRestart = false;
+  private isListening = false;
+  private restartTimeout: number | null = null;
 
   constructor() {
     this.supported =
-      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
 
     if (this.supported) {
       const SpeechRecognitionCtor =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
 
       if (SpeechRecognitionCtor) {
         this.recognition = new SpeechRecognitionCtor();
         this.setupRecognition();
-      } else {
       }
     }
   }
@@ -23,61 +26,121 @@ export class SpeechRecognitionTest {
 
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
-    this.recognition.lang = 'en-US';
+    this.recognition.lang = "en-US";
     this.recognition.maxAlternatives = 1;
 
+    // START
     this.recognition.onstart = () => {
+      this.isListening = true;
+      console.log("Speech recognition started");
     };
 
+    // RESULTS
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
+      let interimTranscript = "";
+      let finalTranscript = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const transcript = result[0].transcript;
 
-        if (result.isFinal) {
-          finalTranscript += transcript + ' ';
-        } else {
-          interimTranscript += transcript;
-        }
+        if (result.isFinal) finalTranscript += transcript + " ";
+        else interimTranscript += transcript;
       }
 
-      if (finalTranscript) {
-      }
-      if (interimTranscript) {
-      }
+      if (finalTranscript) console.log("Final:", finalTranscript.trim());
+      if (interimTranscript) console.log("Interim:", interimTranscript);
     };
 
+    // SAFE AUTO RESTART
     this.recognition.onend = () => {
+      this.isListening = false;
+      console.log("Speech recognition ended");
+
+      if (!this.shouldRestart) return;
+
+      this.restartTimeout = window.setTimeout(() => {
+        if (!this.shouldRestart) return;
+
+        try {
+          this.recognition?.start();
+        } catch (error) {
+          console.error("Restart failed:", error);
+          this.shouldRestart = false;
+          this.restartTimeout = null;
+        }
+      }, 500);
     };
 
-    // ✅ Fix typing issue with type assertion
-    this.recognition.onerror = (event: Event) => {
-      const err = event as unknown as SpeechRecognitionErrorEvent;
-      console.error('Speech recognition error', err.error, err.message);
+    // ERROR HANDLING
+    this.recognition.onerror = (ev: Event) => {
+      const event = ev as SpeechRecognitionErrorEvent;
+
+      console.error("Speech error:", event.error, event.message);
+
+      // stop restart only on real fatal errors
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed" ||
+        event.error === "audio-capture"
+      ) {
+        this.shouldRestart = false;
+      }
     };
   }
 
-  public start(): boolean {
-    if (!this.supported || !this.recognition) {
-      return false;
-    }
-
-    try {
-      this.recognition.start();
-      return true;
-    } catch (error) {
-      return false;
-    }
+  // START LISTENING (RACE SAFE)
+  public async start(): Promise<boolean> {
+  if (!this.supported || !this.recognition || this.isListening) {
+    return false;
   }
+
+  //FIX: cancel any pending auto-restart
+  if (this.restartTimeout) {
+    clearTimeout(this.restartTimeout);
+    this.restartTimeout = null;
+  }
+
+  this.shouldRestart = true;
+
+  const allowed = await this.checkMicrophonePermission();
+
+  if (!this.shouldRestart) {
+    console.log("Start cancelled during permission request");
+    return false;
+  }
+
+  if (!allowed) {
+    console.warn("Microphone permission denied");
+    this.shouldRestart = false;
+    return false;
+  }
+
+  try {
+    this.recognition.start();
+    this.isListening = true;
+    return true;
+  } catch (error) {
+    console.error("Start failed:", error);
+    this.shouldRestart = false;
+    this.isListening = false;
+    return false;
+  }
+}
 
   public stop() {
-    if (this.recognition) {
+    this.shouldRestart = false;
+
+    if (this.restartTimeout !== null) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+
+    if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
       } catch (error) {
+        console.error("Stop failed:", error);
       }
     }
   }
@@ -89,26 +152,28 @@ export class SpeechRecognitionTest {
   public async checkMicrophonePermission(): Promise<boolean> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach(track => track.stop());
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
 }
 
-// Export a simple test function
-export const testSpeechRecognition = () => {
+// TEST HELPER
+export const testSpeechRecognition = async () => {
   const test = new SpeechRecognitionTest();
 
   if (!test.isSpeechRecognitionSupported()) {
+    console.log("Speech recognition not supported in this browser");
     return;
   }
 
-  test.start();
+  const started = await test.start();
+  if (!started) return;
 
-  // Stop after 10 seconds
   setTimeout(() => {
     test.stop();
+    console.log("Manually stopped");
   }, 10000);
 };
