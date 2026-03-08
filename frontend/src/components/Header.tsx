@@ -121,8 +121,11 @@ function Header() {
 
   return (
     <>
-      <header className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-        <div className="text-lg font-semibold">{getBreadcrumbs()}</div>
+      <header className="flex items-center justify-between h-16 px-4 border-b border-border bg-background">
+        <div className="text-lg font-semibold text-foreground">
+          {getBreadcrumbs()}
+        </div>
+
         <div className="flex items-center gap-4">
           <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
             <PopoverTrigger asChild>
@@ -239,7 +242,7 @@ function Header() {
 
           <button
             onClick={toggleDrawer}
-            className="md:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100"
+            className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-muted"
             aria-label="Open menu"
           >
             <Menu className="h-6 w-6" />
@@ -250,13 +253,14 @@ function Header() {
       {isDrawerOpen && (
         <div className="fixed inset-0 z-[1000] md:hidden">
           <div
-            className="absolute inset-0 bg-black bg-opacity-50"
+            className="absolute inset-0 bg-black/50"
             onClick={toggleDrawer}
-          ></div>
-          <div className="relative w-64 h-full bg-white shadow-lg transform transition-transform duration-300 ease-in-out translate-x-0 ml-auto">
-            <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+          />
+
+          <div className="relative w-64 h-full bg-background border-l border-border shadow-lg ml-auto">
+            <div className="flex items-center justify-between h-16 px-4 border-b border-border">
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold text-gray-900">
+                <span className="text-xl font-bold text-foreground">
                   DebateAI by
                 </span>
                 <img
@@ -265,14 +269,16 @@ function Header() {
                   className="h-8 w-auto object-contain"
                 />
               </div>
+
               <button
                 onClick={toggleDrawer}
-                className="p-2 text-gray-600 hover:text-gray-900"
+                className="p-2 text-muted-foreground hover:text-foreground"
                 aria-label="Close menu"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
+
             <nav className="flex-1 px-2 py-4 space-y-2">
               <NavItem
                 to="/startDebate"
@@ -321,8 +327,8 @@ function NavItem({ to, label, icon, onClick }: NavItemProps) {
       className={({ isActive }) =>
         `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
           isActive
-            ? "bg-gray-200 text-gray-900"
-            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
         }`
       }
     >
@@ -331,5 +337,6 @@ function NavItem({ to, label, icon, onClick }: NavItemProps) {
     </NavLink>
   );
 }
+
 
 export default Header;
