@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"arguehub/db"
+	"arguehub/models"
 	"arguehub/services"
 	"arguehub/utils"
 
@@ -30,8 +31,14 @@ var upgrader = websocket.Upgrader{
 
 // Room represents a debate room with connected clients.
 type Room struct {
-	Clients map[*websocket.Conn]*Client
-	Mutex   sync.Mutex
+	Clients                map[*websocket.Conn]*Client
+	Mutex                  sync.Mutex
+	DevilAdvocateEnabled   bool
+	DevilAdvocateFrequency int
+	MessageCount           int
+	DevilSpawnedAt         map[int]bool // tracks which message counts have already triggered the devil
+	Topic                  string
+	History                []models.Message
 }
 
 // Client represents a connected client with user information
@@ -270,7 +277,31 @@ func WebsocketHandler(c *gin.Context) {
 	// Create the room if it doesn't exist.
 	roomsMutex.Lock()
 	if _, exists := rooms[roomID]; !exists {
-		rooms[roomID] = &Room{Clients: make(map[*websocket.Conn]*Client)}
+		newRoom := &Room{
+			Clients:        make(map[*websocket.Conn]*Client),
+			DevilSpawnedAt: make(map[int]bool),
+		}
+
+		// Load room settings from database
+		roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
+		var roomDoc struct {
+			DevilAdvocateEnabled   bool   `bson:"devilAdvocateEnabled"`
+			DevilAdvocateFrequency int    `bson:"devilAdvocateFrequency"`
+			Topic                  string `bson:"topic"`
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := roomCollection.FindOne(ctx, bson.M{"_id": roomID}).Decode(&roomDoc)
+		cancel()
+		if err == nil {
+			newRoom.DevilAdvocateEnabled = roomDoc.DevilAdvocateEnabled
+			newRoom.DevilAdvocateFrequency = roomDoc.DevilAdvocateFrequency
+			newRoom.Topic = roomDoc.Topic
+			if newRoom.DevilAdvocateFrequency <= 0 {
+				newRoom.DevilAdvocateFrequency = 5 // Default frequency
+			}
+		}
+
+		rooms[roomID] = newRoom
 	}
 	room := rooms[roomID]
 	roomsMutex.Unlock()
@@ -531,6 +562,51 @@ func handleChatMessage(room *Room, conn *websocket.Conn, message Message, client
 		if err := r.SafeWriteJSON(response); err != nil {
 		}
 	}
+
+	// AI Devil's Advocate Logic
+	room.Mutex.Lock()
+	if room.DevilAdvocateEnabled {
+		// Update history
+		room.History = append(room.History, models.Message{
+			Sender: client.Username,
+			Text:   message.Content,
+			Phase:  message.Phase,
+		})
+
+		// Only count non-spectator messages
+		if !client.IsSpectator {
+			room.MessageCount++
+
+			// Trigger logic: min 3 messages, matches frequency, and hasn't spawned at this count yet
+			if room.MessageCount >= 3 && room.MessageCount%room.DevilAdvocateFrequency == 0 && !room.DevilSpawnedAt[room.MessageCount] {
+				room.DevilSpawnedAt[room.MessageCount] = true
+
+				// Run AI in a goroutine to avoid blocking the websocket handler
+				go func(r *Room, topic string, history []models.Message) {
+					question, err := services.GenerateDevilAdvocateQuestion(topic, history)
+					if err != nil {
+						log.Printf("Devil's Advocate error: %v", err)
+						return
+					}
+
+					// Broadcast the "devil" message
+					devilMessage := map[string]interface{}{
+						"type":      "devil",
+						"username":  "Devil's Advocate",
+						"content":   question,
+						"timestamp": time.Now().Unix(),
+					}
+
+					for _, cl := range snapshotRecipients(r, nil) {
+						if err := cl.SafeWriteJSON(devilMessage); err != nil {
+							log.Printf("Error sending devil message: %v", err)
+						}
+					}
+				}(room, room.Topic, room.History)
+			}
+		}
+	}
+	room.Mutex.Unlock()
 }
 
 // handleTypingIndicator handles typing indicators

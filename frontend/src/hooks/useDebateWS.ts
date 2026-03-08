@@ -81,9 +81,8 @@ export const useDebateWS = (debateId: string | null) => {
       localStorage.setItem('spectatorId', spectatorId);
     }
 
-    const wsUrl = `${protocol}//${host}/ws/debate/${debateId}${
-      spectatorId ? `?spectatorId=${spectatorId}` : ''
-    }`;
+    const wsUrl = `${protocol}//${host}/ws/debate/${debateId}${spectatorId ? `?spectatorId=${spectatorId}` : ''
+      }`;
 
     const rws = new ReconnectingWebSocket(wsUrl, [], {
       connectionTimeout: 4000,
@@ -239,8 +238,8 @@ export const useDebateWS = (debateId: string | null) => {
                 });
                 const options = Array.isArray(poll.options)
                   ? poll.options
-                      .map((opt: unknown) => String(opt ?? '').trim())
-                      .filter((opt: string) => opt.length > 0)
+                    .map((opt: unknown) => String(opt ?? '').trim())
+                    .filter((opt: string) => opt.length > 0)
                   : Object.keys(counts);
                 return {
                   ...prev,
@@ -269,6 +268,19 @@ export const useDebateWS = (debateId: string | null) => {
                 text: eventData.payload.text,
                 spectatorHash: eventData.payload.spectatorHash,
                 timestamp: eventData.payload.timestamp,
+              },
+            ]);
+            break;
+
+          case 'devil':
+            setQuestions((prev) => [
+              ...prev,
+              {
+                qId: 'devil-' + Date.now(),
+                text: eventData.payload.content,
+                spectatorHash: 'devil',
+                timestamp: Date.now(),
+                type: 'devil',
               },
             ]);
             break;

@@ -19,10 +19,12 @@ import (
 
 // Room represents a debate room.
 type Room struct {
-	ID           string        `json:"id" bson:"_id"`
-	Type         string        `json:"type" bson:"type"`
-	OwnerID      string        `json:"ownerId" bson:"ownerId"`
-	Participants []Participant `json:"participants" bson:"participants"`
+	ID                     string        `json:"id" bson:"_id"`
+	Type                   string        `json:"type" bson:"type"`
+	OwnerID                string        `json:"ownerId" bson:"ownerId"`
+	Participants           []Participant `json:"participants" bson:"participants"`
+	DevilAdvocateEnabled   bool          `json:"devilAdvocateEnabled" bson:"devilAdvocateEnabled"`
+	DevilAdvocateFrequency int           `json:"devilAdvocateFrequency" bson:"devilAdvocateFrequency"`
 }
 
 // Participant represents a user in a room.
@@ -44,7 +46,9 @@ func generateRoomID() string {
 // CreateRoomHandler handles POST /rooms and creates a new debate room.
 func CreateRoomHandler(c *gin.Context) {
 	type CreateRoomInput struct {
-		Type string `json:"type"` // public, private, invite
+		Type                   string `json:"type"` // public, private, invite
+		DevilAdvocateEnabled   bool   `json:"devilAdvocateEnabled"`
+		DevilAdvocateFrequency int    `json:"devilAdvocateFrequency"`
 	}
 
 	var input CreateRoomInput
@@ -90,10 +94,12 @@ func CreateRoomHandler(c *gin.Context) {
 
 	roomID := generateRoomID()
 	newRoom := Room{
-		ID:           roomID,
-		Type:         input.Type,
-		OwnerID:      creatorParticipant.ID,
-		Participants: []Participant{creatorParticipant},
+		ID:                     roomID,
+		Type:                   input.Type,
+		OwnerID:                creatorParticipant.ID,
+		Participants:           []Participant{creatorParticipant},
+		DevilAdvocateEnabled:   input.DevilAdvocateEnabled,
+		DevilAdvocateFrequency: input.DevilAdvocateFrequency,
 	}
 
 	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
