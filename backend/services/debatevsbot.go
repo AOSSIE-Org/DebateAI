@@ -110,7 +110,7 @@ func inferOpponentStyle(message string) string {
 // constructPrompt builds a prompt that adjusts based on bot personality, debate topic, history,
 // extra context, and uses the provided stance directly. It includes phase-specific instructions
 // and leverages InteractionModifiers and PhilosophicalTenets for tailored responses.
-func constructPrompt(bot BotPersonality, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
+func constructPrompt(bot BotPersonality, topic string, history []models.Message, stance, extraContext, role string, maxWords int) string {
 	// Level-based instructions
 	levelInstructions := ""
 	switch strings.ToLower(bot.Level) {
@@ -169,6 +169,17 @@ Your responses must reflect this persona consistently, as if you are the charact
 		limitInstruction = fmt.Sprintf("Limit your response to %d words.", maxWords)
 	}
 
+	// Role-based instructions
+	roleInstruction := ""
+	switch strings.ToLower(role) {
+	case "historian":
+		roleInstruction = "Act as a Historian: use historical examples, timelines, and precedents to support your arguments."
+	case "scientist":
+		roleInstruction = "Act as a Scientist: use empirical evidence, data, and experimental results to support your arguments."
+	case "lawyer":
+		roleInstruction = "Act as a Lawyer: use persuasion, airtight logic, and sharp rebuttals to support your arguments."
+	}
+
 	// Base instruction for all responses
 	baseInstruction := "Provide only your own argument without simulating an opponent’s dialogue. " +
 		"If the user’s input is unclear, off-topic, or empty, respond with a personality-appropriate clarification request, e.g., for Yoda: 'Clouded, your point is, young one. Clarify, you must.'"
@@ -182,17 +193,19 @@ Your debating style must strictly adhere to the following guidelines:
 - Level Instructions: %s
 - Personality Instructions: %s
 - Interaction Modifier: %s
+- Role Instructions: %s
 Your stance is: %s.
 %s
 %s
 %s
 Provide an opening statement that embodies your persona and stance.
 [Your opening argument]
-%s %s`,
+%s`,
 			bot.Name, bot.Level, stance, topic,
 			levelInstructions,
 			personalityInstructions,
 			modifierInstruction,
+			roleInstruction,
 			stance,
 			func() string {
 				if extraContext != "" {
@@ -237,6 +250,7 @@ Your debating style must strictly adhere to the following guidelines:
 - Level Instructions: %s
 - Personality Instructions: %s
 - Interaction Modifier: %s
+- Role Instructions: %s
 Your stance is: %s.
 %s
 %s
@@ -250,6 +264,7 @@ Please provide your full argument.`,
 		levelInstructions,
 		personalityInstructions,
 		modifierInstruction,
+		roleInstruction,
 		stance,
 		func() string {
 			if extraContext != "" {
@@ -267,14 +282,14 @@ Please provide your full argument.`,
 
 // GenerateBotResponse generates a response from the debate bot using the Gemini client library.
 // It uses the bot’s personality to handle errors and responses vividly.
-func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
+func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext, role string, maxWords int) string {
 	if geminiClient == nil {
 		return personalityErrorResponse(botName, "My systems are offline, it seems.")
 	}
 
 	bot := GetBotPersonality(botName)
 	// Construct prompt with enhanced personality integration
-	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
+	prompt := constructPrompt(bot, topic, history, stance, extraContext, role, maxWords)
 
 	ctx := context.Background()
 	response, err := generateDefaultModelText(ctx, prompt)

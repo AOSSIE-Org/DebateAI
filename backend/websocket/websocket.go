@@ -50,6 +50,7 @@ type Client struct {
 	LastActivity time.Time
 	IsMuted      bool   // New field to track mute status
 	Role         string // New field to track debate role (for/against)
+	PersonaRole  string // New field to track persona role (historian, etc.)
 	SpeechText   string // New field to store speech text
 	ConnectionID string
 }
@@ -82,10 +83,11 @@ type Message struct {
 	Timestamp   int64  `json:"timestamp,omitempty"`
 	Mode        string `json:"mode,omitempty"` // 'type' or 'speak'
 	// Debate-specific fields
-	Phase string `json:"phase,omitempty"`
-	Topic string `json:"topic,omitempty"`
-	Role  string `json:"role,omitempty"`
-	Ready *bool  `json:"ready,omitempty"`
+	Phase   string `json:"phase,omitempty"`
+	Topic   string `json:"topic,omitempty"`
+	Role    string `json:"role,omitempty"`
+	Persona string `json:"persona,omitempty"`
+	Ready   *bool  `json:"ready,omitempty"`
 	// New fields for automatic muting
 	IsMuted        bool   `json:"isMuted,omitempty"`
 	CurrentTurn    string `json:"currentTurn,omitempty"`    // "for" or "against"
@@ -173,6 +175,7 @@ func buildParticipantsMessage(room *Room) map[string]interface{} {
 			"displayName": client.Username,
 			"email":       client.Email,
 			"role":        client.Role,
+			"persona":     client.PersonaRole,
 			"isMuted":     client.IsMuted,
 		})
 	}
@@ -466,6 +469,8 @@ func WebsocketHandler(c *gin.Context) {
 			handleTopicChange(room, conn, message, roomID)
 		case "roleSelection":
 			handleRoleSelection(room, conn, message, roomID)
+		case "personaSelection":
+			handlePersonaSelection(room, conn, message, roomID)
 		case "ready":
 			handleReadyStatus(room, conn, message, roomID)
 		case "mute":
@@ -675,6 +680,28 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 	}
 
 	// Broadcast role selection to other clients
+	for _, r := range snapshotRecipients(room, conn) {
+		if err := r.SafeWriteJSON(message); err != nil {
+		}
+	}
+
+	// Send updated participant snapshot to everyone
+	broadcastParticipants(room)
+}
+
+// handlePersonaSelection handles persona role selection
+func handlePersonaSelection(room *Room, conn *websocket.Conn, message Message, roomID string) {
+	// Store the persona in the client
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	if client, exists := room.Clients[conn]; exists {
+		if client.IsSpectator {
+			return
+		}
+		client.PersonaRole = message.Persona
+	}
+
+	// Broadcast persona selection to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
 		}

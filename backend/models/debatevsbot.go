@@ -27,5 +27,6 @@ type DebateVsBot struct {
 	History      []Message          `json:"history" bson:"history"`
 	PhaseTimings []PhaseTiming      `json:"phaseTimings" bson:"phaseTimings"` // Added for custom timings
 	Outcome      string             `json:"outcome" bson:"outcome"`           // Result of the debate (e.g., "User wins")
+	Role         string             `json:"role" bson:"role"`                 // User's role (historian, scientist, lawyer, neutral)
 	CreatedAt    int64              `json:"createdAt" bson:"createdAt"`
 }

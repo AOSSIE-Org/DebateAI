@@ -94,9 +94,7 @@ func (ms *MatchmakingService) RemoveFromPool(userID string) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
 
-	if _, exists := ms.pool[userID]; exists {
-		delete(ms.pool, userID)
-	}
+	delete(ms.pool, userID)
 }
 
 // UpdateActivity updates the last activity time for a user

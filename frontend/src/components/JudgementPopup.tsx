@@ -113,6 +113,7 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   botName,
   userStance,
   botStance,
+  botDesc,
   forRole,
   againstRole,
   localRole = null,
@@ -133,64 +134,64 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
     localStorage.getItem('opponentAvatar') ||
     'https://avatar.iran.liara.run/public/31';
 
-const isUserBotFormat = 'user' in judgment.opening_statement;
+  const isUserBotFormat = 'user' in judgment.opening_statement;
 
-const defaultForName = forRole || 'For Debater';
-const defaultAgainstName = againstRole || 'Against Debater';
-const resolvedLocalName = localDisplayName || userName;
-const resolvedOpponentName = opponentDisplayName || 'Opponent';
-const derivedLocalAvatar = localAvatarUrl || localAvatar;
-const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
+  const defaultForName = forRole || 'For Debater';
+  const defaultAgainstName = againstRole || 'Against Debater';
+  const resolvedLocalName = localDisplayName || userName;
+  const resolvedOpponentName = opponentDisplayName || 'Opponent';
+  const derivedLocalAvatar = localAvatarUrl || localAvatar;
+  const derivedOpponentAvatar = opponentAvatarUrl || opponentAvatar;
 
-const resolvedForName = isUserBotFormat
-  ? defaultForName
-  : localRole === 'for'
-  ? resolvedLocalName
-  : localRole === 'against'
-  ? resolvedOpponentName
-  : defaultForName;
+  const resolvedForName = isUserBotFormat
+    ? defaultForName
+    : localRole === 'for'
+      ? resolvedLocalName
+      : localRole === 'against'
+        ? resolvedOpponentName
+        : defaultForName;
 
-const resolvedAgainstName = isUserBotFormat
-  ? defaultAgainstName
-  : localRole === 'against'
-  ? resolvedLocalName
-  : localRole === 'for'
-  ? resolvedOpponentName
-  : defaultAgainstName;
+  const resolvedAgainstName = isUserBotFormat
+    ? defaultAgainstName
+    : localRole === 'against'
+      ? resolvedLocalName
+      : localRole === 'for'
+        ? resolvedOpponentName
+        : defaultAgainstName;
 
-const player1Name = isUserBotFormat ? userName : resolvedForName;
-const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
-const player1Stance = isUserBotFormat ? userStance : 'For';
-const player2Stance = isUserBotFormat ? botStance : 'Against';
+  const player1Name = isUserBotFormat ? userName : resolvedForName;
+  const player2Name = isUserBotFormat ? botName || 'Bot' : resolvedAgainstName;
+  const player1Stance = isUserBotFormat ? userStance : 'For';
+  const player2Stance = isUserBotFormat ? botStance : 'Against';
 
-const resolvedForAvatar = isUserBotFormat
-  ? userAvatar
-  : localRole === 'for'
-  ? derivedLocalAvatar
-  : localRole === 'against'
-  ? derivedOpponentAvatar
-  : derivedLocalAvatar || derivedOpponentAvatar;
+  const resolvedForAvatar = isUserBotFormat
+    ? userAvatar
+    : localRole === 'for'
+      ? derivedLocalAvatar
+      : localRole === 'against'
+        ? derivedOpponentAvatar
+        : derivedLocalAvatar || derivedOpponentAvatar;
 
-const resolvedAgainstAvatar = isUserBotFormat
-  ? botAvatar
-  : localRole === 'against'
-  ? derivedLocalAvatar
-  : localRole === 'for'
-  ? derivedOpponentAvatar
-  : derivedOpponentAvatar || derivedLocalAvatar;
+  const resolvedAgainstAvatar = isUserBotFormat
+    ? botAvatar
+    : localRole === 'against'
+      ? derivedLocalAvatar
+      : localRole === 'for'
+        ? derivedOpponentAvatar
+        : derivedOpponentAvatar || derivedLocalAvatar;
 
-const player1Avatar = resolvedForAvatar || localAvatar;
-const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
-const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
+  const player1Avatar = resolvedForAvatar || localAvatar;
+  const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
+  const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
 
-const formatChange = (value: number) =>
-  `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
-const formatRating = (value: number) => value.toFixed(2);
+  const formatChange = (value: number) =>
+    `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+  const formatRating = (value: number) => value.toFixed(2);
 
-const player1RatingSummary =
-  !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
-const player2RatingSummary =
-  !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
+  const player1RatingSummary =
+    !isUserBotFormat && ratingSummary ? ratingSummary.for : null;
+  const player2RatingSummary =
+    !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
 
   const handleGoHome = () => {
     navigate('/startdebate');
@@ -283,15 +284,15 @@ const player2RatingSummary =
       cross_questions: isUserBotFormat
         ? getScoreAndReason('cross_examination', 'player1').reason.toLowerCase()
         : getScoreAndReason(
-            'cross_examination_questions',
-            'player1'
-          ).reason.toLowerCase(),
+          'cross_examination_questions',
+          'player1'
+        ).reason.toLowerCase(),
       cross_answers: isUserBotFormat
         ? getScoreAndReason('answers', 'player1').reason.toLowerCase()
         : getScoreAndReason(
-            'cross_examination_answers',
-            'player1'
-          ).reason.toLowerCase(),
+          'cross_examination_answers',
+          'player1'
+        ).reason.toLowerCase(),
       closing: getScoreAndReason('closing', 'player1').reason.toLowerCase(),
     };
 
@@ -650,11 +651,10 @@ const player2RatingSummary =
                   </span>
                 </p>
                 <p
-                  className={`text-sm font-semibold ${
-                    player1RatingSummary.change >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}
+                  className={`text-sm font-semibold ${player1RatingSummary.change >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                    }`}
                 >
                   Change: {formatChange(player1RatingSummary.change)}
                 </p>
@@ -670,11 +670,10 @@ const player2RatingSummary =
                   </span>
                 </p>
                 <p
-                  className={`text-sm font-semibold ${
-                    player2RatingSummary.change >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}
+                  className={`text-sm font-semibold ${player2RatingSummary.change >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                    }`}
                 >
                   Change: {formatChange(player2RatingSummary.change)}
                 </p>

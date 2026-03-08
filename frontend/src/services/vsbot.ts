@@ -21,6 +21,7 @@ export type DebateRequest = {
   stance: string;
   phaseTimings?: PhaseTiming[]; // For createDebate
   context?: string; // Added optional context field
+  role?: string; // Added role field
 };
 
 export type DebateResponse = {
@@ -29,6 +30,7 @@ export type DebateResponse = {
   botLevel: string;
   topic: string;
   stance: string;
+  role?: string;
   phaseTimings?: PhaseTiming[]; // Included in response for consistency
 };
 
