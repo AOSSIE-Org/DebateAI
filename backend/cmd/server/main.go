@@ -33,9 +33,11 @@ func main() {
 
 	// Connect to MongoDB using the configured URI
 	// MongoDB is optional so the server (and /health) can start without it
+	mongoReady := true
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
 		log.Printf("⚠️ Warning: Failed to connect to MongoDB: %v", err)
 		log.Println("⚠️ Continuing without MongoDB")
+		mongoReady = false
 	} else {
 		log.Println("Connected to MongoDB")
 	}
@@ -67,9 +69,13 @@ func main() {
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
 
-	// Seed initial debate-related data
-	utils.SeedDebateData()
-	utils.PopulateTestUsers()
+	// Seed initial debate-related data only if MongoDB is available
+	if mongoReady {
+		utils.SeedDebateData()
+		utils.PopulateTestUsers()
+	} else {
+		log.Println("Skipping SeedDebateData and PopulateTestUsers because MongoDB is unavailable")
+	}
 
 	// Create uploads directory
 	os.MkdirAll("uploads", os.ModePerm)
