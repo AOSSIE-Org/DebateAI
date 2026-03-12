@@ -1,50 +1,55 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"time"
 
 	"arguehub/services"
 )
 
+// main performs a smoke test of the matchmaking service.
+// It adds users to the pool, starts matchmaking for them,
+// waits briefly for the matching process, and prints the
+// matchmaking pool state at each stage.
 func main() {
 
-	// Test the matchmaking service
+	// Initialize matchmaking service
 	ms := services.GetMatchmakingService()
 
-	// Add some test users (but don't start matchmaking yet)
-	err := ms.AddToPool("user1", "Alice", 1200)
-	if err != nil {
+	// Add test users to the pool
+	if err := ms.AddToPool("user1", "Alice", 1200); err != nil {
+		log.Fatal("Failed to add user1 to pool:", err)
 	}
 
-	err = ms.AddToPool("user2", "Bob", 1250)
-	if err != nil {
+	if err := ms.AddToPool("user2", "Bob", 1250); err != nil {
+		log.Fatal("Failed to add user2 to pool:", err)
 	}
 
-	// Check pool - should be empty since no one started matchmaking
+	// Check pool before matchmaking starts
 	pool := ms.GetPool()
+	fmt.Println("Pool before matchmaking starts:")
+	fmt.Println(pool)
 
 	// Start matchmaking for both users
-	err = ms.StartMatchmaking("user1")
-	if err != nil {
+	if err := ms.StartMatchmaking("user1"); err != nil {
+		log.Fatal("Failed to start matchmaking for user1:", err)
 	}
 
-	err = ms.StartMatchmaking("user2")
-	if err != nil {
+	if err := ms.StartMatchmaking("user2"); err != nil {
+		log.Fatal("Failed to start matchmaking for user2:", err)
 	}
 
-	// Check pool - should have 2 users now
+	// Check pool after starting matchmaking
 	pool = ms.GetPool()
+	fmt.Println("Pool after matchmaking started:")
+	fmt.Println(pool)
 
-	for range pool {
-	}
-
-	// Wait a bit for matching
+	// Wait for matching to process
 	time.Sleep(1 * time.Second)
 
-	// Check pool after matching
+	// Check pool after matching attempt
 	pool = ms.GetPool()
-
-	for range pool {
-	}
-
+	fmt.Println("Pool after matching process:")
+	fmt.Println(pool)
 }
