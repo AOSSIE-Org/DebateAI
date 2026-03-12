@@ -275,7 +275,8 @@ func JudgeDebate(c *gin.Context) {
 		latestDebate.BotName,
 		resultStatus,
 		req.History,
-		nil,
+		map[string]string{},
+		0.0,
 	)
 
 	// Update gamification (score, badges, streaks) after bot debate
@@ -591,7 +592,8 @@ func ConcedeDebate(c *gin.Context) {
 		debate.BotName,
 		"loss",
 		historyToSave,
-		nil,
+		map[string]string{},
+		0.0,
 	)
 
 	// Update gamification (score, badges, streaks)

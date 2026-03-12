@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"log"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,9 +187,10 @@ func SubmitTranscripts(
 					resultFor,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					forSubmission.Transcripts,
-					forRecord.RatingChange
+					0.0,
 				)
 				if err != nil {
+					log.Println("Error saving transcript for forUser:", err)
 				}
 
 				// Save transcript for "against" user
@@ -201,8 +203,10 @@ func SubmitTranscripts(
 					resultAgainst,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					againstSubmission.Transcripts,
+					0.0,
 				)
 				if err != nil {
+					log.Println("Error saving transcript for againstUser:", err)
 				}
 
 				// Update ratings based on the result
