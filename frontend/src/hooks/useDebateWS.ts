@@ -358,14 +358,12 @@ export const useDebateWS = (debateId: string | null) => {
 
     rws.onerror = (error) => {
       handleError(error, 'WebSocket connection error');
-      handleReconnect();
     };
 
     rws.onclose = (event) => {
       // Don't treat normal closure as error
       if (event.code !== 1000) { // 1000 is normal closure
         handleError(new Error(`Connection closed with code ${event.code}: ${event.reason || 'Unknown reason'}`));
-        handleReconnect();
       } else {
         setWsStatus('disconnected');
         setWsError(null);
@@ -384,8 +382,9 @@ export const useDebateWS = (debateId: string | null) => {
         try {
           if (rws.readyState === WebSocket.OPEN) {
             rws.close(1000, 'Component unmounting');
+          } else {
+            rws.close();
           }
-          rws.close();
         } catch (error) {
           console.error('Error during WebSocket cleanup:', error);
         } finally {
