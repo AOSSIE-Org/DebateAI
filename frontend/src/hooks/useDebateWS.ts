@@ -15,6 +15,8 @@ import {
 } from '../atoms/debateAtoms';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 
+const ERROR_THROTTLE_MS = 5000;
+
 interface Event {
   type: string;
   payload: any;
@@ -35,7 +37,6 @@ export const useDebateWS = (debateId: string | null) => {
   
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const lastErrorTime = useRef(0);
-  const retryCount = useRef(0);
 
   useEffect(() => {
     if (!debateId) return;
@@ -105,7 +106,7 @@ export const useDebateWS = (debateId: string | null) => {
 
     const handleError = (error: unknown, context = 'WebSocket error') => {
       const now = Date.now();
-      if (now - lastErrorTime.current > 5000) { // 5 seconds throttle
+      if (now - lastErrorTime.current > ERROR_THROTTLE_MS) { // 5 seconds throttle
         const errorMessage = error instanceof Error 
           ? `${context}: ${error.message}`
           : `${context}: An unknown error occurred`;
@@ -143,11 +144,8 @@ export const useDebateWS = (debateId: string | null) => {
         
         const eventData: Event = JSON.parse(event.data);
         
-        // Reset error state on successful message
-        if (retryCount.current > 0) {
-          retryCount.current = 0;
-          setWsError(null);
-        }
+        // Clear error state on successful message
+        setWsError(null);
 
         if (eventData.type !== 'poll_snapshot' && eventData.timestamp) {
           setLastEventId(String(eventData.timestamp));
