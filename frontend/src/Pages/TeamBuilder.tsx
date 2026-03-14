@@ -335,7 +335,7 @@ const TeamBuilder: React.FC = () => {
   return (
       <div className="container mx-auto p-6 max-w-6xl">
         <div className="mb-8 text-center">
-        <h1 className="text-5xl font-600 text-blue-400 mb-3 tracking-wide">
+        <h1 className="text-5xl font-bold text-primary mb-3 tracking-wide">
           Team Builder
         </h1>
         <p className="text-lg text-gray-700">
