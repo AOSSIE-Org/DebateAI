@@ -9,22 +9,30 @@ import {
   Trophy,
   Users,
   MessageCircle,
+  Heart,
 } from 'lucide-react';
 import debateAiLogo from '@/assets/aossie.png';
 import { ThemeToggle } from './ThemeToggle';
 
 function Sidebar() {
   return (
-    <aside className='hidden md:flex flex-col w-64 border-r border-gray-200'>
+    <aside className='hidden md:flex flex-col w-64 border-r border-border bg-background'>
       {/* Logo / Brand */}
-      <div className='flex items-center h-16 px-4 border-b border-gray-200'>
+      <div className='flex items-center h-16 px-4 border-b border-border'>
         <div className='flex items-center gap-2'>
           <span className='text-xl font-bold'>DebateAI by</span>
-          <img
-            src={debateAiLogo}
-            alt='DebateAI Logo'
-            className='h-8 w-auto object-contain'
-          />
+          <a 
+            href="https://aossie.org" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:opacity-80 transition-opacity"
+          >
+            <img
+              src={debateAiLogo}
+              alt='DebateAI Logo'
+              className='h-8 w-auto object-contain'
+            />
+          </a>
         </div>
       </div>
       {/* Nav links */}
@@ -63,6 +71,11 @@ function Sidebar() {
           to='/about'
           label='About'
           icon={<Info className='mr-3 h-4 w-4' />}
+        />
+        <NavItem
+          to='/support-os'
+          label='Support DebateAI'
+          icon={<Heart className='mr-3 h-4 w-4 text-red-500 transition-all duration-300 group-hover:fill-red-500 group-hover:scale-110' />}
         />
         <ThemeToggle />
       </nav>
