@@ -186,7 +186,7 @@ func SubmitTranscripts(
 					resultFor,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					forSubmission.Transcripts,
-					forRecord.RatingChange
+					0,
 				)
 				if err != nil {
 				}
@@ -201,6 +201,7 @@ func SubmitTranscripts(
 					resultAgainst,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					againstSubmission.Transcripts,
+					0,
 				)
 				if err != nil {
 				}

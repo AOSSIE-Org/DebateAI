@@ -20,11 +20,13 @@ function Sidebar() {
       <div className='flex items-center h-16 px-4 border-b border-gray-200'>
         <div className='flex items-center gap-2'>
           <span className='text-xl font-bold'>DebateAI by</span>
-          <img
-            src={debateAiLogo}
-            alt='DebateAI Logo'
-            className='h-8 w-auto object-contain'
-          />
+          <a href="https://aossie.org" target="_blank" rel="noopener noreferrer">
+            <img
+              src={debateAiLogo}
+              alt='DebateAI Logo'
+              className='h-8 w-auto object-contain'
+            />
+          </a>
         </div>
       </div>
       {/* Nav links */}

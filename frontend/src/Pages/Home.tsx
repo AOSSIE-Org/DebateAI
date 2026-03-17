@@ -5,6 +5,7 @@ import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 import { useContext } from "react";
 import { AuthContext } from "@/context/authContext";
+import { FaHeart } from "react-icons/fa";
 
 {/* TODO modify the home page for already logged in and signed up state  */}
 
@@ -45,7 +46,7 @@ const Home: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <nav className="flex items-center justify-between px-4 py-4 md:px-12">
-        <h1 className="text-xl md:text-3xl font-bold">Argue-Hub</h1>
+        <h1 className="text-xl md:text-3xl font-bold">DebateAI</h1>
           {
             authContext?.isAuthenticated?(<Button onClick={logoutHandler}>Log out</Button>):(
               <div className="flex">
@@ -88,6 +89,11 @@ const Home: React.FC = () => {
                   </span>
                 </div>
               </Button>
+            </div>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                <span className="text-sm text-gray-500">Support DebateAI</span>
+
+                <FaHeart className="text-gray-400 hover:text-red-500 hover:scale-110 transition duration-300 cursor-pointer" />
             </div>
           </div>
         </div>
