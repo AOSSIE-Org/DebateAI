@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -14,26 +15,31 @@ import (
 	"arguehub/utils"
 	"arguehub/websocket"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// Load the configuration from the specified YAML file
 	cfg, err := config.LoadConfig("./config/config.prod.yml")
+
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
-
+	// Initialize services
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
 
-	// Connect to MongoDB using the URI from the configuration
+	// Connect to MongoDB using the configured URI
+	// MongoDB is optional so the server (and /health) can start without it
+	mongoReady := true
 	if err := db.ConnectMongoDB(cfg.Database.URI); err != nil {
-		panic("Failed to connect to MongoDB: " + err.Error())
+		log.Printf("⚠️ Warning: Failed to connect to MongoDB: %v", err)
+		log.Println("⚠️ Continuing without MongoDB")
+		mongoReady = false
+	} else {
+		log.Println("Connected to MongoDB")
 	}
-	log.Println("Connected to MongoDB")
 
 	// Initialize Casbin RBAC
 	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
@@ -62,9 +68,13 @@ func main() {
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
 
-	// Seed initial debate-related data
-	utils.SeedDebateData()
-	utils.PopulateTestUsers()
+	// Seed initial debate-related data only if MongoDB is available
+	if mongoReady {
+		utils.SeedDebateData()
+		utils.PopulateTestUsers()
+	} else {
+		log.Println("Skipping SeedDebateData and PopulateTestUsers because MongoDB is unavailable")
+	}
 
 	// Create uploads directory
 	os.MkdirAll("uploads", os.ModePerm)
@@ -78,21 +88,73 @@ func main() {
 	}
 }
 
+// CORSMiddleware handles CORS preflight and actual requests with enhanced security
+func CORSMiddleware() gin.HandlerFunc {
+	// Allowed origins list; add production domains here
+	allowedOrigins := []string{
+		"http://localhost:5173",
+		"http://127.0.0.1:5173",
+	}
+
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+
+		isAllowed := false
+		for _, o := range allowedOrigins {
+			if o == origin {
+				isAllowed = true
+				break
+			}
+		}
+
+		if isAllowed {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Vary", "Origin")
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		// Set allowed methods for all responses
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+		// Handle preflight requests
+		if c.Request.Method == "OPTIONS" {
+			// Set allowed headers if requested
+			if reqHeaders := c.GetHeader("Access-Control-Request-Headers"); reqHeaders != "" {
+				c.Writer.Header().Set("Access-Control-Allow-Headers", reqHeaders)
+			} else {
+				c.Writer.Header().Set("Access-Control-Allow-Headers",
+					"Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+			}
+
+			// Cache preflight response for 24 hours (86400 seconds)
+			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+
+			// End preflight request with 204 No Content or 200 OK
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// setupRouter initializes the HTTP routes for the backend server.
+// It includes a lightweight /health endpoint used to verify server availability
+// without depending on external services such as databases or caches.
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
 
-	// Configure CORS for your frontend (e.g., localhost:5173 for Vite)
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-	router.OPTIONS("/*path", func(c *gin.Context) { c.Status(204) })
+	// Apply CORS middleware globally
+	router.Use(CORSMiddleware())
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+		})
+	})
 
 	// Public routes for authentication
 	router.POST("/signup", routes.SignUpRouteHandler)
@@ -129,7 +191,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		// WebSocket signaling endpoint (handles auth internally)
 		router.GET("/ws", websocket.WebsocketHandler)
 
-		// Set up transcript routes
+		// Set up the transcript routes
 		routes.SetupTranscriptRoutes(auth)
 
 		auth.GET("/coach/strengthen-argument/weak-statement", routes.GetWeakStatement)
