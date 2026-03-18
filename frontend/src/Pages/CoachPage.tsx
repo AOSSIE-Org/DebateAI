@@ -134,7 +134,7 @@ const CoachPage: React.FC = () => {
             Managed with ❤️ by <a href="https://aossie.org" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">AOSSIE</a>
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            © {new Date().getFullYear()} DebateAI. All rights reserved.
+            © 2016-{new Date().getFullYear()} AOSSIE. All rights reserved.
           </p>
         </div>
       </footer>
