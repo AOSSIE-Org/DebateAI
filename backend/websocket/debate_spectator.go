@@ -46,10 +46,9 @@ type SpectatorClient struct {
 
 // NewDebateHub creates a new DebateHub
 func NewDebateHub() *DebateHub {
-	hub := &DebateHub{
+	return &DebateHub{
 		debates: make(map[string]*DebateRoom),
 	}
-	return hub
 }
 
 // Register registers a new WebSocket connection for a debate
@@ -57,7 +56,6 @@ func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHas
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Get or create debate room
 	room, exists := h.debates[debateID]
 	if !exists {
 		room = &DebateRoom{
@@ -67,13 +65,11 @@ func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHas
 		}
 		h.debates[debateID] = room
 
-		// Start consumer group for this debate (only if Redis is available)
 		if room.consumer != nil {
 			go room.consumer.StartConsumerGroup(debateID)
 		}
 	}
 
-	// Create client
 	client := &SpectatorClient{
 		conn:          conn,
 		spectatorHash: spectatorHash,
@@ -85,15 +81,13 @@ func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHas
 	clientCount := len(room.clients)
 	room.mu.Unlock()
 
-	// Broadcast presence update
-	presenceEvent := map[string]interface{}{
+	h.BroadcastPresence(debateID, map[string]interface{}{
 		"type": "presence",
 		"payload": map[string]interface{}{
 			"connected": clientCount,
 		},
 		"timestamp": time.Now().Unix(),
-	}
-	h.BroadcastPresence(debateID, presenceEvent)
+	})
 
 	return client
 }
@@ -113,15 +107,13 @@ func (h *DebateHub) Unregister(debateID string, conn *websocket.Conn) {
 	clientCount := len(room.clients)
 	room.mu.Unlock()
 
-	// Broadcast presence update
-	presenceEvent := map[string]interface{}{
+	h.BroadcastPresence(debateID, map[string]interface{}{
 		"type": "presence",
 		"payload": map[string]interface{}{
 			"connected": clientCount,
 		},
 		"timestamp": time.Now().Unix(),
-	}
-	h.BroadcastPresence(debateID, presenceEvent)
+	})
 }
 
 // BroadcastToDebate broadcasts an event to all connected clients for a debate
@@ -141,10 +133,8 @@ func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
 	}
 	room.mu.RUnlock()
 
-	// Convert event to frontend format - parse payload
 	var payload interface{}
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
-		// If unmarshal fails, use raw payload
 		payload = json.RawMessage(event.Payload)
 	}
 
@@ -154,7 +144,6 @@ func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
 		"timestamp": event.Timestamp,
 	}
 
-	// Broadcast to all clients
 	for _, client := range clients {
 		if err := client.WriteJSON(eventData); err != nil {
 		}
@@ -178,7 +167,6 @@ func (h *DebateHub) BroadcastPresence(debateID string, presenceEvent map[string]
 	}
 	room.mu.RUnlock()
 
-	// Broadcast to all clients
 	for _, client := range clients {
 		if err := client.WriteJSON(presenceEvent); err != nil {
 		}
@@ -201,41 +189,33 @@ func DebateWebsocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Upgrade connection
 	conn, err := debateUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
 
-	// Get or generate spectator hash
 	spectatorID := c.Query("spectatorId")
 
 	var spectatorHash string
 	if spectatorID != "" {
-		// Hash the spectator ID
 		h := sha256.Sum256([]byte(spectatorID))
 		spectatorHash = hex.EncodeToString(h[:])
 	} else {
-		// Generate ephemeral ID
 		ephemeralID := uuid.New().String()
 		h := sha256.Sum256([]byte(ephemeralID))
 		spectatorHash = hex.EncodeToString(h[:])
 	}
 
-	// Register client
 	hub := GetDebateHub()
 	client := hub.Register(debateID, conn, spectatorHash)
 	defer hub.Unregister(debateID, conn)
 
-	// Send initial poll snapshot
 	snapshot, err := loadPollSnapshot(debateID)
 	if err == nil && snapshot != nil {
 		conn.WriteJSON(snapshot)
-	} else if err != nil {
 	}
 
-	// Send initial presence count - get it from the hub after registration
 	hub.mu.RLock()
 	room, exists := hub.debates[debateID]
 	clientCount := 0
@@ -246,43 +226,36 @@ func DebateWebsocketHandler(c *gin.Context) {
 	}
 	hub.mu.RUnlock()
 
-	// Send presence event in format expected by frontend
-	presenceEvent := map[string]interface{}{
+	conn.WriteJSON(map[string]interface{}{
 		"type": "presence",
 		"payload": map[string]interface{}{
 			"connected": clientCount,
 		},
 		"timestamp": time.Now().Unix(),
-	}
-	conn.WriteJSON(presenceEvent)
+	})
 
-	// Read pump
-	go readPump(client, hub)
+	// ✅ FIX: removed unused `hub` param — readPump only needs client
+	go readPump(client)
 
-	// Keep connection alive
 	select {}
 }
 
 // readPump handles incoming messages from client
-func readPump(client *SpectatorClient, hub *DebateHub) {
+// hub param removed — not used inside the pump; handlers call GetDebateHub() directly
+func readPump(client *SpectatorClient) {
 	defer client.conn.Close()
 
 	for {
 		_, messageBytes, err := client.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-			} else {
-			}
 			break
 		}
 
-		// Parse client message
 		var clientMsg debate.ClientMessage
 		if err := json.Unmarshal(messageBytes, &clientMsg); err != nil {
 			continue
 		}
 
-		// Handle different message types
 		switch clientMsg.Type {
 		case "join":
 		case "vote":
@@ -305,42 +278,31 @@ func handleVote(client *SpectatorClient, payloadBytes []byte) {
 		return
 	}
 
-	// Set spectator hash and timestamp
 	payload.SpectatorHash = client.spectatorHash
 	if payload.ClientEventID == "" {
 		payload.ClientEventID = uuid.New().String()
 	}
 	payload.Timestamp = time.Now().Unix()
 
-	// Check rate limit
 	rateLimiter := debate.NewRateLimiter()
 	canVote, err := rateLimiter.CheckVoteRateLimit(client.debateID, payload.PollID, client.spectatorHash)
 	if err != nil || !canVote {
 		return
 	}
 
-	// Process vote
 	store := debate.NewPollStore()
 	success, err := store.Vote(client.debateID, payload.PollID, payload.Option, client.spectatorHash)
-	if err != nil {
+	if err != nil || !success {
 		return
 	}
 
-	if !success {
-		return
-	}
-
-	// Get hub to broadcast
 	hub := GetDebateHub()
-
-	// Create event for broadcasting (in frontend format)
 	voteEvent := map[string]interface{}{
 		"type":      "vote",
 		"payload":   payload,
 		"timestamp": payload.Timestamp,
 	}
 
-	// Broadcast directly to all connected clients
 	hub.mu.RLock()
 	room, exists := hub.debates[client.debateID]
 	if exists {
@@ -352,10 +314,9 @@ func handleVote(client *SpectatorClient, payloadBytes []byte) {
 	}
 	hub.mu.RUnlock()
 
-	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("vote", payload)
 	if err == nil {
-		debate.PublishEvent(client.debateID, event) // Ignore error if Redis unavailable
+		debate.PublishEvent(client.debateID, event)
 	}
 }
 
@@ -366,14 +327,12 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 		return
 	}
 
-	// Set spectator hash and timestamp
 	payload.SpectatorHash = client.spectatorHash
 	if payload.QID == "" {
 		payload.QID = uuid.New().String()
 	}
 	payload.Timestamp = time.Now().Unix()
 
-	// Check rate limit
 	rateLimiter := debate.NewRateLimiter()
 	config := debate.DefaultRateLimitConfig()
 	canAsk, err := rateLimiter.CheckQuestionRateLimit(client.debateID, client.spectatorHash, config)
@@ -381,20 +340,15 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 		return
 	}
 
-	// Record rate limit
 	rateLimiter.RecordQuestion(client.debateID, client.spectatorHash, config)
 
-	// Get hub to broadcast
 	hub := GetDebateHub()
-
-	// Create event for broadcasting (in frontend format)
 	questionEvent := map[string]interface{}{
 		"type":      "question",
 		"payload":   payload,
 		"timestamp": payload.Timestamp,
 	}
 
-	// Broadcast directly to all connected clients
 	hub.mu.RLock()
 	room, exists := hub.debates[client.debateID]
 	if exists {
@@ -407,10 +361,9 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 	}
 	hub.mu.RUnlock()
 
-	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("question", payload)
 	if err == nil {
-		debate.PublishEvent(client.debateID, event) // Ignore error if Redis unavailable
+		debate.PublishEvent(client.debateID, event)
 	}
 }
 
@@ -421,11 +374,9 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 		return
 	}
 
-	// Set spectator hash and timestamp
 	payload.SpectatorHash = client.spectatorHash
 	payload.Timestamp = time.Now().Unix()
 
-	// Check rate limit
 	rateLimiter := debate.NewRateLimiter()
 	config := debate.DefaultRateLimitConfig()
 	canReact, err := rateLimiter.CheckReactionRateLimit(client.debateID, client.spectatorHash, config)
@@ -433,20 +384,15 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 		return
 	}
 
-	// Record rate limit
 	rateLimiter.RecordReaction(client.debateID, client.spectatorHash, config)
 
-	// Get hub to broadcast
 	hub := GetDebateHub()
-
-	// Create event for broadcasting (in frontend format)
 	reactionEvent := map[string]interface{}{
 		"type":      "reaction",
 		"payload":   payload,
 		"timestamp": payload.Timestamp,
 	}
 
-	// Broadcast directly to all connected clients
 	hub.mu.RLock()
 	room, exists := hub.debates[client.debateID]
 	if exists {
@@ -458,10 +404,9 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 	}
 	hub.mu.RUnlock()
 
-	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("reaction", payload)
 	if err == nil {
-		debate.PublishEvent(client.debateID, event) // Ignore error if Redis unavailable
+		debate.PublishEvent(client.debateID, event)
 	}
 }
 
@@ -485,13 +430,8 @@ func handleCreatePoll(client *SpectatorClient, payloadBytes []byte) {
 		return
 	}
 
-	// Load current snapshot for counts/metadata
-	snapshot, err := loadPollSnapshot(client.debateID)
-	if err != nil {
-		// Even if snapshot fails, continue with created event
-	}
+	snapshot, _ := loadPollSnapshot(client.debateID)
 
-	// Determine created poll data for event
 	var createdPoll map[string]interface{}
 	if snapshot != nil {
 		if payloadMap, ok := snapshot["payload"].(map[string]interface{}); ok {
@@ -509,7 +449,6 @@ func handleCreatePoll(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	if createdPoll == nil {
-		// Fallback payload
 		createdPoll = map[string]interface{}{
 			"pollId":   pollID,
 			"question": payload.Question,
@@ -540,7 +479,6 @@ func handleCreatePoll(client *SpectatorClient, payloadBytes []byte) {
 	}
 	hub.mu.RUnlock()
 
-	// Publish event for persistence
 	eventPayload := debate.PollCreatedPayload{
 		PollID:    pollID,
 		Question:  payload.Question,
@@ -564,17 +502,16 @@ func loadPollSnapshot(debateID string) (map[string]interface{}, error) {
 	polls := make([]map[string]interface{}, 0, len(pollState))
 	for pollID, counts := range pollState {
 		meta := metadata[pollID]
-		poll := map[string]interface{}{
+		polls = append(polls, map[string]interface{}{
 			"pollId":   pollID,
 			"question": meta.Question,
 			"options":  meta.Options,
 			"counts":   counts,
 			"voters":   votersCount[pollID],
-		}
-		polls = append(polls, poll)
+		})
 	}
 
-	snapshot := map[string]interface{}{
+	return map[string]interface{}{
 		"type": "poll_snapshot",
 		"payload": map[string]interface{}{
 			"pollState":   pollState,
@@ -582,9 +519,7 @@ func loadPollSnapshot(debateID string) (map[string]interface{}, error) {
 			"polls":       polls,
 		},
 		"timestamp": time.Now().Unix(),
-	}
-
-	return snapshot, nil
+	}, nil
 }
 
 // GetDebateHub returns the global DebateHub instance
