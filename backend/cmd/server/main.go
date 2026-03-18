@@ -89,11 +89,14 @@ func main() {
 }
 
 // CORSMiddleware handles CORS preflight and actual requests with enhanced security
-func CORSMiddleware() gin.HandlerFunc {
-	// Allowed origins list; add production domains here
-	allowedOrigins := []string{
-		"http://localhost:5173",
-		"http://127.0.0.1:5173",
+func CORSMiddleware(cfg *config.Config) gin.HandlerFunc {
+	// Use allowed origins from configuration if available, with localhost defaults as fallback
+	allowedOrigins := cfg.CORS.AllowedOrigins
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+		}
 	}
 
 	return func(c *gin.Context) {
@@ -129,8 +132,9 @@ func CORSMiddleware() gin.HandlerFunc {
 			// Cache preflight response for 24 hours (86400 seconds)
 			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 
-			// End preflight request with 204 No Content or 200 OK
-			c.AbortWithStatus(http.StatusNoContent)
+			// Return 200 OK with JSON body for preflight as required
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+			c.Abort()
 			return
 		}
 
@@ -148,7 +152,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
 
 	// Apply CORS middleware globally
-	router.Use(CORSMiddleware())
+	router.Use(CORSMiddleware(cfg))
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
