@@ -221,7 +221,14 @@ const DebateRoom: React.FC = () => {
   const judgingRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const debateData = location.state as DebateProps;
+  const debateData = location.state as unknown as DebateProps | null;
+  if (!debateData) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Invalid access. Please start debate from dashboard.
+      </div>
+    );
+  }
   const phases = debateData.phaseTimings;
   const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
   const [user] = useAtom(userAtom);
@@ -237,7 +244,7 @@ const DebateRoom: React.FC = () => {
           isBotTurn: false,
           userStance: "",
           botStance: "",
-          timer: phases[0].time,
+          timer: phases?.[0]?.time || 0,
           isDebateEnded: false,
         };
   });
@@ -578,23 +585,32 @@ const DebateRoom: React.FC = () => {
 
     const judgeDebateResult = async (messages: Message[]) => {
     if (judgingRef.current) {
-      console.log("Judging already in progress, skipping duplicate call");
+      if (import.meta.env.DEV) {
+        console.log("Judging already in progress, skipping duplicate call");
+      }
       return;
     }
 
     judgingRef.current = true;
 
     try {
-      console.log("Starting judgment with messages:", messages);
+      if (import.meta.env.DEV) {
+        console.log("Starting judgment...");
+        console.log("Message count:", messages.length);
+      }
       const { result } = await judgeDebate({
         history: messages,
         userId: debateData.userId,
       });
 
-      console.log("Raw judge result:", result);
+      if (import.meta.env.DEV) {
+        console.log("Judgment result received");
+      }
 
       const jsonString = extractJSON(result);
-      console.log("Extracted JSON string:", jsonString);
+      if (import.meta.env.DEV) {
+        console.log("JSON extracted successfully");
+      }
 
       let judgment: JudgmentData;
       try {
@@ -603,7 +619,9 @@ const DebateRoom: React.FC = () => {
         throw new Error(`Failed to parse judgment JSON: ${e}`);
       }
 
-      console.log("Parsed judgment:", judgment);
+      if (import.meta.env.DEV) {
+        console.log("Judgment parsed successfully");
+      }
       setJudgmentData(judgment);
       setPopup({ show: false, message: "" });
       setShowJudgment(true);
@@ -678,7 +696,7 @@ const DebateRoom: React.FC = () => {
         {phaseMessages.map((msg, idx) => (
           <div
             key={idx}
-            className="p-3 bg-gray-50 rounded-lg shadow-sm text-gray-800 break-words"
+            className="p-3 bg-gray-50 dark:bg-zinc-800 rounded-lg shadow-sm text-gray-800 dark:text-gray-200 break-words"
           >
             <span className="text-xs text-gray-500 block mb-1">
               {msg.phase}
@@ -702,10 +720,10 @@ const DebateRoom: React.FC = () => {
        <div className="rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg bg-gradient-to-r from-orange-100 via-white to-orange-100
     dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800
        ">
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
             Debate: {debateData.topic}
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
             Phase:{" "}
             <span className="font-medium">
               {phases[state.currentPhase]?.name || "Finished"}
@@ -729,7 +747,7 @@ const DebateRoom: React.FC = () => {
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue500 mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-800">
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
                   {popup.message}
                 </h2>
               </div>
@@ -796,7 +814,7 @@ const DebateRoom: React.FC = () => {
             <p className="text-sm font-semibold text-orange-600 mb-1">
               Stance: {state.botStance}
             </p>
-            <p className="text-xs mb-1">
+            <p className="text-xs mb-1 text-gray-700 dark:text-gray-300">
               Time:{" "}
               {formatTime(
                 state.isBotTurn

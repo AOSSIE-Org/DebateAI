@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+import plugin from "tailwindcss/plugin"
+
 export default {
   darkMode: ["class"],
   content: [
@@ -62,5 +64,8 @@ export default {
   plugins: [
     require("tailwindcss-animate"),
     require("tailwind-scrollbar-hide"),
+    plugin(function ({ addVariant }) {
+      addVariant("high-contrast", ".high-contrast &")
+    }),
   ],
 }
