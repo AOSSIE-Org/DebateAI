@@ -113,6 +113,7 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   botName,
   userStance,
   botStance,
+  botDesc,
   forRole,
   againstRole,
   localRole = null,
@@ -133,7 +134,12 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
     localStorage.getItem('opponentAvatar') ||
     'https://avatar.iran.liara.run/public/31';
 
-const isUserBotFormat = 'user' in judgment.opening_statement;
+  // Some judge responses can be partial/malformed; keep rendering with safe fallbacks
+  const openingStatement = (judgment as Partial<JudgmentDataUserBot>).opening_statement as
+    | JudgmentDataUserBot['opening_statement']
+    | JudgmentDataForAgainst['opening_statement']
+    | undefined;
+  const isUserBotFormat = Boolean(openingStatement && 'user' in openingStatement);
 
 const defaultForName = forRole || 'For Debater';
 const defaultAgainstName = againstRole || 'Against Debater';
@@ -201,64 +207,72 @@ const player2RatingSummary =
     section: string,
     player: 'player1' | 'player2'
   ) => {
+    const asNumber = (v: unknown) =>
+      typeof v === 'number' && Number.isFinite(v) ? v : 0;
+    const asString = (v: unknown) => (typeof v === 'string' ? v : '');
+
+    try {
     if (isUserBotFormat) {
-      const data = judgment as JudgmentDataUserBot;
+      const data = judgment as Partial<JudgmentDataUserBot>;
       const key = player === 'player1' ? 'user' : 'bot';
       switch (section) {
         case 'opening_statement':
           return {
-            score: data.opening_statement[key].score,
-            reason: data.opening_statement[key].reason,
+            score: asNumber(data.opening_statement?.[key]?.score),
+            reason: asString(data.opening_statement?.[key]?.reason),
           };
         case 'cross_examination':
           return {
-            score: data.cross_examination[key].score,
-            reason: data.cross_examination[key].reason,
+            score: asNumber(data.cross_examination?.[key]?.score),
+            reason: asString(data.cross_examination?.[key]?.reason),
           };
         case 'answers':
           return {
-            score: data.answers[key].score,
-            reason: data.answers[key].reason,
+            score: asNumber(data.answers?.[key]?.score),
+            reason: asString(data.answers?.[key]?.reason),
           };
         case 'closing':
           return {
-            score: data.closing[key].score,
-            reason: data.closing[key].reason,
+            score: asNumber(data.closing?.[key]?.score),
+            reason: asString(data.closing?.[key]?.reason),
           };
         case 'total':
-          return { score: data.total[key], reason: '' };
+          return { score: asNumber(data.total?.[key]), reason: '' };
         default:
           return { score: 0, reason: 'Data not available' };
       }
     } else {
-      const data = judgment as JudgmentDataForAgainst;
+      const data = judgment as Partial<JudgmentDataForAgainst>;
       const key = player === 'player1' ? 'for' : 'against';
       switch (section) {
         case 'opening_statement':
           return {
-            score: data.opening_statement[key].score,
-            reason: data.opening_statement[key].reason,
+            score: asNumber(data.opening_statement?.[key]?.score),
+            reason: asString(data.opening_statement?.[key]?.reason),
           };
         case 'cross_examination_questions':
           return {
-            score: data.cross_examination_questions[key].score,
-            reason: data.cross_examination_questions[key].reason,
+            score: asNumber(data.cross_examination_questions?.[key]?.score),
+            reason: asString(data.cross_examination_questions?.[key]?.reason),
           };
         case 'cross_examination_answers':
           return {
-            score: data.cross_examination_answers[key].score,
-            reason: data.cross_examination_answers[key].reason,
+            score: asNumber(data.cross_examination_answers?.[key]?.score),
+            reason: asString(data.cross_examination_answers?.[key]?.reason),
           };
         case 'closing':
           return {
-            score: data.closing[key].score,
-            reason: data.closing[key].reason,
+            score: asNumber(data.closing?.[key]?.score),
+            reason: asString(data.closing?.[key]?.reason),
           };
         case 'total':
-          return { score: data.total[key], reason: '' };
+          return { score: asNumber(data.total?.[key]), reason: '' };
         default:
           return { score: 0, reason: 'Data not available' };
       }
+    }
+    } catch {
+      return { score: 0, reason: 'Data not available' };
     }
   };
 
@@ -279,20 +293,26 @@ const player2RatingSummary =
       opening: getScoreAndReason(
         'opening_statement',
         'player1'
-      ).reason.toLowerCase(),
+      ).reason?.toLowerCase?.() ?? String(getScoreAndReason('opening_statement', 'player1').reason || '').toLowerCase(),
       cross_questions: isUserBotFormat
-        ? getScoreAndReason('cross_examination', 'player1').reason.toLowerCase()
+        ? (getScoreAndReason('cross_examination', 'player1').reason?.toLowerCase?.() ??
+            String(getScoreAndReason('cross_examination', 'player1').reason || '').toLowerCase())
         : getScoreAndReason(
             'cross_examination_questions',
             'player1'
-          ).reason.toLowerCase(),
+          ).reason?.toLowerCase?.() ??
+          String(getScoreAndReason('cross_examination_questions', 'player1').reason || '').toLowerCase(),
       cross_answers: isUserBotFormat
-        ? getScoreAndReason('answers', 'player1').reason.toLowerCase()
+        ? (getScoreAndReason('answers', 'player1').reason?.toLowerCase?.() ??
+            String(getScoreAndReason('answers', 'player1').reason || '').toLowerCase())
         : getScoreAndReason(
             'cross_examination_answers',
             'player1'
-          ).reason.toLowerCase(),
-      closing: getScoreAndReason('closing', 'player1').reason.toLowerCase(),
+          ).reason?.toLowerCase?.() ??
+          String(getScoreAndReason('cross_examination_answers', 'player1').reason || '').toLowerCase(),
+      closing:
+        getScoreAndReason('closing', 'player1').reason?.toLowerCase?.() ??
+        String(getScoreAndReason('closing', 'player1').reason || '').toLowerCase(),
     };
 
     // Strengthen Argument: Low scores in opening/closing or weak argument-related feedback
@@ -687,11 +707,17 @@ const player2RatingSummary =
         <div className='mt-10 bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg shadow-md text-white text-center'>
           <h3 className='text-2xl font-bold'>Verdict</h3>
           <p className='mt-4 text-3xl font-bold'>
-            {judgment.verdict.winner} Wins!
+            {(judgment as any)?.verdict?.winner
+              ? `${(judgment as any).verdict.winner} Wins!`
+              : 'Result unavailable'}
           </p>
-          <p className='mt-3 text-lg'>{judgment.verdict.congratulations}</p>
+          <p className='mt-3 text-lg'>
+            {(judgment as any)?.verdict?.congratulations || ''}
+          </p>
           <p className='mt-2 text-md leading-relaxed'>
-            {judgment.verdict.opponent_analysis}
+            {(judgment as any)?.verdict?.opponent_analysis ||
+              (judgment as any)?.verdict?.reason ||
+              ''}
           </p>
         </div>
 
