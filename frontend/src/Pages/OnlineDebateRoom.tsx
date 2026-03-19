@@ -160,9 +160,7 @@ const OnlineDebateRoom = (): JSX.Element => {
         .slice(0, 10),
     [audienceQuestions]
   );
-  const audiencePolls = useMemo(() => Object.values(pollState), [pollState]);
-
-  // User state management
+  const audiencePolls = useMemo(() => Object.values(pollState), [pollState]);  // User state management
   const [localUser, setLocalUser] = useState<UserDetails | null>(null);
   const [opponentUser, setOpponentUser] = useState<UserDetails | null>(null);
   const [roomParticipants, setRoomParticipants] = useState<UserDetails[]>([]);
@@ -211,6 +209,11 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [debatePhase, setDebatePhase] = useState<DebatePhase>(
     DebatePhase.Setup
   );
+  const roleLocked =
+  localReady ||
+  (peerReady && localRole !== null) ||
+  debatePhase !== DebatePhase.Setup ||
+  localRole !== null;
 
   // State for media streams
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -1987,16 +1990,20 @@ const OnlineDebateRoom = (): JSX.Element => {
   };
 
   const handleRoleSelection = (role: DebateRole) => {
-    if (peerRole === role) {
-      alert(
-        `Your opponent already chose "${role}". Please select the other side.`
-      );
-      return;
-    }
-    setLocalRole(role);
-    const message = JSON.stringify({ type: "roleSelection", role });
-    wsRef.current?.send(message);
-  };
+  // Hard lock once ready OR once role is selected OR once debate started
+  if (roleLocked) return;
+
+  // Prevent picking same role as opponent
+  if (peerRole === role) {
+    alert(
+      `Your opponent already chose "${role}". Please select the other side.`
+    );
+    return;
+  }
+
+  setLocalRole(role);
+  wsRef.current?.send(JSON.stringify({ type: "roleSelection", role }));
+};
 
   const toggleReady = () => {
     const newReadyState = !localReady;
@@ -2209,25 +2216,33 @@ const OnlineDebateRoom = (): JSX.Element => {
                     </div>
                     <div className="mt-2 flex space-x-2">
                       <button
-                        onClick={() => handleRoleSelection("for")}
-                        className={`px-2 py-1 rounded text-xs border transition ${
-                          localRole === "for"
-                            ? "bg-primary text-primary-foreground border-transparent"
-                            : "bg-muted text-muted-foreground border-border"
-                        }`}
-                      >
-                        For
-                      </button>
+  onClick={() => handleRoleSelection("for")}
+  disabled={roleLocked || peerRole === "for"}
+  className={`px-2 py-1 rounded text-xs border transition ${
+    localRole === "for"
+      ? "bg-primary text-primary-foreground border-transparent"
+      : "bg-muted text-muted-foreground border-border"
+  } ${roleLocked || peerRole === "for" ? "opacity-50 cursor-not-allowed" : ""}`}
+>
+  For
+</button>
+
                       <button
-                        onClick={() => handleRoleSelection("against")}
-                        className={`px-2 py-1 rounded text-xs border transition ${
-                          localRole === "against"
-                            ? "bg-primary text-primary-foreground border-transparent"
-                            : "bg-muted text-muted-foreground border-border"
-                        }`}
-                      >
-                        Against
-                      </button>
+  onClick={() => handleRoleSelection("against")}
+  disabled={roleLocked || peerRole === "against"}
+  className={`px-2 py-1 rounded text-xs border transition ${
+    localRole === "against"
+      ? "bg-primary text-primary-foreground border-transparent"
+      : "bg-muted text-muted-foreground border-border"
+  } ${
+    roleLocked || peerRole === "against"
+      ? "opacity-50 cursor-not-allowed"
+      : ""
+  }`}
+>
+  Against
+</button>
+
                     </div>
                     <div className="mt-1 text-xs">
                       {localRole

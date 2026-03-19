@@ -28,12 +28,16 @@ type DebateFormat struct {
 }
 
 type Room struct {
-	Users         map[string]*websocket.Conn
-	Mutex         sync.Mutex
-	DebateFmt     DebateFormat
-	DebateStarted bool
-	CurrentTurn   string
-	TurnActive    map[string]bool
+	Users          map[string]*websocket.Conn
+	Mutex          sync.Mutex
+	DebateFmt      DebateFormat
+	DebateStarted  bool
+	CurrentTurn    string
+	TurnActive     map[string]bool
+	ForUserID      string
+	AgainstUserID  string
+	FirstSpeakerID string
+	ReadyUsers     map[string]bool
 }
 
 type ChatMessage struct {

@@ -32,6 +32,9 @@ var upgrader = websocket.Upgrader{
 type Room struct {
 	Clients map[*websocket.Conn]*Client
 	Mutex   sync.Mutex
+	ForUserID     string
+	AgainstUserID string
+	ReadyUsers    map[string]bool
 }
 
 // Client represents a connected client with user information
@@ -169,12 +172,14 @@ func buildParticipantsMessage(room *Room) map[string]interface{} {
 		}
 
 		participants = append(participants, map[string]interface{}{
-			"id":          client.UserID,
-			"displayName": client.Username,
-			"email":       client.Email,
-			"role":        client.Role,
-			"isMuted":     client.IsMuted,
-		})
+	        "id":          client.UserID,
+	        "displayName": client.Username,
+	        "email":       client.Email,
+	        "role":        client.Role,
+	        "isMuted":     client.IsMuted,
+	        "avatarUrl": client.AvatarURL,
+	        "elo":       client.Elo,
+        })
 	}
 
 	message := map[string]interface{}{
@@ -270,8 +275,14 @@ func WebsocketHandler(c *gin.Context) {
 	// Create the room if it doesn't exist.
 	roomsMutex.Lock()
 	if _, exists := rooms[roomID]; !exists {
-		rooms[roomID] = &Room{Clients: make(map[*websocket.Conn]*Client)}
+	rooms[roomID] = &Room{
+		Clients:     make(map[*websocket.Conn]*Client),
+		ReadyUsers:  make(map[string]bool),
+		ForUserID:   "",
+		AgainstUserID: "",
 	}
+}
+
 	room := rooms[roomID]
 	roomsMutex.Unlock()
 
@@ -409,8 +420,24 @@ func WebsocketHandler(c *gin.Context) {
 			)
 			room.Mutex.Lock()
 			if disconnectedClient, exists = room.Clients[conn]; exists {
-				delete(room.Clients, conn)
-			}
+
+	// ✅ Free role locks
+	if disconnectedClient.Role == "for" && room.ForUserID == disconnectedClient.UserID {
+		room.ForUserID = ""
+	}
+	if disconnectedClient.Role == "against" && room.AgainstUserID == disconnectedClient.UserID {
+		room.AgainstUserID = ""
+	}
+
+	// ✅ Remove ready state
+	if room.ReadyUsers != nil {
+		delete(room.ReadyUsers, disconnectedClient.UserID)
+	}
+
+	// Remove client from room
+	delete(room.Clients, conn)
+}
+
 			clientCount = len(room.Clients)
 
 			// If room is empty, delete it.
@@ -664,34 +691,131 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 
 // handleRoleSelection handles role selection
 func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, roomID string) {
-	// Store the role in the client
+
 	room.Mutex.Lock()
-	defer room.Mutex.Unlock()
-	if client, exists := room.Clients[conn]; exists {
-		if client.IsSpectator {
-			return
-		}
-		client.Role = message.Role
+	client, exists := room.Clients[conn]
+	if !exists || client.IsSpectator {
+		room.Mutex.Unlock()
+		return
 	}
 
-	// Broadcast role selection to other clients
-	for _, r := range snapshotRecipients(room, conn) {
-		if err := r.SafeWriteJSON(message); err != nil {
+	// 1) Prevent changing role after ready
+	if room.ReadyUsers != nil && room.ReadyUsers[client.UserID] {
+		room.Mutex.Unlock()
+		_ = client.SafeWriteJSON(map[string]interface{}{
+			"type":    "roleError",
+			"message": "You cannot change your role after clicking Ready.",
+		})
+		return
+	}
+
+	newRole := strings.ToLower(strings.TrimSpace(message.Role))
+	if newRole != "for" && newRole != "against" {
+		room.Mutex.Unlock()
+		_ = client.SafeWriteJSON(map[string]interface{}{
+			"type":    "roleError",
+			"message": "Invalid role selected.",
+		})
+		return
+	}
+
+	// 2) Prevent changing role after selecting once (hard lock)
+	if client.Role != "" && client.Role != newRole {
+		room.Mutex.Unlock()
+		_ = client.SafeWriteJSON(map[string]interface{}{
+			"type":    "roleError",
+			"message": "You cannot change your role after selecting it once.",
+		})
+		return
+	}
+
+	// 3) Lock role if available
+	if newRole == "for" {
+		if room.ForUserID != "" && room.ForUserID != client.UserID {
+			room.Mutex.Unlock()
+			_ = client.SafeWriteJSON(map[string]interface{}{
+				"type":    "roleError",
+				"message": "Opponent already selected 'For'. Choose 'Against'.",
+			})
+			return
 		}
+		room.ForUserID = client.UserID
+		client.Role = "for"
+	}
+
+	if newRole == "against" {
+		if room.AgainstUserID != "" && room.AgainstUserID != client.UserID {
+			room.Mutex.Unlock()
+			_ = client.SafeWriteJSON(map[string]interface{}{
+				"type":    "roleError",
+				"message": "Opponent already selected 'Against'. Choose 'For'.",
+			})
+			return
+		}
+		room.AgainstUserID = client.UserID
+		client.Role = "against"
+	}
+
+	room.Mutex.Unlock()
+
+	// Broadcast role selection to everyone
+	for _, r := range snapshotRecipients(room, nil) {
+		_ = r.SafeWriteJSON(map[string]interface{}{
+			"type":   "roleSelection",
+			"userId": client.UserID,
+			"role":   client.Role,
+		})
 	}
 
 	// Send updated participant snapshot to everyone
 	broadcastParticipants(room)
 }
 
+	
+
 // handleReadyStatus handles ready status
 func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID string) {
-	// Broadcast ready status to other clients
-	for _, r := range snapshotRecipients(room, conn) {
-		if err := r.SafeWriteJSON(message); err != nil {
-		}
+
+	room.Mutex.Lock()
+	client, exists := room.Clients[conn]
+	if !exists || client.IsSpectator {
+		room.Mutex.Unlock()
+		return
+	}
+
+	// ready field must exist
+	if message.Ready == nil {
+		room.Mutex.Unlock()
+		return
+	}
+
+	// Must have role selected before ready
+	if client.Role != "for" && client.Role != "against" {
+		room.Mutex.Unlock()
+		_ = client.SafeWriteJSON(map[string]interface{}{
+			"type":    "readyError",
+			"message": "Select For/Against before clicking Ready.",
+		})
+		return
+	}
+
+	if room.ReadyUsers == nil {
+		room.ReadyUsers = make(map[string]bool)
+	}
+
+	room.ReadyUsers[client.UserID] = *message.Ready
+	room.Mutex.Unlock()
+
+	// Broadcast ready status to everyone
+	for _, r := range snapshotRecipients(room, nil) {
+		_ = r.SafeWriteJSON(map[string]interface{}{
+			"type":   "ready",
+			"userId": client.UserID,
+			"ready":  *message.Ready,
+		})
 	}
 }
+
 
 // handleMuteRequest handles mute requests
 func handleMuteRequest(room *Room, conn *websocket.Conn, message Message, client *Client, roomID string) {
