@@ -115,6 +115,7 @@ func SaveDebateTranscriptHandler(c *gin.Context) {
 		req.Result,
 		req.Messages,
 		req.Transcripts,
+		0.0,
 	)
 
 	if err != nil {
@@ -296,7 +297,8 @@ func CreateTestTranscriptHandler(c *gin.Context) {
 		"AI Bot",
 		"win",
 		testMessages,
-		nil,
+		map[string]string{},
+		0.0,
 	)
 
 	if err != nil {
@@ -354,7 +356,8 @@ func CreateTestBotDebateHandler(c *gin.Context) {
 		"Expert Emma",
 		"win",
 		testMessages,
-		nil,
+		map[string]string{},
+		0.0,
 	)
 
 	if err != nil {

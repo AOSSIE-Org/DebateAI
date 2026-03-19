@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-export default function AdminSignup() {
+export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,11 +26,14 @@ export default function AdminSignup() {
     setLoading(true);
 
     try {
-      const response = await adminLogin(email, password);
-      
-      localStorage.setItem('adminToken', response.accessToken);
-      localStorage.setItem('admin', JSON.stringify(response.admin));
-      navigate('/admin/dashboard');
+     const response = await adminLogin(email.trim().toLowerCase(), password);
+      // Validate response before saving
+      if (!response || !response.accessToken || !response.admin) {
+        throw new Error("Invalid login response");
+      }
+      localStorage.setItem("adminToken", response.accessToken);
+      localStorage.setItem("admin", JSON.stringify(response.admin));
+      navigate("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {

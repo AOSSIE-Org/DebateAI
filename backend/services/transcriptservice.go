@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"log"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,8 +187,10 @@ func SubmitTranscripts(
 					resultFor,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					forSubmission.Transcripts,
+					0.0,
 				)
 				if err != nil {
+					log.Println("Error saving transcript for forUser:", err)
 				}
 
 				// Save transcript for "against" user
@@ -200,8 +203,10 @@ func SubmitTranscripts(
 					resultAgainst,
 					[]models.Message{}, // You might want to reconstruct messages from transcripts
 					againstSubmission.Transcripts,
+					0.0,
 				)
 				if err != nil {
+					log.Println("Error saving transcript for againstUser:", err)
 				}
 
 				// Update ratings based on the result
@@ -659,7 +664,7 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 }
 
 // SaveDebateTranscript saves a debate transcript for later viewing
-func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string, eloChange float64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -682,11 +687,13 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 
 		// If the result has changed or is "pending", update the transcript
 		if existingTranscript.Result != result || existingTranscript.Result == "pending" {
+
 			update := bson.M{
 				"$set": bson.M{
 					"result":      result,
 					"messages":    messages,
 					"transcripts": transcripts,
+					"eloChange":   eloChange,
 					"updatedAt":   time.Now(),
 				},
 			}
@@ -712,6 +719,7 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		Opponent:    opponent,
 		Result:      result,
 		Messages:    messages,
+		EloChange:   eloChange, 
 		Transcripts: transcripts,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),

@@ -30,11 +30,13 @@ type SavedDebateTranscript struct {
 	Topic       string             `bson:"topic" json:"topic"`
 	Opponent    string             `bson:"opponent" json:"opponent"` // Bot name or opponent email
 	Result      string             `bson:"result" json:"result"`     // "win", "loss", "draw", "pending"
+	EloChange   float64            `bson:"eloChange" json:"eloChange"`
 	Messages    []Message          `bson:"messages" json:"messages"`
-	Transcripts map[string]string  `bson:"transcripts,omitempty" json:"transcripts,omitempty"` // For user vs user debates
+	Transcripts map[string]string  `bson:"transcripts,omitempty" json:"transcripts,omitempty"`
 	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
+
 
 func (s SavedDebateTranscript) MarshalJSON() ([]byte, error) {
 	type Alias SavedDebateTranscript
