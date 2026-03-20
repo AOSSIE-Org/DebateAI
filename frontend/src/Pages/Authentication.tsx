@@ -6,29 +6,38 @@ import DebateCover from '../assets/DebateCover4.svg';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
-    <div className="flex items-center text-lg font-medium">
-      <Link to="/" className="flex items-center">
-        <svg>
-          {/* SVG Content */}
-        </svg>
+  <div className="hidden md:flex w-full h-full flex-col justify-between 
+  bg-gradient-to-br from-purple-500/20 to-blue-500/20 
+  backdrop-blur-lg p-10 text-black dark:text-white">
+
+    {/* Logo */}
+    <div className="flex items-center text-xl font-bold 
+    hover:scale-105 transition-transform duration-300 cursor-pointer">
+      <Link to="/" className="flex items-center gap-2">
         Arguehub
       </Link>
     </div>
+
+    {/* Image */}
     <div className="flex justify-center items-center flex-1 p-10">
-      <img src={DebateCover} alt="Debate Cover" className="max-w-full max-h-full object-contain" />
+      <img 
+        src={DebateCover} 
+        alt="Debate Cover" 
+        className="max-w-full max-h-full object-contain 
+        hover:scale-105 transition-transform duration-500"
+      />
     </div>
-    <div>
-      <blockquote className="space-y-2">
-        <p className="text-lg text-black dark:text-white">
-          "We cannot solve our problems with the same thinking we used when we created them."
-        </p>
-        <footer className="text-sm text-black dark:text-white">Albert Einstein</footer>
-      </blockquote>
-    </div>
+
+    {/* Quote */}
+    <blockquote className="space-y-2 
+    hover:translate-y-[-5px] transition-all duration-300">
+      <p className="text-lg italic">
+        "We cannot solve our problems with the same thinking we used when we created them."
+      </p>
+      <footer className="text-sm opacity-70">— Albert Einstein</footer>
+    </blockquote>
   </div>
 );
-
 
 
 interface RightSectionProps {
