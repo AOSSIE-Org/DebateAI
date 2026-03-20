@@ -7,6 +7,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
+import JSON5 from "json5";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -217,8 +218,9 @@ const extractJSON = (response: string): string => {
 };
 
 const DebateRoom: React.FC = () => {
-  const location = useLocation();
+  const judgingRef = useRef(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const debateData = location.state as DebateProps;
   const phases = debateData.phaseTimings;
   const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
@@ -574,50 +576,49 @@ const DebateRoom: React.FC = () => {
     }
   };
 
-  const judgeDebateResult = async (messages: Message[]) => {
+    const judgeDebateResult = async (messages: Message[]) => {
+    if (judgingRef.current) {
+      console.log("Judging already in progress, skipping duplicate call");
+      return;
+    }
+
+    judgingRef.current = true;
+
     try {
       console.log("Starting judgment with messages:", messages);
       const { result } = await judgeDebate({
         history: messages,
         userId: debateData.userId,
       });
+
       console.log("Raw judge result:", result);
-      
+
       const jsonString = extractJSON(result);
       console.log("Extracted JSON string:", jsonString);
-      
+
       let judgment: JudgmentData;
       try {
-        judgment = JSON.parse(jsonString);
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError, "Trying to fix JSON...");
-        // Try to fix common JSON issues
-        const fixedJson = jsonString
-          .replace(/'/g, '"') // Replace single quotes with double quotes
-          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
-          .replace(/,\s*}/g, '}') // Remove trailing commas
-          .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-        try {
-          judgment = JSON.parse(fixedJson);
-        } catch (e) {
-          throw new Error(`Failed to parse JSON: ${e}`);
-        }
+        judgment = JSON5.parse(jsonString);
+      }catch (e) {
+        throw new Error(`Failed to parse judgment JSON: ${e}`);
       }
-      
+
       console.log("Parsed judgment:", judgment);
       setJudgmentData(judgment);
       setPopup({ show: false, message: "" });
       setShowJudgment(true);
+
     } catch (error) {
       console.error("Judging error:", error);
-      // Show error to user
+
       setPopup({
         show: true,
-        message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
+        message: `Judgment error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Showing default results.`,
         isJudging: false,
       });
-      
-      // Set default judgment data
+
       setJudgmentData({
         opening_statement: {
           user: { score: 0, reason: "Error occurred during judgment" },
@@ -643,12 +644,17 @@ const DebateRoom: React.FC = () => {
           opponent_analysis: "",
         },
       });
+
       setTimeout(() => {
         setPopup({ show: false, message: "" });
         setShowJudgment(true);
       }, 3000);
+
+    } finally {
+      judgingRef.current = false;
     }
   };
+
 
   const formatTime = (seconds: number) => {
     const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60)
@@ -690,9 +696,12 @@ const DebateRoom: React.FC = () => {
   const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
+    <div className="min-h-screen p-4 bg-gradient-to-br from-gray-50 to-gray-200
+  dark:from-zinc-900 dark:to-zinc-800">
       <div className="w-full max-w-5xl mx-auto py-2">
-        <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
+       <div className="rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg bg-gradient-to-r from-orange-100 via-white to-orange-100
+    dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-800
+       ">
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Debate: {debateData.topic}
           </h1>
@@ -716,7 +725,7 @@ const DebateRoom: React.FC = () => {
 
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 border border-orange-200">
+         <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 max-w-m w-full transform transition-all duration-300 scale-105 shadow-2xl border border-orange-200 dark:border-orange-400/30">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue500 mb-4"></div>
@@ -747,17 +756,16 @@ const DebateRoom: React.FC = () => {
           userStance={state.userStance}
           botStance={state.botStance}
           botDesc={bot.desc}
-          onClose={() => setShowJudgment(false)}
+          onClose={() => {
+            setShowJudgment(false);
+            navigate("/"); 
+          }}
         />
       )}
 
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
-        <div
-          className={`relative w-full md:w-1/2 ${
-            state.isBotTurn ? "animate-glow" : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
-        >
+        <div className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""} h-[540px] flex flex-col shadow-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700`}>
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
               <img
@@ -907,7 +915,7 @@ const DebateRoom: React.FC = () => {
             box-shadow: 0 0 5px rgba(255, 149, 0, 0.5);
           }
           50% {
-            box-shadow: 0 0 20px rgba(255, 149, 0, 0.8);
+            box-shadow: 0 0 20px rgba(255, 180, 80, 0.9);
           }
           100% {
             box-shadow: 0 0 5px rgba(255, 149, 0, 0.5);
