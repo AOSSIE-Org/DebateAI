@@ -592,7 +592,14 @@ if (typeof result === "string") {
   console.log("Extracted JSON:", jsonString);
   judgment = JSON.parse(jsonString);
 } else {
-  judgment = result;
+ const res: any = result;
+
+if (res?.opening_statement && res?.verdict) {
+  judgment = res as JudgmentData;
+} else {
+  console.error("Invalid judgment structure:", result);
+  throw new Error("Invalid judgment data structure");
+}
 }
 
 console.log("FINAL PARSED:", judgment);
