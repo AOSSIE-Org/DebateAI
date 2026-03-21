@@ -247,7 +247,6 @@ const DebateRoom: React.FC = () => {
     isJudging?: boolean;
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
-  const [showJudgment, setShowJudgment] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -587,27 +586,19 @@ const DebateRoom: React.FC = () => {
       console.log("Extracted JSON string:", jsonString);
       
       let judgment: JudgmentData;
-      try {
-        judgment = JSON.parse(jsonString);
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError, "Trying to fix JSON...");
-        // Try to fix common JSON issues
-        const fixedJson = jsonString
-          .replace(/'/g, '"') // Replace single quotes with double quotes
-          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
-          .replace(/,\s*}/g, '}') // Remove trailing commas
-          .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-        try {
-          judgment = JSON.parse(fixedJson);
-        } catch (e) {
-          throw new Error(`Failed to parse JSON: ${e}`);
-        }
-      }
+
+if (typeof result === "string") {
+  const jsonString = extractJSON(result);
+  console.log("Extracted JSON:", jsonString);
+  judgment = JSON.parse(jsonString);
+} else {
+  judgment = result;
+}
+
+console.log("FINAL PARSED:", judgment);
+setJudgmentData(judgment);
+setPopup({ show: false, message: "" });
       
-      console.log("Parsed judgment:", judgment);
-      setJudgmentData(judgment);
-      setPopup({ show: false, message: "" });
-      setShowJudgment(true);
     } catch (error) {
       console.error("Judging error:", error);
       // Show error to user
@@ -644,9 +635,8 @@ const DebateRoom: React.FC = () => {
         },
       });
       setTimeout(() => {
-        setPopup({ show: false, message: "" });
-        setShowJudgment(true);
-      }, 3000);
+  setPopup({ show: false, message: "" });
+}, 3000);
     }
   };
 
@@ -689,6 +679,26 @@ const DebateRoom: React.FC = () => {
   const currentEntity = state.userStance === currentStance ? "User" : "Bot";
   const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
 
+  if (judgmentData) {
+    return (
+    <div className="fixed inset-0 z-[9999] bg-black">
+      <JudgmentPopup
+        judgment={judgmentData}
+        userAvatar={userAvatar}
+        botAvatar={bot.avatar}
+        botName={debateData.botName}
+        userStance={state.userStance}
+        botStance={state.botStance}
+        botDesc={bot.desc}
+        onClose={() => {
+          setJudgmentData(null);
+          navigate("/game");
+        }}
+      />
+    </div>
+  );
+}
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
       <div className="w-full max-w-5xl mx-auto py-2">
@@ -719,7 +729,7 @@ const DebateRoom: React.FC = () => {
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 border border-orange-200">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue500 mb-4"></div>
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
                 <h2 className="text-xl font-semibold text-gray-800">
                   {popup.message}
                 </h2>
@@ -736,19 +746,6 @@ const DebateRoom: React.FC = () => {
             )}
           </div>
         </div>
-      )}
-
-      {showJudgment && judgmentData && (
-        <JudgmentPopup
-          judgment={judgmentData}
-          userAvatar={userAvatar}
-          botAvatar={bot.avatar}
-          botName={debateData.botName}
-          userStance={state.userStance}
-          botStance={state.botStance}
-          botDesc={bot.desc}
-          onClose={() => setShowJudgment(false)}
-        />
       )}
 
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
