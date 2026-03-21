@@ -581,10 +581,8 @@ const DebateRoom: React.FC = () => {
         userId: debateData.userId,
       });
       console.log("Raw judge result:", result);
-      
-      const jsonString = extractJSON(result);
-      console.log("Extracted JSON string:", jsonString);
-      
+
+
       let judgment: JudgmentData;
 
 if (typeof result === "string") {
@@ -598,7 +596,7 @@ if (res?.opening_statement && res?.verdict) {
   judgment = res as JudgmentData;
 } else {
   console.error("Invalid judgment structure:", result);
-  throw new Error("Invalid judgment data structure");
+  return;
 }
 }
 
