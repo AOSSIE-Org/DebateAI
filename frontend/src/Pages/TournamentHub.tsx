@@ -11,6 +11,9 @@ export interface Tournament {
   description: string;
 }
 
+const MIN_PARTICIPANTS = 4;
+const MAX_PARTICIPANTS = 64;
+
 export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
     {
@@ -47,21 +50,23 @@ export default function TournamentPage() {
   const [name, setName] = useState("");
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
-  // Fix 3: added participantOption state instead of hardcoding 8
   const [participantOption, setParticipantOption] = useState<string>("8");
   const [customParticipants, setCustomParticipants] = useState<string>("");
   const [customError, setCustomError] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // Derives the final maxParticipants value; returns null if custom input is invalid
   const isPowerOfTwo = (n: number) => n > 1 && (n & (n - 1)) === 0;
 
   const getMaxParticipants = (): number | null => {
     if (participantOption === "custom") {
-      const val = parseInt(customParticipants);
-      if (isNaN(val) || val < 4) {
-        setCustomError("Must be at least 4.");
+      const val = Number(customParticipants);
+      if (!Number.isInteger(val) || val < MIN_PARTICIPANTS) {
+        setCustomError(`Must be at least ${MIN_PARTICIPANTS}.`);
+        return null;
+      }
+      if (val > MAX_PARTICIPANTS) {
+        setCustomError(`Must be at most ${MAX_PARTICIPANTS}.`);
         return null;
       }
       if (!isPowerOfTwo(val)) {
@@ -78,6 +83,15 @@ export default function TournamentPage() {
     e.preventDefault();
     if (!name) {
       setError("Tournament name is required.");
+      return;
+    }
+
+    // Submit-time date validation — cannot be bypassed via manipulated form state
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(`${date}T00:00:00`);
+    if (!date || Number.isNaN(selectedDate.getTime()) || selectedDate < today) {
+      setError("Start date cannot be in the past.");
       return;
     }
 
@@ -126,7 +140,6 @@ export default function TournamentPage() {
     navigate(`/tournament/${tournament.id}/bracket`, { state: { tournament } });
   };
 
-  // Fix: cap visible avatars at 6, show +N badge for the rest to prevent card overflow
   const renderAvatars = (current: number, max: number) => {
     const avatars = [];
     const MAX_VISIBLE = 6;
@@ -275,7 +288,7 @@ export default function TournamentPage() {
                 <label className="block text-sm font-medium text-foreground">
                   Date
                 </label>
-                {/* Fix 2: min attribute prevents selecting past dates */}
+                {/* min attribute prevents selecting past dates in the date picker */}
                 <input
                   type="date"
                   value={date}
@@ -285,7 +298,6 @@ export default function TournamentPage() {
                   className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
                 />
               </div>
-              {/* Fix 3: Max Participants selector with custom option */}
               <div>
                 <label className="block text-sm font-medium text-foreground">
                   Max Participants
@@ -304,7 +316,6 @@ export default function TournamentPage() {
                   <option value="16">16 players</option>
                   <option value="custom">Custom...</option>
                 </select>
-                {/* Custom number input — only shown when "Custom..." is selected */}
                 {participantOption === "custom" && (
                   <div className="mt-2">
                     <input
@@ -314,9 +325,10 @@ export default function TournamentPage() {
                         setCustomParticipants(e.target.value);
                         setCustomError("");
                       }}
-                      min={4}
+                      min={MIN_PARTICIPANTS}
+                      max={MAX_PARTICIPANTS}
                       step={1}
-                      placeholder="e.g. 12, 20, 32"
+                      placeholder="e.g. 4, 8, 16, 32"
                       className="block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
                     />
                     {customError ? (
@@ -325,7 +337,7 @@ export default function TournamentPage() {
                       </p>
                     ) : (
                       <p className="text-muted-foreground text-xs mt-1">
-                        Must be a power of 2 (e.g. 4, 8, 16, 32, 64...)
+                        Must be a power of 2 between 4 and 64 (e.g. 4, 8, 16, 32, 64)
                       </p>
                     )}
                   </div>
