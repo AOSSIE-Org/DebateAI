@@ -47,8 +47,32 @@ export default function TournamentPage() {
   const [name, setName] = useState("");
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
+  // Fix 3: added participantOption state instead of hardcoding 8
+  const [participantOption, setParticipantOption] = useState<string>("8");
+  const [customParticipants, setCustomParticipants] = useState<string>("");
+  const [customError, setCustomError] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  // Derives the final maxParticipants value; returns null if custom input is invalid
+  const isPowerOfTwo = (n: number) => n > 1 && (n & (n - 1)) === 0;
+
+  const getMaxParticipants = (): number | null => {
+    if (participantOption === "custom") {
+      const val = parseInt(customParticipants);
+      if (isNaN(val) || val < 4) {
+        setCustomError("Must be at least 4.");
+        return null;
+      }
+      if (!isPowerOfTwo(val)) {
+        setCustomError("Must be a power of 2 (e.g. 4, 8, 16, 32, 64...).");
+        return null;
+      }
+      setCustomError("");
+      return val;
+    }
+    return parseInt(participantOption);
+  };
 
   const handleCreate = (e: FormEvent) => {
     e.preventDefault();
@@ -57,10 +81,13 @@ export default function TournamentPage() {
       return;
     }
 
+    const maxParticipants = getMaxParticipants();
+    if (maxParticipants === null) return;
+
     const newTournament: Tournament = {
       id: Date.now().toString(),
       name,
-      maxParticipants: 8,
+      maxParticipants,
       currentParticipants: 0,
       date,
       description,
@@ -70,6 +97,9 @@ export default function TournamentPage() {
     setName("");
     setDate("");
     setDescription("");
+    setParticipantOption("8");
+    setCustomParticipants("");
+    setCustomError("");
     setError("");
   };
 
@@ -96,9 +126,14 @@ export default function TournamentPage() {
     navigate(`/tournament/${tournament.id}/bracket`, { state: { tournament } });
   };
 
+  // Fix: cap visible avatars at 6, show +N badge for the rest to prevent card overflow
   const renderAvatars = (current: number, max: number) => {
     const avatars = [];
-    for (let i = 0; i < max; i++) {
+    const MAX_VISIBLE = 6;
+    const visible = Math.min(max, MAX_VISIBLE);
+    const overflow = max - MAX_VISIBLE;
+
+    for (let i = 0; i < visible; i++) {
       const isActive = i < current;
       avatars.push(
         <div
@@ -120,6 +155,21 @@ export default function TournamentPage() {
         </div>
       );
     }
+
+    if (overflow > 0) {
+      avatars.push(
+        <div
+          key="overflow"
+          className="relative flex-shrink-0"
+          style={{ marginLeft: "-1.25rem" }}
+        >
+          <div className="w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center text-muted-foreground text-xs font-medium">
+            +{overflow}
+          </div>
+        </div>
+      );
+    }
+
     return avatars;
   };
 
@@ -139,7 +189,7 @@ export default function TournamentPage() {
               {tournaments.map((t) => (
                 <div
                   key={t.id}
-                  className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-visible flex flex-col"
+                  className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden flex flex-col"
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
                   <h2 className="text-2xl font-bold mb-2 text-accent-foreground tracking-tight">
@@ -225,13 +275,61 @@ export default function TournamentPage() {
                 <label className="block text-sm font-medium text-foreground">
                   Date
                 </label>
+                {/* Fix 2: min attribute prevents selecting past dates */}
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
+                  min={new Date().toISOString().split("T")[0]}
                   className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
                 />
+              </div>
+              {/* Fix 3: Max Participants selector with custom option */}
+              <div>
+                <label className="block text-sm font-medium text-foreground">
+                  Max Participants
+                </label>
+                <select
+                  value={participantOption}
+                  onChange={(e) => {
+                    setParticipantOption(e.target.value);
+                    setCustomParticipants("");
+                    setCustomError("");
+                  }}
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                >
+                  <option value="4">4 players</option>
+                  <option value="8">8 players</option>
+                  <option value="16">16 players</option>
+                  <option value="custom">Custom...</option>
+                </select>
+                {/* Custom number input — only shown when "Custom..." is selected */}
+                {participantOption === "custom" && (
+                  <div className="mt-2">
+                    <input
+                      type="number"
+                      value={customParticipants}
+                      onChange={(e) => {
+                        setCustomParticipants(e.target.value);
+                        setCustomError("");
+                      }}
+                      min={4}
+                      step={1}
+                      placeholder="e.g. 12, 20, 32"
+                      className="block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                    />
+                    {customError ? (
+                      <p className="text-destructive text-xs mt-1">
+                        {customError}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground text-xs mt-1">
+                        Must be a power of 2 (e.g. 4, 8, 16, 32, 64...)
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground">
