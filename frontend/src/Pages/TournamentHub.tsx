@@ -11,6 +11,9 @@ export interface Tournament {
   description: string;
 }
 
+const MIN_PARTICIPANTS = 4;
+const MAX_PARTICIPANTS = 64;
+
 export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
     {
@@ -47,8 +50,34 @@ export default function TournamentPage() {
   const [name, setName] = useState("");
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
+  const [participantOption, setParticipantOption] = useState<string>("8");
+  const [customParticipants, setCustomParticipants] = useState<string>("");
+  const [customError, setCustomError] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  const isPowerOfTwo = (n: number) => n > 1 && (n & (n - 1)) === 0;
+
+  const getMaxParticipants = (): number | null => {
+    if (participantOption === "custom") {
+      const val = Number(customParticipants);
+      if (!Number.isInteger(val) || val < MIN_PARTICIPANTS) {
+        setCustomError(`Must be at least ${MIN_PARTICIPANTS}.`);
+        return null;
+      }
+      if (val > MAX_PARTICIPANTS) {
+        setCustomError(`Must be at most ${MAX_PARTICIPANTS}.`);
+        return null;
+      }
+      if (!isPowerOfTwo(val)) {
+        setCustomError("Must be a power of 2 (e.g. 4, 8, 16, 32, 64...).");
+        return null;
+      }
+      setCustomError("");
+      return val;
+    }
+    return parseInt(participantOption);
+  };
 
   const handleCreate = (e: FormEvent) => {
     e.preventDefault();
@@ -57,10 +86,22 @@ export default function TournamentPage() {
       return;
     }
 
+    // Submit-time date validation — cannot be bypassed via manipulated form state
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(`${date}T00:00:00`);
+    if (!date || Number.isNaN(selectedDate.getTime()) || selectedDate < today) {
+      setError("Start date cannot be in the past.");
+      return;
+    }
+
+    const maxParticipants = getMaxParticipants();
+    if (maxParticipants === null) return;
+
     const newTournament: Tournament = {
       id: Date.now().toString(),
       name,
-      maxParticipants: 8,
+      maxParticipants,
       currentParticipants: 0,
       date,
       description,
@@ -70,6 +111,9 @@ export default function TournamentPage() {
     setName("");
     setDate("");
     setDescription("");
+    setParticipantOption("8");
+    setCustomParticipants("");
+    setCustomError("");
     setError("");
   };
 
@@ -98,7 +142,11 @@ export default function TournamentPage() {
 
   const renderAvatars = (current: number, max: number) => {
     const avatars = [];
-    for (let i = 0; i < max; i++) {
+    const MAX_VISIBLE = 6;
+    const visible = Math.min(max, MAX_VISIBLE);
+    const overflow = max - MAX_VISIBLE;
+
+    for (let i = 0; i < visible; i++) {
       const isActive = i < current;
       avatars.push(
         <div
@@ -120,6 +168,21 @@ export default function TournamentPage() {
         </div>
       );
     }
+
+    if (overflow > 0) {
+      avatars.push(
+        <div
+          key="overflow"
+          className="relative flex-shrink-0"
+          style={{ marginLeft: "-1.25rem" }}
+        >
+          <div className="w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center text-muted-foreground text-xs font-medium">
+            +{overflow}
+          </div>
+        </div>
+      );
+    }
+
     return avatars;
   };
 
@@ -139,7 +202,7 @@ export default function TournamentPage() {
               {tournaments.map((t) => (
                 <div
                   key={t.id}
-                  className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-visible flex flex-col"
+                  className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden flex flex-col"
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
                   <h2 className="text-2xl font-bold mb-2 text-accent-foreground tracking-tight">
@@ -225,13 +288,60 @@ export default function TournamentPage() {
                 <label className="block text-sm font-medium text-foreground">
                   Date
                 </label>
+                {/* min attribute prevents selecting past dates in the date picker */}
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
+                  min={new Date().toISOString().split("T")[0]}
                   className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground">
+                  Max Participants
+                </label>
+                <select
+                  value={participantOption}
+                  onChange={(e) => {
+                    setParticipantOption(e.target.value);
+                    setCustomParticipants("");
+                    setCustomError("");
+                  }}
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                >
+                  <option value="4">4 players</option>
+                  <option value="8">8 players</option>
+                  <option value="16">16 players</option>
+                  <option value="custom">Custom...</option>
+                </select>
+                {participantOption === "custom" && (
+                  <div className="mt-2">
+                    <input
+                      type="number"
+                      value={customParticipants}
+                      onChange={(e) => {
+                        setCustomParticipants(e.target.value);
+                        setCustomError("");
+                      }}
+                      min={MIN_PARTICIPANTS}
+                      max={MAX_PARTICIPANTS}
+                      step={1}
+                      placeholder="e.g. 4, 8, 16, 32"
+                      className="block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                    />
+                    {customError ? (
+                      <p className="text-destructive text-xs mt-1">
+                        {customError}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground text-xs mt-1">
+                        Must be a power of 2 between 4 and 64 (e.g. 4, 8, 16, 32, 64)
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground">
