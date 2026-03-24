@@ -1333,7 +1333,7 @@ const Profile: React.FC = () => {
           </DialogHeader>
           
           {selectedDebate && (
-            <div className="p-4 overflow-y-auto flex-1 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-semibold">Topic:</span>
@@ -1445,7 +1445,7 @@ const Profile: React.FC = () => {
                   <Separator />
                   <div>
                     <h4 className="font-semibold mb-3">Full Conversation</h4>
-                    <div className="max-h-64 overflow-y-auto border rounded-lg p-3 space-y-3">
+                    <div>
                       {fullTranscript.messages.map((message, index: number) => (
                         <div
                           key={index}
