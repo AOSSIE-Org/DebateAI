@@ -1315,7 +1315,7 @@ const Profile: React.FC = () => {
 
       {/* Debate Details Dialog */}
       <Dialog open={isDebateDialogOpen} onOpenChange={setIsDebateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="w-5 h-5" />
@@ -1323,7 +1323,7 @@ const Profile: React.FC = () => {
             </DialogTitle>
           </DialogHeader>
           {selectedDebate && (
-            <div className="space-y-4">
+            <div className="space-y-6 py-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-semibold">Topic:</span>
@@ -1434,7 +1434,7 @@ const Profile: React.FC = () => {
                   <Separator />
                   <div>
                     <h4 className="font-semibold mb-3">Full Conversation</h4>
-                    <div className="max-h-64 overflow-y-auto border rounded-lg p-3 space-y-3">
+                    <div className="border rounded-lg p-4 space-y-4">
                       {fullTranscript.messages.map((message, index: number) => (
                         <div
                           key={index}
