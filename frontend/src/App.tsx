@@ -17,7 +17,7 @@ import StrengthenArgument from './Pages/StrengthenArgument';
 import SpeechTest from './Pages/SpeechTest';
 // Layout
 import Layout from './components/Layout';
-import SupportOpenSource from './Pages/SupportOpenSource';
+// import SupportOpenSource from './Pages/SupportOpenSource';
 import CoachPage from './Pages/CoachPage';
 import ChatRoom from './components/ChatRoom';
 import TournamentHub from './Pages/TournamentHub';
@@ -65,7 +65,7 @@ function AppRoutes() {
       {/* Public routes with layout */}
       <Route element={<Layout />}>
         <Route path='about' element={<About />} />
-        <Route path='support-debateai' element={<SupportOpenSource />} />
+        {/* <Route path='support-debateai' element={<SupportOpenSource />} /> */}
       </Route>
 
       {/* Protected routes with layout */}

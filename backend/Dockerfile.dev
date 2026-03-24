@@ -19,3 +19,9 @@ EXPOSE 1313
 # Run air for live reloading
 # Run directly without air
 CMD ["go", "run", "cmd/server/main.go"]
+
+ENV GONOSUMCHECK=*
+ENV GOFLAGS=-insecure
+ENV GONOSUMDB=*
+ENV GONOPROXY=*
+ENV GOPROXY=direct
