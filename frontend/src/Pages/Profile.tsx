@@ -626,7 +626,7 @@ const Profile: React.FC = () => {
     const [following, setFollowing] = useState<any[]>([]);
     const [loadingFollowers, setLoadingFollowers] = useState(false);
     const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
     useEffect(() => {
       if (user?.id) {
@@ -650,7 +650,7 @@ const Profile: React.FC = () => {
           setFollowers(data.followers || []);
         }
       } catch (err) {
-        console.error('Error fetching followers:', err);
+        console.error("Error fetching followers:", err);
       } finally {
         setLoadingFollowers(false);
       }
@@ -671,7 +671,7 @@ const Profile: React.FC = () => {
           setFollowing(data.following || []);
         }
       } catch (err) {
-        console.error('Error fetching following:', err);
+        console.error("Error fetching following:", err);
       } finally {
         setLoadingFollowing(false);
       }
@@ -682,7 +682,7 @@ const Profile: React.FC = () => {
         <h3 className="text-xs sm:text-sm font-semibold text-foreground">
           Connections
         </h3>
-        
+
         {/* Followers Section */}
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-medium text-foreground">
@@ -700,15 +700,18 @@ const Profile: React.FC = () => {
               </div>
             ) : (
               followers.map((follower: any) => (
-                <ProfileHover key={follower.id || follower._id} userId={follower.id || follower._id}>
+                <ProfileHover
+                  key={follower.id || follower._id}
+                  userId={follower.id || follower._id}
+                >
                   <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
                     <img
                       src={follower.avatarUrl || defaultAvatar}
-                      alt={follower.displayName || 'User'}
+                      alt={follower.displayName || "User"}
                       className="w-5 h-5 rounded-full object-cover"
                     />
                     <span className="text-xs truncate">
-                      {follower.displayName || follower.email || 'User'}
+                      {follower.displayName || follower.email || "User"}
                     </span>
                   </div>
                 </ProfileHover>
@@ -734,15 +737,18 @@ const Profile: React.FC = () => {
               </div>
             ) : (
               following.map((followed: any) => (
-                <ProfileHover key={followed.id || followed._id} userId={followed.id || followed._id}>
+                <ProfileHover
+                  key={followed.id || followed._id}
+                  userId={followed.id || followed._id}
+                >
                   <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
                     <img
                       src={followed.avatarUrl || defaultAvatar}
-                      alt={followed.displayName || 'User'}
+                      alt={followed.displayName || "User"}
                       className="w-5 h-5 rounded-full object-cover"
                     />
                     <span className="text-xs truncate">
-                      {followed.displayName || followed.email || 'User'}
+                      {followed.displayName || followed.email || "User"}
                     </span>
                   </div>
                 </ProfileHover>
@@ -918,9 +924,12 @@ const Profile: React.FC = () => {
                   FirstWin: "First victory earned",
                   Debater10: "10 debates completed",
                 };
-                const badgeIcon = badgeIcons[badge] || <FaAward className="w-6 h-6 text-primary" />;
-                const badgeDescription = badgeDescriptions[badge] || "Achievement unlocked";
-                
+                const badgeIcon = badgeIcons[badge] || (
+                  <FaAward className="w-6 h-6 text-primary" />
+                );
+                const badgeDescription =
+                  badgeDescriptions[badge] || "Achievement unlocked";
+
                 return (
                   <div
                     key={index}
@@ -1315,15 +1324,16 @@ const Profile: React.FC = () => {
 
       {/* Debate Details Dialog */}
       <Dialog open={isDebateDialogOpen} onOpenChange={setIsDebateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-4 border-b">
             <DialogTitle className="flex items-center gap-2">
               <Award className="w-5 h-5" />
               Debate Details
             </DialogTitle>
           </DialogHeader>
+          
           {selectedDebate && (
-            <div className="space-y-4">
+            <div className="p-4 overflow-y-auto flex-1 space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-semibold">Topic:</span>
@@ -1331,6 +1341,7 @@ const Profile: React.FC = () => {
                     {selectedDebate.topic}
                   </p>
                 </div>
+
                 <div>
                   <span className="font-semibold">Opponent:</span>
                   <p className="text-muted-foreground">
