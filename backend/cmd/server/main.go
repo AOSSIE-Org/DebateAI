@@ -68,6 +68,7 @@ func main() {
 
 	// Create uploads directory
 	os.MkdirAll("uploads", os.ModePerm)
+	os.MkdirAll("uploads/avatars", os.ModePerm)
 
 	// Set up the Gin router and configure routes
 	router := setupRouter(cfg)
@@ -80,6 +81,9 @@ func main() {
 
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
+
+	// Serve the uploads directory statically
+	router.Static("/uploads", "./uploads")
 
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
@@ -116,6 +120,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
+		auth.POST("/user/upload-avatar", routes.UploadAvatarRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 

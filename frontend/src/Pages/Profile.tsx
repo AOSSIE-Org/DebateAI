@@ -71,7 +71,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { getProfile, updateProfile } from "@/services/profileService";
+import { getProfile, updateProfile, uploadAvatar } from "@/services/profileService";
 import { getAuthToken } from "@/utils/auth";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
@@ -177,6 +177,45 @@ const Profile: React.FC = () => {
     to: undefined,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("File size should not exceed 5MB.");
+      return;
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+      setErrorMessage("Authentication token is missing.");
+      return;
+    }
+
+    try {
+      const response = await uploadAvatar(token, file);
+      const newAvatarUrl = response.avatarUrl;
+      
+      setDashboard({
+        ...dashboard!,
+        profile: { ...dashboard!.profile, avatarUrl: newAvatarUrl },
+      });
+      await updateProfile(
+        token,
+        dashboard!.profile.displayName,
+        dashboard!.profile.bio,
+        dashboard!.profile.twitter,
+        dashboard!.profile.instagram,
+        dashboard!.profile.linkedin,
+        newAvatarUrl
+      );
+      setSuccessMessage("Avatar uploaded successfully!");
+    } catch (err) {
+      setErrorMessage("Failed to upload avatar.");
+    }
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -774,13 +813,31 @@ const Profile: React.FC = () => {
               alt="Avatar"
               className="object-cover w-full h-full"
             />
-            <button
-              onClick={() => setIsAvatarModalOpen(true)}
-              className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Edit Avatar"
-            >
-              <ImageIcon className="w-6 h-6 text-white" />
-            </button>
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-3">
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                title="Create Avatar"
+                className="text-white hover:text-primary transition-colors"
+              >
+                <Pen className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload Avatar"
+                className="text-white hover:text-primary transition-colors"
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".jpg,.jpeg,.png"
+              onChange={handleFileUpload}
+            />
           </div>
           <AvatarModal
             isOpen={isAvatarModalOpen}

@@ -17,3 +17,7 @@ func UpdateProfileRouteHandler(ctx *gin.Context) {
 func UpdateEloAfterDebateRouteHandler(ctx *gin.Context) {
 	controllers.UpdateEloAfterDebate(ctx)
 }
+
+func UploadAvatarRouteHandler(ctx *gin.Context) {
+	controllers.UploadAvatar(ctx)
+}
