@@ -20,8 +20,3 @@ EXPOSE 1313
 # Run directly without air
 CMD ["go", "run", "cmd/server/main.go"]
 
-ENV GONOSUMCHECK=*
-ENV GOFLAGS=-insecure
-ENV GONOSUMDB=*
-ENV GONOPROXY=*
-ENV GOPROXY=direct

@@ -1434,7 +1434,7 @@ const Profile: React.FC = () => {
                   <Separator />
                   <div>
                     <h4 className="font-semibold mb-3">Full Conversation</h4>
-                    <div className="max-h-48 overflow-y-auto border rounded-lg p-3 space-y-3">
+                    <div className="border rounded-lg p-3 space-y-3">
                       {fullTranscript.messages.map((message, index: number) => (
                         <div
                           key={index}
