@@ -5,11 +5,12 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
+import ConnectionStatus from "@/components/ConnectionStatus";
 import { useUser } from "@/hooks/useUser";
 import { getAuthToken } from "@/utils/auth";
 import ReconnectingWebSocket from "reconnecting-websocket";
@@ -140,12 +141,13 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
 
 const WS_BASE_URL = BASE_URL.replace(
   /^https?/,
-  (match) => (match === "https" ? "wss" : "ws")
+  (match: string) => (match === "https" ? "wss" : "ws")
 );
 
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
+  const navigate = useNavigate();
   const { user: currentUser } = useUser();
   const currentUserId = currentUser?.id ?? null;
   useDebateWS(roomId ?? null);
@@ -242,6 +244,13 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [, setSpeechError] = useState<string | null>(null);
   const retryCountRef = useRef<number>(0);
   const manualRecordingRef = useRef(false);
+
+  // Connection status state
+  const [wsConnectionState, setWsConnectionState] = useState<'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error'>('connecting');
+  const [wsRetryCount, setWsRetryCount] = useState(0);
+  const [wsLastError, setWsLastError] = useState<string | null>(null);
+  const [rtcConnectionState, setRtcConnectionState] = useState<'connected' | 'disconnected' | 'failed'>('disconnected');
+  const WS_MAX_RETRIES = 5;
 
   const cleanupSpectatorConnection = useCallback((connectionId: string) => {
     const pc = spectatorPCsRef.current.get(connectionId);
@@ -1115,7 +1124,7 @@ const OnlineDebateRoom = (): JSX.Element => {
 
     const rws = new ReconnectingWebSocket(wsUrl, [], {
       connectionTimeout: 4000,
-      maxRetries: Infinity,
+      maxRetries: WS_MAX_RETRIES,
       maxReconnectionDelay: 10000,
       minReconnectionDelay: 1000,
       reconnectionDelayGrowFactor: 1.3,
@@ -1123,6 +1132,10 @@ const OnlineDebateRoom = (): JSX.Element => {
     wsRef.current = rws;
 
     rws.onopen = () => {
+      console.log('[WS] Connected to debate room');
+      setWsConnectionState('connected');
+      setWsRetryCount(0);
+      setWsLastError(null);
       rws.send(JSON.stringify({ type: "join", room: roomId }));
       // Wait a bit before fetching participants to ensure room is fully created
       setTimeout(() => {
@@ -1132,6 +1145,31 @@ const OnlineDebateRoom = (): JSX.Element => {
       flushSpectatorOfferQueue();
     };
 
+    rws.onerror = (error: any) => {
+      console.error('[WS] WebSocket error:', error);
+      setWsLastError('WebSocket connection error');
+    };
+
+   rws.onclose = (event: any) => {
+	      console.log('[WS] WebSocket closed:', event.code, event.reason);
+	      const errorMessage = event.code === 1006 ? 'Abnormal closure' : 
+	                          event.code === 1008 ? 'Policy violation' :
+	                          event.code === 1011 ? 'Server error' :
+	                          `Connection closed (code: ${event.code})`;
+	      setWsLastError(errorMessage);
+	      
+	      setWsRetryCount(prev => {
+	        const newCount = prev + 1;
+	        if (newCount >= WS_MAX_RETRIES) {
+	          setWsConnectionState('error');
+	          console.log('[Connection] Max retries exceeded');
+	        } else {
+	          setWsConnectionState('reconnecting');
+	          console.log(`[Connection] Retrying (${newCount}/${WS_MAX_RETRIES})...`);
+	        }
+	        return newCount;
+	      });
+	    };
     rws.onmessage = async (event) => {
       const data: WSMessage = JSON.parse(event.data);
       switch (data.type) {
@@ -1383,6 +1421,28 @@ const OnlineDebateRoom = (): JSX.Element => {
 
     pc.ontrack = (event) => {
       setRemoteStream(event.streams[0]);
+    };
+
+     pc.onconnectionstatechange = () => {
+	      console.log('[RTC] Connection state changed:', pc.connectionState);
+	      switch (pc.connectionState) {
+	        case 'connected':
+	          setRtcConnectionState('connected');
+	          break;
+	        case 'failed':
+	          setRtcConnectionState('failed');
+	          break;
+	        case 'disconnected':
+	          setRtcConnectionState('disconnected');
+	          break;
+	        default:
+	          setRtcConnectionState('disconnected');
+	      }
+	    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('[RTC] ICE connection state changed:', pc.iceConnectionState);
+      // Additional logging for ICE state changes
     };
 
     const getMedia = async () => {
@@ -1894,6 +1954,38 @@ const OnlineDebateRoom = (): JSX.Element => {
     setIsManualRecording(false);
   }, [isManualRecording, stopAudioRecording, stopSpeechRecognition]);
 
+  // Connection management handlers
+  const handleReconnect = useCallback(() => {
+    console.log('[Connection] Manual reconnect initiated');
+    setWsConnectionState('connecting');
+    setWsRetryCount(0);
+    setWsLastError(null);
+    // The ReconnectingWebSocket will automatically attempt to reconnect
+    if (wsRef.current) {
+      wsRef.current.reconnect();
+    }
+  }, []);
+
+   const handleLeaveDebate = useCallback(() => {
+	    console.log('[Connection] Leaving debate room');
+	    // Stop local media tracks
+	    if (localStreamRef.current) {
+	      localStreamRef.current.getTracks().forEach(track => track.stop());
+	    }
+	    if (audioStream) {
+	      audioStream.getTracks().forEach(track => track.stop());
+	    }
+	    // Clean up connections
+	    if (wsRef.current) {
+	      wsRef.current.close();
+	    }
+	    if (pcRef.current) {
+	      pcRef.current.close();
+	    }
+	    // Navigate away
+	    navigate('/game');
+	  }, [navigate, audioStream]);
+
   useEffect(() => {
     if (!manualRecordingRef.current) {
       return;
@@ -2092,6 +2184,17 @@ const OnlineDebateRoom = (): JSX.Element => {
   // Render UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
+      {/* Connection Status Component */}
+      <ConnectionStatus
+        state={wsConnectionState}
+        retryCount={wsRetryCount}
+        maxRetries={WS_MAX_RETRIES}
+        rtcState={rtcConnectionState}
+        lastErrorMessage={wsLastError}
+        onReconnect={handleReconnect}
+        onLeave={handleLeaveDebate}
+      />
+
       <div className="w-full max-w-5xl mx-auto py-2">
         <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
@@ -2424,10 +2527,8 @@ const OnlineDebateRoom = (): JSX.Element => {
                 onClick={
                   isManualRecording ? handleStopSpeaking : handleStartSpeaking
                 }
-                variant={isManualRecording ? "destructive" : "default"}
-                size="sm"
+                className={`h-8 rounded-md px-3 text-xs ${isManualRecording ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}`}
                 disabled={!isManualRecording && !canStartSpeaking}
-                className="px-4"
               >
                 {isManualRecording ? "Stop Speaking" : "Start Speaking"}
               </Button>
