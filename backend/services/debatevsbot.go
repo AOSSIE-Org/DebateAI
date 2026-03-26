@@ -265,14 +265,13 @@ Please provide your full argument.`,
 }
 
 // GenerateBotResponse generates a response from the debate bot using the Gemini client library.
-// It uses the bot’s personality to handle errors and responses vividly.
+// It uses the bot's personality to handle errors and responses vividly.
 func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) (string, *genai.GenerateContentResponseUsageMetadata) {
 	if geminiClient == nil {
 		return personalityErrorResponse(botName, "My systems are offline, it seems."), nil
 	}
 
 	bot := GetBotPersonality(botName)
-	// Construct prompt with enhanced personality integration
 	prompt := ConstructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
 	ctx := context.Background()

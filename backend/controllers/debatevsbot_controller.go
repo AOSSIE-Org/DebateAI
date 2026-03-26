@@ -47,22 +47,25 @@ type DebateResponse struct {
 }
 
 type DebateMessageResponse struct {
-	DebateId       string `json:"debateId"`
-	BotName        string `json:"botName"`
-	BotLevel       string `json:"botLevel"`
-	Topic          string `json:"topic"`
-	Stance         string `json:"stance"`
-	Response       string `json:"response"`
-	PromptTokens   int    `json:"prompt_tokens"`
-	ResponseTokens int    `json:"response_tokens"`
-	TotalTokens    int    `json:"total_tokens"`
+	DebateId          string  `json:"debateId"`
+	BotName           string  `json:"botName"`
+	BotLevel          string  `json:"botLevel"`
+	Topic             string  `json:"topic"`
+	Stance            string  `json:"stance"`
+	Response          string  `json:"response"`
+	UserInputTokens   int     `json:"user_input_tokens"`
+	PromptTokens      int     `json:"prompt_tokens"`
+	ResponseTokens    int     `json:"response_tokens"`
+	TotalTokens       int     `json:"total_tokens"`
+	EstimatedCostUSD  float64 `json:"estimated_cost_usd"`
 }
 
 type JudgeResponse struct {
-	Result         string `json:"result"`
-	PromptTokens   int    `json:"prompt_tokens"`
-	ResponseTokens int    `json:"response_tokens"`
-	TotalTokens    int    `json:"total_tokens"`
+	Result           string  `json:"result"`
+	PromptTokens     int     `json:"prompt_tokens"`
+	ResponseTokens   int     `json:"response_tokens"`
+	TotalTokens      int     `json:"total_tokens"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
 }
 
 func CreateDebate(c *gin.Context) {
@@ -148,14 +151,36 @@ func SendDebateMessage(c *gin.Context) {
 	// Generate bot response with usage metadata.
 	botResponse, usage := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
 
+	// Count user's own input tokens separately for granular cost visibility.
+	userInputTokens := 0
+	userInputText := ""
+	for i := len(req.History) - 1; i >= 0; i-- {
+		if req.History[i].Sender == "User" {
+			userInputText = req.History[i].Text
+			break
+		}
+	}
+	if userInputText != "" {
+		if count, err := services.CountTokens(context.Background(), userInputText); err == nil {
+			userInputTokens = int(count)
+		}
+	}
+
 	promptTokens := 0
 	responseTokens := 0
 	totalTokens := 0
+	var estimatedCost float64
 	if usage != nil {
 		promptTokens = int(usage.PromptTokenCount)
 		responseTokens = int(usage.CandidatesTokenCount)
 		totalTokens = int(usage.TotalTokenCount)
-		log.Printf("[TOKEN USAGE] Bot: %s | Prompt: %d | Response: %d | Total: %d", req.BotName, promptTokens, responseTokens, totalTokens)
+		// Pricing: Gemini 2.5 Flash — Input $0.075/1M, Output $0.30/1M tokens
+		estimatedCost = (float64(promptTokens)*0.075 + float64(responseTokens)*0.30) / 1_000_000
+		log.Printf("[TOKEN USAGE] Bot: %s", req.BotName)
+		log.Printf("  User Input : %d tokens", userInputTokens)
+		log.Printf("  Prompt Total: %d tokens (system + history + user)", promptTokens)
+		log.Printf("  Bot Response: %d tokens", responseTokens)
+		log.Printf("  Total Tokens: %d | Estimated Cost: $%.6f USD", totalTokens, estimatedCost)
 	}
 
 	// Update debate history with the bot's response and token usage.
@@ -185,15 +210,17 @@ func SendDebateMessage(c *gin.Context) {
 	}
 
 	response := DebateMessageResponse{
-		DebateId:       debate.ID.Hex(),
-		BotName:        req.BotName,
-		BotLevel:       req.BotLevel,
-		Topic:          req.Topic,
-		Stance:         req.Stance,
-		Response:       botResponse,
-		PromptTokens:   promptTokens,
-		ResponseTokens: responseTokens,
-		TotalTokens:    totalTokens,
+		DebateId:         debate.ID.Hex(),
+		BotName:          req.BotName,
+		BotLevel:         req.BotLevel,
+		Topic:            req.Topic,
+		Stance:           req.Stance,
+		Response:         botResponse,
+		UserInputTokens:  userInputTokens,
+		PromptTokens:     promptTokens,
+		ResponseTokens:   responseTokens,
+		TotalTokens:      totalTokens,
+		EstimatedCostUSD: estimatedCost,
 	}
 	c.JSON(200, response)
 }
@@ -231,11 +258,16 @@ func JudgeDebate(c *gin.Context) {
 	promptTokens := 0
 	responseTokens := 0
 	totalTokens := 0
+	var estimatedCost float64
 	if usage != nil {
 		promptTokens = int(usage.PromptTokenCount)
 		responseTokens = int(usage.CandidatesTokenCount)
 		totalTokens = int(usage.TotalTokenCount)
-		log.Printf("[TOKEN USAGE] Judge | Prompt: %d | Response: %d | Total: %d", promptTokens, responseTokens, totalTokens)
+		estimatedCost = (float64(promptTokens)*0.075 + float64(responseTokens)*0.30) / 1_000_000
+		log.Printf("[TOKEN USAGE] Judge")
+		log.Printf("  Prompt Total: %d tokens", promptTokens)
+		log.Printf("  Judge Response: %d tokens", responseTokens)
+		log.Printf("  Total Tokens: %d | Estimated Cost: $%.6f USD", totalTokens, estimatedCost)
 	}
 
 	// Update debate outcome
@@ -324,10 +356,11 @@ func JudgeDebate(c *gin.Context) {
 	}()
 
 	c.JSON(200, JudgeResponse{
-		Result:         result,
-		PromptTokens:   promptTokens,
-		ResponseTokens: responseTokens,
-		TotalTokens:    totalTokens,
+		Result:           result,
+		PromptTokens:     promptTokens,
+		ResponseTokens:   responseTokens,
+		TotalTokens:      totalTokens,
+		EstimatedCostUSD: estimatedCost,
 	})
 }
 

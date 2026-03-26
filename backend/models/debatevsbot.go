@@ -4,9 +4,9 @@ import "go.mongodb.org/mongo-driver/bson/primitive"
 
 // Message represents a single message in the debate
 type Message struct {
-	Sender         string `json:"sender" bson:"sender"` // "User", "Bot", or "Judge"
+	Sender         string `json:"sender" bson:"sender"`
 	Text           string `json:"text" bson:"text"`
-	Phase          string `json:"phase,omitempty" bson:"phase,omitempty"` // Added for phase-specific tracking
+	Phase          string `json:"phase,omitempty" bson:"phase,omitempty"`
 	PromptTokens   int    `json:"prompt_tokens,omitempty" bson:"prompt_tokens,omitempty"`
 	ResponseTokens int    `json:"response_tokens,omitempty" bson:"response_tokens,omitempty"`
 	TotalTokens    int    `json:"total_tokens,omitempty" bson:"total_tokens,omitempty"`

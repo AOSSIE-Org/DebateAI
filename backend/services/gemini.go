@@ -51,3 +51,15 @@ func cleanModelOutput(text string) string {
 func generateDefaultModelText(ctx context.Context, prompt string) (string, *genai.GenerateContentResponseUsageMetadata, error) {
 	return generateModelText(ctx, defaultGeminiModel, prompt)
 }
+
+// CountTokens returns the token count for a given text string using the Gemini API.
+func CountTokens(ctx context.Context, text string) (int32, error) {
+	if geminiClient == nil {
+		return 0, errors.New("gemini client not initialized")
+	}
+	resp, err := geminiClient.Models.CountTokens(ctx, defaultGeminiModel, genai.Text(text), nil)
+	if err != nil {
+		return 0, err
+	}
+	return resp.TotalTokens, nil
+}
