@@ -129,9 +129,10 @@ func SubmitTranscripts(
 				"createdAt": bson.M{"$gte": time.Now().Add(-5 * time.Minute)}, // Check for recent transcripts (within 5 minutes)
 			}).Decode(&existingTranscript)
 
-			if err == nil {
+			switch err {
+			case nil:
 				// Transcript already exists, skip saving to prevent duplicates
-			} else if err == mongo.ErrNoDocuments {
+			case mongo.ErrNoDocuments:
 				// No existing transcript found, proceed with saving
 				// Determine result for each user
 				resultFor := "pending"
@@ -236,7 +237,7 @@ func SubmitTranscripts(
 						},
 					}
 				}
-			} else {
+			default:
 			}
 		}
 
@@ -475,7 +476,7 @@ Debate Transcript:
 Provide ONLY the JSON output without any additional text.`, transcript.String())
 
 	ctx := context.Background()
-	text, err := generateDefaultModelText(ctx, prompt)
+	text, _, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
 		return "Unable to judge."
 	}

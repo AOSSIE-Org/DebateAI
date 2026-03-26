@@ -47,16 +47,22 @@ type DebateResponse struct {
 }
 
 type DebateMessageResponse struct {
-	DebateId string `json:"debateId"`
-	BotName  string `json:"botName"`
-	BotLevel string `json:"botLevel"`
-	Topic    string `json:"topic"`
-	Stance   string `json:"stance"`
-	Response string `json:"response"`
+	DebateId       string `json:"debateId"`
+	BotName        string `json:"botName"`
+	BotLevel       string `json:"botLevel"`
+	Topic          string `json:"topic"`
+	Stance         string `json:"stance"`
+	Response       string `json:"response"`
+	PromptTokens   int    `json:"prompt_tokens"`
+	ResponseTokens int    `json:"response_tokens"`
+	TotalTokens    int    `json:"total_tokens"`
 }
 
 type JudgeResponse struct {
-	Result string `json:"result"`
+	Result         string `json:"result"`
+	PromptTokens   int    `json:"prompt_tokens"`
+	ResponseTokens int    `json:"response_tokens"`
+	TotalTokens    int    `json:"total_tokens"`
 }
 
 func CreateDebate(c *gin.Context) {
@@ -139,14 +145,26 @@ func SendDebateMessage(c *gin.Context) {
 		return
 	}
 
-	// Generate bot response with the additional context field.
-	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
+	// Generate bot response with usage metadata.
+	botResponse, usage := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
 
-	// Update debate history with the bot's response.
+	promptTokens := 0
+	responseTokens := 0
+	totalTokens := 0
+	if usage != nil {
+		promptTokens = int(usage.PromptTokenCount)
+		responseTokens = int(usage.CandidatesTokenCount)
+		totalTokens = int(usage.TotalTokenCount)
+		log.Printf("[TOKEN USAGE] Bot: %s | Prompt: %d | Response: %d | Total: %d", req.BotName, promptTokens, responseTokens, totalTokens)
+	}
+
+	// Update debate history with the bot's response and token usage.
 	updatedHistory := append(req.History, models.Message{
-		Sender: "Bot",
-		Text:   botResponse,
-		// You can also store the phase if needed.
+		Sender:         "Bot",
+		Text:           botResponse,
+		PromptTokens:   promptTokens,
+		ResponseTokens: responseTokens,
+		TotalTokens:    totalTokens,
 	})
 
 	debate := models.DebateVsBot{
@@ -167,12 +185,15 @@ func SendDebateMessage(c *gin.Context) {
 	}
 
 	response := DebateMessageResponse{
-		DebateId: debate.ID.Hex(),
-		BotName:  req.BotName,
-		BotLevel: req.BotLevel,
-		Topic:    req.Topic,
-		Stance:   req.Stance,
-		Response: botResponse,
+		DebateId:       debate.ID.Hex(),
+		BotName:        req.BotName,
+		BotLevel:       req.BotLevel,
+		Topic:          req.Topic,
+		Stance:         req.Stance,
+		Response:       botResponse,
+		PromptTokens:   promptTokens,
+		ResponseTokens: responseTokens,
+		TotalTokens:    totalTokens,
 	}
 	c.JSON(200, response)
 }
@@ -205,7 +226,17 @@ func JudgeDebate(c *gin.Context) {
 	}
 
 	// Judge the debate
-	result := services.JudgeDebate(req.History)
+	result, usage := services.JudgeDebate(req.History)
+
+	promptTokens := 0
+	responseTokens := 0
+	totalTokens := 0
+	if usage != nil {
+		promptTokens = int(usage.PromptTokenCount)
+		responseTokens = int(usage.CandidatesTokenCount)
+		totalTokens = int(usage.TotalTokenCount)
+		log.Printf("[TOKEN USAGE] Judge | Prompt: %d | Response: %d | Total: %d", promptTokens, responseTokens, totalTokens)
+	}
 
 	// Update debate outcome
 	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
@@ -293,7 +324,10 @@ func JudgeDebate(c *gin.Context) {
 	}()
 
 	c.JSON(200, JudgeResponse{
-		Result: result,
+		Result:         result,
+		PromptTokens:   promptTokens,
+		ResponseTokens: responseTokens,
+		TotalTokens:    totalTokens,
 	})
 }
 
