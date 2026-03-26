@@ -45,8 +45,7 @@ func UploadAvatar(c *gin.Context) {
 	}
 
 	// Return public URL
-	baseURL := "http://localhost:1313"
-	publicURL := fmt.Sprintf("%s/uploads/avatars/%s", baseURL, newFilename)
+	publicURL := fmt.Sprintf("/uploads/avatars/%s", newFilename)
 
 	c.JSON(http.StatusOK, gin.H{"avatarUrl": publicURL})
 }

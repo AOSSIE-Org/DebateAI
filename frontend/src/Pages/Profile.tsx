@@ -180,40 +180,59 @@ const Profile: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
       setErrorMessage("File size should not exceed 5MB.");
+      input.value = "";
       return;
     }
 
     const token = getAuthToken();
     if (!token) {
       setErrorMessage("Authentication token is missing.");
+      input.value = "";
       return;
     }
 
     try {
       const response = await uploadAvatar(token, file);
       const newAvatarUrl = response.avatarUrl;
+      const previousAvatarUrl = dashboard?.profile.avatarUrl;
       
-      setDashboard({
-        ...dashboard!,
-        profile: { ...dashboard!.profile, avatarUrl: newAvatarUrl },
-      });
-      await updateProfile(
-        token,
-        dashboard!.profile.displayName,
-        dashboard!.profile.bio,
-        dashboard!.profile.twitter,
-        dashboard!.profile.instagram,
-        dashboard!.profile.linkedin,
-        newAvatarUrl
+      setDashboard((current: DashboardData | null) => 
+        current ? {
+          ...current,
+          profile: { ...current.profile, avatarUrl: newAvatarUrl },
+        } : current
       );
-      setSuccessMessage("Avatar uploaded successfully!");
+
+      try {
+        await updateProfile(
+          token,
+          dashboard!.profile.displayName,
+          dashboard!.profile.bio,
+          dashboard!.profile.twitter,
+          dashboard!.profile.instagram,
+          dashboard!.profile.linkedin,
+          newAvatarUrl
+        );
+        setSuccessMessage("Avatar uploaded successfully!");
+      } catch (err) {
+        setDashboard((current: DashboardData | null) => 
+          current ? {
+            ...current,
+            profile: { ...current.profile, avatarUrl: previousAvatarUrl },
+          } : current
+        );
+        setErrorMessage("Failed to save avatar to profile.");
+      }
     } catch (err) {
       setErrorMessage("Failed to upload avatar.");
+    } finally {
+      input.value = "";
     }
   };
 
@@ -813,11 +832,12 @@ const Profile: React.FC = () => {
               alt="Avatar"
               className="object-cover w-full h-full"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-3">
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               <button
                 type="button"
                 onClick={() => setIsAvatarModalOpen(true)}
                 title="Create Avatar"
+                aria-label="Create avatar"
                 className="text-white hover:text-primary transition-colors"
               >
                 <Pen className="w-5 h-5" />
@@ -826,6 +846,7 @@ const Profile: React.FC = () => {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 title="Upload Avatar"
+                aria-label="Upload avatar"
                 className="text-white hover:text-primary transition-colors"
               >
                 <ImageIcon className="w-5 h-5" />

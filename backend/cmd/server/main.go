@@ -66,9 +66,10 @@ func main() {
 	utils.SeedDebateData()
 	utils.PopulateTestUsers()
 
-	// Create uploads directory
-	os.MkdirAll("uploads", os.ModePerm)
-	os.MkdirAll("uploads/avatars", os.ModePerm)
+	// Create avatar upload directory (also creates the parent 'uploads' directory)
+	if err := os.MkdirAll("uploads/avatars", 0o755); err != nil {
+		log.Fatalf("failed to create avatar upload directory: %v", err)
+	}
 
 	// Set up the Gin router and configure routes
 	router := setupRouter(cfg)
