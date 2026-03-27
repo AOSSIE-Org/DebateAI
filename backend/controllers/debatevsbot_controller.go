@@ -221,6 +221,9 @@ func SendDebateMessage(c *gin.Context) {
 		debate.ID = primitive.NewObjectID()
 	}
 	if err := db.SaveDebateVsBot(debate); err != nil {
+		log.Printf("[DATABASE ERROR] Failed to save debate %s: %v", debate.ID.Hex(), err)
+		c.JSON(500, gin.H{"error": "Failed to persist debate analysis"})
+		return
 	}
 
 	response := DebateMessageResponse{
@@ -286,6 +289,9 @@ func JudgeDebate(c *gin.Context) {
 
 	// Update debate outcome
 	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
+		log.Printf("[DATABASE ERROR] Failed to update outcome for %s: %v", email, err)
+		c.JSON(500, gin.H{"error": "Failed to update debate outcome"})
+		return
 	}
 
 	// Get the latest debate information to extract proper details

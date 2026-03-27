@@ -486,13 +486,19 @@ Debate Transcript:
 Provide ONLY the JSON output without any additional text.`, transcript.String())
 
 	ctx := context.Background()
-	text, _, err := generateDefaultModelText(ctx, prompt)
+	text, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
 		return "Unable to judge."
 	}
 	if text == "" {
 		return "Unable to judge."
 	}
+
+	if usage != nil {
+		log.Printf("[TOKEN USAGE] JudgeHvH | Prompt: %d | Response: %d | Total: %d",
+			usage.PromptTokenCount, usage.CandidatesTokenCount, usage.TotalTokenCount)
+	}
+
 	return text
 }
 
