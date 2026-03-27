@@ -269,7 +269,7 @@ Please provide your full argument.`,
 
 // GenerateBotResponse generates a response from the debate bot using the Gemini client library.
 // It uses the bot's personality to handle responses vividly.
-func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) (string, *genai.GenerateContentResponseUsageMetadata) {
+func GenerateBotResponse(ctx context.Context, botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) (string, *genai.GenerateContentResponseUsageMetadata) {
 	if geminiClient == nil {
 		return personalityErrorResponse(botName, "My systems are offline, it seems."), nil
 	}
@@ -277,7 +277,6 @@ func GenerateBotResponse(botName, botLevel, topic string, history []models.Messa
 	bot := GetBotPersonality(botName)
 	prompt := ConstructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
-	ctx := context.Background()
 	response, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
 		return personalityErrorResponse(botName, "A glitch in my logic, there is."), usage
@@ -377,7 +376,7 @@ func personalityClarificationRequest(botName string) string {
 }
 
 // JudgeDebate evaluates the debate transcript using Gemini, returning structured judgment JSON and usage metadata.
-func JudgeDebate(history []models.Message) (string, *genai.GenerateContentResponseUsageMetadata) {
+func JudgeDebate(ctx context.Context, history []models.Message) (string, *genai.GenerateContentResponseUsageMetadata) {
 	if geminiClient == nil {
 		return "Unable to judge.", nil
 	}
@@ -453,7 +452,6 @@ Provide ONLY the JSON output without any additional text.`,
 		bot.Name, bot.Tone, bot.RhetoricalStyle, strings.Join(bot.Catchphrases, ", "), strings.Join(bot.UniverseTies, ", "),
 		bot.DebateStrategy, strings.Join(bot.SignatureMoves, ", "), strings.Join(bot.PhilosophicalTenets, ", "), FormatHistory(history))
 
-	ctx := context.Background()
 	text, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil || text == "" {
 		if err != nil {

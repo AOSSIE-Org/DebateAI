@@ -192,7 +192,7 @@ func SubmitTranscripts(
 					forSubmission.Transcripts,
 				)
 				if err != nil {
-					log.Printf("[TRANSCRIPT] Error saving transcript for 'for' user %s in room %s: %v", forUser.Email, roomID, err)
+					log.Printf("[TRANSCRIPT] Error saving transcript for role=for room=%s: %v", roomID, err)
 				}
 
 				// Save transcript for "against" user
@@ -207,7 +207,7 @@ func SubmitTranscripts(
 					againstSubmission.Transcripts,
 				)
 				if err != nil {
-					log.Printf("[TRANSCRIPT] Error saving transcript for 'against' user %s in room %s: %v", againstUser.Email, roomID, err)
+					log.Printf("[TRANSCRIPT] Error saving transcript for role=against room=%s: %v", roomID, err)
 				}
 
 				// Update ratings based on the result

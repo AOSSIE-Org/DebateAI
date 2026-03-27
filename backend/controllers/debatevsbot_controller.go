@@ -151,7 +151,7 @@ func SendDebateMessage(c *gin.Context) {
 	}
 
 	// Generate bot response with usage metadata.
-	botResponse, usage := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
+	botResponse, usage := services.GenerateBotResponse(c.Request.Context(), req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
 
 	// Count user's own input tokens separately for granular cost visibility.
 	userInputTokens := 0
@@ -199,12 +199,11 @@ func SendDebateMessage(c *gin.Context) {
 
 	// Update debate history with the bot's response and token usage.
 	updatedHistory := append(req.History, models.Message{
-		Sender:          "Bot",
-		Text:            botResponse,
-		PromptTokens:    promptTokens,
-		ResponseTokens:  responseTokens,
-		TotalTokens:     totalTokens,
-		UserInputTokens: userInputTokens,
+		Sender:         "Bot",
+		Text:           botResponse,
+		PromptTokens:   promptTokens,
+		ResponseTokens: responseTokens,
+		TotalTokens:    totalTokens,
 	})
 
 	debate := models.DebateVsBot{
@@ -268,7 +267,7 @@ func JudgeDebate(c *gin.Context) {
 	}
 
 	// Judge the debate
-	result, usage := services.JudgeDebate(req.History)
+	result, usage := services.JudgeDebate(c.Request.Context(), req.History)
 
 	promptTokens := 0
 	responseTokens := 0
