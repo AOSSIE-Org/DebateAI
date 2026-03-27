@@ -53,21 +53,22 @@ type DebateMessageResponse struct {
 	Topic             string  `json:"topic"`
 	Stance            string  `json:"stance"`
 	Response          string  `json:"response"`
-	UserInputTokens   int     `json:"user_input_tokens"`
-	PromptTokens      int     `json:"prompt_tokens"`
-	ResponseTokens    int     `json:"response_tokens"`
-	TotalTokens       int     `json:"total_tokens"`
-	EstimatedCostUSD  float64 `json:"estimated_cost_usd"`
+	UserInputTokens   int     `json:"user_input_tokens,omitempty"`
+	PromptTokens      int     `json:"prompt_tokens,omitempty"`
+	ResponseTokens    int     `json:"response_tokens,omitempty"`
+	TotalTokens       int     `json:"total_tokens,omitempty"`
+	EstimatedCostUSD  float64 `json:"estimated_cost_usd,omitempty"`
 }
 
 type JudgeResponse struct {
 	Result           string  `json:"result"`
-	PromptTokens     int     `json:"prompt_tokens"`
-	ResponseTokens   int     `json:"response_tokens"`
-	TotalTokens      int     `json:"total_tokens"`
-	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+	PromptTokens     int     `json:"prompt_tokens,omitempty"`
+	ResponseTokens   int     `json:"response_tokens,omitempty"`
+	TotalTokens      int     `json:"total_tokens,omitempty"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd,omitempty"`
 }
 
+// CreateDebate handles the creation of a new debate session against a bot.
 func CreateDebate(c *gin.Context) {
 	// Extract token from request header
 	token := c.GetHeader("Authorization")
@@ -128,6 +129,7 @@ func CreateDebate(c *gin.Context) {
 	c.JSON(200, response)
 }
 
+// SendDebateMessage processes a new message from the user and generates a bot response.
 func SendDebateMessage(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
@@ -314,12 +316,21 @@ func JudgeDebate(c *gin.Context) {
 	} else {
 		// Fallback to string matching if JSON parsing fails
 		resultLower := strings.ToLower(result)
-		if strings.Contains(resultLower, "user win") || strings.Contains(resultLower, "user wins") ||
-			strings.Contains(resultLower, "user") && strings.Contains(resultLower, "win") {
+
+		// Group logic checks for clearer precedence
+		userWon := strings.Contains(resultLower, "user win") ||
+			strings.Contains(resultLower, "user wins") ||
+			(strings.Contains(resultLower, "user") && strings.Contains(resultLower, "win"))
+
+		botWon := strings.Contains(resultLower, "bot win") ||
+			strings.Contains(resultLower, "bot wins") ||
+			strings.Contains(resultLower, "lose") ||
+			strings.Contains(resultLower, "loss") ||
+			(strings.Contains(resultLower, "bot") && strings.Contains(resultLower, "win"))
+
+		if userWon {
 			resultStatus = "win"
-		} else if strings.Contains(resultLower, "bot win") || strings.Contains(resultLower, "bot wins") ||
-			strings.Contains(resultLower, "lose") || strings.Contains(resultLower, "loss") ||
-			strings.Contains(resultLower, "bot") && strings.Contains(resultLower, "win") {
+		} else if botWon {
 			resultStatus = "loss"
 		} else if strings.Contains(resultLower, "draw") {
 			resultStatus = "draw"
