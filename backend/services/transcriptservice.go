@@ -246,6 +246,7 @@ func SubmitTranscripts(
 				}
 			default:
 				log.Printf("[TRANSCRIPT] Unexpected error checking existing transcript in room %s: %v", roomID, err)
+				return nil, err
 			}
 		}
 

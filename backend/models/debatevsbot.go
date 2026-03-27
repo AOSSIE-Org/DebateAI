@@ -7,9 +7,10 @@ type Message struct {
 	Sender         string `json:"sender" bson:"sender"`
 	Text           string `json:"text" bson:"text"`
 	Phase          string `json:"phase,omitempty" bson:"phase,omitempty"`
-	PromptTokens   int    `json:"prompt_tokens,omitempty" bson:"prompt_tokens,omitempty"`
-	ResponseTokens int    `json:"response_tokens,omitempty" bson:"response_tokens,omitempty"`
-	TotalTokens    int    `json:"total_tokens,omitempty" bson:"total_tokens,omitempty"`
+	PromptTokens    int    `json:"prompt_tokens,omitempty" bson:"prompt_tokens,omitempty"`
+	ResponseTokens  int    `json:"response_tokens,omitempty" bson:"response_tokens,omitempty"`
+	TotalTokens     int    `json:"total_tokens,omitempty" bson:"total_tokens,omitempty"`
+	UserInputTokens int    `json:"user_input_tokens,omitempty" bson:"user_input_tokens,omitempty"`
 }
 
 // PhaseTiming represents the timing configuration for a debate phase

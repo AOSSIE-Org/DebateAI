@@ -163,8 +163,20 @@ func SendDebateMessage(c *gin.Context) {
 		}
 	}
 	if userInputText != "" {
-		if count, err := services.CountTokens(context.Background(), userInputText); err == nil {
+		// Use a context with timeout to prevent hanging the request
+		countCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if count, err := services.CountTokens(countCtx, userInputText); err == nil {
 			userInputTokens = int(count)
+			// Update the last user message in the history with the token count for persistence
+			for i := len(req.History) - 1; i >= 0; i-- {
+				if req.History[i].Sender == "User" {
+					req.History[i].UserInputTokens = userInputTokens
+					break
+				}
+			}
+		} else {
+			log.Printf("[TOKEN COUNT] Warning: Failed to count user tokens: %v", err)
 		}
 	}
 
@@ -187,11 +199,12 @@ func SendDebateMessage(c *gin.Context) {
 
 	// Update debate history with the bot's response and token usage.
 	updatedHistory := append(req.History, models.Message{
-		Sender:         "Bot",
-		Text:           botResponse,
-		PromptTokens:   promptTokens,
-		ResponseTokens: responseTokens,
-		TotalTokens:    totalTokens,
+		Sender:          "Bot",
+		Text:            botResponse,
+		PromptTokens:    promptTokens,
+		ResponseTokens:  responseTokens,
+		TotalTokens:     totalTokens,
+		UserInputTokens: userInputTokens,
 	})
 
 	debate := models.DebateVsBot{

@@ -280,10 +280,10 @@ func GenerateBotResponse(botName, botLevel, topic string, history []models.Messa
 	ctx := context.Background()
 	response, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
-		return personalityErrorResponse(botName, "A glitch in my logic, there is."), nil
+		return personalityErrorResponse(botName, "A glitch in my logic, there is."), usage
 	}
 	if response == "" {
-		return personalityErrorResponse(botName, "Lost in translation, my thoughts are."), nil
+		return personalityErrorResponse(botName, "Lost in translation, my thoughts are."), usage
 	}
 	if strings.Contains(strings.ToLower(response), "clarify") {
 		return personalityClarificationRequest(botName), usage
@@ -459,7 +459,7 @@ Provide ONLY the JSON output without any additional text.`,
 		if err != nil {
 			log.Printf("Gemini error: %v", err)
 		}
-		return "Unable to judge.", nil
+		return "Unable to judge.", usage
 	}
 	return text, usage
 }
