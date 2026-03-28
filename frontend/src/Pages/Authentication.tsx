@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Button } from '@/components/ui/button';
+import { AuthContext } from '@/context/authContext';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
 import { Link } from 'react-router-dom';
 import DebateCover from '../assets/DebateCover4.svg';
@@ -102,6 +103,7 @@ const RightSection: React.FC<RightSectionProps> = ({
 
 
 const Authentication = () => {
+  const { clearError } = useContext(AuthContext)!;
   // Extend authMode to include 'resetPassword'
   const [authMode, setAuthMode] = useState<
     'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
@@ -112,33 +114,39 @@ const Authentication = () => {
   const [infoMessage, setInfoMessage] = useState('');
 
   const toggleAuthMode = () => {
+    clearError();
     setAuthMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'));
   };
 
   // Start OTP verification process
   const startOtpVerification = (email: string) => {
+    clearError();
     setEmailForOTP(email);
     setAuthMode('otpVerification');
   };
 
   // Handle successful OTP verification
   const handleOtpVerified = () => {
+    clearError();
     setAuthMode('login');
   };
 
   // Start forgot password process
   const startForgotPassword = () => {
+    clearError();
     setAuthMode('forgotPassword');
   };
 
   // Start reset password process
   const startResetPassword = (email: string) => {
+    clearError();
     setEmailForPasswordReset(email);
     setAuthMode('resetPassword');
   };
 
   // Handle successful password reset
   const handlePasswordReset = () => {
+    clearError();
     setInfoMessage('Your password was successfully reset. You can now log in.');
     setAuthMode('login');
   };
