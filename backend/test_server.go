@@ -35,16 +35,9 @@ func main() {
 	// Check pool - should have 2 users now
 	pool = ms.GetPool()
 
-	for _, user := range pool {
-	}
-
 	// Wait a bit for matching
 	time.Sleep(1 * time.Second)
 
 	// Check pool after matching
 	pool = ms.GetPool()
-
-	for _, user := range pool {
-	}
-
 }
