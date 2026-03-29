@@ -21,38 +21,40 @@ const Home: React.FC = () => {
   };
 
   const handlePlayDebateClick = async () => {
+    if (loading) return; 
+
     setLoading("online");
 
     await delay(800);
 
     if (authContext?.isAuthenticated) {
-      navigate('/game');
+      navigate("/game");
     } else {
-      navigate('/auth', { state: { isSignUp: false } });
+      navigate("/auth", { state: { isSignUp: false } });
     }
 
     setLoading(null);
   };
 
   const handlePlayBotClick = async () => {
+    if (loading) return; 
+
     setLoading("bot");
 
     await delay(800);
 
     if (authContext?.isAuthenticated) {
-      navigate('/bot-selection');
+      navigate("/bot-selection");
     } else {
-      navigate('/auth', { state: { isSignUp: false } });
+      navigate("/auth", { state: { isSignUp: false } });
     }
 
     setLoading(null);
   };
 
-  const logoutHandler = () =>{
-    authContext?.logout()
-    navigate("/")
-  }
-
+  const logoutHandler = () => {
+    authContext?.logout(); 
+  };
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <nav className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -104,7 +106,7 @@ const Home: React.FC = () => {
               Play Debate Online on the <span className="text-primary">#1</span> Site!
             </h3>
             <div className="flex flex-col w-full">
-              <Button className="my-2 h-auto rounded text-xl flex items-center justify-start" onClick={handlePlayDebateClick}>
+              <Button disabled={loading !== null} className="my-2 h-auto rounded text-xl flex items-center justify-start" onClick={handlePlayDebateClick}>
                 <FaHandshakeSimpleSlash className="text-4xl" />
                 <div className="flex flex-col items-start ml-4">
                   <span className="font-bold">Play Online</span>
@@ -114,6 +116,7 @@ const Home: React.FC = () => {
                 </div>
               </Button>
               <Button
+                disabled={loading !== null}
                 className="my-2 h-auto rounded text-xl flex items-center justify-start"
                 variant="outline"
                 onClick={handlePlayBotClick}
