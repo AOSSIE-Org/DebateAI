@@ -80,6 +80,7 @@ function AppRoutes() {
             )
           }
         />
+        <Route path="/n" element={<Navigate to="/startDebate" replace />} />
         <Route path="/auth" element={<Authentication />} />
         <Route path="/admin/login" element={<AdminSignup />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
