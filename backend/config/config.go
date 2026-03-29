@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -45,18 +46,21 @@ type Config struct {
 	SMTP struct {
 		Host        string `yaml:"host"`
 		Port        int    `yaml:"port"`
-		Username    string `yaml:"username"`    // Gmail address
-		Password    string `yaml:"password"`    // App Password
-		SenderEmail string `yaml:"senderEmail"` // Same as Username for Gmail
+		Username    string `yaml:"username"`
+		Password    string `yaml:"password"`
+		SenderEmail string `yaml:"senderEmail"`
 		SenderName  string `yaml:"senderName"`
 	} `yaml:"smtp"`
 
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
 	} `yaml:"googleOAuth"`
+
+	CORS struct {
+		AllowedOrigins []string `yaml:"allowedOrigins"`
+	} `yaml:"cors"`
 }
 
-// LoadConfig reads the configuration file
 func LoadConfig(path string) (*Config, error) {
 
 	data, err := os.ReadFile(path)
@@ -69,7 +73,6 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal yaml: %w", err)
 	}
 
-	// Override with environment variables if present
 	if envPort := os.Getenv("PORT"); envPort != "" {
 		fmt.Sscanf(envPort, "%d", &cfg.Server.Port)
 	}
@@ -86,7 +89,43 @@ func LoadConfig(path string) (*Config, error) {
 	if envGoogleClient := os.Getenv("GOOGLE_CLIENT_ID"); envGoogleClient != "" {
 		cfg.GoogleOAuth.ClientID = envGoogleClient
 	}
-	// Add other overrides as needed
+
+	if err := validateConfig(&cfg); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
+}
+
+func validateConfig(cfg *Config) error {
+
+	if cfg.Server.Port == 0 {
+		return fmt.Errorf("server.port is required")
+	}
+	if cfg.Database.URI == "" {
+		return fmt.Errorf("database.uri is required")
+	}
+	if cfg.JWT.Secret == "" {
+		return fmt.Errorf("jwt.secret is required")
+	}
+	if cfg.Gemini.ApiKey == "" {
+		return fmt.Errorf("gemini.apiKey is required")
+	}
+	if cfg.GoogleOAuth.ClientID == "" {
+		return fmt.Errorf("googleOAuth.clientID is required")
+	}
+
+	for _, origin := range cfg.CORS.AllowedOrigins {
+		if strings.TrimSpace(origin) == "" {
+			return fmt.Errorf("cors.allowedOrigins cannot contain empty values")
+		}
+		if origin == "*" {
+			return fmt.Errorf("cors.allowedOrigins cannot contain '*' when credentials are enabled")
+		}
+		if !strings.HasPrefix(origin, "http://") && !strings.HasPrefix(origin, "https://") {
+			return fmt.Errorf("cors.allowedOrigins must include scheme")
+		}
+	}
+
+	return nil
 }
