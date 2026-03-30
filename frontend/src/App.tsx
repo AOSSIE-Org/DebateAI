@@ -29,8 +29,10 @@ import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
 
+
 //framer motion
 import { useLocation } from "react-router-dom";
+import SupportDebateAI from './Pages/SupportDebateAI';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -112,6 +114,7 @@ function AppRoutes() {
         </Route>
 
         {/* Fallback */}
+        <Route path="/support-debateai" element={<SupportDebateAI />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
   );

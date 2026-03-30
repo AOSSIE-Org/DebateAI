@@ -6,11 +6,14 @@ import DebateCover from "../assets/DebateCover4.svg";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 import AOSSIELogo from "@/assets/aossie.png";
+import {useRef, useEffect } from "react";
+
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const authContext = useContext(AuthContext);
   const [loading, setLoading] = useState<null | "online" | "bot">(null);
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  const isMounted = useRef(true);
 
   const signupHandler = () => {
     navigate('/auth', { state: { isSignUp: true } });
@@ -21,40 +24,54 @@ const Home: React.FC = () => {
   };
 
   const handlePlayDebateClick = async () => {
-    if (loading) return; 
+    if (loading) return;
 
     setLoading("online");
 
-    await delay(800);
+    try {
+      await delay(800);
 
-    if (authContext?.isAuthenticated) {
-      navigate("/game");
-    } else {
-      navigate("/auth", { state: { isSignUp: false } });
+      if (!isMounted.current) return; 
+
+      if (authContext?.isAuthenticated) {
+        navigate("/game");
+      } else {
+        navigate("/auth", { state: { isSignUp: false } });
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(null); 
+      }
     }
-
-    setLoading(null);
   };
 
   const handlePlayBotClick = async () => {
-    if (loading) return; 
+    if (loading) return;
 
     setLoading("bot");
 
-    await delay(800);
+    try {
+      await delay(800);
 
-    if (authContext?.isAuthenticated) {
-      navigate("/bot-selection");
-    } else {
-      navigate("/auth", { state: { isSignUp: false } });
+      if (!isMounted.current) return; 
+
+      if (authContext?.isAuthenticated) {
+        navigate("/bot-selection");
+      } else {
+        navigate("/auth", { state: { isSignUp: false } });
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(null); 
+      }
     }
-
-    setLoading(null);
   };
 
-  const logoutHandler = () => {
-    authContext?.logout(); 
-  };
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <nav className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
