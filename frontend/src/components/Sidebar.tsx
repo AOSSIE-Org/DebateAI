@@ -45,6 +45,11 @@ function Sidebar() {
           icon={<Users className='mr-3 h-4 w-4' />}
         />
         <NavItem
+          to='/impromptu'
+          label='Daily Challenge'
+          icon={<MessageSquare className='mr-3 h-4 w-4' />}
+        />
+        <NavItem
           to='/leaderboard'
           label='Leaderboard'
           icon={<BarChart className='mr-3 h-4 w-4' />}

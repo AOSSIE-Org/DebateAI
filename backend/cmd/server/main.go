@@ -126,6 +126,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 		routes.SetupDebateVsBotRoutes(auth)
 
+		routes.SetupImpromptuDebateRoutes(auth)
+
 		// WebSocket signaling endpoint (handles auth internally)
 		router.GET("/ws", websocket.WebsocketHandler)
 

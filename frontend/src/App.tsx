@@ -29,6 +29,7 @@ import CommunityFeed from './Pages/CommunityFeed';
 import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
+import ImpromptuChallenge from './Pages/ImpromptuChallenge';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -95,6 +96,7 @@ function AppRoutes() {
           />{' '}
           {/* Add this route */}
           <Route path='coach/pros-cons' element={<ProsConsChallenge />} />
+          <Route path='/impromptu' element={<ImpromptuChallenge />} />
         </Route>
         <Route path='/debate/:roomId' element={<DebateRoom />} />
         <Route path='/debate-room/:roomId' element={<OnlineDebateRoom />} />
