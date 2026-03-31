@@ -122,203 +122,71 @@ func GoogleLogin(ctx *gin.Context) {
 }
 
 func SignUp(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
-	if cfg == nil {
-		return
-	}
-
+	/*
+		Legacy config load removed as service takes care of dependencies.
+		However, validating input binding is still controller responsibility.
+	*/
 	var request structs.SignUpRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
 
-	// Check if user already exists
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var existingUser models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&existingUser)
-	if err == nil {
-		ctx.JSON(400, gin.H{"error": "User already exists"})
-		return
-	}
-	if err != mongo.ErrNoDocuments {
-		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
+	authService := services.GetAuthService()
+	if err := authService.SignUp(ctx.Request.Context(), request.Email, request.Password); err != nil {
+		if err.Error() == "user already exists" {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "User already exists"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Sign up failed", "message": err.Error()})
 		return
 	}
 
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
-		return
-	}
-
-	// Generate verification code
-	verificationCode := utils.GenerateRandomCode(6)
-
-	// Create new user (unverified)
-	now := time.Now()
-	newUser := models.User{
-		Email:            request.Email,
-		DisplayName:      utils.ExtractNameFromEmail(request.Email),
-		Nickname:         utils.ExtractNameFromEmail(request.Email),
-		Bio:              "",
-		Rating:           1200.0,
-		RD:               350.0,
-		Volatility:       0.06,
-		LastRatingUpdate: now,
-		AvatarURL:        "https://avatar.iran.liara.run/public/10",
-		Password:         string(hashedPassword),
-		IsVerified:       false,
-		VerificationCode: verificationCode,
-		Score:            0,
-		Badges:           []string{},
-		CurrentStreak:    0,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-
-	// Insert user into MongoDB
-	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
-		return
-	}
-	newUser.ID = result.InsertedID.(primitive.ObjectID)
-
-	// Send verification email
-	err = utils.SendVerificationEmail(request.Email, verificationCode)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
-		return
-	}
-
-	// Return success response
-	ctx.JSON(200, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Sign-up successful. Please verify your email.",
 	})
 }
 
 func VerifyEmail(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
-	if cfg == nil {
-		return
-	}
-
 	var request structs.VerifyEmailRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
 
-	// Find user with matching email and verification code
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{
-		"email":            request.Email,
-		"verificationCode": request.ConfirmationCode,
-	}).Decode(&user)
+	authService := services.GetAuthService()
+	user, token, err := authService.VerifyEmail(ctx.Request.Context(), request.Email, request.ConfirmationCode)
 	if err != nil {
-		ctx.JSON(400, gin.H{"error": "Invalid email or verification code"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Check if verification code is expired (24 hours)
-	if time.Since(user.CreatedAt) > 24*time.Hour {
-		ctx.JSON(400, gin.H{"error": "Verification code expired. Please sign up again."})
-		return
-	}
-
-	// Update user verification status
-	now := time.Now()
-	update := bson.M{
-		"$set": bson.M{
-			"isVerified":       true,
-			"verificationCode": "",
-			"updatedAt":        now,
-		},
-	}
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to verify email", "message": err.Error()})
-		return
-	}
-
-	// Update local user object
-	user.IsVerified = true
-	user.VerificationCode = ""
-	user.UpdatedAt = now
-
-	// Generate JWT for immediate login
-	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
-	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
-		return
-	}
-
-	// Return user details and access token
-	ctx.JSON(200, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Email verification successful. You are now logged in.",
 		"accessToken": token,
-		"user":        buildUserResponse(user),
+		"user":        buildUserResponse(*user),
 	})
 }
 
 func Login(ctx *gin.Context) {
-	cfg := loadConfig(ctx)
-	if cfg == nil {
-		return
-	}
-
 	var request structs.LoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": "Check email and password format"})
 		return
 	}
 
-	// Find user in MongoDB
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&user)
+	authService := services.GetAuthService()
+	user, token, err := authService.Login(ctx.Request.Context(), request.Email, request.Password)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		// Differentiate errors if possible, but 401 is generally safe for auth failures
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Normalize stats if needed
-	if normalizeUserStats(&user) {
-		if err := persistUserStats(dbCtx, &user); err != nil {
-		}
-	}
-
-	// Check if user is verified
-	if !user.IsVerified {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified"})
-		return
-	}
-
-	// Verify password
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
-		return
-	}
-
-	// Generate JWT
-	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "message": err.Error()})
-		return
-	}
-
-	// Return user details
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Sign-in successful",
 		"accessToken": token,
-		"user":        buildUserResponse(user),
+		"user":        buildUserResponse(*user),
 	})
 }
 
