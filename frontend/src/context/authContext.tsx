@@ -173,9 +173,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Signup failed');
-      }
+  const data = await response.json();
+  // Check for 'error' first (common in Go), then 'message', then fallback
+  throw new Error(data.error || data.message || 'Signup failed');
+}
     } catch (error) {
       handleError(error);
     } finally {
