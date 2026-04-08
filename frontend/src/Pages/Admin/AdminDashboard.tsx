@@ -40,6 +40,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, Users, MessageSquare, Activity } from "lucide-react";
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { useToast } from '@/hooks/use-toast';
 
 type SnapshotLike = AnalyticsSnapshot &
   Partial<Record<"DebatesToday" | "CommentsToday" | "NewUsersToday", number>>;
@@ -240,6 +242,14 @@ export default function AdminDashboard() {
   const [selectedComments, setSelectedComments] = useState<Set<string>>(
     new Set()
   );
+  
+  const [deleteDebateModalOpen, setDeleteDebateModalOpen] = useState(false);
+  const [debateToDelete, setDebateToDelete] = useState<string | null>(null);
+  const [deleteCommentModalOpen, setDeleteCommentModalOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<{id: string, type: string} | null>(null);
+  const [bulkDeleteDebatesModalOpen, setBulkDeleteDebatesModalOpen] = useState(false);
+  const [bulkDeleteCommentsModalOpen, setBulkDeleteCommentsModalOpen] = useState(false);
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -382,61 +392,91 @@ export default function AdminDashboard() {
     navigate("/admin/login");
   };
 
-  const handleDeleteDebate = async (id: string) => {
-    if (!token) return;
-    if (!confirm("Are you sure you want to delete this debate?")) return;
+  const handleDeleteDebate = (id: string) => {
+    setDebateToDelete(id);
+    setDeleteDebateModalOpen(true);
+  };
+
+  const confirmDeleteDebate = async () => {
+    if (!token || !debateToDelete) return;
 
     try {
-      await deleteDebate(token, id);
-      setDebates(debates.filter((d) => d.id !== id));
+      await deleteDebate(token, debateToDelete);
+      setDebates(debates.filter((d) => d.id !== debateToDelete));
       loadData(token);
+      toast({
+        title: "Success",
+        description: "Debate deleted successfully",
+      });
     } catch (err) {
       console.error("Failed to delete debate", err);
-      alert("Failed to delete debate");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete debate",
+      });
     }
   };
 
-  const handleDeleteComment = async (id: string, type: string) => {
-    if (!token) return;
-    if (!confirm("Are you sure you want to delete this comment?")) return;
+  const handleDeleteComment = (id: string, type: string) => {
+    setCommentToDelete({ id, type });
+    setDeleteCommentModalOpen(true);
+  };
+
+  const confirmDeleteComment = async () => {
+    if (!token || !commentToDelete) return;
 
     try {
-      await deleteComment(token, id, type);
-      setComments(comments.filter((c) => c.id !== id));
+      await deleteComment(token, commentToDelete.id, commentToDelete.type);
+      setComments(comments.filter((c) => c.id !== commentToDelete.id));
       loadData(token);
+      toast({
+        title: "Success",
+        description: "Comment deleted successfully",
+      });
     } catch (err) {
       console.error("Failed to delete comment", err);
-      alert("Failed to delete comment");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete comment",
+      });
     }
   };
 
-  const handleBulkDeleteDebates = async () => {
+  const handleBulkDeleteDebates = () => {
     if (!token || selectedDebates.size === 0) return;
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedDebates.size} debates?`
-      )
-    )
-      return;
+    setBulkDeleteDebatesModalOpen(true);
+  };
+
+  const confirmBulkDeleteDebates = async () => {
+    if (!token || selectedDebates.size === 0) return;
 
     try {
       await bulkDeleteDebates(token, Array.from(selectedDebates));
       setSelectedDebates(new Set());
       loadData(token);
+      toast({
+        title: "Success",
+        description: "Debates deleted successfully",
+      });
     } catch (err) {
       console.error("Failed to delete debates", err);
-      alert("Failed to delete debates");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete debates",
+      });
     }
   };
 
-  const handleBulkDeleteComments = async () => {
+  const handleBulkDeleteComments = () => {
     if (!token || selectedComments.size === 0) return;
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedComments.size} comments?`
-      )
-    )
-      return;
+    setBulkDeleteCommentsModalOpen(true);
+  };
+
+  const confirmBulkDeleteComments = async () => {
+    if (!token || selectedComments.size === 0) return;
 
     try {
       // Get types for selected comments
@@ -448,9 +488,17 @@ export default function AdminDashboard() {
       await bulkDeleteComments(token, Array.from(selectedComments), type);
       setSelectedComments(new Set());
       loadData(token);
+      toast({
+        title: "Success",
+        description: "Comments deleted successfully",
+      });
     } catch (err) {
       console.error("Failed to delete comments", err);
-      alert("Failed to delete comments");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete comments",
+      });
     }
   };
 
@@ -964,6 +1012,52 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ConfirmationModal
+        isOpen={deleteDebateModalOpen}
+        onClose={() => {
+          setDeleteDebateModalOpen(false);
+          setDebateToDelete(null);
+        }}
+        onConfirm={confirmDeleteDebate}
+        title="Delete Debate"
+        description="Are you sure you want to delete this debate? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+      />
+
+      <ConfirmationModal
+        isOpen={deleteCommentModalOpen}
+        onClose={() => {
+          setDeleteCommentModalOpen(false);
+          setCommentToDelete(null);
+        }}
+        onConfirm={confirmDeleteComment}
+        title="Delete Comment"
+        description="Are you sure you want to delete this comment? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteDebatesModalOpen}
+        onClose={() => setBulkDeleteDebatesModalOpen(false)}
+        onConfirm={confirmBulkDeleteDebates}
+        title="Bulk Delete Debates"
+        description={`Are you sure you want to delete ${selectedDebates.size} debates? This action cannot be undone.`}
+        confirmText="Delete All"
+        variant="destructive"
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteCommentsModalOpen}
+        onClose={() => setBulkDeleteCommentsModalOpen(false)}
+        onConfirm={confirmBulkDeleteComments}
+        title="Bulk Delete Comments"
+        description={`Are you sure you want to delete ${selectedComments.size} comments? This action cannot be undone.`}
+        confirmText="Delete All"
+        variant="destructive"
+      />
     </div>
   );
 }

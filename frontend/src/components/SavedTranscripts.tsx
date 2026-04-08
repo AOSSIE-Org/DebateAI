@@ -31,6 +31,8 @@ import { format } from 'date-fns';
 import CommentTree from './CommentTree';
 import { Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ConfirmationModal from './ConfirmationModal';
+import { useToast } from '@/hooks/use-toast';
 
 interface SavedTranscriptsProps {
   className?: string;
@@ -46,6 +48,9 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [creatingPost, setCreatingPost] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [transcriptToDelete, setTranscriptToDelete] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchTranscripts();
@@ -68,24 +73,31 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     }
   };
 
-  const handleDeleteTranscript = async (id: string) => {
+  const handleDeleteTranscript = (id: string) => {
+    setTranscriptToDelete(id);
+    setDeleteModalOpen(true);
+  };
 
-    if (
-      !confirm(
-        'Are you sure you want to delete this transcript? This action cannot be undone.'
-      )
-    ) {
-      return;
-    }
-
+  const confirmDeleteTranscript = async () => {
+    if (!transcriptToDelete) return;
+    
     try {
-      setDeletingId(id);
-      await transcriptService.deleteTranscript(id);
-      setTranscripts(transcripts.filter((t) => t.id !== id));
+      setDeletingId(transcriptToDelete);
+      await transcriptService.deleteTranscript(transcriptToDelete);
+      setTranscripts(transcripts.filter((t) => t.id !== transcriptToDelete));
+      toast({
+        title: "Success",
+        description: "Transcript deleted successfully",
+      });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete transcript');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to delete transcript',
+      });
     } finally {
       setDeletingId(null);
+      setTranscriptToDelete(null);
     }
   };
 
@@ -101,7 +113,11 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('Please log in to create a post');
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please log in to create a post",
+        });
         return;
       }
 
@@ -122,15 +138,20 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
         throw new Error(errorData.error || 'Failed to create post');
       }
 
-      alert(
-        'Post created successfully! You can view it in the Community Feed.'
-      );
+      toast({
+        title: "Success",
+        description: "Post created successfully! You can view it in the Community Feed.",
+      });
       navigate('/community');
     } catch (err) {
       console.error('Error creating post:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to create post';
-      alert(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
     } finally {
       setCreatingPost(false);
     }
@@ -482,6 +503,19 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setTranscriptToDelete(null);
+        }}
+        onConfirm={confirmDeleteTranscript}
+        title="Delete Transcript"
+        description="Are you sure you want to delete this transcript? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+      />
     </>
   );
 };

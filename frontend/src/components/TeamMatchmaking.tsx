@@ -13,6 +13,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaUsers, FaClock, FaCheckCircle } from 'react-icons/fa';
 import type { User as AppUser } from '@/types/user';
+import { useToast } from '@/hooks/use-toast';
 
 interface Team {
   id: string;
@@ -42,6 +43,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   const [matchedTeam, setMatchedTeam] = useState<Team | null>(null);
   const [activeDebateId, setActiveDebateId] = useState<string | null>(null);
   const [showDebateNotification, setShowDebateNotification] = useState(false);
+  const { toast } = useToast();
 
   // Check if current user is captain
   // Handle both string comparison and potential ObjectID structures
@@ -123,7 +125,11 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
 
   const handleJoinMatchmaking = async () => {
     if (!isTeamFull) {
-      alert('Team must be full to join matchmaking!');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Team must be full to join matchmaking!",
+      });
       return;
     }
 
@@ -134,7 +140,11 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to join matchmaking';
-      alert(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
       setIsSearching(false);
     }
   };
@@ -147,7 +157,11 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to leave matchmaking';
-      alert(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
     }
   };
 
@@ -167,7 +181,11 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to create debate';
-      alert(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage,
+      });
     }
   };
 

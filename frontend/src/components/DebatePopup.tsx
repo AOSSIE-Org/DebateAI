@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import RoomBrowser from './RoomBrowser';
 import Matchmaking from './Matchmaking';
+import { useToast } from '@/hooks/use-toast';
 
 interface DebatePopupProps {
   onClose: () => void;
@@ -14,6 +15,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'join' | 'matchmaking'>(
     'create'
   );
+  const { toast } = useToast();
 
   // Handler to join a debate room by sending the room code via navigation.
   const handleJoinRoom = () => {
@@ -38,14 +40,22 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
         body: JSON.stringify({ type: 'public' }),
       });
       if (!response.ok) {
-        alert('Error creating room.');
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Error creating room.",
+        });
         return;
       }
       const room = await response.json();
       navigate(`/debate-room/${room.id}`);
       onClose();
     } catch (error) {
-      alert('Error creating room.');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error creating room.",
+      });
     }
   };
 

@@ -10,6 +10,8 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { MessageCircle, Trash2, UserPlus, UserCheck } from "lucide-react";
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { useToast } from '@/hooks/use-toast';
 
 interface Post {
   id: string;
@@ -188,6 +190,11 @@ const CommunityFeed: React.FC = () => {
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<
     string | null
   >(null);
+  
+  const [deletePostModalOpen, setDeletePostModalOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const { toast } = useToast();
+
   const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
   const normalizeObjectId = useCallback(
     (value: ObjectIdLike | undefined): string => {
@@ -358,7 +365,11 @@ const CommunityFeed: React.FC = () => {
   const handleFollow = async (userId: string, isFollowing: boolean) => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to follow users");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please log in to follow users",
+      });
       return;
     }
 
@@ -397,26 +408,36 @@ const CommunityFeed: React.FC = () => {
         err instanceof Error
           ? err.message
           : `Failed to ${isFollowing ? "unfollow" : "follow"} user`;
-      alert(message);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: message,
+      });
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = (postId: string) => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to delete posts");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please log in to delete posts",
+      });
       return;
     }
+    setPostToDelete(postId);
+    setDeletePostModalOpen(true);
+  };
 
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this post?"
-    );
-    if (!confirmDelete) {
-      return;
-    }
+  const confirmDeletePost = async () => {
+    if (!postToDelete) return;
+    
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
     try {
-      const response = await fetch(`${baseURL}/posts/${postId}`, {
+      const response = await fetch(`${baseURL}/posts/${postToDelete}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -430,12 +451,20 @@ const CommunityFeed: React.FC = () => {
         throw new Error(errorData.error || "Failed to delete post");
       }
 
-      setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+      setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postToDelete));
+      toast({
+        title: "Success",
+        description: "Post deleted successfully",
+      });
     } catch (err: unknown) {
       console.error("Error deleting post:", err);
       const message =
         err instanceof Error ? err.message : "Failed to delete post";
-      alert(message);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: message,
+      });
     }
   };
 
@@ -634,6 +663,19 @@ const CommunityFeed: React.FC = () => {
           })}
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deletePostModalOpen}
+        onClose={() => {
+          setDeletePostModalOpen(false);
+          setPostToDelete(null);
+        }}
+        onConfirm={confirmDeletePost}
+        title="Delete Post"
+        description="Are you sure you want to delete this post? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+      />
     </div>
   );
 };
