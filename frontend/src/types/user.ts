@@ -1,12 +1,13 @@
 export type User = {
   id?: string;
   email: string;
+  username?: string;
   displayName: string;
   bio: string;
   rating: number;
   rd: number;
   volatility: number;
-  lastRatingUpdate: string; 
+  lastRatingUpdate: string;
   avatarUrl?: string;
   twitter?: string;
   instagram?: string;

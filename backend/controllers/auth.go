@@ -42,14 +42,12 @@ func GoogleLogin(ctx *gin.Context) {
 		return
 	}
 
-	// Verify Google ID token
 	payload, err := idtoken.Validate(ctx, request.IDToken, cfg.GoogleOAuth.ClientID)
 	if err != nil {
 		ctx.JSON(401, gin.H{"error": "Invalid Google ID token", "message": err.Error()})
 		return
 	}
 
-	// Extract email and name from Google token
 	email, ok := payload.Claims["email"].(string)
 	if !ok || email == "" {
 		ctx.JSON(400, gin.H{"error": "Email not found in Google token"})
@@ -61,7 +59,6 @@ func GoogleLogin(ctx *gin.Context) {
 	}
 	avatarURL, _ := payload.Claims["picture"].(string)
 
-	// Check if user exists in MongoDB
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var existingUser models.User
@@ -73,7 +70,14 @@ func GoogleLogin(ctx *gin.Context) {
 
 	now := time.Now()
 	if err == mongo.ErrNoDocuments {
-		// Create new user
+		// Check if displayName is already taken for new Google users
+		var existingDisplayName models.User
+		dnErr := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": nickname}).Decode(&existingDisplayName)
+		if dnErr == nil {
+			ctx.JSON(400, gin.H{"error": "Display name already taken"})
+			return
+		}
+
 		newUser := models.User{
 			Email:            email,
 			DisplayName:      nickname,
@@ -85,9 +89,9 @@ func GoogleLogin(ctx *gin.Context) {
 			LastRatingUpdate: now,
 			AvatarURL:        avatarURL,
 			IsVerified:       true,
-			Score:            0,          // Initialize gamification score
-			Badges:           []string{}, // Initialize badges array
-			CurrentStreak:    0,          // Initialize streak
+			Score:            0,
+			Badges:           []string{},
+			CurrentStreak:    0,
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
@@ -100,20 +104,17 @@ func GoogleLogin(ctx *gin.Context) {
 		existingUser = newUser
 	}
 
-	// Normalize stats if needed to prevent NaN values
 	if normalizeUserStats(&existingUser) {
 		if err := persistUserStats(dbCtx, &existingUser); err != nil {
 		}
 	}
 
-	// Generate JWT
 	token, err := generateJWT(existingUser.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
 	}
 
-	// Return user details (excluding sensitive fields)
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Google login successful",
 		"accessToken": token,
@@ -133,7 +134,6 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Check if user already exists
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var existingUser models.User
@@ -147,22 +147,28 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Hash password
+	// Check if displayName is already taken
+	defaultDisplayName := utils.ExtractNameFromEmail(request.Email)
+	var existingDisplayName models.User
+	err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": defaultDisplayName}).Decode(&existingDisplayName)
+	if err == nil {
+		ctx.JSON(400, gin.H{"error": "Display name already taken"})
+		return
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
 		return
 	}
 
-	// Generate verification code
 	verificationCode := utils.GenerateRandomCode(6)
 
-	// Create new user (unverified)
 	now := time.Now()
 	newUser := models.User{
 		Email:            request.Email,
-		DisplayName:      utils.ExtractNameFromEmail(request.Email),
-		Nickname:         utils.ExtractNameFromEmail(request.Email),
+		DisplayName:      defaultDisplayName,
+		Nickname:         defaultDisplayName,
 		Bio:              "",
 		Rating:           1200.0,
 		RD:               350.0,
@@ -179,7 +185,6 @@ func SignUp(ctx *gin.Context) {
 		UpdatedAt:        now,
 	}
 
-	// Insert user into MongoDB
 	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
@@ -187,14 +192,12 @@ func SignUp(ctx *gin.Context) {
 	}
 	newUser.ID = result.InsertedID.(primitive.ObjectID)
 
-	// Send verification email
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
 		return
 	}
 
-	// Return success response
 	ctx.JSON(200, gin.H{
 		"message": "Sign-up successful. Please verify your email.",
 	})
@@ -212,7 +215,6 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	// Find user with matching email and verification code
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -225,13 +227,11 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	// Check if verification code is expired (24 hours)
 	if time.Since(user.CreatedAt) > 24*time.Hour {
 		ctx.JSON(400, gin.H{"error": "Verification code expired. Please sign up again."})
 		return
 	}
 
-	// Update user verification status
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
@@ -246,19 +246,16 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	// Update local user object
 	user.IsVerified = true
 	user.VerificationCode = ""
 	user.UpdatedAt = now
 
-	// Generate JWT for immediate login
 	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
 	}
 
-	// Return user details and access token
 	ctx.JSON(200, gin.H{
 		"message":     "Email verification successful. You are now logged in.",
 		"accessToken": token,
@@ -278,7 +275,6 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	// Find user in MongoDB
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -288,33 +284,28 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	// Normalize stats if needed
 	if normalizeUserStats(&user) {
 		if err := persistUserStats(dbCtx, &user); err != nil {
 		}
 	}
 
-	// Check if user is verified
 	if !user.IsVerified {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified"})
 		return
 	}
 
-	// Verify password
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	// Generate JWT
 	token, err := generateJWT(user.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
 	}
 
-	// Return user details
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Sign-in successful",
 		"accessToken": token,
@@ -411,7 +402,6 @@ func ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Find user
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -421,10 +411,8 @@ func ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Generate reset code
 	resetCode := utils.GenerateRandomCode(6)
 
-	// Update user with reset code
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
@@ -438,7 +426,6 @@ func ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Send reset email
 	err = utils.SendPasswordResetEmail(request.Email, resetCode)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to send reset email", "message": err.Error()})
@@ -460,7 +447,6 @@ func VerifyForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Find user with reset code
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -470,14 +456,12 @@ func VerifyForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Hash new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
 		return
 	}
 
-	// Update user with new password
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
@@ -514,14 +498,12 @@ func VerifyToken(ctx *gin.Context) {
 	}
 	tokenString := tokenParts[1]
 
-	// Validate JWT
 	claims, err := validateJWT(tokenString, cfg.JWT.Secret)
 	if err != nil {
 		ctx.JSON(401, gin.H{"error": "Invalid or expired token", "message": err.Error()})
 		return
 	}
 
-	// Verify user exists in MongoDB
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -531,7 +513,6 @@ func VerifyToken(ctx *gin.Context) {
 		return
 	}
 
-	// Return user details
 	ctx.JSON(200, gin.H{
 		"message": "Token is valid",
 		"user": gin.H{
@@ -555,7 +536,6 @@ func VerifyToken(ctx *gin.Context) {
 	})
 }
 
-// Helper function to generate JWT
 func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 	now := time.Now()
 	expirationTime := now.Add(time.Minute * time.Duration(expiryMinutes))
@@ -578,7 +558,6 @@ func generateJWT(email, secret string, expiryMinutes int) (string, error) {
 	return signedToken, nil
 }
 
-// Helper function to validate JWT
 func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -608,7 +587,6 @@ func loadConfig(ctx *gin.Context) *config.Config {
 	return cfg
 }
 
-// GetMatchmakingPoolStatus returns the current matchmaking pool status (debug endpoint)
 func GetMatchmakingPoolStatus(ctx *gin.Context) {
 	matchmakingService := services.GetMatchmakingService()
 	pool := matchmakingService.GetPool()
