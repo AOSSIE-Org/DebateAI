@@ -344,7 +344,7 @@ func UpdateProfile(ctx *gin.Context) {
 		return
 	}
 	if result.MatchedCount == 0 {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
@@ -365,7 +365,11 @@ func CheckDisplayName(c *gin.Context) {
 	var existing models.User
 	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": displayName}).Decode(&existing)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"available": true})
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusOK, gin.H{"available": true})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 

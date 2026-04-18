@@ -33,10 +33,9 @@ func main() {
 	}
 	log.Println("Connected to MongoDB")
 
-	// Ensure DB indexes (including unique username)
 	if err := db.EnsureIndexes(); err != nil {
-		log.Printf("Warning: failed to ensure indexes: %v", err)
-	}
+    log.Fatalf("Failed to ensure indexes: %v", err)
+    }
 
 	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
 		log.Fatalf("Failed to initialize Casbin: %v", err)

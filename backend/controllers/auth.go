@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -75,6 +76,9 @@ func GoogleLogin(ctx *gin.Context) {
 		dnErr := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": nickname}).Decode(&existingDisplayName)
 		if dnErr == nil {
 			ctx.JSON(400, gin.H{"error": "Display name already taken"})
+			return
+		} else if !errors.Is(dnErr, mongo.ErrNoDocuments) {
+			ctx.JSON(500, gin.H{"error": "Database error"})
 			return
 		}
 
@@ -154,8 +158,10 @@ func SignUp(ctx *gin.Context) {
 	if err == nil {
 		ctx.JSON(400, gin.H{"error": "Display name already taken"})
 		return
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		ctx.JSON(500, gin.H{"error": "Database error"})
+		return
 	}
-
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
@@ -187,6 +193,10 @@ func SignUp(ctx *gin.Context) {
 
 	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			ctx.JSON(400, gin.H{"error": "Display name already taken"})
+			return
+		}
 		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
 		return
 	}
