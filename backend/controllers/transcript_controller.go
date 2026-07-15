@@ -113,6 +113,7 @@ func SaveDebateTranscriptHandler(c *gin.Context) {
 		req.Topic,
 		req.Opponent,
 		req.Result,
+		0.0,
 		req.Messages,
 		req.Transcripts,
 	)
@@ -295,6 +296,7 @@ func CreateTestTranscriptHandler(c *gin.Context) {
 		"Climate Change Action",
 		"AI Bot",
 		"win",
+		0.0,
 		testMessages,
 		nil,
 	)
@@ -353,6 +355,7 @@ func CreateTestBotDebateHandler(c *gin.Context) {
 		"AI Benefits vs Risks",
 		"Expert Emma",
 		"win",
+		0.0,
 		testMessages,
 		nil,
 	)

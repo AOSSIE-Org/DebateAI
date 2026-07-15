@@ -176,34 +176,6 @@ func SubmitTranscripts(
 				// Determine the actual debate topic
 				topic := resolveDebateTopic(ctx, roomID, forSubmission, againstSubmission)
 
-				// Save transcript for "for" user
-				err = SaveDebateTranscript(
-					forUser.ID,
-					forUser.Email,
-					"user_vs_user",
-					topic,
-					againstUser.Email,
-					resultFor,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					forSubmission.Transcripts,
-				)
-				if err != nil {
-				}
-
-				// Save transcript for "against" user
-				err = SaveDebateTranscript(
-					againstUser.ID,
-					againstUser.Email,
-					"user_vs_user",
-					topic,
-					forUser.Email,
-					resultAgainst,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					againstSubmission.Transcripts,
-				)
-				if err != nil {
-				}
-
 				// Update ratings based on the result
 				outcomeFor := 0.5
 				switch strings.ToLower(resultFor) {
@@ -214,8 +186,12 @@ func SubmitTranscripts(
 				}
 
 				debateRecord, opponentRecord, ratingErr := UpdateRatings(forUser.ID, againstUser.ID, outcomeFor, time.Now())
-				if ratingErr != nil {
-				} else {
+				
+				var forEloChange, againstEloChange float64
+				if ratingErr == nil {
+					forEloChange = debateRecord.RatingChange
+					againstEloChange = opponentRecord.RatingChange
+
 					debateRecord.Topic = topic
 					debateRecord.Result = resultFor
 					opponentRecord.Topic = topic
@@ -235,6 +211,36 @@ func SubmitTranscripts(
 							"change": opponentRecord.RatingChange,
 						},
 					}
+				}
+
+				// Save transcript for "for" user
+				err = SaveDebateTranscript(
+					forUser.ID,
+					forUser.Email,
+					"user_vs_user",
+					topic,
+					againstUser.Email,
+					resultFor,
+					forEloChange,
+					[]models.Message{}, // You might want to reconstruct messages from transcripts
+					forSubmission.Transcripts,
+				)
+				if err != nil {
+				}
+
+				// Save transcript for "against" user
+				err = SaveDebateTranscript(
+					againstUser.ID,
+					againstUser.Email,
+					"user_vs_user",
+					topic,
+					forUser.Email,
+					resultAgainst,
+					againstEloChange,
+					[]models.Message{}, // You might want to reconstruct messages from transcripts
+					againstSubmission.Transcripts,
+				)
+				if err != nil {
 				}
 			} else {
 			}
@@ -659,7 +665,7 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 }
 
 // SaveDebateTranscript saves a debate transcript for later viewing
-func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, eloChange float64, messages []models.Message, transcripts map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -681,14 +687,21 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		// Transcript already exists, check if we need to update it
 
 		// If the result has changed or is "pending", update the transcript
-		if existingTranscript.Result != result || existingTranscript.Result == "pending" {
+		if existingTranscript.Result != result || existingTranscript.Result == "pending" || (eloChange != 0 && existingTranscript.EloChange == 0) {
+			updateFields := bson.M{
+				"result":      result,
+				"messages":    messages,
+				"transcripts": transcripts,
+				"updatedAt":   time.Now(),
+			}
+
+			// Update eloChange if provided
+			if eloChange != 0 {
+				updateFields["eloChange"] = eloChange
+			}
+
 			update := bson.M{
-				"$set": bson.M{
-					"result":      result,
-					"messages":    messages,
-					"transcripts": transcripts,
-					"updatedAt":   time.Now(),
-				},
+				"$set": updateFields,
 			}
 
 			_, err = collection.UpdateOne(ctx, bson.M{"_id": existingTranscript.ID}, update)
@@ -711,6 +724,7 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		Topic:       topic,
 		Opponent:    opponent,
 		Result:      result,
+		EloChange:   eloChange,
 		Messages:    messages,
 		Transcripts: transcripts,
 		CreatedAt:   time.Now(),

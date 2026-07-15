@@ -274,6 +274,7 @@ func JudgeDebate(c *gin.Context) {
 		latestDebate.Topic,
 		latestDebate.BotName,
 		resultStatus,
+		0.0,
 		req.History,
 		nil,
 	)
@@ -590,6 +591,7 @@ func ConcedeDebate(c *gin.Context) {
 		debate.Topic,
 		debate.BotName,
 		"loss",
+		0.0,
 		historyToSave,
 		nil,
 	)
