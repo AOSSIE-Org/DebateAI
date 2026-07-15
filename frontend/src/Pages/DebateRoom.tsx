@@ -605,9 +605,53 @@ const DebateRoom: React.FC = () => {
       }
       
       console.log("Parsed judgment:", judgment);
-      setJudgmentData(judgment);
+
+      // Guard against partial/incorrect judge payloads that could crash the popup render
+      const isValidJudgment =
+        Boolean((judgment as any)?.opening_statement) &&
+        Boolean((judgment as any)?.verdict);
+      const safeJudgment: JudgmentData = isValidJudgment
+        ? judgment
+        : ({
+            opening_statement: {
+              user: { score: 0, reason: "Judgment data missing/invalid." },
+              bot: { score: 0, reason: "Judgment data missing/invalid." },
+            },
+            cross_examination: {
+              user: { score: 0, reason: "" },
+              bot: { score: 0, reason: "" },
+            },
+            answers: {
+              user: { score: 0, reason: "" },
+              bot: { score: 0, reason: "" },
+            },
+            closing: {
+              user: { score: 0, reason: "" },
+              bot: { score: 0, reason: "" },
+            },
+            total: { user: 0, bot: 0 },
+            verdict: {
+              winner: "Unknown",
+              reason:
+                typeof (judgment as any)?.verdict?.reason === "string"
+                  ? (judgment as any).verdict.reason
+                  : "Judgment data missing/invalid.",
+              congratulations:
+                typeof (judgment as any)?.verdict?.congratulations === "string"
+                  ? (judgment as any).verdict.congratulations
+                  : "",
+              opponent_analysis:
+                typeof (judgment as any)?.verdict?.opponent_analysis === "string"
+                  ? (judgment as any).verdict.opponent_analysis
+                  : "",
+            },
+          } as JudgmentData);
+
+      setJudgmentData(safeJudgment);
       setPopup({ show: false, message: "" });
-      setShowJudgment(true);
+      setTimeout(() => {
+        setShowJudgment(true);
+      }, 100);
     } catch (error) {
       console.error("Judging error:", error);
       // Show error to user
@@ -677,7 +721,16 @@ const DebateRoom: React.FC = () => {
             <span className="text-xs text-gray-500 block mb-1">
               {msg.phase}
             </span>
-            {msg.text}
+            {/* {msg.text} */}
+            {msg.text.includes("- ") ? (
+  <ul className="list-disc pl-5 space-y-4">
+    {msg.text.split(/\n|-\s+/).filter(Boolean).map((point, i) => (
+      <li key={i}>{point.trim()}</li>
+    ))}
+  </ul>
+) : (
+  <div className="whitespace-pre-line">{msg.text}</div>
+)}
           </div>
         ))}
         <div ref={messagesEndRef} />

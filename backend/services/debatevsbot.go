@@ -169,6 +169,7 @@ Your responses must reflect this persona consistently, as if you are the charact
 		limitInstruction = fmt.Sprintf("Limit your response to %d words.", maxWords)
 	}
 
+
 	// Base instruction for all responses
 	baseInstruction := "Provide only your own argument without simulating an opponent’s dialogue. " +
 		"If the user’s input is unclear, off-topic, or empty, respond with a personality-appropriate clarification request, e.g., for Yoda: 'Clouded, your point is, young one. Clarify, you must.'"
@@ -186,7 +187,7 @@ Your stance is: %s.
 %s
 %s
 %s
-Provide an opening statement that embodies your persona and stance.
+Provide an opening statement that embodies your persona and stance in bullet points.
 [Your opening argument]
 %s %s`,
 			bot.Name, bot.Level, stance, topic,
