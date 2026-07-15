@@ -111,6 +111,7 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   userAvatar,
   botAvatar,
   botName,
+  botDesc,
   userStance,
   botStance,
   forRole,
@@ -181,7 +182,9 @@ const resolvedAgainstAvatar = isUserBotFormat
 
 const player1Avatar = resolvedForAvatar || localAvatar;
 const player2Avatar = resolvedAgainstAvatar || opponentAvatar;
-const player2Desc = isUserBotFormat ? botDesc : resolvedAgainstName || 'Debater';
+const player2Desc = isUserBotFormat 
+  ? (botDesc || 'AI Opponent') 
+  : (resolvedAgainstName || 'Debater');
 
 const formatChange = (value: number) =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
