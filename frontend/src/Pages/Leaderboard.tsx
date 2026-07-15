@@ -26,6 +26,7 @@ import {
   GamificationEvent,
 } from "@/services/gamificationService";
 import BadgeUnlocked from "@/components/BadgeUnlocked";
+import Top10Celebration from "@/components/Top10Celebration";
 import { useUser } from "@/hooks/useUser";
 
 interface Debater {
@@ -86,7 +87,16 @@ const Leaderboard: React.FC = () => {
   });
   const [sortCategory, setSortCategory] = useState<SortCategory>("score");
   const wsRef = useRef<WebSocket | null>(null);
+  const previousRankRef = useRef<number | null>(null);
+  const isInitialRenderRef = useRef(true);
   const { user } = useUser();
+  const [top10Celebration, setTop10Celebration] = useState<{
+    rank: number;
+    isOpen: boolean;
+  }>({
+    rank: 0,
+    isOpen: false,
+  });
 
   // Load initial leaderboard data
   useEffect(() => {
@@ -226,6 +236,33 @@ const Leaderboard: React.FC = () => {
     (debater) => debater.currentUser
   );
 
+  // Check if user entered top 10 and trigger celebration
+  useEffect(() => {
+    // Skip celebration on initial page load
+    if (isInitialRenderRef.current) {
+      if (currentUserIndex !== -1) {
+        previousRankRef.current = currentUserIndex + 1;
+      }
+      isInitialRenderRef.current = false;
+      return;
+    }
+
+    if (currentUserIndex !== -1 && currentUserIndex < 10) {
+      const currentRank = currentUserIndex + 1;
+      // Only celebrate if user wasn't in top 10 before or improved their rank
+      if (previousRankRef.current !== null && previousRankRef.current > 10) {
+        // User just entered top 10!
+        setTop10Celebration({ rank: currentRank, isOpen: true });
+      } else if (previousRankRef.current !== null && previousRankRef.current > currentRank && currentRank <= 3) {
+        // User improved to top 3!
+        setTop10Celebration({ rank: currentRank, isOpen: true });
+      }
+      previousRankRef.current = currentRank;
+    } else if (currentUserIndex >= 10) {
+      previousRankRef.current = currentUserIndex + 1;
+    }
+  }, [currentUserIndex, sortedDebaters]);
+
   const getVisibleDebaters = () => {
     if (!sortedDebaters.length) return [];
     const initialList = sortedDebaters
@@ -267,6 +304,11 @@ const Leaderboard: React.FC = () => {
         badgeName={badgeUnlocked.badgeName}
         isOpen={badgeUnlocked.isOpen}
         onClose={() => setBadgeUnlocked({ badgeName: "", isOpen: false })}
+      />
+      <Top10Celebration
+        rank={top10Celebration.rank}
+        isOpen={top10Celebration.isOpen}
+        onClose={() => setTop10Celebration({ rank: 0, isOpen: false })}
       />
       <div className="max-w-7xl mx-auto">
         <p className="text-center text-muted-foreground mb-8 text-lg">
@@ -315,9 +357,8 @@ const Leaderboard: React.FC = () => {
                   {visibleDebaters.map((debater) => (
                     <TableRow
                       key={debater.id}
-                      className={`group hover:bg-accent/30 ${
-                        debater.currentUser ? "bg-primary/10" : ""
-                      }`}
+                      className={`group hover:bg-accent/30 ${debater.currentUser ? "bg-primary/10" : ""
+                        }`}
                     >
                       <TableCell className="pl-6">
                         <div
