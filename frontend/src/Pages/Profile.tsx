@@ -755,8 +755,8 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row gap-4 p-2 sm:p-4 bg-background min-h-[calc(100vh-4rem)]">
-      <div className="w-full md:w-1/4 lg:w-1/5 bg-card p-4 border border-border rounded-md shadow max-h-[calc(100vh-4rem)] overflow-y-auto">
+    <div className="w-full flex flex-col lg:flex-row gap-4 p-2 sm:p-4 bg-background">
+      <div className="w-full lg:w-1/3 bg-card p-4 sm:p-6 border border-border rounded-md shadow lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
         {successMessage && (
           <div className="mb-2 p-2 rounded bg-green-100 text-green-700 text-xs animate-in fade-in duration-300">
             {successMessage}
@@ -1170,7 +1170,7 @@ const Profile: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
+          <Card className="shadow min-h-[250px] sm:min-h-[300px] flex flex-col">
             <CardHeader className="p-2 flex-shrink-0">
               <CardTitle className="text-foreground text-base sm:text-lg">
                 Top 5 Debaters
