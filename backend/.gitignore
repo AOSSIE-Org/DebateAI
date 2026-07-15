@@ -1,2 +1,3 @@
 .env
 config.prod.yml
+*.tar.gz
