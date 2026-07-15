@@ -66,8 +66,10 @@ func main() {
 	utils.SeedDebateData()
 	utils.PopulateTestUsers()
 
-	// Create uploads directory
-	os.MkdirAll("uploads", os.ModePerm)
+	// Create avatar upload directory (also creates the parent 'uploads' directory)
+	if err := os.MkdirAll("uploads/avatars", 0o755); err != nil {
+		log.Fatalf("failed to create avatar upload directory: %v", err)
+	}
 
 	// Set up the Gin router and configure routes
 	router := setupRouter(cfg)
@@ -80,6 +82,9 @@ func main() {
 
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
+
+	// Serve the uploads directory statically
+	router.Static("/uploads", "./uploads")
 
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
@@ -116,6 +121,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
+		auth.POST("/user/upload-avatar", routes.UploadAvatarRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 

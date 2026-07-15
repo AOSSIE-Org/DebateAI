@@ -71,7 +71,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { getProfile, updateProfile } from "@/services/profileService";
+import { getProfile, updateProfile, uploadAvatar } from "@/services/profileService";
 import { getAuthToken } from "@/utils/auth";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
@@ -177,6 +177,64 @@ const Profile: React.FC = () => {
     to: undefined,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("File size should not exceed 5MB.");
+      input.value = "";
+      return;
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+      setErrorMessage("Authentication token is missing.");
+      input.value = "";
+      return;
+    }
+
+    try {
+      const response = await uploadAvatar(token, file);
+      const newAvatarUrl = response.avatarUrl;
+      const previousAvatarUrl = dashboard?.profile.avatarUrl;
+      
+      setDashboard((current: DashboardData | null) => 
+        current ? {
+          ...current,
+          profile: { ...current.profile, avatarUrl: newAvatarUrl },
+        } : current
+      );
+
+      try {
+        await updateProfile(
+          token,
+          dashboard!.profile.displayName,
+          dashboard!.profile.bio,
+          dashboard!.profile.twitter,
+          dashboard!.profile.instagram,
+          dashboard!.profile.linkedin,
+          newAvatarUrl
+        );
+        setSuccessMessage("Avatar uploaded successfully!");
+      } catch (err) {
+        setDashboard((current: DashboardData | null) => 
+          current ? {
+            ...current,
+            profile: { ...current.profile, avatarUrl: previousAvatarUrl },
+          } : current
+        );
+        setErrorMessage("Failed to save avatar to profile.");
+      }
+    } catch (err) {
+      setErrorMessage("Failed to upload avatar.");
+    } finally {
+      input.value = "";
+    }
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -774,13 +832,33 @@ const Profile: React.FC = () => {
               alt="Avatar"
               className="object-cover w-full h-full"
             />
-            <button
-              onClick={() => setIsAvatarModalOpen(true)}
-              className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Edit Avatar"
-            >
-              <ImageIcon className="w-6 h-6 text-white" />
-            </button>
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                title="Create Avatar"
+                aria-label="Create avatar"
+                className="text-white hover:text-primary transition-colors"
+              >
+                <Pen className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload Avatar"
+                aria-label="Upload avatar"
+                className="text-white hover:text-primary transition-colors"
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".jpg,.jpeg,.png"
+              onChange={handleFileUpload}
+            />
           </div>
           <AvatarModal
             isOpen={isAvatarModalOpen}
