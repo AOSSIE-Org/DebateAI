@@ -657,7 +657,7 @@ const DebateRoom: React.FC = () => {
     return (
       <span
         className={`font-mono ${
-          seconds <= 5 ? "text-red-500 animate-pulse" : "text-gray-600"
+          seconds <= 5 ? "text-destructive animate-pulse" : "text-muted-foreground"
         }`}
       >
         {timeStr}
@@ -672,9 +672,9 @@ const DebateRoom: React.FC = () => {
         {phaseMessages.map((msg, idx) => (
           <div
             key={idx}
-            className="p-3 bg-gray-50 rounded-lg shadow-sm text-gray-800 break-words"
+            className="p-3 bg-muted rounded-lg shadow-sm text-foreground break-words"
           >
-            <span className="text-xs text-gray-500 block mb-1">
+            <span className="text-xs text-muted-foreground block mb-1">
               {msg.phase}
             </span>
             {msg.text}
@@ -690,19 +690,19 @@ const DebateRoom: React.FC = () => {
   const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
+    <div className="min-h-screen bg-background p-4 transition-colors duration-300">
       <div className="w-full max-w-5xl mx-auto py-2">
-        <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+        <div className="bg-card border border-border rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">
             Debate: {debateData.topic}
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
+          <p className="mt-2 text-sm text-muted-foreground">
             Phase:{" "}
-            <span className="font-medium">
+            <span className="font-medium text-foreground">
               {phases[state.currentPhase]?.name || "Finished"}
             </span>{" "}
             | Current Turn:{" "}
-            <span className="font-semibold text-orange-600">
+            <span className="font-semibold text-primary">
               {currentEntity === "User" ? "You" : debateData.botName} to{" "}
               {currentTurnType === "statement"
                 ? "make a statement"
@@ -716,20 +716,20 @@ const DebateRoom: React.FC = () => {
 
       {popup.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105 border border-orange-200">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue500 mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-800">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-primary mb-4"></div>
+                <h2 className="text-xl font-semibold text-foreground">
                   {popup.message}
                 </h2>
               </div>
             ) : (
               <>
-                <h3 className="text-xl font-bold text-orange-600 mb-2">
+                <h3 className="text-xl font-bold text-primary mb-2">
                   Phase Transition
                 </h3>
-                <p className="text-gray-700 text-center text-sm">
+                <p className="text-muted-foreground text-center text-sm">
                   {popup.message}
                 </p>
               </>
@@ -756,36 +756,36 @@ const DebateRoom: React.FC = () => {
         <div
           className={`relative w-full md:w-1/2 ${
             state.isBotTurn ? "animate-glow" : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
         >
-          <div className="p-2 bg-gray-50 flex items-center gap-2">
+          <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
               <img
                 src={bot.avatar}
                 alt={debateData.botName}
-                className="w-full h-full rounded-full border border-orange-400 object-cover"
+                className="w-full h-full rounded-full border border-border object-cover"
               />
             </div>
             <div className="flex flex-col">
-              <div className="text-sm font-medium text-gray-800">
+              <div className="text-sm font-medium text-foreground">
                 {debateData.botName}
               </div>
-              <div className="text-xs text-gray-500">{bot.desc}</div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">{bot.desc}</div>
+              <div className="text-xs text-muted-foreground">
                 {bot.rating ? `Rating: ${bot.rating}` : "Ready to argue!"}
               </div>
             </div>
             {nextTurnPending && (
               <Button
                 onClick={handleNextTurn}
-                className="ml-auto bg-green-500 hover:bg-green-600 text-white rounded-md px-3 text-sm"
+                className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
               >
                 Next Turn
               </Button>
             )}
           </div>
           <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-sm font-semibold text-orange-600 mb-1">
+            <p className="text-sm font-semibold text-primary mb-1">
               Stance: {state.botStance}
             </p>
             <p className="text-xs mb-1">
@@ -804,38 +804,38 @@ const DebateRoom: React.FC = () => {
         <div
           className={`relative w-full md:w-1/2 ${
             !state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
         >
-          <div className="p-2 bg-gray-50 flex items-center gap-2">
+          <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
               <img
                 src={userAvatar}
                 alt="You"
-                className="w-full h-full rounded-full border border-orange-400 object-cover"
+                className="w-full h-full rounded-full border border-border object-cover"
               />
             </div>
             <div className="flex flex-col">
-              <div className="text-sm font-medium text-gray-800">
+              <div className="text-sm font-medium text-foreground">
                 {user?.displayName || "You"}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {user?.bio || "Debater"}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {user?.rating ? `Rating: ${user.rating}` : "Ready to argue!"}
               </div>
             </div>
             {!state.isDebateEnded && (
               <Button
                 onClick={handleConcede}
-                className="ml-auto bg-red-500 hover:bg-red-600 text-white rounded-md px-3 text-sm"
+                className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md px-3 text-sm"
               >
                 Concede
               </Button>
             )}
           </div>
           <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-sm font-semibold text-orange-600 mb-1">
+            <p className="text-sm font-semibold text-primary mb-1">
               Stance: {state.userStance}
             </p>
             <p className="text-xs mb-1">
@@ -871,14 +871,14 @@ const DebateRoom: React.FC = () => {
                       ? "Ask your question"
                       : "Provide your answer"
                   }
-                  className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-orange-400"
+                  className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary"
                 />
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-blue-500 hover:bg-blue-600 text-white rounded-md p-2"
+                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-md p-2"
                 >
                   {isRecognizing ? (
                     <MicOff className="w-5 h-5" />
@@ -891,7 +891,7 @@ const DebateRoom: React.FC = () => {
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-orange-500 hover:bg-orange-600 text-white rounded-md px-3 text-sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
                 >
                   Send
                 </Button>
