@@ -36,6 +36,32 @@ export const updateProfile = async (
   }
   return response.json();
 };
+export const uploadAvatar = async (
+  token: string,
+  file: File
+): Promise<{ message: string; avatar_url: string }> => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const response = await fetch(`${baseURL}/user/upload-avatar`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (response.status === 413) {
+    throw new Error("File too large. Maximum size is 5MB.");
+  }
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.error || "Failed to upload avatar");
+  }
+
+  return response.json();
+};
+
 export const getLeaderboard = async () => {
   const response = await fetch(`${baseURL}/leaderboard`, {
     method: "GET",
