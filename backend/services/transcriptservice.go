@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -129,9 +130,10 @@ func SubmitTranscripts(
 				"createdAt": bson.M{"$gte": time.Now().Add(-5 * time.Minute)}, // Check for recent transcripts (within 5 minutes)
 			}).Decode(&existingTranscript)
 
-			if err == nil {
+			switch err {
+			case nil:
 				// Transcript already exists, skip saving to prevent duplicates
-			} else if err == mongo.ErrNoDocuments {
+			case mongo.ErrNoDocuments:
 				// No existing transcript found, proceed with saving
 				// Determine result for each user
 				resultFor := "pending"
@@ -155,8 +157,10 @@ func SubmitTranscripts(
 								resultAgainst = "draw"
 							}
 						} else {
+							log.Printf("[TRANSCRIPT] Could not find winner in verdict JSON for room %s", roomID)
 						}
 					} else {
+						log.Printf("[TRANSCRIPT] Invalid verdict structure in JSON for room %s", roomID)
 					}
 				} else {
 					// Fallback to string matching if JSON parsing fails
@@ -188,6 +192,7 @@ func SubmitTranscripts(
 					forSubmission.Transcripts,
 				)
 				if err != nil {
+					log.Printf("[TRANSCRIPT] Error saving transcript for role=for room=%s: %v", roomID, err)
 				}
 
 				// Save transcript for "against" user
@@ -202,6 +207,7 @@ func SubmitTranscripts(
 					againstSubmission.Transcripts,
 				)
 				if err != nil {
+					log.Printf("[TRANSCRIPT] Error saving transcript for role=against room=%s: %v", roomID, err)
 				}
 
 				// Update ratings based on the result
@@ -215,6 +221,7 @@ func SubmitTranscripts(
 
 				debateRecord, opponentRecord, ratingErr := UpdateRatings(forUser.ID, againstUser.ID, outcomeFor, time.Now())
 				if ratingErr != nil {
+					log.Printf("[TRANSCRIPT] Error updating ratings for room %s: %v", roomID, ratingErr)
 				} else {
 					debateRecord.Topic = topic
 					debateRecord.Result = resultFor
@@ -223,6 +230,7 @@ func SubmitTranscripts(
 
 					records := []interface{}{debateRecord, opponentRecord}
 					if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
+						log.Printf("[TRANSCRIPT] Error inserting debate records for room %s: %v", roomID, insertErr)
 					}
 
 					ratingSummary = map[string]interface{}{
@@ -236,13 +244,16 @@ func SubmitTranscripts(
 						},
 					}
 				}
-			} else {
+			default:
+				log.Printf("[TRANSCRIPT] Unexpected error checking existing transcript in room %s: %v", roomID, err)
+				return nil, err
 			}
 		}
 
 		// Clean up transcripts (optional)
 		_, err = transcriptCollection.DeleteMany(ctx, bson.M{"roomId": roomID})
 		if err != nil {
+			log.Printf("[TRANSCRIPT] Error cleaning up room %s after judgment: %v", roomID, err)
 		}
 
 		response := map[string]interface{}{
@@ -475,13 +486,19 @@ Debate Transcript:
 Provide ONLY the JSON output without any additional text.`, transcript.String())
 
 	ctx := context.Background()
-	text, err := generateDefaultModelText(ctx, prompt)
+	text, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
 		return "Unable to judge."
 	}
 	if text == "" {
 		return "Unable to judge."
 	}
+
+	if usage != nil {
+		log.Printf("[TOKEN USAGE] JudgeHvH | Prompt: %d | Response: %d | Total: %d",
+			usage.PromptTokenCount, usage.CandidatesTokenCount, usage.TotalTokenCount)
+	}
+
 	return text
 }
 
@@ -659,6 +676,7 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 }
 
 // SaveDebateTranscript saves a debate transcript for later viewing
+// SaveDebateTranscript persists a debate transcript and result into the database for a given user.
 func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

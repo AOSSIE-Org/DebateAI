@@ -18,9 +18,9 @@ func initGemini(apiKey string) (*genai.Client, error) {
 	return genai.NewClient(context.Background(), config)
 }
 
-func generateModelText(ctx context.Context, modelName, prompt string) (string, error) {
+func generateModelText(ctx context.Context, modelName, prompt string) (string, *genai.GenerateContentResponseUsageMetadata, error) {
 	if geminiClient == nil {
-		return "", errors.New("gemini client not initialized")
+		return "", nil, errors.New("gemini client not initialized")
 	}
 
 	config := &genai.GenerateContentConfig{
@@ -32,11 +32,11 @@ func generateModelText(ctx context.Context, modelName, prompt string) (string, e
 		},
 	}
 
-	resp, err := geminiClient.Models.GenerateContent(ctx, defaultGeminiModel, genai.Text(prompt), config)
+	resp, err := geminiClient.Models.GenerateContent(ctx, modelName, genai.Text(prompt), config)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return cleanModelOutput(resp.Text()), nil
+	return cleanModelOutput(resp.Text()), resp.UsageMetadata, nil
 }
 
 func cleanModelOutput(text string) string {
@@ -48,6 +48,18 @@ func cleanModelOutput(text string) string {
 	return strings.TrimSpace(cleaned)
 }
 
-func generateDefaultModelText(ctx context.Context, prompt string) (string, error) {
+func generateDefaultModelText(ctx context.Context, prompt string) (string, *genai.GenerateContentResponseUsageMetadata, error) {
 	return generateModelText(ctx, defaultGeminiModel, prompt)
+}
+
+// CountTokens returns the token count for a given text string using the Gemini API.
+func CountTokens(ctx context.Context, text string) (int32, error) {
+	if geminiClient == nil {
+		return 0, errors.New("gemini client not initialized")
+	}
+	resp, err := geminiClient.Models.CountTokens(ctx, defaultGeminiModel, genai.Text(text), nil)
+	if err != nil {
+		return 0, err
+	}
+	return resp.TotalTokens, nil
 }
