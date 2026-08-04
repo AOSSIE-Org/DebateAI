@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"arguehub/config"
+	"arguehub/controllers"
 	"arguehub/db"
 	"arguehub/internal/debate"
 	"arguehub/middlewares"
@@ -94,6 +95,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	}))
 	router.OPTIONS("/*path", func(c *gin.Context) { c.Status(204) })
 
+	// Serve uploaded files statically
+	router.Static("/uploads", "./uploads")
+
 	// Public routes for authentication
 	router.POST("/signup", routes.SignUpRouteHandler)
 	router.POST("/verifyEmail", routes.VerifyEmailRouteHandler)
@@ -116,6 +120,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
+		auth.POST("/user/upload-avatar", controllers.UploadAvatar)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 

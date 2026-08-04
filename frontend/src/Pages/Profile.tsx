@@ -71,7 +71,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { getProfile, updateProfile } from "@/services/profileService";
+import { getProfile, updateProfile, uploadAvatar } from "@/services/profileService";
 import { getAuthToken } from "@/utils/auth";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
@@ -177,6 +177,8 @@ const Profile: React.FC = () => {
     to: undefined,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -312,6 +314,52 @@ const Profile: React.FC = () => {
           avatarUrl: dashboard.profile.avatarUrl,
         },
       });
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !dashboard?.profile) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png"];
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMessage("Invalid file type. Only JPG and PNG files are allowed.");
+      return;
+    }
+
+    // Validate file size (5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setErrorMessage("File too large. Maximum size is 5MB.");
+      return;
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+      setErrorMessage("Authentication token is missing.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    setErrorMessage("");
+
+    try {
+      const result = await uploadAvatar(token, file);
+      // Update local state immediately
+      setDashboard({
+        ...dashboard,
+        profile: { ...dashboard.profile, avatarUrl: result.avatar_url },
+      });
+      setSuccessMessage("Avatar uploaded successfully!");
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Failed to upload avatar."
+      );
+    } finally {
+      setAvatarUploading(false);
+      // Reset file input so re-selecting the same file triggers onChange
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -769,18 +817,40 @@ const Profile: React.FC = () => {
         )}
         <div className="flex flex-col items-center mb-4">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md group">
-            <img
-              src={profile.avatarUrl || defaultAvatar}
-              alt="Avatar"
-              className="object-cover w-full h-full"
+            {avatarUploading ? (
+              <div className="flex items-center justify-center w-full h-full bg-muted">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : (
+              <img
+                src={profile.avatarUrl || defaultAvatar}
+                alt="Avatar"
+                className="object-cover w-full h-full"
+              />
+            )}
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                title="Upload Photo"
+              >
+                <ChevronRight className="w-5 h-5 text-white rotate-90" />
+              </button>
+              <button
+                onClick={() => setIsAvatarModalOpen(true)}
+                className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                title="Choose Avatar"
+              >
+                <ImageIcon className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              className="hidden"
+              onChange={handleAvatarUpload}
             />
-            <button
-              onClick={() => setIsAvatarModalOpen(true)}
-              className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Edit Avatar"
-            >
-              <ImageIcon className="w-6 h-6 text-white" />
-            </button>
           </div>
           <AvatarModal
             isOpen={isAvatarModalOpen}

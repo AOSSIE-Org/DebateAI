@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { X } from 'lucide-react';
+import { X, Upload, Loader2 } from 'lucide-react';
+import { uploadAvatar } from '@/services/profileService';
+import { getAuthToken } from '@/utils/auth';
 
 interface AvatarModalProps {
   isOpen: boolean;
@@ -20,6 +22,12 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
   const [seed, setSeed] = useState(
     currentAvatar?.split('seed=')[1]?.split('&')[0] || 'Jude'
   );
+  const [activeTab, setActiveTab] = useState<'customize' | 'upload'>('customize');
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [backgroundColor, setBackgroundColor] = useState('b6e3f4');
   const [ear, setEar] = useState('variant01');
   const [eyes, setEyes] = useState('variant01');
@@ -417,6 +425,49 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Only JPG and PNG files are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File too large. Maximum size is 5MB.');
+      return;
+    }
+
+    setUploadError('');
+    setUploadFile(file);
+    setUploadPreview(URL.createObjectURL(file));
+  };
+
+  const handleUploadSubmit = async () => {
+    if (!uploadFile) return;
+    const token = getAuthToken();
+    if (!token) {
+      setUploadError('Authentication token missing. Please log in.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError('');
+
+    try {
+      const result = await uploadAvatar(token, uploadFile);
+      onSelectAvatar(result.avatar_url);
+      setUploadPreview(null);
+      setUploadFile(null);
+      onClose();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
       <div className='bg-background rounded-lg px-6 pb-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto'>
@@ -430,13 +481,85 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
           </div>
           <div className='w-full flex justify-center'>
             <img
-              src={selectedAvatar}
+              src={activeTab === 'upload' && uploadPreview ? uploadPreview : selectedAvatar}
               alt='Avatar Preview'
-              className='w-32 h-32 rounded-full border-2 border-primary shadow-md'
+              className='w-32 h-32 rounded-full border-2 border-primary shadow-md object-cover'
             />
+          </div>
+
+          {/* Tab Switcher */}
+          <div className='flex mt-4 border rounded-lg overflow-hidden'>
+            <button
+              onClick={() => setActiveTab('customize')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'customize'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              Customize Avatar
+            </button>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'upload'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              Upload Photo
+            </button>
           </div>
         </div>
 
+        {activeTab === 'upload' ? (
+          /* Upload Photo Tab */
+          <div className='mt-6 flex flex-col items-center gap-4'>
+            <div
+              onClick={() => uploadInputRef.current?.click()}
+              className='w-full max-w-sm border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 flex flex-col items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors'
+            >
+              <Upload className='w-10 h-10 text-muted-foreground' />
+              <p className='text-sm text-muted-foreground text-center'>
+                Click to select a photo
+                <br />
+                <span className='text-xs'>JPG or PNG, max 5MB</span>
+              </p>
+            </div>
+            <input
+              ref={uploadInputRef}
+              type='file'
+              accept='image/jpeg,image/png'
+              className='hidden'
+              onChange={handleFileSelect}
+            />
+
+            {uploadError && (
+              <p className='text-sm text-red-500'>{uploadError}</p>
+            )}
+
+            <div className='flex gap-2 w-full max-w-sm'>
+              <Button
+                className='flex-1'
+                onClick={handleUploadSubmit}
+                disabled={!uploadFile || uploading}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                    Uploading...
+                  </>
+                ) : (
+                  'Upload & Save'
+                )}
+              </Button>
+              <Button variant='secondary' className='flex-1' onClick={onClose}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Character Selection */}
         <div className='mt-6 ml-6'>
           <Label className='text-sm font-semibold'>Characters</Label>
@@ -747,6 +870,8 @@ const AvatarModal: React.FC<AvatarModalProps> = ({
             Cancel
           </Button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
