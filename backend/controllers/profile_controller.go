@@ -254,7 +254,7 @@ func GetProfile(c *gin.Context) {
 				"opponent":   transcript.Opponent,
 				"debateType": transcript.DebateType,
 				"date":       transcript.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-				"eloChange":  0, // TODO: Add actual Elo change tracking
+				"eloChange":  transcript.EloChange,
 			})
 		}
 
