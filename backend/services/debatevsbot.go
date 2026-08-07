@@ -66,7 +66,7 @@ func findLastUserMessage(history []models.Message) models.Message {
 	return models.Message{} // Return empty message if history is empty
 }
 
-// inferOpponentStyle infers the opponent's debating style based on their latest message
+// inferOpponentStyle infers the opponent's debating style based on their latest message context.
 func inferOpponentStyle(message string) string {
 	message = strings.ToLower(message)
 	aggressiveWords := []string{"ridiculous", "absurd", "nonsense", "prove it", "wrong"}
@@ -107,10 +107,13 @@ func inferOpponentStyle(message string) string {
 	}
 }
 
-// constructPrompt builds a prompt that adjusts based on bot personality, debate topic, history,
+// ConstructPrompt builds a prompt that adjusts based on bot personality, debate topic, history,
 // extra context, and uses the provided stance directly. It includes phase-specific instructions
 // and leverages InteractionModifiers and PhilosophicalTenets for tailored responses.
-func constructPrompt(bot BotPersonality, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
+//
+// NOTE: This function is exported (public) to allow for unit testing and modular prompt construction
+// in other services (like coach or transcript services) that may need to mock or reuse bot logic.
+func ConstructPrompt(bot BotPersonality, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
 	// Level-based instructions
 	levelInstructions := ""
 	switch strings.ToLower(bot.Level) {
@@ -183,7 +186,6 @@ Your debating style must strictly adhere to the following guidelines:
 - Personality Instructions: %s
 - Interaction Modifier: %s
 Your stance is: %s.
-%s
 %s
 %s
 Provide an opening statement that embodies your persona and stance.
@@ -266,31 +268,29 @@ Please provide your full argument.`,
 }
 
 // GenerateBotResponse generates a response from the debate bot using the Gemini client library.
-// It uses the bot’s personality to handle errors and responses vividly.
-func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
+// It uses the bot's personality to handle responses vividly.
+func GenerateBotResponse(ctx context.Context, botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) (string, *genai.GenerateContentResponseUsageMetadata) {
 	if geminiClient == nil {
-		return personalityErrorResponse(botName, "My systems are offline, it seems.")
+		return personalityErrorResponse(botName, "My systems are offline, it seems."), nil
 	}
 
 	bot := GetBotPersonality(botName)
-	// Construct prompt with enhanced personality integration
-	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
+	prompt := ConstructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
-	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
-		return personalityErrorResponse(botName, "A glitch in my logic, there is.")
+		return personalityErrorResponse(botName, "A glitch in my logic, there is."), usage
 	}
 	if response == "" {
-		return personalityErrorResponse(botName, "Lost in translation, my thoughts are.")
+		return personalityErrorResponse(botName, "Lost in translation, my thoughts are."), usage
 	}
 	if strings.Contains(strings.ToLower(response), "clarify") {
-		return personalityClarificationRequest(botName)
+		return personalityClarificationRequest(botName), usage
 	}
-	return response
+	return response, usage
 }
 
-// personalityErrorResponse returns a personality-specific error message
+// personalityErrorResponse returns a character-specific error message when the AI service fails.
 func personalityErrorResponse(botName, defaultMsg string) string {
 	// Dynamically construct error message using bot personality
 	bot := GetBotPersonality(botName)
@@ -333,7 +333,7 @@ func personalityErrorResponse(botName, defaultMsg string) string {
 	}
 }
 
-// personalityClarificationRequest returns a personality-specific clarification request
+// personalityClarificationRequest returns a character-specific request for the user to clarify their point.
 func personalityClarificationRequest(botName string) string {
 	bot := GetBotPersonality(botName)
 	var universeTie string
@@ -375,10 +375,10 @@ func personalityClarificationRequest(botName string) string {
 	}
 }
 
-// JudgeDebate evaluates the debate, factoring in the bot’s personality adherence
-func JudgeDebate(history []models.Message) string {
+// JudgeDebate evaluates the debate transcript using Gemini, returning structured judgment JSON and usage metadata.
+func JudgeDebate(ctx context.Context, history []models.Message) (string, *genai.GenerateContentResponseUsageMetadata) {
 	if geminiClient == nil {
-		return "Unable to judge."
+		return "Unable to judge.", nil
 	}
 
 	// Extract bot name from history (assume bot is the non-user sender)
@@ -452,18 +452,17 @@ Provide ONLY the JSON output without any additional text.`,
 		bot.Name, bot.Tone, bot.RhetoricalStyle, strings.Join(bot.Catchphrases, ", "), strings.Join(bot.UniverseTies, ", "),
 		bot.DebateStrategy, strings.Join(bot.SignatureMoves, ", "), strings.Join(bot.PhilosophicalTenets, ", "), FormatHistory(history))
 
-	ctx := context.Background()
-	text, err := generateDefaultModelText(ctx, prompt)
+	text, usage, err := generateDefaultModelText(ctx, prompt)
 	if err != nil || text == "" {
 		if err != nil {
 			log.Printf("Gemini error: %v", err)
 		}
-		return "Unable to judge."
+		return "Unable to judge.", usage
 	}
-	return text
+	return text, usage
 }
 
-// CreateDebateService creates a new debate in MongoDB, ensuring bot personality is logged
+// CreateDebateService creates a new debate document in MongoDB with initial configuration.
 func CreateDebateService(debate *models.DebateVsBot, stance string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

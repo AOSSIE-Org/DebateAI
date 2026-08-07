@@ -47,18 +47,28 @@ type DebateResponse struct {
 }
 
 type DebateMessageResponse struct {
-	DebateId string `json:"debateId"`
-	BotName  string `json:"botName"`
-	BotLevel string `json:"botLevel"`
-	Topic    string `json:"topic"`
-	Stance   string `json:"stance"`
-	Response string `json:"response"`
+	DebateId          string  `json:"debateId"`
+	BotName           string  `json:"botName"`
+	BotLevel          string  `json:"botLevel"`
+	Topic             string  `json:"topic"`
+	Stance            string  `json:"stance"`
+	Response          string  `json:"response"`
+	UserInputTokens   int     `json:"user_input_tokens,omitempty"`
+	PromptTokens      int     `json:"prompt_tokens,omitempty"`
+	ResponseTokens    int     `json:"response_tokens,omitempty"`
+	TotalTokens       int     `json:"total_tokens,omitempty"`
+	EstimatedCostUSD  float64 `json:"estimated_cost_usd,omitempty"`
 }
 
 type JudgeResponse struct {
-	Result string `json:"result"`
+	Result           string  `json:"result"`
+	PromptTokens     int     `json:"prompt_tokens,omitempty"`
+	ResponseTokens   int     `json:"response_tokens,omitempty"`
+	TotalTokens      int     `json:"total_tokens,omitempty"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd,omitempty"`
 }
 
+// CreateDebate handles the creation of a new debate session against a bot.
 func CreateDebate(c *gin.Context) {
 	// Extract token from request header
 	token := c.GetHeader("Authorization")
@@ -119,6 +129,7 @@ func CreateDebate(c *gin.Context) {
 	c.JSON(200, response)
 }
 
+// SendDebateMessage processes a new message from the user and generates a bot response.
 func SendDebateMessage(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
@@ -139,14 +150,60 @@ func SendDebateMessage(c *gin.Context) {
 		return
 	}
 
-	// Generate bot response with the additional context field.
-	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
+	// Generate bot response with usage metadata.
+	botResponse, usage := services.GenerateBotResponse(c.Request.Context(), req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
 
-	// Update debate history with the bot's response.
+	// Count user's own input tokens separately for granular cost visibility.
+	userInputTokens := 0
+	userInputText := ""
+	for i := len(req.History) - 1; i >= 0; i-- {
+		if req.History[i].Sender == "User" {
+			userInputText = req.History[i].Text
+			break
+		}
+	}
+	if userInputText != "" {
+		// Use a context with timeout to prevent hanging the request
+		countCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if count, err := services.CountTokens(countCtx, userInputText); err == nil {
+			userInputTokens = int(count)
+			// Update the last user message in the history with the token count for persistence
+			for i := len(req.History) - 1; i >= 0; i-- {
+				if req.History[i].Sender == "User" {
+					req.History[i].UserInputTokens = userInputTokens
+					break
+				}
+			}
+		} else {
+			log.Printf("[TOKEN COUNT] Warning: Failed to count user tokens: %v", err)
+		}
+	}
+
+	promptTokens := 0
+	responseTokens := 0
+	totalTokens := 0
+	var estimatedCost float64
+	if usage != nil {
+		promptTokens = int(usage.PromptTokenCount)
+		responseTokens = int(usage.CandidatesTokenCount)
+		totalTokens = int(usage.TotalTokenCount)
+		// Pricing: Gemini 2.5 Flash — Input $0.075/1M, Output $0.30/1M tokens
+		estimatedCost = (float64(promptTokens)*0.075 + float64(responseTokens)*0.30) / 1_000_000
+		log.Printf("[TOKEN USAGE] Bot: %s", req.BotName)
+		log.Printf("  User Input : %d tokens", userInputTokens)
+		log.Printf("  Prompt Total: %d tokens (system + history + user)", promptTokens)
+		log.Printf("  Bot Response: %d tokens", responseTokens)
+		log.Printf("  Total Tokens: %d | Estimated Cost: $%.6f USD", totalTokens, estimatedCost)
+	}
+
+	// Update debate history with the bot's response and token usage.
 	updatedHistory := append(req.History, models.Message{
-		Sender: "Bot",
-		Text:   botResponse,
-		// You can also store the phase if needed.
+		Sender:         "Bot",
+		Text:           botResponse,
+		PromptTokens:   promptTokens,
+		ResponseTokens: responseTokens,
+		TotalTokens:    totalTokens,
 	})
 
 	debate := models.DebateVsBot{
@@ -164,15 +221,23 @@ func SendDebateMessage(c *gin.Context) {
 		debate.ID = primitive.NewObjectID()
 	}
 	if err := db.SaveDebateVsBot(debate); err != nil {
+		log.Printf("[DATABASE ERROR] Failed to save debate %s: %v", debate.ID.Hex(), err)
+		c.JSON(500, gin.H{"error": "Failed to persist debate analysis"})
+		return
 	}
 
 	response := DebateMessageResponse{
-		DebateId: debate.ID.Hex(),
-		BotName:  req.BotName,
-		BotLevel: req.BotLevel,
-		Topic:    req.Topic,
-		Stance:   req.Stance,
-		Response: botResponse,
+		DebateId:         debate.ID.Hex(),
+		BotName:          req.BotName,
+		BotLevel:         req.BotLevel,
+		Topic:            req.Topic,
+		Stance:           req.Stance,
+		Response:         botResponse,
+		UserInputTokens:  userInputTokens,
+		PromptTokens:     promptTokens,
+		ResponseTokens:   responseTokens,
+		TotalTokens:      totalTokens,
+		EstimatedCostUSD: estimatedCost,
 	}
 	c.JSON(200, response)
 }
@@ -205,10 +270,28 @@ func JudgeDebate(c *gin.Context) {
 	}
 
 	// Judge the debate
-	result := services.JudgeDebate(req.History)
+	result, usage := services.JudgeDebate(c.Request.Context(), req.History)
+
+	promptTokens := 0
+	responseTokens := 0
+	totalTokens := 0
+	var estimatedCost float64
+	if usage != nil {
+		promptTokens = int(usage.PromptTokenCount)
+		responseTokens = int(usage.CandidatesTokenCount)
+		totalTokens = int(usage.TotalTokenCount)
+		estimatedCost = (float64(promptTokens)*0.075 + float64(responseTokens)*0.30) / 1_000_000
+		log.Printf("[TOKEN USAGE] Judge")
+		log.Printf("  Prompt Total: %d tokens", promptTokens)
+		log.Printf("  Judge Response: %d tokens", responseTokens)
+		log.Printf("  Total Tokens: %d | Estimated Cost: $%.6f USD", totalTokens, estimatedCost)
+	}
 
 	// Update debate outcome
 	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
+		log.Printf("[DATABASE ERROR] Failed to update outcome for %s: %v", email, err)
+		c.JSON(500, gin.H{"error": "Failed to update debate outcome"})
+		return
 	}
 
 	// Get the latest debate information to extract proper details
@@ -251,12 +334,21 @@ func JudgeDebate(c *gin.Context) {
 	} else {
 		// Fallback to string matching if JSON parsing fails
 		resultLower := strings.ToLower(result)
-		if strings.Contains(resultLower, "user win") || strings.Contains(resultLower, "user wins") ||
-			strings.Contains(resultLower, "user") && strings.Contains(resultLower, "win") {
+
+		// Group logic checks for clearer precedence
+		userWon := strings.Contains(resultLower, "user win") ||
+			strings.Contains(resultLower, "user wins") ||
+			(strings.Contains(resultLower, "user") && strings.Contains(resultLower, "win"))
+
+		botWon := strings.Contains(resultLower, "bot win") ||
+			strings.Contains(resultLower, "bot wins") ||
+			strings.Contains(resultLower, "lose") ||
+			strings.Contains(resultLower, "loss") ||
+			(strings.Contains(resultLower, "bot") && strings.Contains(resultLower, "win"))
+
+		if userWon {
 			resultStatus = "win"
-		} else if strings.Contains(resultLower, "bot win") || strings.Contains(resultLower, "bot wins") ||
-			strings.Contains(resultLower, "lose") || strings.Contains(resultLower, "loss") ||
-			strings.Contains(resultLower, "bot") && strings.Contains(resultLower, "win") {
+		} else if botWon {
 			resultStatus = "loss"
 		} else if strings.Contains(resultLower, "draw") {
 			resultStatus = "draw"
@@ -293,7 +385,11 @@ func JudgeDebate(c *gin.Context) {
 	}()
 
 	c.JSON(200, JudgeResponse{
-		Result: result,
+		Result:           result,
+		PromptTokens:     promptTokens,
+		ResponseTokens:   responseTokens,
+		TotalTokens:      totalTokens,
+		EstimatedCostUSD: estimatedCost,
 	})
 }
 
