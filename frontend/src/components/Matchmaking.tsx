@@ -40,14 +40,14 @@ const Matchmaking: React.FC = () => {
     }
 
     if (!user) {
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 
     // Get token from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 

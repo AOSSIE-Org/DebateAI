@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('token');
         setToken(null);
         setUser(null);
-        navigate('/login');
+        navigate('/auth');
         return;
       }
       setToken(storedToken);
