@@ -81,6 +81,13 @@ func main() {
 func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
+	// Health check endpoint (no auth, no external dependencies)
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "ok",
+		})
+	})
+
 	// Set trusted proxies (adjust as needed)
 	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
 
