@@ -70,14 +70,11 @@ func SaveDebateVsBot(debate models.DebateVsBot) error {
 }
 
 // UpdateDebateVsBotOutcome updates the outcome of the most recent bot debate for a user
-func UpdateDebateVsBotOutcome(userId, outcome string) error {
-	filter := bson.M{"userId": userId}
+func UpdateDebateVsBotOutcome(email, outcome string) error {
+	filter := bson.M{"email": email}
 	update := bson.M{"$set": bson.M{"outcome": outcome}}
-	_, err := DebateVsBotCollection.UpdateOne(context.Background(), filter, update, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+	opts := options.FindOneAndUpdate().SetSort(bson.M{"createdAt": -1})
+	return DebateVsBotCollection.FindOneAndUpdate(context.Background(), filter, update, opts).Err()
 }
 
 // GetLatestDebateVsBot retrieves the most recent bot debate for a user

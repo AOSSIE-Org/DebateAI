@@ -209,6 +209,7 @@ func JudgeDebate(c *gin.Context) {
 
 	// Update debate outcome
 	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
+		log.Printf("Failed to update debate vs bot outcome for %s: %v", email, err)
 	}
 
 	// Get the latest debate information to extract proper details
