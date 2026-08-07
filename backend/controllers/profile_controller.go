@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,18 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-// Calculate new Elo ratings using float64
-func calculateEloRating(ratingA, ratingB float64, scoreA float64) (newRatingA, newRatingB float64) {
-	const K = 32.0
-	expectedA := 1.0 / (1.0 + math.Pow(10, (ratingB-ratingA)/400.0))
-	expectedB := 1.0 - expectedA
-	scoreB := 1.0 - scoreA
-
-	newRatingA = ratingA + K*(scoreA-expectedA)
-	newRatingB = ratingB + K*(scoreB-expectedB)
-	return newRatingA, newRatingB
-}
 
 func extractNameFromEmail(email string) string {
 	for i, char := range email {
@@ -347,59 +334,4 @@ func UpdateProfile(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
-}
-
-func UpdateEloAfterDebate(ctx *gin.Context) {
-	var req struct {
-		WinnerID string `json:"winnerId"`
-		LoserID  string `json:"loserId"`
-		Topic    string `json:"topic"`
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-		return
-	}
-
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	winnerID, _ := primitive.ObjectIDFromHex(req.WinnerID)
-	loserID, _ := primitive.ObjectIDFromHex(req.LoserID)
-
-	var winner, loser models.User
-	_ = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": winnerID}).Decode(&winner)
-	_ = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"_id": loserID}).Decode(&loser)
-
-	newWinnerElo, newLoserElo := calculateEloRating(winner.Rating, loser.Rating, 1.0)
-
-	winnerChange := newWinnerElo - winner.Rating
-	loserChange := newLoserElo - loser.Rating
-
-	// Update users
-	db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": winnerID}, bson.M{"$set": bson.M{"rating": newWinnerElo}})
-	db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"_id": loserID}, bson.M{"$set": bson.M{"rating": newLoserElo}})
-
-	// Log debates
-	now := time.Now()
-	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
-		"email":     winner.Email,
-		"topic":     req.Topic,
-		"result":    "win",
-		"eloChange": winnerChange,
-		"rating":    newWinnerElo,
-		"date":      now,
-	})
-	db.MongoDatabase.Collection("debates").InsertOne(dbCtx, bson.M{
-		"email":     loser.Email,
-		"topic":     req.Topic,
-		"result":    "loss",
-		"eloChange": loserChange,
-		"rating":    newLoserElo,
-		"date":      now,
-	})
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"winnerNewElo": int(newWinnerElo),
-		"loserNewElo":  int(newLoserElo),
-	})
 }

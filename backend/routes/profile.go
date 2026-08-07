@@ -13,7 +13,3 @@ func GetProfileRouteHandler(ctx *gin.Context) {
 func UpdateProfileRouteHandler(ctx *gin.Context) {
 	controllers.UpdateProfile(ctx)
 }
-
-func UpdateEloAfterDebateRouteHandler(ctx *gin.Context) {
-	controllers.UpdateEloAfterDebate(ctx)
-}
