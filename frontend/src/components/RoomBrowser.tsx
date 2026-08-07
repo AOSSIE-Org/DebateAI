@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../constants/api';
 
 interface Participant {
   id: string;
@@ -21,7 +22,7 @@ const RoomBrowser: React.FC = () => {
   const fetchRooms = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:1313/rooms', {
+      const response = await fetch(`${API_BASE_URL}/rooms`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +62,7 @@ const RoomBrowser: React.FC = () => {
     const token = localStorage.getItem('token');
     try {
       const response = await fetch(
-        `http://localhost:1313/rooms/${roomId}/join`,
+        `${API_BASE_URL}/rooms/${roomId}/join`,
         {
           method: 'POST',
           headers: {

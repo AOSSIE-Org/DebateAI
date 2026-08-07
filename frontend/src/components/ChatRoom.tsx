@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import clsx from 'clsx';
+import { WS_BASE_URL } from '../constants/api';
 
 const reactionsList = ['😂', '❤️', '❤️', '👍'];
 
@@ -45,7 +46,7 @@ const ChatRoom = () => {
     if (!token) return;
 
     wsRef.current = new WebSocket(
-      `ws://localhost:1313/chat/${roomId}?token=${token}`
+      `${WS_BASE_URL}/chat/${roomId}?token=${token}`
     );
 
     wsRef.current.onopen = () => {
