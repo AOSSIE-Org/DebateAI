@@ -82,13 +82,15 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
 	// Set trusted proxies (adjust as needed)
-	router.SetTrustedProxies([]string{"127.0.0.1", "localhost"})
+	router.SetTrustedProxies([]string{"127.0.0.1", "localhost", "::1"})
 
 	// Configure CORS for your frontend (e.g., localhost:5173 for Vite)
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{"http://localhost:5173",
+		                          "http://127.0.0.1:5173",},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept",             // Added
+			"X-Requested-With",},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
