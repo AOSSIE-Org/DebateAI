@@ -14,6 +14,24 @@ export const getProfile = async (token: string) => {
   return response.json();
 };
 
+export const uploadAvatar = async (token: string, file: File) => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const response = await fetch(`${baseURL}/user/upload-avatar`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to upload avatar");
+  }
+
+  return response.json();
+};
 export const updateProfile = async (
   token: string,
   displayName: string,
