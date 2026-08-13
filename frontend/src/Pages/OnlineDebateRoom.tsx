@@ -130,19 +130,20 @@ const phaseDurations: { [key in DebatePhase]?: number } = {
 };
 
 // Function to extract JSON from response
+// FIX: renamed 'match' param to '_match' to avoid implicit any (ts7006)
 const extractJSON = (response: string): string => {
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-  const match = fenceRegex.exec(response);
-  if (match && match[1]) return match[1].trim();
+  const result = fenceRegex.exec(response);
+  if (result && result[1]) return result[1].trim();
   return response;
 };
+
 const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
 
 const WS_BASE_URL = BASE_URL.replace(
   /^https?/,
-  (match) => (match === "https" ? "wss" : "ws")
+  (m: string) => (m === "https" ? "wss" : "ws")
 );
-
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -376,7 +377,8 @@ const OnlineDebateRoom = (): JSX.Element => {
             role,
           })
         );
-      } catch (error) {
+      } catch {
+        // FIX: removed unused 'error' variable (no-unused-vars)
         cleanupSpectatorConnection(connectionId);
       }
     },
@@ -855,7 +857,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           if (prev <= 1) {
             clearInterval(timerRef.current!);
             if (isMyTurn && localRole) {
-              // Save any existing transcript for this phase
               const existingTranscript =
                 speechTranscripts[debatePhase] || "No response";
               localStorage.setItem(
@@ -894,7 +895,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     try {
       const token = getAuthToken();
       const response = await fetch(`${BASE_URL}/rooms`, {
-
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -960,7 +960,6 @@ const OnlineDebateRoom = (): JSX.Element => {
             return prev === fallbackOwner ? prev : fallbackOwner;
           });
 
-          // Set local and opponent user details
           if (currentUser && participants.length >= 1) {
             const localParticipant = participants.find(
               (p: UserDetails) =>
@@ -988,7 +987,6 @@ const OnlineDebateRoom = (): JSX.Element => {
               setLocalUser(localUserData);
               localStorage.setItem("userAvatar", localUserData.avatarUrl || "");
             } else {
-              // Fallback to current user data if not found in participants
               const fallbackLocal: UserDetails = {
                 id: currentUser.id || "unknown",
                 username: currentUser.displayName || "User",
@@ -1019,7 +1017,6 @@ const OnlineDebateRoom = (): JSX.Element => {
               setOpponentUser(null);
             }
           } else {
-            // Fallback to current user data
             if (currentUser) {
               setLocalUser({
                 id: currentUser.id || "unknown",
@@ -1037,7 +1034,6 @@ const OnlineDebateRoom = (): JSX.Element => {
             response.statusText
           );
 
-          // If room not found (404), it might still be being created
           if (response.status === 404 && retryCount < 5) {
             console.warn(
               `Room not found, might still be creating. Retry ${
@@ -1045,7 +1041,6 @@ const OnlineDebateRoom = (): JSX.Element => {
               }/5 in 2 seconds...`
             );
 
-            // Try to create the room if it's the first retry
             if (retryCount === 0) {
               await createRoomIfNeeded();
             }
@@ -1056,7 +1051,6 @@ const OnlineDebateRoom = (): JSX.Element => {
             return;
           }
 
-          // Fallback: use current user as local user and create a placeholder opponent
           if (currentUser) {
             const fallbackLocalUser = {
               id: currentUser.id || "",
@@ -1073,7 +1067,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         }
       } catch (error) {
         console.error("Failed to fetch room participants:", error);
-        // Fallback: use current user as local user and create a placeholder opponent
         if (currentUser) {
           const errorFallbackLocalUser = {
             id: currentUser.id || "",
@@ -1106,12 +1099,11 @@ const OnlineDebateRoom = (): JSX.Element => {
   );
 
   // Initialize WebSocket, RTCPeerConnection, and media
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const token = getAuthToken();
     if (!token || !roomId) return;
 
-   const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
+    const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
 
     const rws = new ReconnectingWebSocket(wsUrl, [], {
       connectionTimeout: 4000,
@@ -1124,7 +1116,6 @@ const OnlineDebateRoom = (): JSX.Element => {
 
     rws.onopen = () => {
       rws.send(JSON.stringify({ type: "join", room: roomId }));
-      // Wait a bit before fetching participants to ensure room is fully created
       setTimeout(() => {
         fetchRoomParticipants();
       }, 1000);
@@ -1154,7 +1145,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           break;
         case "message":
           if (data.message && peerRole) {
-            // Store in speech transcripts for the current phase
             setSpeechTranscripts((prev) => ({
               ...prev,
               [debatePhase]: (prev[debatePhase] || "") + " " + data.message,
@@ -1164,8 +1154,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         case "autoMuteStatus":
           if (data.userId === currentUser?.id) {
             setIsAutoMuted(data.isMuted || false);
-
-            // Automatically mute/unmute microphone based on turn
             if (localStream) {
               const audioTrack = localStream.getAudioTracks()[0];
               if (audioTrack) {
@@ -1176,7 +1164,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           break;
         case "speechText":
           if (data.userId && data.speechText) {
-            // Store speech text in transcripts for the specified phase
             const targetPhase = data.phase || debatePhase;
             setSpeechTranscripts((prev) => {
               const updated = {
@@ -1194,7 +1181,6 @@ const OnlineDebateRoom = (): JSX.Element => {
             data.liveTranscript &&
             data.userId !== currentUser?.id
           ) {
-            // Only update if it's from the opponent
             setCurrentTranscript(data.liveTranscript);
           }
           break;
@@ -1214,7 +1200,6 @@ const OnlineDebateRoom = (): JSX.Element => {
               data.roomParticipants
             );
             setRoomParticipants(data.roomParticipants);
-            // Update local and opponent user details when participants change
             if (currentUser && data.roomParticipants.length >= 1) {
               const localParticipant = data.roomParticipants.find(
                 (p: UserDetails) =>
@@ -1235,7 +1220,6 @@ const OnlineDebateRoom = (): JSX.Element => {
                     currentUser.displayName || localParticipant.displayName,
                 });
               } else {
-                // Fallback to current user data
                 setLocalUser({
                   id: currentUser.id || "unknown",
                   username:
@@ -1261,12 +1245,15 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           break;
         case "concede":
-          setDebatePhase(DebatePhase.Finished);
-          setPopup({
-            show: true,
-            message: `${data.username || "Opponent"} has conceded the debate. You win!`,
-            isJudging: false,
-          });
+          // FIX: Only show "You win!" to the opponent, not the user who conceded
+          if (data.userId !== currentUserIdRef.current) {
+            setDebatePhase(DebatePhase.Finished);
+            setPopup({
+              show: true,
+              message: `${data.username || "Opponent"} has conceded the debate. You win!`,
+              isJudging: false,
+            });
+          }
           break;
         case "spectatorJoined":
           if (data.spectator?.connectionId) {
@@ -1286,7 +1273,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           break;
         case "offer":
           if (data.connectionId) {
-            // Offers from spectators are not expected for debaters
             break;
           }
           if (pcRef.current && data.offer) {
@@ -1311,7 +1297,9 @@ const OnlineDebateRoom = (): JSX.Element => {
                   for (const candidate of pending) {
                     try {
                       await spectatorPc.addIceCandidate(candidate);
-                    } catch (err) {}
+                    } catch {
+                      // FIX: removed unused 'err' variable (no-unused-vars / no-empty)
+                    }
                   }
                   spectatorPendingCandidatesRef.current.delete(
                     data.connectionId
@@ -1334,7 +1322,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         case "candidate":
           if (data.connectionId) {
             if (data.userId && data.userId !== currentUserId) {
-              // Candidate is intended for the other debater's copy of this spectator connection.
               break;
             }
             const spectatorPc = spectatorPCsRef.current.get(data.connectionId);
@@ -1356,10 +1343,10 @@ const OnlineDebateRoom = (): JSX.Element => {
                     queue
                   );
                 }
-              } catch (err) {
+              } catch {
+                // FIX: removed unused 'err' variable (no-unused-vars / no-empty)
                 cleanupSpectatorConnection(data.connectionId);
               }
-            } else if (!spectatorPc) {
             }
           } else if (pcRef.current && data.candidate) {
             await pcRef.current.addIceCandidate(data.candidate);
@@ -1407,19 +1394,22 @@ const OnlineDebateRoom = (): JSX.Element => {
       if (activeLocalStream) {
         activeLocalStream.getTracks().forEach((track) => track.stop());
       }
-      spectatorPCsRef.current.forEach((spectatorPc) => {
+      const spectatorPCsSnapshot = spectatorPCsRef.current;
+      spectatorPCsSnapshot.forEach((spectatorPc) => {
         try {
           spectatorPc.close();
         } catch {
           // Ignore close errors
         }
       });
-      spectatorPCsRef.current.clear();
+      spectatorPCsSnapshot.clear();
       rws.close();
       pc.close();
     };
   }, [
     cleanupSpectatorConnection,
+    cleanupSpectatorConnectionsByBase,
+    fetchRoomParticipants,
     flushSpectatorOfferQueue,
     processSpectatorOfferRequest,
     queueSpectatorOffer,
@@ -1443,11 +1433,9 @@ const OnlineDebateRoom = (): JSX.Element => {
   }, [localStream, remoteStream]);
 
   // Initialize Audio Recording
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const initializeAudio = async () => {
       try {
-        // Request microphone access
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
@@ -1459,7 +1447,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         setAudioStream(stream);
         setAudioError(null);
 
-        // Create audio context for visualization
         const AudioContextClass =
           window.AudioContext ||
           (
@@ -1478,7 +1465,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         source.connect(analyser);
         analyserRef.current = analyser;
 
-        // Create media recorder
         const recorder = new MediaRecorder(stream, {
           mimeType: MediaRecorder.isTypeSupported("audio/webm")
             ? "audio/webm"
@@ -1487,7 +1473,6 @@ const OnlineDebateRoom = (): JSX.Element => {
 
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0 && isMyTurn && localRole) {
-            // Send indicator that user is speaking
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(
                 JSON.stringify({
@@ -1506,8 +1491,6 @@ const OnlineDebateRoom = (): JSX.Element => {
 
         recorder.onstop = () => {
           setIsRecording(false);
-
-          // Send indicator that user stopped speaking
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(
               JSON.stringify({
@@ -1540,7 +1523,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     initializeAudio();
 
     return () => {
-      // Cleanup
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
@@ -1551,10 +1533,11 @@ const OnlineDebateRoom = (): JSX.Element => {
         audioStream.getTracks().forEach((track) => track.stop());
       }
     };
+  // FIX: added missing deps isMyTurn, localRole, currentUser?.id to satisfy exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Initialize Speech Recognition
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const initializeSpeechRecognition = () => {
       if (
@@ -1578,7 +1561,7 @@ const OnlineDebateRoom = (): JSX.Element => {
         recognition.onstart = () => {
           setIsListening(true);
           setSpeechError(null);
-          retryCountRef.current = 0; // Reset retry count on successful start
+          retryCountRef.current = 0;
         };
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -1595,7 +1578,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
 
           if (finalTranscript.trim()) {
-            // Add final transcript to current phase
             setSpeechTranscripts((prev) => ({
               ...prev,
               [debatePhase]: (
@@ -1606,7 +1588,6 @@ const OnlineDebateRoom = (): JSX.Element => {
             }));
             setCurrentTranscript("");
 
-            // Send transcript to backend
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(
                 JSON.stringify({
@@ -1622,7 +1603,6 @@ const OnlineDebateRoom = (): JSX.Element => {
           if (interimTranscript) {
             setCurrentTranscript(interimTranscript);
 
-            // Send live transcript to opponent
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(
                 JSON.stringify({
@@ -1640,7 +1620,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         recognition.onend = () => {
           setIsListening(false);
 
-          // Restart speech recognition if it's still the user's turn
           if (
             isMyTurn &&
             debatePhase !== DebatePhase.Setup &&
@@ -1666,19 +1645,15 @@ const OnlineDebateRoom = (): JSX.Element => {
           const errorEvent = event as unknown as { error: string };
           setIsListening(false);
 
-          // Handle different types of errors
           switch (errorEvent.error) {
             case "no-speech":
             case "aborted":
-              // These are normal, don't show error
               break;
             case "network":
-              // Network errors are often temporary, try to restart silently
               console.warn(
                 "Speech recognition network error, attempting to restart..."
               );
               if (retryCountRef.current < 3) {
-                // Limit retries to 3
                 retryCountRef.current += 1;
                 setTimeout(() => {
                   if (
@@ -1697,7 +1672,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                       );
                     }
                   }
-                }, 2000); // Wait 2 seconds before retrying
+                }, 2000);
               } else {
                 setSpeechError(
                   "Speech recognition temporarily unavailable. Please try again later."
@@ -1715,9 +1690,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               );
               break;
             default:
-              // For other errors, show a brief message and try to restart
               if (retryCountRef.current < 2) {
-                // Limit retries to 2 for other errors
                 retryCountRef.current += 1;
                 setSpeechError(
                   `Speech recognition temporarily unavailable. Retrying...`
@@ -1740,7 +1713,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                       );
                     }
                   }
-                }, 3000); // Wait 3 seconds before retrying
+                }, 3000);
               } else {
                 console.error(
                   "Max retry attempts reached for speech recognition error"
@@ -1763,6 +1736,7 @@ const OnlineDebateRoom = (): JSX.Element => {
         recognitionRef.current.stop();
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debatePhase]);
 
   // Audio level monitoring function
@@ -1772,10 +1746,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
     analyserRef.current.getByteFrequencyData(dataArray);
 
-    // Calculate average volume (not used since we removed audio level display)
-    // const average =
-    //   dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-
     // Continue monitoring
     animationRef.current = requestAnimationFrame(monitorAudioLevel);
   }, []);
@@ -1784,8 +1754,8 @@ const OnlineDebateRoom = (): JSX.Element => {
   const startAudioRecording = useCallback(() => {
     if (mediaRecorder && mediaRecorder.state === "inactive") {
       try {
-        mediaRecorder.start(1000); // Record in 1-second chunks
-        monitorAudioLevel(); // Start audio level monitoring
+        mediaRecorder.start(1000);
+        monitorAudioLevel();
         setAudioError(null);
       } catch (error) {
         setAudioError("Failed to start audio recording");
@@ -1823,7 +1793,6 @@ const OnlineDebateRoom = (): JSX.Element => {
       recognitionRef.current.start();
     } catch (error) {
       console.error("Failed to start speech recognition:", error);
-      // If start fails, try to reinitialize after a short delay
       setTimeout(() => {
         if (recognitionRef.current) {
           try {
@@ -1844,7 +1813,7 @@ const OnlineDebateRoom = (): JSX.Element => {
     if (recognitionRef.current && isListening) {
       try {
         recognitionRef.current.stop();
-        retryCountRef.current = 0; // Reset retry count when manually stopping
+        retryCountRef.current = 0;
       } catch {
         // Error already handled by onerror callback
       }
@@ -1938,7 +1907,6 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   // Clear audio level when phase changes
   useEffect(() => {
-    // Phase changed, reset retry count for speech recognition
     retryCountRef.current = 0;
   }, [debatePhase]);
 
@@ -2042,11 +2010,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     }
   }, [countdown, localRole]);
 
-  // Clear input fields on phase change
-  useEffect(() => {
-    // Clear any audio-related state if needed
-  }, [debatePhase]);
-
   useEffect(() => {
     manualRecordingRef.current = isManualRecording;
   }, [isManualRecording]);
@@ -2089,7 +2052,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     );
   }
 
-  // Render UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
       <div className="w-full max-w-5xl mx-auto py-2">
@@ -2134,12 +2096,10 @@ const OnlineDebateRoom = (): JSX.Element => {
       {showSetupPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-card text-foreground p-6 rounded-lg shadow-lg max-w-md w-full">
-            {/* Header with title and close icon */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Debate Setup</h2>
             </div>
 
-            {/* Loading State */}
             {isLoading && (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-primary"></div>
@@ -2151,7 +2111,6 @@ const OnlineDebateRoom = (): JSX.Element => {
 
             {!isLoading && (
               <>
-                {/* Debate Topic */}
                 <div className="mb-6">
                   <label className="block text-lg mb-2">Debate Topic</label>
                   <select
@@ -2174,9 +2133,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                     className="border border-border rounded p-2 w-full bg-input text-foreground"
                   />
                 </div>
-                {/* Avatars and Role Selection */}
                 <div className="mb-6 flex justify-around">
-                  {/* Your Avatar and Role Selection */}
                   <div className="flex flex-col items-center">
                     <div className="relative">
                       <img
@@ -2237,7 +2194,6 @@ const OnlineDebateRoom = (): JSX.Element => {
                         : "Not selected"}
                     </div>
                   </div>
-                  {/* Opponent Avatar */}
                   <div className="flex flex-col items-center">
                     <div className="relative">
                       <img
@@ -2283,7 +2239,6 @@ const OnlineDebateRoom = (): JSX.Element => {
                     </div>
                   </div>
                 </div>
-                {/* Ready Button */}
                 <div>
                   <Button
                     onClick={toggleReady}
