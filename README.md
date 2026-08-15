@@ -28,6 +28,117 @@
 
 ## Project Setup Guide
 
+You can run DebateAI either with **Docker** (recommended) or by setting up the backend and frontend manually.
+
+---
+
+## 🐳 Docker Setup (Recommended)
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) (version 20.10 or later)
+- [Docker Compose](https://docs.docker.com/compose/install/) (version 2.0 or later)
+
+### 1. Environment Configuration
+
+#### Backend Configuration
+Create the backend config file:
+
+```bash
+cd backend/config
+cp config.prod.sample.yml config.prod.yml
+```
+
+Update `backend/config/config.prod.yml` with your MongoDB connection string:
+
+```yaml
+database:
+  uri: "<YOUR_MONGODB_URI>"  # Use MongoDB Atlas or local MongoDB
+```
+
+**Optional:** Configure Gemini API for AI features:
+
+```yaml
+gemini:
+  apiKey: "<YOUR_GEMINI_API_KEY>"
+```
+
+#### Frontend Configuration
+Create a `.env` file in the `frontend/` directory:
+
+```bash
+cd frontend
+touch .env
+```
+
+Add the following to `frontend/.env`:
+
+```env
+VITE_BASE_URL="http://localhost:1313"
+VITE_GOOGLE_CLIENT_ID="<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
+```
+
+### 2. Running with Docker Compose
+
+From the project root directory, run:
+
+```bash
+docker compose up
+```
+
+This will:
+- Build and start the **backend** service on `http://localhost:1313`
+- Build and start the **frontend** service on `http://localhost:5173`
+
+### 3. Stopping the Services
+
+To stop all running containers:
+
+```bash
+docker compose down
+```
+
+To stop and remove all volumes (including MongoDB data):
+
+```bash
+docker compose down -v
+```
+
+### 4. Using Local MongoDB (Optional)
+
+If you want to use a local MongoDB instance instead of MongoDB Atlas:
+
+1. Uncomment the MongoDB service in `docker-compose.yml`:
+
+```yaml
+  mongo:
+    image: mongo:latest
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
+```
+
+2. Uncomment the `depends_on` section in the backend service:
+
+```yaml
+  backend:
+    # ...
+    depends_on:
+      - mongo
+```
+
+3. Update your `backend/config/config.prod.yml` to use the local MongoDB:
+
+```yaml
+database:
+  uri: "mongodb://mongo:27017/debateai"
+```
+
+---
+
+## 🛠️ Manual Setup (Without Docker)
+
 ### Backend Configuration
 ### Prerequisites
 - Go (version 1.20 or later)
