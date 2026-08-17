@@ -24,20 +24,19 @@ import (
 
 // TeamRoom represents a team debate room with connected team members
 type TeamRoom struct {
-	Clients     map[*websocket.Conn]*TeamClient
-	Team1ID     primitive.ObjectID
-	Team2ID     primitive.ObjectID
-	DebateID    primitive.ObjectID
-	Mutex       sync.Mutex
-	TurnManager *services.TeamTurnManager
-	TokenBucket *services.TokenBucketService
-	// Room state for synchronization
+	Clients      map[*websocket.Conn]*TeamClient
+	Team1ID      primitive.ObjectID
+	Team2ID      primitive.ObjectID
+	DebateID     primitive.ObjectID
+	Mutex        sync.Mutex
+	TurnManager  *services.TeamTurnManager
+	TokenBucket  *services.TokenBucketService
 	CurrentTopic string
 	CurrentPhase string
 	Team1Role    string
 	Team2Role    string
-	Team1Ready   map[string]bool // userId -> ready status
-	Team2Ready   map[string]bool // userId -> ready status
+	Team1Ready   map[string]bool
+	Team2Ready   map[string]bool
 }
 
 // TeamClient represents a connected team member
@@ -53,9 +52,9 @@ type TeamClient struct {
 	PartialText  string
 	LastActivity time.Time
 	IsMuted      bool
-	Role         string // "for" or "against"
+	Role         string
 	SpeechText   string
-	Tokens       int // Remaining speaking tokens
+	Tokens       int
 }
 
 // SafeWriteJSON safely writes JSON data to the team client's WebSocket connection
@@ -119,7 +118,6 @@ func TeamWebsocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Validate token
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
 		configPath = "./config/config.yml"
@@ -137,7 +135,6 @@ func TeamWebsocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Get user details from database
 	userID, username, _, _, err := getUserDetails(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user details"})
@@ -156,7 +153,6 @@ func TeamWebsocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Get team debate details
 	debateCollection := db.MongoDatabase.Collection("team_debates")
 	var debate models.TeamDebate
 	err = debateCollection.FindOne(context.Background(), bson.M{"_id": debateObjectID}).Decode(&debate)
@@ -165,12 +161,9 @@ func TeamWebsocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Check if user is part of either team
 	teamCollection := db.MongoDatabase.Collection("teams")
 	var userTeamID primitive.ObjectID
-	// var isTeam1 bool
 
-	// Check team 1
 	var team1 models.Team
 	err = teamCollection.FindOne(context.Background(), bson.M{
 		"_id":            debate.Team1ID,
@@ -178,9 +171,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 	}).Decode(&team1)
 	if err == nil {
 		userTeamID = debate.Team1ID
-		// isTeam1 = true
 	} else {
-		// Check team 2
 		var team2 models.Team
 		err = teamCollection.FindOne(context.Background(), bson.M{
 			"_id":            debate.Team2ID,
@@ -188,23 +179,18 @@ func TeamWebsocketHandler(c *gin.Context) {
 		}).Decode(&team2)
 		if err == nil {
 			userTeamID = debate.Team2ID
-			// isTeam1 = false
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"error": "User is not part of either team"})
 			return
 		}
 	}
 
-	// Prepare room outside lock
 	roomKey := debateID
 	turnManager := services.NewTeamTurnManager()
 	tokenBucket := services.NewTokenBucketService()
 
-	// Initialize turn management for both teams
 	turnErr1 := turnManager.InitializeTeamTurns(debate.Team1ID)
 	turnErr2 := turnManager.InitializeTeamTurns(debate.Team2ID)
-
-	// Initialize token buckets for both teams
 	bucketErr1 := tokenBucket.InitializeTeamBuckets(debate.Team1ID)
 	bucketErr2 := tokenBucket.InitializeTeamBuckets(debate.Team2ID)
 
@@ -229,25 +215,20 @@ func TeamWebsocketHandler(c *gin.Context) {
 		Team2Ready:   make(map[string]bool),
 	}
 
-	// Insert room if absent
 	teamRoomsMutex.Lock()
 	room, exists := teamRooms[roomKey]
 	if !exists {
 		teamRooms[roomKey] = preparedRoom
 		room = preparedRoom
-	} else {
-		// discard prepared room; existing room will be used
 	}
 	teamRoomsMutex.Unlock()
 
-	// Upgrade the connection
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("Team WebSocket upgrade error:", err)
 		return
 	}
 
-	// CRITICAL: Validate userTeamID matches one of the debate teams before creating client
 	userTeamIDHex := userTeamID.Hex()
 	team1IDHex := debate.Team1ID.Hex()
 	team2IDHex := debate.Team2ID.Hex()
@@ -261,13 +242,12 @@ func TeamWebsocketHandler(c *gin.Context) {
 
 	log.Printf("[TeamWebsocketHandler] ✓ User %s belongs to team %s (Team1=%s, Team2=%s)", userObjectID.Hex(), userTeamIDHex, team1IDHex, team2IDHex)
 
-	// Create team client instance
 	client := &TeamClient{
 		Conn:         conn,
 		UserID:       userObjectID,
 		Username:     username,
 		Email:        email,
-		TeamID:       userTeamID, // This MUST match either debate.Team1ID or debate.Team2ID
+		TeamID:       userTeamID,
 		IsTyping:     false,
 		IsSpeaking:   false,
 		PartialText:  "",
@@ -275,14 +255,29 @@ func TeamWebsocketHandler(c *gin.Context) {
 		IsMuted:      false,
 		Role:         "",
 		SpeechText:   "",
-		Tokens:       10, // Initial tokens
+		Tokens:       10,
 	}
 
 	room.Mutex.Lock()
 	room.Clients[conn] = client
 	room.Mutex.Unlock()
 
-	// Send initial team status
+	// ✅ FIX: Broadcast memberJoined to all OTHER clients already in the room.
+	// When Member 2 connects, Member 1's frontend receives this event and can
+	// update the member count immediately without waiting for an HTTP poll cycle.
+	room.Mutex.Lock()
+	membersCount := len(room.Clients)
+	room.Mutex.Unlock()
+
+	broadcastExcept(room, conn, map[string]any{
+		"type":         "memberJoined",
+		"userId":       userObjectID.Hex(),
+		"username":     username,
+		"teamId":       userTeamID.Hex(),
+		"membersCount": membersCount,
+	})
+
+	// Send initial team status to the newly connected client
 	teamStatus, statusErr := room.TokenBucket.GetTeamSpeakingStatus(userTeamID, room.TurnManager)
 	if statusErr != nil {
 		log.Printf("failed to load team status for team %s: %v", userTeamID.Hex(), statusErr)
@@ -302,27 +297,25 @@ func TeamWebsocketHandler(c *gin.Context) {
 	team1Role := room.Team1Role
 	team2Role := room.Team2Role
 
-	// Get ready counts for both teams and individual ready status
 	team1ReadyCount := 0
 	team1ReadyStatus := make(map[string]bool)
-	for userId, ready := range room.Team1Ready {
+	for uID, ready := range room.Team1Ready {
 		if ready {
 			team1ReadyCount++
 		}
-		team1ReadyStatus[userId] = ready
+		team1ReadyStatus[uID] = ready
 	}
 
 	team2ReadyCount := 0
 	team2ReadyStatus := make(map[string]bool)
-	for userId, ready := range room.Team2Ready {
+	for uID, ready := range room.Team2Ready {
 		if ready {
 			team2ReadyCount++
 		}
-		team2ReadyStatus[userId] = ready
+		team2ReadyStatus[uID] = ready
 	}
 	room.Mutex.Unlock()
 
-	// Send state sync message with individual ready status and team names
 	client.SafeWriteJSON(map[string]interface{}{
 		"type":              "stateSync",
 		"topic":             currentTopic,
@@ -333,28 +326,25 @@ func TeamWebsocketHandler(c *gin.Context) {
 		"team2Ready":        team2ReadyCount,
 		"team1MembersCount": len(debate.Team1Members),
 		"team2MembersCount": len(debate.Team2Members),
-		"team1ReadyStatus":  team1ReadyStatus, // Individual ready status for Team1
-		"team2ReadyStatus":  team2ReadyStatus, // Individual ready status for Team2
-		"team1Name":         debate.Team1Name, // Team names
+		"team1ReadyStatus":  team1ReadyStatus,
+		"team2ReadyStatus":  team2ReadyStatus,
+		"team1Name":         debate.Team1Name,
 		"team2Name":         debate.Team2Name,
 	})
 
-	// Send team member lists
 	client.SafeWriteJSON(map[string]interface{}{
 		"type":         "teamMembers",
 		"team1Members": debate.Team1Members,
 		"team2Members": debate.Team2Members,
 	})
 
-	// Listen for messages
+	// Message loop
 	for {
 		messageType, msg, err := conn.ReadMessage()
 		if err != nil {
-			// Remove client from room
-			userID := client.UserID.Hex()
+			leaveUserID := client.UserID.Hex()
 			room.Mutex.Lock()
 			delete(room.Clients, conn)
-			// If room is empty, delete it
 			if len(room.Clients) == 0 {
 				teamRoomsMutex.Lock()
 				delete(teamRooms, roomKey)
@@ -362,21 +352,18 @@ func TeamWebsocketHandler(c *gin.Context) {
 			}
 			room.Mutex.Unlock()
 
-			// Notify remaining clients that this user has left
 			broadcastExcept(room, conn, map[string]any{
 				"type":   "leave",
-				"userId": userID,
+				"userId": leaveUserID,
 			})
 			break
 		}
 
-		// Parse the message
 		var message TeamMessage
 		if err := json.Unmarshal(msg, &message); err != nil {
 			continue
 		}
 
-		// Update client activity
 		message.FromUserID = client.UserID.Hex()
 		message.UserID = client.UserID.Hex()
 		if message.TeamID == "" {
@@ -384,15 +371,14 @@ func TeamWebsocketHandler(c *gin.Context) {
 		}
 
 		room.Mutex.Lock()
-		if client, exists := room.Clients[conn]; exists {
-			client.LastActivity = time.Now()
+		if c, exists := room.Clients[conn]; exists {
+			c.LastActivity = time.Now()
 		}
 		room.Mutex.Unlock()
 
-		// Handle different message types
 		switch message.Type {
 		case "join":
-			handleTeamJoin(room, conn, message, client, roomKey)
+			handleTeamJoin(room, message, client, roomKey)
 		case "message":
 			handleTeamChatMessage(room, conn, message, client, roomKey)
 		case "debateMessage":
@@ -404,19 +390,19 @@ func TeamWebsocketHandler(c *gin.Context) {
 		case "liveTranscript":
 			handleTeamLiveTranscript(room, conn, message, client, roomKey)
 		case "phaseChange":
-			handleTeamPhaseChange(room, conn, message, roomKey)
+			handleTeamPhaseChange(room, message, roomKey)
 		case "topicChange":
-			handleTeamTopicChange(room, conn, message, roomKey)
+			handleTeamTopicChange(room, message, roomKey)
 		case "roleSelection":
 			handleTeamRoleSelection(room, conn, message, roomKey)
 		case "ready":
 			handleTeamReadyStatus(room, conn, message, roomKey)
 		case "checkStart":
-			handleCheckStart(room, conn, roomKey)
+			handleCheckStart(room, roomKey)
 		case "requestTurn":
-			handleTeamTurnRequest(room, conn, message, client, roomKey)
+			handleTeamTurnRequest(room, message, client, roomKey)
 		case "endTurn":
-			handleTeamTurnEnd(room, conn, message, client, roomKey)
+			handleTeamTurnEnd(room, message, client, roomKey)
 		case "offer":
 			handleTeamWebRTCOffer(room, client, message)
 		case "answer":
@@ -426,7 +412,6 @@ func TeamWebsocketHandler(c *gin.Context) {
 		case "leave":
 			handleTeamLeave(room, client, roomKey)
 		default:
-			// Broadcast the message to all other clients in the room
 			for _, r := range snapshotTeamRecipients(room, conn) {
 				if err := r.SafeWriteMessage(messageType, msg); err != nil {
 					log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
@@ -436,7 +421,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 	}
 }
 
-// snapshotTeamRecipients returns a slice of team clients to send messages to, excluding the specified connection
+// snapshotTeamRecipients returns a slice of team clients excluding the specified connection
 func snapshotTeamRecipients(room *TeamRoom, exclude *websocket.Conn) []*TeamClient {
 	room.Mutex.Lock()
 	defer room.Mutex.Unlock()
@@ -496,15 +481,14 @@ func broadcastAll(room *TeamRoom, payload any) {
 }
 
 // handleTeamJoin handles team join messages
-func handleTeamJoin(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Send team status to all clients
+// conn param removed — not used in this handler
+func handleTeamJoin(room *TeamRoom, message TeamMessage, client *TeamClient, roomKey string) {
 	teamStatus, statusErr := room.TokenBucket.GetTeamSpeakingStatus(client.TeamID, room.TurnManager)
 	if statusErr != nil {
 		log.Printf("failed to load team status for team %s: %v", client.TeamID.Hex(), statusErr)
 		teamStatus = map[string]interface{}{}
 	}
 
-	// Broadcast to all clients in the room
 	recipients := snapshotTeamRecipients(room, nil)
 	for _, r := range recipients {
 		response := map[string]interface{}{
@@ -520,19 +504,16 @@ func handleTeamJoin(room *TeamRoom, conn *websocket.Conn, message TeamMessage, c
 
 // handleTeamChatMessage handles team chat messages
 func handleTeamChatMessage(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Add timestamp if not provided
 	if message.Timestamp == 0 {
 		message.Timestamp = time.Now().Unix()
 	}
 
-	// Reset typing/speaking indicators
 	room.Mutex.Lock()
 	client.IsTyping = false
 	client.IsSpeaking = false
 	client.PartialText = ""
 	room.Mutex.Unlock()
 
-	// Broadcast to other clients in the same team
 	for _, r := range snapshotTeamRecipients(room, conn) {
 		if r.TeamID == client.TeamID {
 			response := map[string]interface{}{
@@ -552,12 +533,10 @@ func handleTeamChatMessage(room *TeamRoom, conn *websocket.Conn, message TeamMes
 
 // handleTeamDebateMessage handles debate messages
 func handleTeamDebateMessage(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Add timestamp if not provided
 	if message.Timestamp == 0 {
 		message.Timestamp = time.Now().Unix()
 	}
 
-	// Broadcast to all clients in the room
 	for _, r := range snapshotTeamRecipients(room, conn) {
 		response := map[string]interface{}{
 			"type":      "debateMessage",
@@ -580,7 +559,6 @@ func handleTeamSpeakingIndicator(room *TeamRoom, conn *websocket.Conn, message T
 	client.IsSpeaking = message.IsSpeaking
 	room.Mutex.Unlock()
 
-	// Broadcast speaking indicator to all clients
 	for _, r := range snapshotTeamRecipients(room, conn) {
 		response := map[string]interface{}{
 			"type":       "speakingIndicator",
@@ -601,7 +579,6 @@ func handleTeamSpeechText(room *TeamRoom, conn *websocket.Conn, message TeamMess
 	client.SpeechText = message.SpeechText
 	room.Mutex.Unlock()
 
-	// Broadcast speech text to all clients
 	for _, r := range snapshotTeamRecipients(room, conn) {
 		response := map[string]interface{}{
 			"type":       "speechText",
@@ -619,7 +596,6 @@ func handleTeamSpeechText(room *TeamRoom, conn *websocket.Conn, message TeamMess
 
 // handleTeamLiveTranscript handles live/interim transcript updates
 func handleTeamLiveTranscript(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Broadcast live transcript to all clients
 	for _, r := range snapshotTeamRecipients(room, conn) {
 		response := map[string]interface{}{
 			"type":           "liveTranscript",
@@ -636,8 +612,8 @@ func handleTeamLiveTranscript(room *TeamRoom, conn *websocket.Conn, message Team
 }
 
 // handleTeamPhaseChange handles phase changes
-func handleTeamPhaseChange(room *TeamRoom, conn *websocket.Conn, message TeamMessage, roomKey string) {
-	// Update room state
+// conn param removed — not used in this handler
+func handleTeamPhaseChange(room *TeamRoom, message TeamMessage, roomKey string) {
 	room.Mutex.Lock()
 	oldPhase := room.CurrentPhase
 	if message.Phase != "" {
@@ -649,13 +625,11 @@ func handleTeamPhaseChange(room *TeamRoom, conn *websocket.Conn, message TeamMes
 	currentPhase := room.CurrentPhase
 	room.Mutex.Unlock()
 
-	// Broadcast phase change to ALL clients (including sender for sync)
 	phaseMessage := TeamMessage{
 		Type:  "phaseChange",
 		Phase: currentPhase,
 	}
-	recipients := snapshotTeamRecipients(room, nil)
-	for _, r := range recipients {
+	for _, r := range snapshotTeamRecipients(room, nil) {
 		if err := r.SafeWriteJSON(phaseMessage); err != nil {
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 		} else {
@@ -665,17 +639,15 @@ func handleTeamPhaseChange(room *TeamRoom, conn *websocket.Conn, message TeamMes
 }
 
 // handleTeamTopicChange handles topic changes
-func handleTeamTopicChange(room *TeamRoom, conn *websocket.Conn, message TeamMessage, roomKey string) {
-	// Update room state
+// conn param removed — not used in this handler
+func handleTeamTopicChange(room *TeamRoom, message TeamMessage, roomKey string) {
 	room.Mutex.Lock()
 	if message.Topic != "" {
 		room.CurrentTopic = message.Topic
 	}
 	room.Mutex.Unlock()
 
-	// Broadcast topic change to ALL clients (including sender for sync)
-	recipients := snapshotTeamRecipients(room, nil)
-	for _, r := range recipients {
+	for _, r := range snapshotTeamRecipients(room, nil) {
 		if err := r.SafeWriteJSON(message); err != nil {
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 		}
@@ -684,28 +656,26 @@ func handleTeamTopicChange(room *TeamRoom, conn *websocket.Conn, message TeamMes
 
 // handleTeamRoleSelection handles role selection
 func handleTeamRoleSelection(room *TeamRoom, conn *websocket.Conn, message TeamMessage, roomKey string) {
-	// Store the role in the client and update room state
 	room.Mutex.Lock()
 	if client, exists := room.Clients[conn]; exists {
 		client.Role = message.Role
 
-		// Use Hex() comparison for reliability (same as ready status)
 		clientTeamIDHex := client.TeamID.Hex()
 		team1IDHex := room.Team1ID.Hex()
 		team2IDHex := room.Team2ID.Hex()
 
-		// Update team role based on which team the client belongs to
-		if clientTeamIDHex == team1IDHex {
+		// Tagged switch eliminates if/else if chain
+		switch clientTeamIDHex {
+		case team1IDHex:
 			room.Team1Role = message.Role
 			log.Printf("[handleTeamRoleSelection] Team1 role set to: %s by user %s", message.Role, client.UserID.Hex())
-		} else if clientTeamIDHex == team2IDHex {
+		case team2IDHex:
 			room.Team2Role = message.Role
 			log.Printf("[handleTeamRoleSelection] Team2 role set to: %s by user %s", message.Role, client.UserID.Hex())
-		} else {
+		default:
 			log.Printf("[handleTeamRoleSelection] ERROR: Client TeamID %s doesn't match Team1ID %s or Team2ID %s", clientTeamIDHex, team1IDHex, team2IDHex)
 		}
 
-		// Broadcast role selection to ALL clients (including sender for sync)
 		roleMessage := map[string]interface{}{
 			"type":   "roleSelection",
 			"role":   message.Role,
@@ -714,8 +684,7 @@ func handleTeamRoleSelection(room *TeamRoom, conn *websocket.Conn, message TeamM
 		}
 		room.Mutex.Unlock()
 
-		recipients := snapshotTeamRecipients(room, nil)
-		for _, r := range recipients {
+		for _, r := range snapshotTeamRecipients(room, nil) {
 			if err := r.SafeWriteJSON(roleMessage); err != nil {
 				log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 			}
@@ -727,7 +696,6 @@ func handleTeamRoleSelection(room *TeamRoom, conn *websocket.Conn, message TeamM
 
 // handleTeamReadyStatus handles ready status
 func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMessage, roomKey string) {
-	// Update ready status in room state
 	room.Mutex.Lock()
 	client, exists := room.Clients[conn]
 	if !exists {
@@ -736,7 +704,6 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		return
 	}
 
-	// Store client info before unlocking
 	userID := client.UserID.Hex()
 	clientTeamIDHex := client.TeamID.Hex()
 	team1IDHex := room.Team1ID.Hex()
@@ -751,11 +718,7 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		return
 	}
 
-	// CRITICAL: Assign ready status to the CORRECT team ONLY
-	// Remove from wrong team first to prevent double assignment
-	var assignedToTeam string
-
-	// Remove user from the OTHER team's ready map first (cleanup)
+	// Remove from wrong team first
 	if clientTeamIDHex != team1IDHex {
 		delete(room.Team1Ready, userID)
 	}
@@ -763,28 +726,26 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		delete(room.Team2Ready, userID)
 	}
 
-	// Now assign to the CORRECT team
-	if clientTeamIDHex == team1IDHex {
-		// User belongs to Team 1 - assign ONLY to Team1Ready
+	var assignedToTeam string
+
+	// Tagged switch eliminates if/else if chain
+	switch clientTeamIDHex {
+	case team1IDHex:
 		room.Team1Ready[userID] = *message.Ready
 		assignedToTeam = "Team1"
-		log.Printf("[handleTeamReadyStatus] ✓✓✓ ASSIGNED TO Team1Ready ONLY. User %s (TeamID: %s) ready=%v", userID, clientTeamIDHex, *message.Ready)
-	} else if clientTeamIDHex == team2IDHex {
-		// User belongs to Team 2 - assign ONLY to Team2Ready
+		log.Printf("[handleTeamReadyStatus] ✓✓✓ ASSIGNED TO Team1Ready. User %s ready=%v", userID, *message.Ready)
+	case team2IDHex:
 		room.Team2Ready[userID] = *message.Ready
 		assignedToTeam = "Team2"
-		log.Printf("[handleTeamReadyStatus] ✓✓✓ ASSIGNED TO Team2Ready ONLY. User %s (TeamID: %s) ready=%v", userID, clientTeamIDHex, *message.Ready)
-	} else {
-		// CRITICAL ERROR: TeamID doesn't match - this should NEVER happen
-		log.Printf("[handleTeamReadyStatus] ❌❌❌ CRITICAL ERROR: User %s TeamID %s doesn't match Team1ID %s or Team2ID %s - NOT ASSIGNING READY", userID, clientTeamIDHex, team1IDHex, team2IDHex)
+		log.Printf("[handleTeamReadyStatus] ✓✓✓ ASSIGNED TO Team2Ready. User %s ready=%v", userID, *message.Ready)
+	default:
+		log.Printf("[handleTeamReadyStatus] ❌❌❌ CRITICAL ERROR: User %s TeamID %s doesn't match Team1ID %s or Team2ID %s", userID, clientTeamIDHex, team1IDHex, team2IDHex)
 		room.Mutex.Unlock()
 		return
 	}
 
 	client.LastActivity = time.Now()
 
-	// Keep mutex locked and calculate all counts accurately
-	// Count ready members for each team
 	currentTeam1ReadyCount := 0
 	for _, ready := range room.Team1Ready {
 		if ready {
@@ -798,22 +759,20 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		}
 	}
 
-	// Count actual team members connected
 	currentTeam1MembersCount := 0
 	currentTeam2MembersCount := 0
 	for _, c := range room.Clients {
-		cTeamIDHex := c.TeamID.Hex()
-		if cTeamIDHex == team1IDHex {
+		switch c.TeamID.Hex() {
+		case team1IDHex:
 			currentTeam1MembersCount++
-		} else if cTeamIDHex == team2IDHex {
+		case team2IDHex:
 			currentTeam2MembersCount++
 		}
 	}
 
-	log.Printf("[handleTeamReadyStatus] Current counts - Team1Ready=%d/%d, Team2Ready=%d/%d",
+	log.Printf("[handleTeamReadyStatus] Counts - Team1Ready=%d/%d, Team2Ready=%d/%d",
 		currentTeam1ReadyCount, currentTeam1MembersCount, currentTeam2ReadyCount, currentTeam2MembersCount)
 
-	// Broadcast ready status with accurate counts to ALL clients
 	readyMessage := map[string]interface{}{
 		"type":              "ready",
 		"ready":             message.Ready,
@@ -822,44 +781,28 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		"assignedToTeam":    assignedToTeam,
 		"team1Ready":        currentTeam1ReadyCount,
 		"team2Ready":        currentTeam2ReadyCount,
-		"team1MembersCount": currentTeam1MembersCount, // Use accurate counts
-		"team2MembersCount": currentTeam2MembersCount, // Use accurate counts
+		"team1MembersCount": currentTeam1MembersCount,
+		"team2MembersCount": currentTeam2MembersCount,
 	}
 
-	log.Printf("[handleTeamReadyStatus] Broadcasting ready status: User %s assigned to %s, Team1Ready=%d/%d, Team2Ready=%d/%d",
-		userID, assignedToTeam, currentTeam1ReadyCount, currentTeam1MembersCount, currentTeam2ReadyCount, currentTeam2MembersCount)
-
-	// Log the actual message being sent to verify counts are included
 	readyMessageJSON, _ := json.Marshal(readyMessage)
-	log.Printf("[handleTeamReadyStatus] Ready message JSON: %s", string(readyMessageJSON))
+	log.Printf("[handleTeamReadyStatus] Broadcasting: %s", string(readyMessageJSON))
 
 	for _, r := range room.Clients {
 		if err := r.SafeWriteJSON(readyMessage); err != nil {
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
-		} else {
-			log.Printf("[handleTeamReadyStatus] ✓ Ready message sent successfully")
 		}
 	}
 
-	// Check if all teams are ready and phase is still setup
 	allTeam1Ready := currentTeam1ReadyCount == currentTeam1MembersCount && currentTeam1MembersCount > 0
 	allTeam2Ready := currentTeam2ReadyCount == currentTeam2MembersCount && currentTeam2MembersCount > 0
 	allReady := allTeam1Ready && allTeam2Ready
 
-	log.Printf("[handleTeamReadyStatus] Ready check: Team1=%d/%d ready=%v, Team2=%d/%d ready=%v, AllReady=%v, Phase=%s",
-		currentTeam1ReadyCount, currentTeam1MembersCount, allTeam1Ready,
-		currentTeam2ReadyCount, currentTeam2MembersCount, allTeam2Ready,
-		allReady, room.CurrentPhase)
-
-	// Check if we should start countdown - use a flag to prevent multiple triggers
 	shouldStartCountdown := allReady && room.CurrentPhase == "setup"
 
-	// Check if countdown already started (phase is still setup but we have a flag in room)
-	// We'll use a simple check: if phase is setup and all ready, start countdown
 	if shouldStartCountdown {
-		log.Printf("[handleTeamReadyStatus] ✓ All teams ready and phase is setup - starting countdown")
+		log.Printf("[handleTeamReadyStatus] ✓ All teams ready — starting countdown")
 
-		// Broadcast countdown start to ALL clients immediately
 		countdownMessage := map[string]interface{}{
 			"type":      "countdownStart",
 			"countdown": 3,
@@ -867,49 +810,37 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		for _, r := range room.Clients {
 			if err := r.SafeWriteJSON(countdownMessage); err != nil {
 				log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
-			} else {
-				log.Printf("[handleTeamReadyStatus] ✓ Countdown message sent to client")
 			}
 		}
-		log.Printf("[handleTeamReadyStatus] All teams ready! Starting countdown for %d clients", len(room.Clients))
 
-		// Update phase immediately to prevent multiple triggers
 		room.CurrentPhase = "countdown"
 
-		// Start countdown and phase change after 3 seconds in a goroutine
 		go func() {
 			time.Sleep(3 * time.Second)
 
 			teamRoomsMutex.Lock()
-			room, stillExists := teamRooms[roomKey]
+			r, stillExists := teamRooms[roomKey]
 			teamRoomsMutex.Unlock()
 
 			if !stillExists {
-				log.Printf("[handleTeamReadyStatus] Room %s no longer exists, aborting phase change", roomKey)
+				log.Printf("[handleTeamReadyStatus] Room %s no longer exists", roomKey)
 				return
 			}
 
-			room.Mutex.Lock()
-			if room.CurrentPhase == "countdown" || room.CurrentPhase == "setup" {
-				room.CurrentPhase = "openingFor"
-
-				// Broadcast phase change to ALL clients using proper TeamMessage format
-				phaseMessage := TeamMessage{
-					Type:  "phaseChange",
-					Phase: "openingFor",
-				}
-				for _, r := range room.Clients {
-					if err := r.SafeWriteJSON(phaseMessage); err != nil {
+			r.Mutex.Lock()
+			if r.CurrentPhase == "countdown" || r.CurrentPhase == "setup" {
+				r.CurrentPhase = "openingFor"
+				phaseMessage := TeamMessage{Type: "phaseChange", Phase: "openingFor"}
+				for _, rc := range r.Clients {
+					if err := rc.SafeWriteJSON(phaseMessage); err != nil {
 						log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
-					} else {
-						log.Printf("[handleTeamReadyStatus] ✓ Phase change message sent to client")
 					}
 				}
-				log.Printf("[handleTeamReadyStatus] Debate started! Phase changed to openingFor for %d clients", len(room.Clients))
+				log.Printf("[handleTeamReadyStatus] Phase changed to openingFor for %d clients", len(r.Clients))
 			} else {
-				log.Printf("[handleTeamReadyStatus] Phase already changed to %s, skipping", room.CurrentPhase)
+				log.Printf("[handleTeamReadyStatus] Phase already %s, skipping", r.CurrentPhase)
 			}
-			room.Mutex.Unlock()
+			r.Mutex.Unlock()
 		}()
 	} else {
 		log.Printf("[handleTeamReadyStatus] Not starting countdown: allReady=%v, phase=%s", allReady, room.CurrentPhase)
@@ -919,27 +850,23 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 }
 
 // handleTeamTurnRequest handles turn requests
-func handleTeamTurnRequest(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Attempt to consume tokens if the user is allowed to speak
+// conn param removed — not used in this handler
+func handleTeamTurnRequest(room *TeamRoom, message TeamMessage, client *TeamClient, roomKey string) {
 	canSpeak, remainingTokens := room.TokenBucket.TryConsumeForSpeaking(client.TeamID, client.UserID, room.TurnManager)
 
 	if canSpeak {
-		// Update client tokens
 		room.Mutex.Lock()
 		client.Tokens = remainingTokens
 		room.Mutex.Unlock()
 
-		// Send turn granted response
-		response := map[string]interface{}{
+		client.SafeWriteJSON(map[string]interface{}{
 			"type":     "turnGranted",
 			"userId":   client.UserID.Hex(),
 			"username": client.Username,
 			"tokens":   client.Tokens,
 			"canSpeak": true,
-		}
-		client.SafeWriteJSON(response)
+		})
 
-		// Broadcast turn status to all clients
 		teamStatus, statusErr := room.TokenBucket.GetTeamSpeakingStatus(client.TeamID, room.TurnManager)
 		if statusErr != nil {
 			log.Printf("failed to load team status for team %s: %v", client.TeamID.Hex(), statusErr)
@@ -947,74 +874,65 @@ func handleTeamTurnRequest(room *TeamRoom, conn *websocket.Conn, message TeamMes
 		}
 		currentTurn := room.TurnManager.GetCurrentTurn(client.TeamID).Hex()
 
-		recipients := snapshotTeamRecipients(room, nil)
-		for _, r := range recipients {
+		for _, r := range snapshotTeamRecipients(room, nil) {
 			if r.TeamID == client.TeamID {
-				response := map[string]interface{}{
+				if err := r.SafeWriteJSON(map[string]interface{}{
 					"type":        "teamStatus",
 					"teamStatus":  teamStatus,
 					"currentTurn": currentTurn,
-				}
-				if err := r.SafeWriteJSON(response); err != nil {
+				}); err != nil {
 					log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 				}
 			}
 		}
 	} else {
-		// Send turn denied response
-		response := map[string]interface{}{
+		client.SafeWriteJSON(map[string]interface{}{
 			"type":     "turnDenied",
 			"userId":   client.UserID.Hex(),
 			"username": client.Username,
 			"reason":   "No tokens available or not your turn",
-		}
-		client.SafeWriteJSON(response)
+		})
 	}
 }
 
 // handleTeamTurnEnd handles turn end
-func handleTeamTurnEnd(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Advance to next turn
+// conn param removed — not used in this handler
+func handleTeamTurnEnd(room *TeamRoom, message TeamMessage, client *TeamClient, roomKey string) {
 	nextUserID := room.TurnManager.NextTurn(client.TeamID)
 
-	// Update team status
 	teamStatus, statusErr := room.TokenBucket.GetTeamSpeakingStatus(client.TeamID, room.TurnManager)
 	if statusErr != nil {
 		log.Printf("failed to load team status for team %s: %v", client.TeamID.Hex(), statusErr)
 		teamStatus = map[string]interface{}{}
 	}
 
-	// Broadcast turn change to all clients in the team
-	recipients := snapshotTeamRecipients(room, nil)
-	for _, r := range recipients {
+	for _, r := range snapshotTeamRecipients(room, nil) {
 		if r.TeamID == client.TeamID {
-			response := map[string]interface{}{
+			if err := r.SafeWriteJSON(map[string]interface{}{
 				"type":        "teamStatus",
 				"teamStatus":  teamStatus,
 				"currentTurn": nextUserID.Hex(),
-			}
-			if err := r.SafeWriteJSON(response); err != nil {
+			}); err != nil {
 				log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 			}
 		}
 	}
 }
 
-// handleCheckStart checks if all teams are ready and starts debate
-func handleCheckStart(room *TeamRoom, conn *websocket.Conn, roomKey string) {
+// handleCheckStart checks if all teams are ready and starts the debate
+// conn param removed — not used in this handler
+func handleCheckStart(room *TeamRoom, roomKey string) {
 	room.Mutex.Lock()
 	defer room.Mutex.Unlock()
 
 	if room.CurrentPhase != "setup" {
-		log.Printf("[handleCheckStart] Phase is %s, not setup - ignoring", room.CurrentPhase)
+		log.Printf("[handleCheckStart] Phase is %s, not setup — ignoring", room.CurrentPhase)
 		return
 	}
 
-	// Get team IDs
 	team1IDHex := room.Team1ID.Hex()
 	team2IDHex := room.Team2ID.Hex()
 
-	// Count ready members for each team
 	team1ReadyCount := 0
 	for _, ready := range room.Team1Ready {
 		if ready {
@@ -1028,14 +946,13 @@ func handleCheckStart(room *TeamRoom, conn *websocket.Conn, roomKey string) {
 		}
 	}
 
-	// Count actual team members connected
 	team1MembersCount := 0
 	team2MembersCount := 0
 	for _, c := range room.Clients {
-		cTeamIDHex := c.TeamID.Hex()
-		if cTeamIDHex == team1IDHex {
+		switch c.TeamID.Hex() {
+		case team1IDHex:
 			team1MembersCount++
-		} else if cTeamIDHex == team2IDHex {
+		case team2IDHex:
 			team2MembersCount++
 		}
 	}
@@ -1044,67 +961,55 @@ func handleCheckStart(room *TeamRoom, conn *websocket.Conn, roomKey string) {
 	allTeam2Ready := team2ReadyCount == team2MembersCount && team2MembersCount > 0
 	allReady := allTeam1Ready && allTeam2Ready
 
-	log.Printf("[handleCheckStart] Check: Team1=%d/%d ready=%v, Team2=%d/%d ready=%v, AllReady=%v",
+	log.Printf("[handleCheckStart] Team1=%d/%d ready=%v, Team2=%d/%d ready=%v, AllReady=%v",
 		team1ReadyCount, team1MembersCount, allTeam1Ready,
-		team2ReadyCount, team2MembersCount, allTeam2Ready,
-		allReady)
+		team2ReadyCount, team2MembersCount, allTeam2Ready, allReady)
 
-	if allReady && room.CurrentPhase == "setup" {
-		log.Printf("[handleCheckStart] ✓✓✓ ALL TEAMS READY! Starting countdown...")
-
-		// Update phase to prevent multiple triggers
-		room.CurrentPhase = "countdown"
-
-		// Broadcast countdown start to ALL clients immediately
-		countdownMessage := map[string]interface{}{
-			"type":      "countdownStart",
-			"countdown": 3,
-		}
-		for _, r := range room.Clients {
-			if err := r.SafeWriteJSON(countdownMessage); err != nil {
-				log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
-			} else {
-				log.Printf("[handleCheckStart] ✓ Countdown message sent")
-			}
-		}
-
-		// Start countdown and phase change after 3 seconds
-		go func() {
-			time.Sleep(3 * time.Second)
-
-			teamRoomsMutex.Lock()
-			room, stillExists := teamRooms[roomKey]
-			teamRoomsMutex.Unlock()
-
-			if !stillExists {
-				log.Printf("[handleCheckStart] Room %s no longer exists", roomKey)
-				return
-			}
-
-			room.Mutex.Lock()
-			if room.CurrentPhase == "countdown" || room.CurrentPhase == "setup" {
-				room.CurrentPhase = "openingFor"
-
-				// Broadcast phase change to ALL clients
-				phaseMessage := TeamMessage{
-					Type:  "phaseChange",
-					Phase: "openingFor",
-				}
-				for _, r := range room.Clients {
-					if err := r.SafeWriteJSON(phaseMessage); err != nil {
-						log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
-					} else {
-						log.Printf("[handleCheckStart] ✓ Phase change sent")
-					}
-				}
-				log.Printf("[handleCheckStart] Debate started! Phase changed to openingFor")
-			}
-			room.Mutex.Unlock()
-		}()
-	} else {
+	if !allReady {
 		log.Printf("[handleCheckStart] Not all ready: Team1=%d/%d, Team2=%d/%d",
 			team1ReadyCount, team1MembersCount, team2ReadyCount, team2MembersCount)
+		return
 	}
+
+	log.Printf("[handleCheckStart] ✓✓✓ ALL TEAMS READY! Starting countdown...")
+	room.CurrentPhase = "countdown"
+
+	for _, r := range room.Clients {
+		if err := r.SafeWriteJSON(map[string]interface{}{
+			"type":      "countdownStart",
+			"countdown": 3,
+		}); err != nil {
+			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
+		}
+	}
+
+	go func() {
+		time.Sleep(3 * time.Second)
+
+		teamRoomsMutex.Lock()
+		r, stillExists := teamRooms[roomKey]
+		teamRoomsMutex.Unlock()
+
+		if !stillExists {
+			log.Printf("[handleCheckStart] Room %s no longer exists", roomKey)
+			return
+		}
+
+		r.Mutex.Lock()
+		if r.CurrentPhase == "countdown" || r.CurrentPhase == "setup" {
+			r.CurrentPhase = "openingFor"
+			phaseMessage := TeamMessage{Type: "phaseChange", Phase: "openingFor"}
+			for _, rc := range r.Clients {
+				if err := rc.SafeWriteJSON(phaseMessage); err != nil {
+					log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
+				} else {
+					log.Printf("[handleCheckStart] ✓ Phase change sent")
+				}
+			}
+			log.Printf("[handleCheckStart] Debate started! Phase: openingFor")
+		}
+		r.Mutex.Unlock()
+	}()
 }
 
 // handleTeamWebRTCOffer relays an SDP offer to the intended target user
@@ -1113,16 +1018,13 @@ func handleTeamWebRTCOffer(room *TeamRoom, client *TeamClient, message TeamMessa
 		log.Printf("[handleTeamWebRTCOffer] Missing offer or target for user %s", client.UserID.Hex())
 		return
 	}
-
-	payload := map[string]any{
+	if err := sendMessageToUser(room, message.TargetUserID, map[string]any{
 		"type":         "offer",
 		"fromUserId":   client.UserID.Hex(),
 		"targetUserId": message.TargetUserID,
 		"teamId":       client.TeamID.Hex(),
 		"offer":        message.Offer,
-	}
-
-	if err := sendMessageToUser(room, message.TargetUserID, payload); err != nil {
+	}); err != nil {
 		log.Printf("[handleTeamWebRTCOffer] Failed forwarding offer from %s to %s: %v", client.UserID.Hex(), message.TargetUserID, err)
 	}
 }
@@ -1133,16 +1035,13 @@ func handleTeamWebRTCAnswer(room *TeamRoom, client *TeamClient, message TeamMess
 		log.Printf("[handleTeamWebRTCAnswer] Missing answer or target for user %s", client.UserID.Hex())
 		return
 	}
-
-	payload := map[string]any{
+	if err := sendMessageToUser(room, message.TargetUserID, map[string]any{
 		"type":         "answer",
 		"fromUserId":   client.UserID.Hex(),
 		"targetUserId": message.TargetUserID,
 		"teamId":       client.TeamID.Hex(),
 		"answer":       message.Answer,
-	}
-
-	if err := sendMessageToUser(room, message.TargetUserID, payload); err != nil {
+	}); err != nil {
 		log.Printf("[handleTeamWebRTCAnswer] Failed forwarding answer from %s to %s: %v", client.UserID.Hex(), message.TargetUserID, err)
 	}
 }
@@ -1153,27 +1052,23 @@ func handleTeamWebRTCCandidate(room *TeamRoom, client *TeamClient, message TeamM
 		log.Printf("[handleTeamWebRTCCandidate] Missing candidate or target for user %s", client.UserID.Hex())
 		return
 	}
-
-	payload := map[string]any{
+	if err := sendMessageToUser(room, message.TargetUserID, map[string]any{
 		"type":         "candidate",
 		"fromUserId":   client.UserID.Hex(),
 		"targetUserId": message.TargetUserID,
 		"teamId":       client.TeamID.Hex(),
 		"candidate":    message.Candidate,
-	}
-
-	if err := sendMessageToUser(room, message.TargetUserID, payload); err != nil {
+	}); err != nil {
 		log.Printf("[handleTeamWebRTCCandidate] Failed forwarding candidate from %s to %s: %v", client.UserID.Hex(), message.TargetUserID, err)
 	}
 }
 
 // handleTeamLeave notifies all clients that a participant has left voluntarily
 func handleTeamLeave(room *TeamRoom, client *TeamClient, roomKey string) {
-	payload := map[string]any{
+	broadcastAll(room, map[string]any{
 		"type":   "leave",
 		"userId": client.UserID.Hex(),
 		"teamId": client.TeamID.Hex(),
-	}
-	broadcastAll(room, payload)
+	})
 	log.Printf("[handleTeamLeave] User %s left room %s", client.UserID.Hex(), roomKey)
 }

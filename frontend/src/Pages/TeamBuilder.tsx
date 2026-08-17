@@ -88,42 +88,46 @@ const TeamBuilder: React.FC = () => {
   const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
-  const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(
-    null
-  );
+  const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const [isMemberProfileOpen, setIsMemberProfileOpen] = useState(false);
-  const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(
-    null
-  );
+  const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editingSize, setEditingSize] = useState(false);
   const [editTeamName, setEditTeamName] = useState<string>("");
   const [searchCode, setSearchCode] = useState<string>("");
   const [joiningByCode, setJoiningByCode] = useState(false);
 
-  // Fetch available teams
   const fetchAvailableTeams = useCallback(async () => {
     try {
       const teams = await getAvailableTeams();
       setAvailableTeams(teams || []);
-    } catch (error) {
+    } catch {
       setAvailableTeams([]);
     }
   }, []);
 
-  // Fetch user's teams
   const fetchUserTeams = useCallback(async () => {
     try {
       const teams = await getUserTeams();
       setUserTeams(teams || []);
-    } catch (error) {
+    } catch {
       setUserTeams([]);
     }
   }, []);
 
+  // ✅ FIX: Poll every 3s so member count stays live for all team members.
+  // Previously fetched once on mount — Member 1's UI went stale when Member 2
+  // joined via HTTP and had to reload to see the updated count.
   React.useEffect(() => {
     fetchAvailableTeams();
     fetchUserTeams();
+
+    const interval = setInterval(() => {
+      fetchUserTeams();
+      fetchAvailableTeams();
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [fetchAvailableTeams, fetchUserTeams]);
 
   const handleCreateTeam = async () => {
@@ -132,11 +136,8 @@ const TeamBuilder: React.FC = () => {
       return;
     }
 
-    // Check if user is already in a team
     if (userTeams && userTeams.length > 0) {
-      setError(
-        "You are already in a team. Leave your current team before creating a new one."
-      );
+      setError("You are already in a team. Leave your current team before creating a new one.");
       return;
     }
 
@@ -151,8 +152,8 @@ const TeamBuilder: React.FC = () => {
       fetchAvailableTeams();
       fetchUserTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to create team");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to create team");
     } finally {
       setIsCreating(false);
     }
@@ -165,8 +166,8 @@ const TeamBuilder: React.FC = () => {
       fetchAvailableTeams();
       fetchUserTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to join team");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to join team");
       setTimeout(() => setError(""), 5000);
     }
   };
@@ -177,8 +178,6 @@ const TeamBuilder: React.FC = () => {
     try {
       const profile = await getTeamMemberProfile(memberId);
       setMemberProfile(profile);
-
-      // Store team and member info for captain actions
       if (team) {
         setSelectedMember({
           memberUserId: memberId,
@@ -187,64 +186,50 @@ const TeamBuilder: React.FC = () => {
           teamCaptainEmail: team.captainEmail,
         });
       }
-
       setIsMemberProfileOpen(true);
-    } catch (error) {
+    } catch {
+      // profile fetch failed silently
     }
   };
 
-  const handleRemoveMember = async (
-    teamId: string,
-    memberId: string
-  ): Promise<void> => {
+  const handleRemoveMember = async (teamId: string, memberId: string): Promise<void> => {
     if (!confirm("Are you sure you want to remove this member?")) return;
-
     try {
       await removeMember(teamId, memberId);
       setSuccess("Member removed successfully");
       fetchUserTeams();
       fetchAvailableTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to remove member");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to remove member");
       setTimeout(() => setError(""), 5000);
     }
   };
 
   const handleDeleteTeam = async (teamId: string): Promise<void> => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this team? This action cannot be undone."
-      )
-    )
-      return;
-
+    if (!confirm("Are you sure you want to delete this team? This action cannot be undone.")) return;
     try {
       await deleteTeam(teamId);
       setSuccess("Team deleted successfully");
       fetchUserTeams();
       fetchAvailableTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to delete team");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to delete team");
       setTimeout(() => setError(""), 5000);
     }
   };
 
   const isCaptain = (team: Team | null): boolean => {
     if (!team || !user) return false;
-    
-    // Convert captainId to string if it's an object (for backwards compatibility)
-    const captainIdStr = typeof team.captainId === 'string' 
-      ? team.captainId 
-      : (team.captainId as any)?.$oid || String(team.captainId);
-    
-    // Convert user.id to string if needed
-    const userIdStr = typeof user.id === 'string'
-      ? user.id
-      : (user.id as any)?.$oid || String(user.id);
-    
-    // Check both ID and email
+    const captainIdStr =
+      typeof team.captainId === "string"
+        ? team.captainId
+        : ((team.captainId as unknown) as Record<string, string>)?.$oid || String(team.captainId);
+    const userIdStr =
+      typeof user.id === "string"
+        ? user.id
+        : ((user.id as unknown) as Record<string, string>)?.$oid || String(user.id);
     return captainIdStr === userIdStr || team.captainEmail === user?.email;
   };
 
@@ -258,31 +243,27 @@ const TeamBuilder: React.FC = () => {
       setError("Team name cannot be empty");
       return;
     }
-
     try {
       await updateTeamName(teamId, editTeamName);
       setSuccess("Team name updated successfully!");
       setEditingTeamId(null);
       fetchUserTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to update team name");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to update team name");
       setTimeout(() => setError(""), 5000);
     }
   };
 
-  const handleUpdateTeamSize = async (
-    teamId: string,
-    newSize: number
-  ): Promise<void> => {
+  const handleUpdateTeamSize = async (teamId: string, newSize: number): Promise<void> => {
     try {
       await updateTeamSize(teamId, newSize);
       setSuccess("Team size updated successfully!");
       setEditingSize(false);
       fetchUserTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to update team size");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to update team size");
       setTimeout(() => setError(""), 5000);
     }
   };
@@ -294,17 +275,14 @@ const TeamBuilder: React.FC = () => {
   };
 
   const handleLeaveTeam = async (teamId: string): Promise<void> => {
-    if (!window.confirm("Are you sure you want to leave this team?")) {
-      return;
-    }
-
+    if (!window.confirm("Are you sure you want to leave this team?")) return;
     try {
       await leaveTeam(teamId);
       setSuccess("You have left the team");
       fetchUserTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to leave team");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to leave team");
       setTimeout(() => setError(""), 5000);
     }
   };
@@ -314,7 +292,6 @@ const TeamBuilder: React.FC = () => {
       setError("Please enter a team code");
       return;
     }
-
     setJoiningByCode(true);
     try {
       const team = await getTeamByCode(searchCode.toUpperCase());
@@ -324,8 +301,8 @@ const TeamBuilder: React.FC = () => {
       fetchUserTeams();
       fetchAvailableTeams();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error: unknown) {
-      setError((error as Error).message || "Failed to join team");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to join team");
       setTimeout(() => setError(""), 5000);
     } finally {
       setJoiningByCode(false);
@@ -342,19 +319,11 @@ const TeamBuilder: React.FC = () => {
       </div>
 
       {/* User Status Banner */}
-      <div
-        className={`mb-6 p-4 rounded-lg border ${
-          isUserInTeam ? "bg-card border-border" : "bg-muted border-border"
-        }`}
-      >
+      <div className={`mb-6 p-4 rounded-lg border ${isUserInTeam ? "bg-card border-border" : "bg-muted border-border"}`}>
         <div className="flex items-center gap-2">
-          <FaUsers
-            className={isUserInTeam ? "text-primary" : "text-muted-foreground"}
-          />
+          <FaUsers className={isUserInTeam ? "text-primary" : "text-muted-foreground"} />
           <p className="text-sm font-medium">
-            {isUserInTeam
-              ? "You are currently in a team"
-              : "You are not in any team yet"}
+            {isUserInTeam ? "You are currently in a team" : "You are not in any team yet"}
           </p>
         </div>
       </div>
@@ -378,10 +347,7 @@ const TeamBuilder: React.FC = () => {
                 className="flex-1"
                 onKeyPress={(e) => e.key === "Enter" && handleJoinByCode()}
               />
-              <Button
-                onClick={handleJoinByCode}
-                disabled={joiningByCode || !searchCode.trim()}
-              >
+              <Button onClick={handleJoinByCode} disabled={joiningByCode || !searchCode.trim()}>
                 {joiningByCode ? "Joining..." : "Join Team"}
               </Button>
             </div>
@@ -418,11 +384,7 @@ const TeamBuilder: React.FC = () => {
                   className="flex-1"
                   onKeyPress={(e) => e.key === "Enter" && handleCreateTeam()}
                 />
-                <Button
-                  onClick={handleCreateTeam}
-                  disabled={isCreating || !teamName.trim()}
-                  className="px-8"
-                >
+                <Button onClick={handleCreateTeam} disabled={isCreating || !teamName.trim()} className="px-8">
                   {isCreating ? "Creating..." : "Create Team"}
                 </Button>
               </div>
@@ -432,20 +394,10 @@ const TeamBuilder: React.FC = () => {
                   Team Size
                 </label>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={maxSize === 2 ? "default" : "outline"}
-                    onClick={() => setMaxSize(2)}
-                    className="flex-1"
-                  >
+                  <Button type="button" variant={maxSize === 2 ? "default" : "outline"} onClick={() => setMaxSize(2)} className="flex-1">
                     <FaUsers className="mr-1" /> 2 Members
                   </Button>
-                  <Button
-                    type="button"
-                    variant={maxSize === 4 ? "default" : "outline"}
-                    onClick={() => setMaxSize(4)}
-                    className="flex-1"
-                  >
+                  <Button type="button" variant={maxSize === 4 ? "default" : "outline"} onClick={() => setMaxSize(4)} className="flex-1">
                     <FaUsers className="mr-1" /> 4 Members
                   </Button>
                 </div>
@@ -459,7 +411,7 @@ const TeamBuilder: React.FC = () => {
         </Card>
       )}
 
-      {/* Matchmaking Pool Debug */}
+      {/* Matchmaking Pool */}
       <MatchmakingPool />
 
       {/* Your Teams */}
@@ -482,10 +434,7 @@ const TeamBuilder: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {userTeams.map((team) => (
-                <div
-                  key={team.id}
-                  className="relative overflow-hidden p-6 bg-card border rounded-lg shadow-sm hover:shadow-md transition-all"
-                >
+                <div key={team.id} className="relative overflow-hidden p-6 bg-card border rounded-lg shadow-sm hover:shadow-md transition-all">
                   <div className="relative">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -495,39 +444,17 @@ const TeamBuilder: React.FC = () => {
                               value={editTeamName}
                               onChange={(e) => setEditTeamName(e.target.value)}
                               className="flex-1"
-                              onKeyPress={(e) =>
-                                e.key === "Enter" && handleSaveTeamName(team.id)
-                              }
+                              onKeyPress={(e) => e.key === "Enter" && handleSaveTeamName(team.id)}
                               autoFocus
                             />
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveTeamName(team.id)}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingTeamId(null);
-                                setEditTeamName("");
-                              }}
-                            >
-                              Cancel
-                            </Button>
+                            <Button size="sm" onClick={() => handleSaveTeamName(team.id)}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={() => { setEditingTeamId(null); setEditTeamName(""); }}>Cancel</Button>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-2xl text-foreground">
-                              {team.name}
-                            </h3>
+                            <h3 className="font-bold text-2xl text-foreground">{team.name}</h3>
                             {isCaptain(team) && (
-                              <button
-                                onClick={() => handleEditTeamName(team)}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Edit team name"
-                              >
+                              <button onClick={() => handleEditTeamName(team)} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Edit team name">
                                 <FaEdit className="text-gray-400" />
                               </button>
                             )}
@@ -536,21 +463,14 @@ const TeamBuilder: React.FC = () => {
                         <div className="flex items-center gap-3 mt-2 text-sm">
                           <div className="flex items-center gap-1 text-gray-600">
                             <span className="font-medium">
-                              <FaCrown className="inline text-yellow-500" />{" "}
-                              Captain:
+                              <FaCrown className="inline text-yellow-500" /> Captain:
                             </span>
                             <span>{team.captainEmail}</span>
                           </div>
                           {team.code && (
                             <div className="flex items-center gap-1">
-                              <Badge variant="secondary">
-                                Code: {team.code}
-                              </Badge>
-                              <button
-                                onClick={() => handleCopyTeamCode(team.code)}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Copy team code"
-                              >
+                              <Badge variant="secondary">Code: {team.code}</Badge>
+                              <button onClick={() => handleCopyTeamCode(team.code)} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Copy team code">
                                 <FaCopy className="text-xs text-gray-400" />
                               </button>
                             </div>
@@ -558,12 +478,8 @@ const TeamBuilder: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Average Rating
-                        </div>
-                        <div className="text-2xl font-bold text-primary">
-                          {Math.round(team.averageElo || 0)}
-                        </div>
+                        <div className="text-xs text-muted-foreground mb-1">Average Rating</div>
+                        <div className="text-2xl font-bold text-primary">{Math.round(team.averageElo || 0)}</div>
                       </div>
                     </div>
 
@@ -576,51 +492,18 @@ const TeamBuilder: React.FC = () => {
                           {editingSize && isCaptain(team) ? (
                             <div className="flex items-center gap-2">
                               <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant={
-                                    team.maxSize === 2 ? "default" : "outline"
-                                  }
-                                  onClick={() =>
-                                    handleUpdateTeamSize(team.id, 2)
-                                  }
-                                  disabled={team.members.length > 2}
-                                >
-                                  2
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant={
-                                    team.maxSize === 4 ? "default" : "outline"
-                                  }
-                                  onClick={() =>
-                                    handleUpdateTeamSize(team.id, 4)
-                                  }
-                                  disabled={team.members.length > 4}
-                                >
-                                  4
-                                </Button>
+                                <Button size="sm" variant={team.maxSize === 2 ? "default" : "outline"} onClick={() => handleUpdateTeamSize(team.id, 2)} disabled={team.members.length > 2}>2</Button>
+                                <Button size="sm" variant={team.maxSize === 4 ? "default" : "outline"} onClick={() => handleUpdateTeamSize(team.id, 4)} disabled={team.members.length > 4}>4</Button>
                               </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingSize(false)}
-                              >
-                                Cancel
-                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setEditingSize(false)}>Cancel</Button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary">
-                                {team.members?.length || 0} /{" "}
-                                {team.maxSize || 4}
+                                {team.members?.length || 0} / {team.maxSize || 4}
                               </Badge>
                               {isCaptain(team) && team.members.length === 0 && (
-                                <button
-                                  onClick={() => setEditingSize(true)}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  title="Edit team size"
-                                >
+                                <button onClick={() => setEditingSize(true)} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Edit team size">
                                   <FaEdit className="text-xs text-gray-400" />
                                 </button>
                               )}
@@ -633,15 +516,7 @@ const TeamBuilder: React.FC = () => {
                       <div className="mt-4">
                         <TeamMatchmaking
                           team={team}
-                          user={
-                            user
-                              ? {
-                                  id: user.id || "",
-                                  email: user.email,
-                                  displayName: user.displayName,
-                                }
-                              : null
-                          }
+                          user={user ? { id: user.id || "", email: user.email, displayName: user.displayName } : null}
                         />
                       </div>
 
@@ -650,55 +525,34 @@ const TeamBuilder: React.FC = () => {
                           <Badge
                             key={member.userId}
                             className="bg-white text-gray-700 border border-gray-300 shadow-sm cursor-pointer hover:shadow-md transition-all group relative"
-                            onClick={() =>
-                              handleViewMemberProfile(member.userId, team)
-                            }
+                            onClick={() => handleViewMemberProfile(member.userId, team)}
                           >
                             <div className="flex items-center gap-1.5">
-                              {member.userId === team.captainId && (
-                                <FaCrown className="text-yellow-500" />
-                              )}
-                              <span className="font-medium">
-                                {member.displayName}
-                              </span>
-                              <span className="text-xs">
-                                ({Math.round(member.elo)})
-                              </span>
+                              {member.userId === team.captainId && <FaCrown className="text-yellow-500" />}
+                              <span className="font-medium">{member.displayName}</span>
+                              <span className="text-xs">({Math.round(member.elo)})</span>
                             </div>
-                            {isCaptain(team) &&
-                              member.userId !== team.captainId && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveMember(team.id, member.userId);
-                                  }}
-                                  className="ml-2 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Remove member"
-                                >
-                                  <FaTimes />
-                                </button>
-                              )}
+                            {isCaptain(team) && member.userId !== team.captainId && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRemoveMember(team.id, member.userId); }}
+                                className="ml-2 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove member"
+                              >
+                                <FaTimes />
+                              </button>
+                            )}
                           </Badge>
                         ))}
                       </div>
+
                       <div className="mt-3 pt-3 border-t">
                         {isCaptain(team) ? (
-                          <Button
-                            onClick={() => handleDeleteTeam(team.id)}
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                          >
+                          <Button onClick={() => handleDeleteTeam(team.id)} variant="destructive" size="sm" className="w-full">
                             <FaTrash className="mr-2" />
                             Delete Team
                           </Button>
                         ) : (
-                          <Button
-                            onClick={() => handleLeaveTeam(team.id)}
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                          >
+                          <Button onClick={() => handleLeaveTeam(team.id)} variant="outline" size="sm" className="w-full text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
                             <FaSignOutAlt className="mr-2" />
                             Leave Team
                           </Button>
@@ -718,73 +572,50 @@ const TeamBuilder: React.FC = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Profile</DialogTitle>
-            <DialogDescription>
-              View member details and statistics
-            </DialogDescription>
+            <DialogDescription>View member details and statistics</DialogDescription>
           </DialogHeader>
           {memberProfile && (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <Avatar className="w-16 h-16">
                   <AvatarImage src={memberProfile.avatarUrl} />
-                  <AvatarFallback>
-                    {memberProfile.displayName[0]}
-                  </AvatarFallback>
+                  <AvatarFallback>{memberProfile.displayName[0]}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="text-xl font-bold">
-                    {memberProfile.displayName}
-                  </h3>
+                  <h3 className="text-xl font-bold">{memberProfile.displayName}</h3>
                   <p className="text-sm text-gray-500">{memberProfile.email}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted rounded-lg">
-                  <div className="text-xs text-muted-foreground mb-1">
-                    Rating
-                  </div>
-                  <div className="text-2xl font-bold text-primary">
-                    {Math.round(memberProfile.rating)}
-                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">Rating</div>
+                  <div className="text-2xl font-bold text-primary">{Math.round(memberProfile.rating)}</div>
                 </div>
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="text-xs text-muted-foreground mb-1">RD</div>
-                  <div className="text-2xl font-bold text-primary">
-                    {Math.round(memberProfile.rd)}
-                  </div>
+                  <div className="text-2xl font-bold text-primary">{Math.round(memberProfile.rd)}</div>
                 </div>
               </div>
               {memberProfile.bio && (
                 <div>
                   <div className="text-sm font-medium mb-1">Bio</div>
-                  <p className="text-sm text-muted-foreground">
-                    {memberProfile.bio}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{memberProfile.bio}</p>
                 </div>
               )}
-
-              {/* Captain Actions */}
               {selectedMember &&
                 selectedMember.teamId &&
                 userTeams &&
                 userTeams.find((t) => t.id === selectedMember.teamId) && (
                   <div className="pt-4 border-t border-border space-y-2">
-                    {isCaptain(
-                      userTeams.find((t) => t.id === selectedMember.teamId) ||
-                        null
-                    ) && (
+                    {isCaptain(userTeams.find((t) => t.id === selectedMember.teamId) || null) && (
                       <>
                         {selectedMember.memberUserId !==
-                          (userTeams.find((t) => t.id === selectedMember.teamId)
-                            ?.captainId || "") && (
+                          (userTeams.find((t) => t.id === selectedMember.teamId)?.captainId || "") && (
                           <Button
                             variant="destructive"
                             className="w-full"
                             onClick={() => {
-                              handleRemoveMember(
-                                selectedMember.teamId,
-                                selectedMember.memberUserId
-                              );
+                              handleRemoveMember(selectedMember.teamId, selectedMember.memberUserId);
                               setIsMemberProfileOpen(false);
                             }}
                           >
@@ -814,9 +645,7 @@ const TeamBuilder: React.FC = () => {
             <div className="text-center py-12">
               <FaSearch className="text-6xl mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500 text-lg mb-2">No teams available</p>
-              <p className="text-gray-400 text-sm">
-                Be the first to create a team!
-              </p>
+              <p className="text-gray-400 text-sm">Be the first to create a team!</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -838,64 +667,33 @@ const TeamBuilder: React.FC = () => {
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-bold text-xl text-foreground">
-                              {team.name}
-                            </h3>
-                            {isFull && (
-                              <Badge
-                                variant="destructive"
-                                className="border-destructive"
-                              >
-                                Full
-                              </Badge>
-                            )}
-                            {!isFull && (
-                              <Badge
-                                variant="secondary"
-                                className="border-primary"
-                              >
-                                Open
-                              </Badge>
-                            )}
+                            <h3 className="font-bold text-xl text-foreground">{team.name}</h3>
+                            {isFull && <Badge variant="destructive" className="border-destructive">Full</Badge>}
+                            {!isFull && <Badge variant="secondary" className="border-primary">Open</Badge>}
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <FaCrown className="text-primary" />
-                              <span className="font-medium">
-                                {team.captainEmail}
-                              </span>
+                              <span className="font-medium">{team.captainEmail}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <FaChartLine className="text-primary" />
-                              <span className="font-medium">
-                                Avg: {Math.round(team.averageElo || 0)}
-                              </span>
+                              <span className="font-medium">Avg: {Math.round(team.averageElo || 0)}</span>
                             </div>
                           </div>
                         </div>
-
                         <div className="text-right">
-                          <div className="text-sm text-muted-foreground mb-1">
-                            Members ({capacity})
-                          </div>
-                          <div className="text-2xl font-bold text-primary">
-                            {memberCount}/{capacity}
-                          </div>
+                          <div className="text-sm text-muted-foreground mb-1">Members ({capacity})</div>
+                          <div className="text-2xl font-bold text-primary">{memberCount}/{capacity}</div>
                         </div>
                       </div>
 
                       {memberCount > 0 && (
                         <div className="mt-3 pt-3 border-t border-border">
-                          <div className="text-xs text-muted-foreground mb-2">
-                            Current Members:
-                          </div>
+                          <div className="text-xs text-muted-foreground mb-2">Current Members:</div>
                           <div className="flex flex-wrap gap-2">
                             {(team.members || []).map((member: TeamMember) => (
-                              <Badge
-                                key={member.userId}
-                                variant="secondary"
-                                className="text-xs"
-                              >
+                              <Badge key={member.userId} variant="secondary" className="text-xs">
                                 {member.displayName} ({Math.round(member.elo)})
                               </Badge>
                             ))}
