@@ -1,2 +1,3 @@
 .env
+config/config.prod.yml
 config.prod.yml
