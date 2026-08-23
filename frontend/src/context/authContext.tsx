@@ -115,6 +115,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     verifyToken();
   }, [verifyToken]);
 
+  const getPostLoginPath = () => {
+    const returnUrl = sessionStorage.getItem('returnUrl');
+    if (returnUrl) {
+      sessionStorage.removeItem('returnUrl');
+      return returnUrl;
+    }
+    return '/startDebate';
+  };
+
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
@@ -155,7 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      navigate('/');
+      navigate(getPostLoginPath());
     } catch (error) {
       handleError(error);
     } finally {
@@ -228,7 +237,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         setUser(normalizedUser);
         localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-        navigate('/');
+        navigate(getPostLoginPath());
       }
     } catch (error) {
       handleError(error);
@@ -322,7 +331,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
       console.log('User after Google login:', data.user);
-      navigate('/');
+      navigate(getPostLoginPath());
     } catch (error) {
       handleError(error);
     } finally {

@@ -2,10 +2,13 @@ package routes
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"math"
-	"math/rand"
+	mathrand "math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"arguehub/db"
@@ -19,10 +22,13 @@ import (
 
 // Room represents a debate room.
 type Room struct {
-	ID           string        `json:"id" bson:"_id"`
-	Type         string        `json:"type" bson:"type"`
-	OwnerID      string        `json:"ownerId" bson:"ownerId"`
-	Participants []Participant `json:"participants" bson:"participants"`
+	ID              string        `json:"id" bson:"_id"`
+	Type            string        `json:"type" bson:"type"`
+	OwnerID         string        `json:"ownerId" bson:"ownerId"`
+	Participants    []Participant `json:"participants" bson:"participants"`
+	InviteToken     string        `json:"inviteToken,omitempty" bson:"inviteToken,omitempty"`
+	Topic           string        `json:"topic,omitempty" bson:"topic,omitempty"`
+	InvitedUsername string        `json:"invitedUsername,omitempty" bson:"invitedUsername,omitempty"`
 }
 
 // Participant represents a user in a room.
@@ -36,8 +42,41 @@ type Participant struct {
 
 // generateRoomID creates a random six-digit room ID as a string.
 func generateRoomID() string {
-	rand.Seed(time.Now().UnixNano())
-	return strconv.Itoa(rand.Intn(900000) + 100000)
+	mathrand.Seed(time.Now().UnixNano())
+	return strconv.Itoa(mathrand.Intn(900000) + 100000)
+}
+
+func generateInviteToken() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	return hex.EncodeToString(b)
+}
+
+type roomUser struct {
+	ID          primitive.ObjectID `bson:"_id"`
+	Email       string             `bson:"email"`
+	DisplayName string             `bson:"displayName"`
+	Rating      float64            `bson:"rating"`
+	AvatarURL   string             `bson:"avatarUrl"`
+}
+
+func fetchUserByEmail(ctx context.Context, email string) (roomUser, error) {
+	userCollection := db.MongoDatabase.Collection("users")
+	var user roomUser
+	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	return user, err
+}
+
+func userToParticipant(user roomUser) Participant {
+	return Participant{
+		ID:        user.ID.Hex(),
+		Username:  user.DisplayName,
+		Elo:       int(math.Round(user.Rating)),
+		AvatarURL: user.AvatarURL,
+		Email:     user.Email,
+	}
 }
 
 // CreateRoomHandler handles POST /rooms and creates a new debate room.
@@ -61,7 +100,7 @@ func CreateRoomHandler(c *gin.Context) {
 	}
 
 	// Query user document using email
-	userCollection := db.MongoClient.Database("DebateAI").Collection("users")
+	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -96,7 +135,7 @@ func CreateRoomHandler(c *gin.Context) {
 		Participants: []Participant{creatorParticipant},
 	}
 
-	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
+	roomCollection := db.MongoDatabase.Collection("rooms")
 	_, err = roomCollection.InsertOne(ctx, newRoom)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
@@ -109,7 +148,7 @@ func CreateRoomHandler(c *gin.Context) {
 // GetRoomsHandler handles GET /rooms and returns all rooms.
 func GetRoomsHandler(c *gin.Context) {
 
-	collection := db.MongoClient.Database("DebateAI").Collection("rooms")
+	collection := db.MongoDatabase.Collection("rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -132,17 +171,17 @@ func GetRoomsHandler(c *gin.Context) {
 func JoinRoomHandler(c *gin.Context) {
 	roomId := c.Param("id")
 
-	// Get user email from middleware-set context
+	type JoinRoomInput struct {
+		InviteToken string `json:"inviteToken"`
+	}
+	var input JoinRoomInput
+	_ = c.ShouldBindJSON(&input)
+
 	email, exists := c.Get("email")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user email not found"})
 		return
 	}
-
-	// Query user document using email
-	userCollection := db.MongoClient.Database("DebateAI").Collection("users")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	emailStr, ok := email.(string)
 	if !ok {
@@ -150,31 +189,48 @@ func JoinRoomHandler(c *gin.Context) {
 		return
 	}
 
-	var user struct {
-		ID          primitive.ObjectID `bson:"_id"`
-		Email       string             `bson:"email"`
-		DisplayName string             `bson:"displayName"`
-		Rating      float64            `bson:"rating"`
-		AvatarURL   string             `bson:"avatarUrl"`
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	err := userCollection.FindOne(ctx, bson.M{"email": emailStr}).Decode(&user)
+	user, err := fetchUserByEmail(ctx, emailStr)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	// Create participant
-	participant := Participant{
-		ID:        user.ID.Hex(),
-		Username:  user.DisplayName,
-		Elo:       int(math.Round(user.Rating)),
-		AvatarURL: user.AvatarURL,
-		Email:     user.Email,
+	participant := userToParticipant(user)
+
+	roomCollection := db.MongoDatabase.Collection("rooms")
+	var room Room
+	if err := roomCollection.FindOne(ctx, bson.M{"_id": roomId}).Decode(&room); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
 	}
 
-	// Use atomic operation to join room
-	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
+	alreadyIn := false
+	for _, p := range room.Participants {
+		if p.ID == participant.ID {
+			alreadyIn = true
+			break
+		}
+	}
+
+	if room.InviteToken != "" && !alreadyIn {
+		if input.InviteToken == "" || input.InviteToken != room.InviteToken {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid invite token"})
+			return
+		}
+		if len(room.Participants) >= 2 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Room is full"})
+			return
+		}
+	}
+
+	if alreadyIn {
+		c.JSON(http.StatusOK, room)
+		return
+	}
+
 	filter := bson.M{"_id": roomId}
 	update := bson.M{
 		"$addToSet": bson.M{"participants": participant},
@@ -187,7 +243,6 @@ func JoinRoomHandler(c *gin.Context) {
 		return
 	}
 
-	// Remove user from matchmaking pool if they were in it
 	matchmakingService := services.GetMatchmakingService()
 	matchmakingService.RemoveFromPool(user.ID.Hex())
 
@@ -206,8 +261,8 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	}
 
 	// Query room document
-	roomCollection := db.MongoClient.Database("DebateAI").Collection("rooms")
-	userCollection := db.MongoClient.Database("DebateAI").Collection("users")
+	roomCollection := db.MongoDatabase.Collection("rooms")
+	userCollection := db.MongoDatabase.Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -325,4 +380,135 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 		"ownerId":      ownerID,
 		"participants": participantsWithDetails,
 	})
+}
+
+// CreateChallengeHandler handles POST /rooms/challenge.
+func CreateChallengeHandler(c *gin.Context) {
+	type CreateChallengeInput struct {
+		OpponentUsername string `json:"opponentUsername"`
+		Topic            string `json:"topic"`
+	}
+
+	var input CreateChallengeInput
+	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.Topic) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Topic is required"})
+		return
+	}
+
+	email, exists := c.Get("email")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user email not found"})
+		return
+	}
+
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	user, err := fetchUserByEmail(ctx, emailStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	opponentUsername := strings.TrimSpace(input.OpponentUsername)
+	if opponentUsername != "" {
+		userCollection := db.MongoDatabase.Collection("users")
+		var opponent roomUser
+		_ = userCollection.FindOne(ctx, bson.M{"displayName": opponentUsername}).Decode(&opponent)
+	}
+
+	creatorParticipant := userToParticipant(user)
+	inviteToken := generateInviteToken()
+	roomID := generateRoomID()
+
+	newRoom := Room{
+		ID:              roomID,
+		Type:            "invite",
+		OwnerID:         creatorParticipant.ID,
+		Participants:    []Participant{creatorParticipant},
+		InviteToken:     inviteToken,
+		Topic:           strings.TrimSpace(input.Topic),
+		InvitedUsername: opponentUsername,
+	}
+
+	roomCollection := db.MongoDatabase.Collection("rooms")
+	if _, err := roomCollection.InsertOne(ctx, newRoom); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create challenge room"})
+		return
+	}
+
+	c.JSON(http.StatusOK, newRoom)
+}
+
+// RematchHandler handles POST /rooms/:id/rematch.
+func RematchHandler(c *gin.Context) {
+	roomId := c.Param("id")
+
+	email, exists := c.Get("email")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user email not found"})
+		return
+	}
+
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	user, err := fetchUserByEmail(ctx, emailStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	roomCollection := db.MongoDatabase.Collection("rooms")
+	var room Room
+	if err := roomCollection.FindOne(ctx, bson.M{"_id": roomId}).Decode(&room); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
+	if room.InviteToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Rematch is only available for challenge rooms"})
+		return
+	}
+
+	wasParticipant := false
+	for _, p := range room.Participants {
+		if p.ID == user.ID.Hex() {
+			wasParticipant = true
+			break
+		}
+	}
+	if !wasParticipant {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You were not in this challenge"})
+		return
+	}
+
+	creatorParticipant := userToParticipant(user)
+	newRoom := Room{
+		ID:           generateRoomID(),
+		Type:         "invite",
+		OwnerID:      creatorParticipant.ID,
+		Participants: []Participant{creatorParticipant},
+		InviteToken:  generateInviteToken(),
+		Topic:        room.Topic,
+	}
+
+	if _, err := roomCollection.InsertOne(ctx, newRoom); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create rematch room"})
+		return
+	}
+
+	c.JSON(http.StatusOK, newRoom)
 }

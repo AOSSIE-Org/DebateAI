@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 
 import JudgmentPopup from "@/components/JudgementPopup";
@@ -146,6 +146,9 @@ const WS_BASE_URL = BASE_URL.replace(
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const inviteToken = searchParams.get("invite");
   const { user: currentUser } = useUser();
   const currentUserId = currentUser?.id ?? null;
   useDebateWS(roomId ?? null);
@@ -469,6 +472,8 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(
     null
   );
+  const [isChallengeRoom, setIsChallengeRoom] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   // Ordered list of debate phases
   const phaseOrder = useMemo<DebatePhase[]>(
@@ -917,6 +922,69 @@ const OnlineDebateRoom = (): JSX.Element => {
     }
     return false;
   }, [roomId, currentUser, setRoomOwnerId]);
+
+  const handleRematch = useCallback(async () => {
+    if (!roomId) return;
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`${BASE_URL}/rooms/${roomId}/rematch`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        navigate(`/debate-room/${data.id}?invite=${data.inviteToken}`);
+      }
+    } catch (error) {
+      console.error("Failed to create rematch:", error);
+    }
+  }, [roomId, navigate]);
+
+  useEffect(() => {
+    const joinChallengeRoom = async () => {
+      if (!roomId || !currentUser) return;
+
+      try {
+        const token = getAuthToken();
+        const body: { inviteToken?: string } = {};
+        if (inviteToken) {
+          body.inviteToken = inviteToken;
+        }
+
+        const response = await fetch(`${BASE_URL}/rooms/${roomId}/join`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          const room = await response.json();
+          if (room.inviteToken) {
+            setIsChallengeRoom(true);
+          }
+          if (room.topic) {
+            setTopic(room.topic);
+          }
+        } else if (inviteToken) {
+          const data = await response.json();
+          setJoinError(data.error || "Failed to join challenge room");
+        }
+      } catch {
+        if (inviteToken) {
+          setJoinError("Failed to join challenge room");
+        }
+      }
+    };
+
+    joinChallengeRoom();
+  }, [roomId, currentUser, inviteToken]);
 
   // Function to fetch room participants
   const fetchRoomParticipants = useCallback(
@@ -2089,6 +2157,22 @@ const OnlineDebateRoom = (): JSX.Element => {
     );
   }
 
+  if (joinError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="bg-white rounded-lg shadow-md p-6 max-w-md text-center">
+          <p className="text-red-600 font-medium">{joinError}</p>
+          <Button
+            onClick={() => navigate("/startDebate")}
+            className="mt-4"
+          >
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Render UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
@@ -2368,6 +2452,8 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           opponentAvatarUrl={opponentUser?.avatarUrl || null}
           ratingSummary={ratingSummary}
+          showRematch={isChallengeRoom}
+          onRematch={handleRematch}
           onClose={() => setShowJudgment(false)}
         />
       )}

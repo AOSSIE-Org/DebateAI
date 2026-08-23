@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/authContext';
 import { ThemeProvider } from './context/theme-provider';
 // Pages
@@ -29,11 +29,11 @@ import CommunityFeed from './Pages/CommunityFeed';
 import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
-import SupportOpenSource from './Pages/SupportOpenSource';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
   const authContext = useContext(AuthContext);
+  const location = useLocation();
   if (!authContext) {
     throw new Error('ProtectedRoute must be used within an AuthProvider');
   }
@@ -41,7 +41,14 @@ function ProtectedRoute() {
   if (isLoading) {
     return <div>Loading...</div>;
   }
-  return isAuthenticated ? <Outlet /> : <Navigate to='/' replace />;
+  if (!isAuthenticated) {
+    sessionStorage.setItem(
+      'returnUrl',
+      location.pathname + location.search
+    );
+    return <Navigate to='/auth' replace />;
+  }
+  return <Outlet />;
 }
 
 // Defines application routes

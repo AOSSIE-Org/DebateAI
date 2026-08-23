@@ -138,7 +138,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		// Add Room routes.
 		auth.GET("/rooms", routes.GetRoomsHandler)
 		auth.POST("/rooms", routes.CreateRoomHandler)
+		auth.POST("/rooms/challenge", routes.CreateChallengeHandler)
 		auth.POST("/rooms/:id/join", routes.JoinRoomHandler)
+		auth.POST("/rooms/:id/rematch", routes.RematchHandler)
 		auth.GET("/rooms/:id/participants", routes.GetRoomParticipantsHandler)
 
 		// Chat functionality is now handled by the main WebSocket handler
