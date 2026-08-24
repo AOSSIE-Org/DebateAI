@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { getAuthToken } from "@/utils/auth";
+import { API_BASE_URL } from "@/constants/api";
 
 interface ArgumentEvaluation {
   score: number;
@@ -41,7 +42,7 @@ const ProsConsChallenge: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:1313/coach/pros-cons/topic", {
+      const response = await fetch(`${API_BASE_URL}/coach/pros-cons/topic`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -82,7 +83,7 @@ const ProsConsChallenge: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:1313/coach/pros-cons/submit", {
+      const response = await fetch(`${API_BASE_URL}/coach/pros-cons/submit`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

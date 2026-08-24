@@ -8,6 +8,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { API_BASE_URL } from "@/constants/api";
 import {
   Dialog,
   DialogContent,
@@ -112,7 +113,7 @@ const StrengthenArgument: React.FC = () => {
     setError(null);
     setWeakStatement(null);
     try {
-      const url = `http://localhost:1313/coach/strengthen-argument/weak-statement?topic=${encodeURIComponent(topic)}&stance=${encodeURIComponent(stance)}`;
+      const url = `${API_BASE_URL}/coach/strengthen-argument/weak-statement?topic=${encodeURIComponent(topic)}&stance=${encodeURIComponent(stance)}`;
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -152,7 +153,7 @@ const StrengthenArgument: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:1313/coach/strengthen-argument/evaluate", {
+      const response = await fetch(`${API_BASE_URL}/coach/strengthen-argument/evaluate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

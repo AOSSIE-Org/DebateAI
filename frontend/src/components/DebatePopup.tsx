@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import RoomBrowser from './RoomBrowser';
 import Matchmaking from './Matchmaking';
+import { API_BASE_URL } from '../constants/api';
 
 interface DebatePopupProps {
   onClose: () => void;
@@ -59,7 +60,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
     try {
       // Sending a POST request to create a new room.
       // You might also send additional parameters (e.g., room type, settings).
-      const response = await fetch('http://localhost:1313/rooms', {
+      const response = await fetch(`${API_BASE_URL}/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Avatar from 'react-avatar';
 import { useUser } from '../hooks/useUser';
+import { WS_BASE_URL } from '../constants/api';
 
 interface MatchmakingPool {
   userId: string;
@@ -59,7 +60,7 @@ const Matchmaking: React.FC = () => {
 
     // Connect to WebSocket with authentication token
     const ws = new WebSocket(
-      `ws://localhost:1313/ws/matchmaking?token=${token}`
+      `${WS_BASE_URL}/ws/matchmaking?token=${token}`
     );
     wsRef.current = ws;
 
