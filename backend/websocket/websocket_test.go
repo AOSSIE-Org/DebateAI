@@ -11,11 +11,13 @@ func TestBuildParticipantsMessageIncludesRecoverableRoomState(t *testing.T) {
 	room := &Room{
 		Clients: map[*gorilla.Conn]*Client{
 			conn: {
-				UserID:   "user-1",
-				Username: "Alice",
-				Email:    "alice@example.com",
-				Role:     "for",
-				Ready:    true,
+				UserID:    "user-1",
+				Username:  "Alice",
+				Email:     "alice@example.com",
+				AvatarURL: "https://example.com/alice.png",
+				Elo:       1425,
+				Role:      "for",
+				Ready:     true,
 			},
 		},
 	}
@@ -35,5 +37,14 @@ func TestBuildParticipantsMessageIncludesRecoverableRoomState(t *testing.T) {
 	}
 	if role, ok := participant["role"].(string); !ok || role != "for" {
 		t.Fatalf("expected role=for, got %#v", participant["role"])
+	}
+	if username, ok := participant["username"].(string); !ok || username != "Alice" {
+		t.Fatalf("expected username=Alice, got %#v", participant["username"])
+	}
+	if avatarURL, ok := participant["avatarUrl"].(string); !ok || avatarURL != "https://example.com/alice.png" {
+		t.Fatalf("expected participant avatar URL, got %#v", participant["avatarUrl"])
+	}
+	if elo, ok := participant["elo"].(int); !ok || elo != 1425 {
+		t.Fatalf("expected elo=1425, got %#v", participant["elo"])
 	}
 }

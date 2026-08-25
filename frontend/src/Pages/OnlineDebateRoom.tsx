@@ -170,12 +170,14 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [roomParticipants, setRoomParticipants] = useState<UserDetails[]>([]);
   const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
   const [isWsConnected, setIsWsConnected] = useState(false);
+  const [isPeerWsConnected, setIsPeerWsConnected] = useState(false);
 
   const isRoomOwner = Boolean(roomOwnerId && currentUserId === roomOwnerId);
 
   // Refs for WebSocket, PeerConnection, and media elements
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const peerOfferStartedRef = useRef(false);
   const spectatorPCsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const spectatorOfferQueueRef = useRef<
     { connectionId: string; requestId?: string }[]
@@ -201,6 +203,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const judgePollRef = useRef<NodeJS.Timeout | null>(null);
   const submissionStartedRef = useRef(false);
+  const debateEndedByConcessionRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -816,15 +819,29 @@ const OnlineDebateRoom = (): JSX.Element => {
   ]);
 
   const handleConcede = useCallback(() => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
-      if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({
-          type: "concede",
-          room: roomId,
-          userId: currentUserId,
-          username: currentUser?.displayName || "User"
-        }));
+    if (
+      window.confirm(
+        "Are you sure you want to concede? This will count as a loss."
+      )
+    ) {
+      debateEndedByConcessionRef.current = true;
+      submissionStartedRef.current = true;
+      if (judgePollRef.current) {
+        clearInterval(judgePollRef.current);
+        judgePollRef.current = null;
       }
+
+      if (wsRef.current) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "concede",
+            room: roomId,
+            userId: currentUserId,
+            username: currentUser?.displayName || "User",
+          })
+        );
+      }
+      setShowJudgment(false);
       setDebatePhase(DebatePhase.Finished);
       setPopup({
         show: true,
@@ -1150,6 +1167,8 @@ const OnlineDebateRoom = (): JSX.Element => {
     if (!token || !roomId) return;
 
     let participantFetchTimeout: number | undefined;
+    let pendingPeerOffer: RTCSessionDescriptionInit | null = null;
+    const pendingPeerCandidates: RTCIceCandidateInit[] = [];
 
     const wsUrl = `${WS_BASE_URL}/ws?room=${roomId}&token=${token}`;
 
@@ -1175,10 +1194,35 @@ const OnlineDebateRoom = (): JSX.Element => {
 
     rws.onclose = () => {
       setIsWsConnected(false);
+      setIsPeerWsConnected(false);
     };
 
     rws.onerror = () => {
       setIsWsConnected(false);
+      setIsPeerWsConnected(false);
+    };
+
+    const flushPendingPeerCandidates = async () => {
+      const pc = pcRef.current;
+      if (!pc?.remoteDescription) return;
+
+      while (pendingPeerCandidates.length > 0) {
+        const candidate = pendingPeerCandidates.shift();
+        if (candidate) {
+          await pc.addIceCandidate(candidate);
+        }
+      }
+    };
+
+    const acceptPeerOffer = async (offer: RTCSessionDescriptionInit) => {
+      const pc = pcRef.current;
+      if (!pc) return;
+
+      await pc.setRemoteDescription(offer);
+      await flushPendingPeerCandidates();
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      wsRef.current?.send(JSON.stringify({ type: "answer", answer }));
     };
 
     rws.onmessage = async (event) => {
@@ -1264,6 +1308,7 @@ const OnlineDebateRoom = (): JSX.Element => {
           break;
         case "roomParticipants":
           if (data.roomParticipants) {
+            setIsPeerWsConnected(data.roomParticipants.length >= 2);
             console.debug(
               "Received room participants update:",
               data.roomParticipants
@@ -1330,14 +1375,28 @@ const OnlineDebateRoom = (): JSX.Element => {
             }
           }
           break;
-        case "concede":
+        case "concede": {
+          debateEndedByConcessionRef.current = true;
+          submissionStartedRef.current = true;
+          if (judgePollRef.current) {
+            clearInterval(judgePollRef.current);
+            judgePollRef.current = null;
+          }
+
+          const localUserConceded = data.userId === currentUserIdRef.current;
+          setShowJudgment(false);
           setDebatePhase(DebatePhase.Finished);
           setPopup({
             show: true,
-            message: `${data.username || "Opponent"} has conceded the debate. You win!`,
+            message: localUserConceded
+              ? "You have conceded the debate."
+              : `${
+                  data.username || "Opponent"
+                } has conceded the debate. You win!`,
             isJudging: false,
           });
           break;
+        }
         case "spectatorJoined":
           if (data.spectator?.connectionId) {
             queueSpectatorOffer(
@@ -1360,10 +1419,11 @@ const OnlineDebateRoom = (): JSX.Element => {
             break;
           }
           if (pcRef.current && data.offer) {
-            await pcRef.current.setRemoteDescription(data.offer!);
-            const answer = await pcRef.current.createAnswer();
-            await pcRef.current.setLocalDescription(answer);
-            wsRef.current?.send(JSON.stringify({ type: "answer", answer }));
+            if (localStreamRef.current) {
+              await acceptPeerOffer(data.offer);
+            } else {
+              pendingPeerOffer = data.offer;
+            }
           }
           break;
         case "answer":
@@ -1404,6 +1464,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             // Spectator answer meant for the other debater; ignore.
           } else if (pcRef.current && data.answer) {
             await pcRef.current.setRemoteDescription(data.answer);
+            await flushPendingPeerCandidates();
           }
           break;
         case "candidate":
@@ -1436,7 +1497,11 @@ const OnlineDebateRoom = (): JSX.Element => {
               }
             }
           } else if (pcRef.current && data.candidate) {
-            await pcRef.current.addIceCandidate(data.candidate);
+            if (pcRef.current.remoteDescription) {
+              await pcRef.current.addIceCandidate(data.candidate);
+            } else {
+              pendingPeerCandidates.push(data.candidate);
+            }
           }
           break;
       }
@@ -1465,8 +1530,14 @@ const OnlineDebateRoom = (): JSX.Element => {
           video: { width: 1280, height: 720 },
           audio: true,
         });
+        localStreamRef.current = stream;
         setLocalStream(stream);
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        if (pendingPeerOffer) {
+          const offer = pendingPeerOffer;
+          pendingPeerOffer = null;
+          await acceptPeerOffer(offer);
+        }
         flushSpectatorOfferQueue();
       } catch (err) {
         setMediaError(
@@ -1494,6 +1565,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       spectatorPCsRef.current.clear();
       rws.close();
       pc.close();
+      peerOfferStartedRef.current = false;
     };
   }, [
     cleanupSpectatorConnection,
@@ -1503,6 +1575,45 @@ const OnlineDebateRoom = (): JSX.Element => {
     queueSpectatorOffer,
     roomId,
   ]);
+
+  const startPeerVideo = useCallback(async () => {
+    const pc = pcRef.current;
+    const ws = wsRef.current;
+
+    if (
+      !isRoomOwner ||
+      !isWsConnected ||
+      !isPeerWsConnected ||
+      !localStream ||
+      !pc ||
+      !ws ||
+      ws.readyState !== WebSocket.OPEN ||
+      pc.signalingState !== "stable" ||
+      peerOfferStartedRef.current
+    ) {
+      return;
+    }
+
+    peerOfferStartedRef.current = true;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({ type: "offer", offer }));
+    } catch (error) {
+      peerOfferStartedRef.current = false;
+      console.error("Failed to start opponent video stream:", error);
+    }
+  }, [isPeerWsConnected, isRoomOwner, isWsConnected, localStream]);
+
+  useEffect(() => {
+    void startPeerVideo();
+  }, [startPeerVideo]);
+
+  useEffect(() => {
+    if (!isPeerWsConnected) {
+      peerOfferStartedRef.current = false;
+    }
+  }, [isPeerWsConnected]);
 
   useEffect(() => {
     flushSpectatorOfferQueue();
@@ -2042,15 +2153,20 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   // Trigger logMessageHistory when debatePhase changes to Finished
   useEffect(() => {
-    if (debatePhase === DebatePhase.Finished && localRole) {
+    if (
+      debatePhase === DebatePhase.Finished &&
+      localRole &&
+      !debateEndedByConcessionRef.current
+    ) {
       logMessageHistory();
     }
   }, [debatePhase, localRole, logMessageHistory]);
 
-  // Reset submissionStartedRef whenever phase moves away from Finished.
+  // Reset terminal-flow guards whenever phase moves away from Finished.
   useEffect(() => {
     if (debatePhase !== DebatePhase.Finished) {
       submissionStartedRef.current = false;
+      debateEndedByConcessionRef.current = false;
     }
   }, [debatePhase]);
 
@@ -2113,16 +2229,6 @@ const OnlineDebateRoom = (): JSX.Element => {
       console.debug(
         `Countdown finished. Starting debate at ${DebatePhase.OpeningFor} for ${localRole}`
       );
-      if (localRole === "for") {
-        pcRef.current
-          ?.createOffer()
-          .then((offer) =>
-            pcRef.current!.setLocalDescription(offer).then(() => offer)
-          )
-          .then((offer) =>
-            wsRef.current?.send(JSON.stringify({ type: "offer", offer }))
-          );
-      }
     }
   }, [countdown, localRole]);
 

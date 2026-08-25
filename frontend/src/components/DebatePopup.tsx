@@ -8,6 +8,10 @@ interface DebatePopupProps {
   onClose: () => void;
 }
 
+const baseURL = (
+  import.meta.env.VITE_BASE_URL || 'http://localhost:1313'
+).replace(/\/+$/, '');
+
 const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const [roomCode, setRoomCode] = useState('');
@@ -25,9 +29,6 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
       alert('Please sign in again.');
       return;
     }
-
-    const baseURL =
-      import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
 
     try {
       const response = await fetch(
@@ -59,7 +60,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
     try {
       // Sending a POST request to create a new room.
       // You might also send additional parameters (e.g., room type, settings).
-      const response = await fetch('http://localhost:1313/rooms', {
+      const response = await fetch(`${baseURL}/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

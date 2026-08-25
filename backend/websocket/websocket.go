@@ -171,8 +171,11 @@ func buildParticipantsMessage(room *Room) map[string]interface{} {
 
 		participants = append(participants, map[string]interface{}{
 			"id":          client.UserID,
+			"username":    client.Username,
 			"displayName": client.Username,
 			"email":       client.Email,
+			"avatarUrl":   client.AvatarURL,
+			"elo":         client.Elo,
 			"role":        client.Role,
 			"ready":       client.Ready,
 			"isMuted":     client.IsMuted,

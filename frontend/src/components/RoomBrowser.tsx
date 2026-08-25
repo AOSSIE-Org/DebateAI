@@ -13,6 +13,10 @@ interface Room {
   participants: Participant[] | null;
 }
 
+const baseURL = (
+  import.meta.env.VITE_BASE_URL || 'http://localhost:1313'
+).replace(/\/+$/, '');
+
 const RoomBrowser: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +25,7 @@ const RoomBrowser: React.FC = () => {
   const fetchRooms = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:1313/rooms', {
+      const response = await fetch(`${baseURL}/rooms`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -45,7 +49,8 @@ const RoomBrowser: React.FC = () => {
       }));
 
       setRooms(normalizedRooms);
-    } catch (error) {
+    } catch {
+      setRooms([]);
     } finally {
       setLoading(false);
     }
@@ -60,22 +65,19 @@ const RoomBrowser: React.FC = () => {
   const handleJoinMatch = async (roomId: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(
-        `http://localhost:1313/rooms/${roomId}/join`,
-        {
+      const response = await fetch(`${baseURL}/rooms/${roomId}/join`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        });
       if (!response.ok) {
         alert(`Failed to join room ${roomId}.`);
         return;
       }
       navigate(`/debate-room/${roomId}`);
-    } catch (error) {
+    } catch {
       alert('An error occurred while joining the match.');
     }
   };
