@@ -17,7 +17,6 @@ import StrengthenArgument from './Pages/StrengthenArgument';
 import SpeechTest from './Pages/SpeechTest';
 // Layout
 import Layout from './components/Layout';
-import SupportOpenSource from './Pages/SupportOpenSource';
 import CoachPage from './Pages/CoachPage';
 import ChatRoom from './components/ChatRoom';
 import TournamentHub from './Pages/TournamentHub';
@@ -67,13 +66,14 @@ function AppRoutes() {
           isAuthenticated ? <Navigate to='/startDebate' replace /> : <Home />
         }
       />
-      <Route path='/auth' element={<Authentication />} />
+      <Route path='/auth'
+        element={ isAuthenticated ? <Navigate to='/startDebate' replace/> : <Authentication/> }
+      />
       <Route path='/admin/login' element={<AdminSignup />} />
       <Route path='/admin/dashboard' element={<AdminDashboard />} />
       {/* Public routes with layout */}
       <Route element={<Layout />}>
         <Route path='about' element={<About />} />
-        <Route path='support-debateai' element={<SupportOpenSource />} />
       </Route>
 
       {/* Protected routes with layout */}
@@ -96,12 +96,6 @@ function AppRoutes() {
             path='coach/strengthen-argument'
             element={<StrengthenArgument />}
           />
-          <Route path='/coach' element={<CoachPage />} />
-          <Route
-            path='coach/strengthen-argument'
-            element={<StrengthenArgument />}
-          />{' '}
-          {/* Add this route */}
           <Route path='coach/pros-cons' element={<ProsConsChallenge />} />
           <Route path='support-os' element={<SupportOpenSource />} />
         </Route>

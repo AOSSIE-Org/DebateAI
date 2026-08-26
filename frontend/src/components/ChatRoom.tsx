@@ -17,6 +17,10 @@ interface FloatingEmoji {
 
 type VoteOption = 'FOR' | 'AGAINST';
 
+const wsBaseURL = (
+  import.meta.env.VITE_BASE_URL || 'http://localhost:1313'
+).replace(/^http/, 'ws');
+
 const ChatRoom = () => {
   const { roomId } = useParams();
   const [username, setUsername] = useState('');
@@ -45,7 +49,7 @@ const ChatRoom = () => {
     if (!token) return;
 
     wsRef.current = new WebSocket(
-      `ws://localhost:1313/chat/${roomId}?token=${token}`
+      `${wsBaseURL}/chat/${roomId}?token=${token}`
     );
 
     wsRef.current.onopen = () => {

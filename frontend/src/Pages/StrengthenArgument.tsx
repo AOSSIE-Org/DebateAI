@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { getAuthToken } from "@/utils/auth";
 
+const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+
 // Dummy list of topics for suggestions
 const sampleTopics = [
   "Should AI rule the world?",
@@ -112,7 +114,7 @@ const StrengthenArgument: React.FC = () => {
     setError(null);
     setWeakStatement(null);
     try {
-      const url = `http://localhost:1313/coach/strengthen-argument/weak-statement?topic=${encodeURIComponent(topic)}&stance=${encodeURIComponent(stance)}`;
+      const url = `${baseURL}/coach/strengthen-argument/weak-statement?topic=${encodeURIComponent(topic)}&stance=${encodeURIComponent(stance)}`;
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -152,7 +154,7 @@ const StrengthenArgument: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:1313/coach/strengthen-argument/evaluate", {
+      const response = await fetch(`${baseURL}/coach/strengthen-argument/evaluate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

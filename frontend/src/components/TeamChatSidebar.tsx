@@ -156,7 +156,7 @@ const TeamChatSidebar: React.FC<TeamChatSidebarProps> = ({
               >
                 <Avatar className='w-8 h-8'>
                   <AvatarImage
-                    src={`https://avatar.iran.liara.run/public/${msg.userId}`}
+                    src={`https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(msg.userId)}`}
                   />
                   <AvatarFallback>{msg.displayName[0]}</AvatarFallback>
                 </Avatar>

@@ -2,9 +2,9 @@ import { useEffect, useContext } from "react";
 import { useAtom } from "jotai";
 import { userAtom } from "../state/userAtom";
 import { AuthContext } from "../context/authContext";
+import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 
 const USER_CACHE_KEY = "userProfile";
-const DEFAULT_AVATAR = "https://avatar.iran.liara.run/public/10";
 const DEFAULT_RATING = 1500;
 const DEFAULT_RD = 350;
 const DEFAULT_VOLATILITY = 0.06;
@@ -73,7 +73,7 @@ export const useUser = () => {
           avatarUrl:
             profile.avatarUrl ||
             userData.avatarUrl ||
-            DEFAULT_AVATAR,
+            DEFAULT_AVATAR_URL,
           twitter: profile.twitter || userData.twitter,
           instagram: profile.instagram || userData.instagram,
           linkedin: profile.linkedin || userData.linkedin,

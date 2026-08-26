@@ -77,6 +77,9 @@ func LoadConfig(path string) (*Config, error) {
 	if envDB := os.Getenv("DATABASE_URI"); envDB != "" {
 		cfg.Database.URI = envDB
 	}
+	if envRedisAddr := os.Getenv("REDIS_ADDR"); envRedisAddr != "" {
+		cfg.Redis.Addr = envRedisAddr
+	}
 	if envGemini := os.Getenv("GEMINI_API_KEY"); envGemini != "" {
 		cfg.Gemini.ApiKey = envGemini
 	}

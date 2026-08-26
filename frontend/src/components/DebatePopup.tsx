@@ -8,6 +8,8 @@ interface DebatePopupProps {
   onClose: () => void;
 }
 
+const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+
 const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const [roomCode, setRoomCode] = useState('');
@@ -16,10 +18,38 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   );
 
   // Handler to join a debate room by sending the room code via navigation.
-  const handleJoinRoom = () => {
-    if (roomCode.trim() === '') return;
-    navigate(`/debate-room/${roomCode}`);
-    onClose();
+  const handleJoinRoom = async () => {
+    const trimmedRoomCode = roomCode.trim();
+    if (!trimmedRoomCode) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please sign in again.');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${baseURL}/rooms/${encodeURIComponent(trimmedRoomCode)}/join`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        alert(data?.error || 'Unable to join this room.');
+        return;
+      }
+
+      navigate(`/debate-room/${trimmedRoomCode}`);
+      onClose();
+    } catch {
+      alert('Unable to connect to the server.');
+    }
   };
 
   // Handler to create a new room by sending a POST request to the backend.
@@ -28,7 +58,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
     try {
       // Sending a POST request to create a new room.
       // You might also send additional parameters (e.g., room type, settings).
-      const response = await fetch('http://localhost:1313/rooms', {
+      const response = await fetch(`${baseURL}/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -44,7 +74,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
       const room = await response.json();
       navigate(`/debate-room/${room.id}`);
       onClose();
-    } catch (error) {
+    } catch {
       alert('Error creating room.');
     }
   };

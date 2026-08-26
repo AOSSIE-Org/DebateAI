@@ -1,16 +1,11 @@
 const baseURL = import.meta.env.VITE_BASE_URL;
 
 export const getProfile = async (token: string) => {
-  
   const response = await fetch(`${baseURL}/user/fetchprofile`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) {
-    throw new Error("Failed to fetch profile");
-  }
+  if (!response.ok) throw new Error("Failed to fetch profile");
   return response.json();
 };
 
@@ -29,19 +24,34 @@ export const updateProfile = async (
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin,avatarUrl }),
+    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin, avatarUrl }),
   });
   if (!response.ok) {
-    throw new Error("Failed to update profile");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to update profile");
   }
   return response.json();
 };
+
+export const checkDisplayNameAvailability = async (
+  token: string,
+  displayName: string
+): Promise<{ available: boolean }> => {
+  const response = await fetch(
+    `${baseURL}/user/check-displayname?displayName=${encodeURIComponent(displayName)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!response.ok) throw new Error("Failed to check display name");
+  return response.json();
+};
+
 export const getLeaderboard = async () => {
   const response = await fetch(`${baseURL}/leaderboard`, {
     method: "GET",
   });
-  if (!response.ok) {
-    throw new Error("Failed to fetch leaderboard");
-  }
+  if (!response.ok) throw new Error("Failed to fetch leaderboard");
   return response.json();
 };

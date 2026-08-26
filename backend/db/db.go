@@ -4,7 +4,7 @@ import (
 	"arguehub/models"
 	"context"
 	"fmt"
-	"log" // Added missing import
+	"log"
 	"net/url"
 	"time"
 
@@ -19,24 +19,21 @@ var MongoDatabase *mongo.Database
 var DebateVsBotCollection *mongo.Collection
 var RedisClient *redis.Client
 
-// GetCollection returns a collection by name
 func GetCollection(collectionName string) *mongo.Collection {
 	return MongoDatabase.Collection(collectionName)
 }
 
-// extractDBName parses the database name from the URI, defaulting to "test"
 func extractDBName(uri string) string {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return "test"
 	}
 	if u.Path != "" && u.Path != "/" {
-		return u.Path[1:] // Trim leading '/'
+		return u.Path[1:]
 	}
 	return "test"
 }
 
-// ConnectMongoDB establishes a connection to MongoDB using the provided URI
 func ConnectMongoDB(uri string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -47,20 +44,36 @@ func ConnectMongoDB(uri string) error {
 		return fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
-	// Verify connection with a ping
 	if err := client.Ping(ctx, nil); err != nil {
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 
 	MongoClient = client
 	dbName := extractDBName(uri)
-
 	MongoDatabase = client.Database(dbName)
 	DebateVsBotCollection = MongoDatabase.Collection("debates_vs_bot")
 	return nil
 }
 
-// SaveDebateVsBot saves a bot debate session to MongoDB
+func EnsureIndexes() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	usersCol := MongoDatabase.Collection("users")
+
+	indexModel := mongo.IndexModel{
+		Keys:    bson.D{{Key: "displayName", Value: 1}},
+		Options: options.Index().SetUnique(true).SetSparse(true).SetName("unique_displayName"),
+	}
+
+	_, err := usersCol.Indexes().CreateOne(ctx, indexModel)
+	if err != nil {
+		return fmt.Errorf("failed to create displayName index: %w", err)
+	}
+	log.Println("DisplayName unique index ensured")
+	return nil
+}
+
 func SaveDebateVsBot(debate models.DebateVsBot) error {
 	_, err := DebateVsBotCollection.InsertOne(context.Background(), debate)
 	if err != nil {
@@ -69,7 +82,6 @@ func SaveDebateVsBot(debate models.DebateVsBot) error {
 	return nil
 }
 
-// UpdateDebateVsBotOutcome updates the outcome of the most recent bot debate for a user
 func UpdateDebateVsBotOutcome(userId, outcome string) error {
 	filter := bson.M{"userId": userId}
 	update := bson.M{"$set": bson.M{"outcome": outcome}}
@@ -80,7 +92,6 @@ func UpdateDebateVsBotOutcome(userId, outcome string) error {
 	return nil
 }
 
-// GetLatestDebateVsBot retrieves the most recent bot debate for a user
 func GetLatestDebateVsBot(email string) (*models.DebateVsBot, error) {
 	filter := bson.M{"email": email}
 	opts := options.FindOne().SetSort(bson.M{"createdAt": -1})
@@ -96,7 +107,6 @@ func GetLatestDebateVsBot(email string) (*models.DebateVsBot, error) {
 	return &debate, nil
 }
 
-// ConnectRedis establishes a connection to Redis
 func ConnectRedis(addr, password string, db int) error {
 	RedisClient = redis.NewClient(&redis.Options{
 		Addr:     addr,
@@ -107,7 +117,6 @@ func ConnectRedis(addr, password string, db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Test the connection with a ping
 	_, err := RedisClient.Ping(ctx).Result()
 	if err != nil {
 		return fmt.Errorf("failed to connect to Redis: %w", err)

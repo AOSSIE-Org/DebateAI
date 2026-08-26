@@ -24,6 +24,10 @@ interface MatchmakingMessage {
   error?: string;
 }
 
+const wsBaseURL = (
+  import.meta.env.VITE_BASE_URL || 'http://localhost:1313'
+).replace(/^http/, 'ws');
+
 const Matchmaking: React.FC = () => {
   const [pool, setPool] = useState<MatchmakingPool[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -59,7 +63,7 @@ const Matchmaking: React.FC = () => {
 
     // Connect to WebSocket with authentication token
     const ws = new WebSocket(
-      `ws://localhost:1313/ws/matchmaking?token=${token}`
+      `${wsBaseURL}/ws/matchmaking?token=${token}`
     );
     wsRef.current = ws;
 

@@ -1799,7 +1799,7 @@ const TeamDebateRoom: React.FC = () => {
                             <div key={member.userId} className="flex items-center gap-3">
                               <div className="relative">
                                 <img
-                                  src={member.avatarUrl || "https://avatar.iran.liara.run/public/31"}
+                                  src={member.avatarUrl || "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"}
                                   alt={member.displayName}
                                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                 />
@@ -1836,7 +1836,7 @@ const TeamDebateRoom: React.FC = () => {
                             <div key={member.userId} className="flex items-center gap-3">
                               <div className="relative">
                                 <img
-                                  src={member.avatarUrl || "https://avatar.iran.liara.run/public/31"}
+                                  src={member.avatarUrl || "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"}
                                   alt={member.displayName}
                                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                 />

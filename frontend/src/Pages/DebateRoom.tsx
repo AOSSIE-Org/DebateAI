@@ -7,6 +7,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
+import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -247,7 +248,6 @@ const DebateRoom: React.FC = () => {
     isJudging?: boolean;
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
-  const [showJudgment, setShowJudgment] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -257,7 +257,7 @@ const DebateRoom: React.FC = () => {
 
   const bot = allBots.find((b) => b.name === debateData.botName) || allBots[0];
   const userAvatar =
-    user?.avatarUrl || "https://avatar.iran.liara.run/public/10";
+    user?.avatarUrl || DEFAULT_AVATAR_URL;
 
   const handleConcede = async () => {
     if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
@@ -582,32 +582,29 @@ const DebateRoom: React.FC = () => {
         userId: debateData.userId,
       });
       console.log("Raw judge result:", result);
-      
-      const jsonString = extractJSON(result);
-      console.log("Extracted JSON string:", jsonString);
-      
+
+
       let judgment: JudgmentData;
-      try {
-        judgment = JSON.parse(jsonString);
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError, "Trying to fix JSON...");
-        // Try to fix common JSON issues
-        const fixedJson = jsonString
-          .replace(/'/g, '"') // Replace single quotes with double quotes
-          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
-          .replace(/,\s*}/g, '}') // Remove trailing commas
-          .replace(/,\s*]/g, ']'); // Remove trailing commas in arrays
-        try {
-          judgment = JSON.parse(fixedJson);
-        } catch (e) {
-          throw new Error(`Failed to parse JSON: ${e}`);
-        }
-      }
+
+if (typeof result === "string") {
+  const jsonString = extractJSON(result);
+  console.log("Extracted JSON:", jsonString);
+  judgment = JSON.parse(jsonString);
+} else {
+ const res: any = result;
+
+if (res?.opening_statement && res?.verdict) {
+  judgment = res as JudgmentData;
+} else {
+  console.error("Invalid judgment structure:", result);
+  return;
+}
+}
+
+console.log("FINAL PARSED:", judgment);
+setJudgmentData(judgment);
+setPopup({ show: false, message: "" });
       
-      console.log("Parsed judgment:", judgment);
-      setJudgmentData(judgment);
-      setPopup({ show: false, message: "" });
-      setShowJudgment(true);
     } catch (error) {
       console.error("Judging error:", error);
       // Show error to user
@@ -644,9 +641,8 @@ const DebateRoom: React.FC = () => {
         },
       });
       setTimeout(() => {
-        setPopup({ show: false, message: "" });
-        setShowJudgment(true);
-      }, 3000);
+  setPopup({ show: false, message: "" });
+}, 3000);
     }
   };
 
@@ -689,6 +685,26 @@ const DebateRoom: React.FC = () => {
   const currentEntity = state.userStance === currentStance ? "User" : "Bot";
   const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
 
+  if (judgmentData) {
+    return (
+    <div className="fixed inset-0 z-[9999] bg-black">
+      <JudgmentPopup
+        judgment={judgmentData}
+        userAvatar={userAvatar}
+        botAvatar={bot.avatar}
+        botName={debateData.botName}
+        userStance={state.userStance}
+        botStance={state.botStance}
+        botDesc={bot.desc}
+        onClose={() => {
+          setJudgmentData(null);
+          navigate("/game");
+        }}
+      />
+    </div>
+  );
+}
+
   return (
     <div className="min-h-screen bg-background p-4 transition-colors duration-300">
       <div className="w-full max-w-5xl mx-auto py-2">
@@ -719,8 +735,8 @@ const DebateRoom: React.FC = () => {
           <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-primary mb-4"></div>
-                <h2 className="text-xl font-semibold text-foreground">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
+                <h2 className="text-xl font-semibold text-gray-800">
                   {popup.message}
                 </h2>
               </div>
@@ -736,19 +752,6 @@ const DebateRoom: React.FC = () => {
             )}
           </div>
         </div>
-      )}
-
-      {showJudgment && judgmentData && (
-        <JudgmentPopup
-          judgment={judgmentData}
-          userAvatar={userAvatar}
-          botAvatar={bot.avatar}
-          botName={debateData.botName}
-          userStance={state.userStance}
-          botStance={state.botStance}
-          botDesc={bot.desc}
-          onClose={() => setShowJudgment(false)}
-        />
       )}
 
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">

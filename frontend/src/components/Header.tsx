@@ -21,7 +21,20 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import debateAiLogo from "@/assets/aossie.png";
 import avatarImage from "@/assets/avatar2.jpg";
+import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
+
+const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+  const image = event.currentTarget;
+
+  if (image.src !== DEFAULT_AVATAR_URL) {
+    image.src = DEFAULT_AVATAR_URL;
+    return;
+  }
+
+  image.onerror = null;
+  image.src = avatarImage;
+};
 
 /**
  * Header component providing breadcrumb navigation, notifications, 
@@ -219,8 +232,9 @@ function Header() {
                 className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full transition-opacity"
               >
                 <img
-                  src={user?.avatarUrl || avatarImage}
+                  src={user?.avatarUrl || DEFAULT_AVATAR_URL}
                   alt="User avatar"
+                  onError={handleAvatarLoadError}
                   className="w-8 h-8 rounded-full border-2 border-border object-cover cursor-pointer hover:opacity-80 transition-opacity"
                 />
               </button>
@@ -229,8 +243,9 @@ function Header() {
               <div className="p-4 border-b border-border">
                 <div className="flex items-center gap-3 mb-3">
                   <img
-                    src={user?.avatarUrl || avatarImage}
+                    src={user?.avatarUrl || DEFAULT_AVATAR_URL}
                     alt="User avatar"
+                    onError={handleAvatarLoadError}
                     className="w-12 h-12 rounded-full border-2 border-border object-cover"
                   />
                   <div className="overflow-hidden">

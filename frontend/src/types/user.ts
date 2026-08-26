@@ -6,7 +6,7 @@ export type User = {
   rating: number;
   rd: number;
   volatility: number;
-  lastRatingUpdate: string; 
+  lastRatingUpdate: string;
   avatarUrl?: string;
   twitter?: string;
   instagram?: string;

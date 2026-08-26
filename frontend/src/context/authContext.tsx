@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSetAtom } from 'jotai';
 import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
+import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
 
 const baseURL = import.meta.env.VITE_BASE_URL;
 const USER_CACHE_KEY = 'userProfile';
@@ -52,65 +53,83 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     throw error;
   };
 
-  const verifyToken = useCallback(async () => {
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken) return;
-    try {
-      const response = await fetch(`${baseURL}/verifyToken`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${storedToken}` },
-      });
+let currentRequest = 0;
+const verifyToken = useCallback(async () => {
+  const requestId = ++currentRequest;
 
-      if (!response.ok) {
-        // Token is expired or invalid - clear it and redirect to login
-        localStorage.removeItem('token');
-        setToken(null);
-        setUser(null);
-        navigate('/login');
-        return;
-      }
-      setToken(storedToken);
+  const storedToken = localStorage.getItem('token');
+  if (!storedToken) return;
 
-      // Fetch user data to populate userAtom
-      const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${storedToken}` },
-      });
+  try {
+    const response = await fetch(`${baseURL}/verifyToken`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${storedToken}` },
+    });
 
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        const normalizedUser: User = {
-          id: userData.id || userData._id,
-          email: userData.email,
-          displayName: userData.displayName || 'User',
-          bio: userData.bio || '',
-          rating: userData.rating || 1500,
-          rd: userData.rd || 350,
-          volatility: userData.volatility || 0.06,
-          lastRatingUpdate:
-            userData.lastRatingUpdate || new Date().toISOString(),
-          avatarUrl:
-            userData.avatarUrl || 'https://avatar.iran.liara.run/public/10',
-          twitter: userData.twitter,
-          instagram: userData.instagram,
-          linkedin: userData.linkedin,
-          password: '',
-          nickname: userData.nickname || 'User',
-          isVerified: userData.isVerified || false,
-          verificationCode: userData.verificationCode,
-          resetPasswordCode: userData.resetPasswordCode,
-          createdAt: userData.createdAt || new Date().toISOString(),
-          updatedAt: userData.updatedAt || new Date().toISOString(),
-        };
-        setUser(normalizedUser);
-        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      }
-    } catch (error) {
-      console.log('error', error);
-      logout();
+    // ignore if outdated
+    if (requestId !== currentRequest) return;
+
+    if (!response.ok) {
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+      navigate('/login');
+      return;
     }
-  }, [setUser]);
 
+    setToken(storedToken);
+
+    const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${storedToken}` },
+    });
+
+    // ignore if outdated
+    if (requestId !== currentRequest) return;
+
+    if (userResponse.ok) {
+      const responseData = await userResponse.json();
+
+      // ignore if outdated
+      if (requestId !== currentRequest) return;
+
+      const userData = responseData.profile;
+
+      const normalizedUser: User = {
+        id: userData.id || userData._id,
+        email: userData.email,
+        displayName: userData.displayName || 'User',
+        bio: userData.bio || '',
+        rating: userData.rating || 1500,
+        rd: userData.rd || 350,
+        volatility: userData.volatility || 0.06,
+        lastRatingUpdate:
+          userData.lastRatingUpdate || new Date().toISOString(),
+        avatarUrl: userData.avatarUrl || DEFAULT_AVATAR_URL,
+        twitter: userData.twitter,
+        instagram: userData.instagram,
+        linkedin: userData.linkedin,
+        password: '',
+        nickname: userData.nickname || 'User',
+        isVerified: userData.isVerified || false,
+        verificationCode: userData.verificationCode,
+        resetPasswordCode: userData.resetPasswordCode,
+        createdAt: userData.createdAt || new Date().toISOString(),
+        updatedAt: userData.updatedAt || new Date().toISOString(),
+      };
+
+      // final safety check
+      if (requestId !== currentRequest) return;
+
+      setUser(normalizedUser);
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+    }
+  } catch (error) {
+    console.log('error', error);
+    logout();
+  }
+}, [setUser]);
+  
   useEffect(() => {
     verifyToken();
   }, [verifyToken]);
@@ -150,7 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastRatingUpdate:
           data.user?.lastRatingUpdate || new Date().toISOString(),
         avatarUrl:
-          data.user?.avatarUrl || 'https://avatar.iran.liara.run/public/10',
+          data.user?.avatarUrl || DEFAULT_AVATAR_URL,
         twitter: data.user?.twitter || undefined,
         instagram: data.user?.instagram || undefined,
         linkedin: data.user?.linkedin || undefined,
@@ -223,7 +242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           rd: data.user?.rd || 350,
           volatility: data.user?.volatility || 0.06,
           lastRatingUpdate: data.user?.lastRatingUpdate || new Date().toISOString(),
-          avatarUrl: data.user?.avatarUrl || 'https://avatar.iran.liara.run/public/10',
+          avatarUrl: data.user?.avatarUrl || DEFAULT_AVATAR_URL,
           twitter: data.user?.twitter || undefined,
           instagram: data.user?.instagram || undefined,
           linkedin: data.user?.linkedin || undefined,
@@ -316,7 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastRatingUpdate:
           data.user?.lastRatingUpdate || new Date().toISOString(),
         avatarUrl:
-          data.user?.avatarUrl || 'https://avatar.iran.liara.run/public/10',
+          data.user?.avatarUrl || DEFAULT_AVATAR_URL,
         twitter: data.user?.twitter || undefined,
         instagram: data.user?.instagram || undefined,
         linkedin: data.user?.linkedin || undefined,
