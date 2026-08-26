@@ -30,8 +30,9 @@ var upgrader = websocket.Upgrader{
 
 // Room represents a debate room with connected clients.
 type Room struct {
-	Clients map[*websocket.Conn]*Client
-	Mutex   sync.Mutex
+	Clients      map[*websocket.Conn]*Client
+	Mutex        sync.Mutex
+	CurrentTopic string
 }
 
 // Client represents a connected client with user information
@@ -50,7 +51,9 @@ type Client struct {
 	LastActivity time.Time
 	IsMuted      bool   // New field to track mute status
 	Role         string // New field to track debate role (for/against)
+	Ready        bool   // Ready status during setup
 	Ready        bool   // Whether the debater is ready to start
+
 	SpeechText   string // New field to store speech text
 	ConnectionID string
 }
@@ -193,6 +196,72 @@ func broadcastParticipants(room *Room) {
 	for _, client := range snapshotRecipients(room, nil) {
 		if err := client.SafeWriteJSON(message); err != nil {
 		}
+	}
+}
+
+func lookupRoomTopic(roomID string) string {
+	if db.MongoDatabase == nil {
+		return ""
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var room struct {
+		Topic string `bson:"topic"`
+	}
+	if err := db.MongoDatabase.Collection("rooms").FindOne(ctx, bson.M{"_id": roomID}).Decode(&room); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(room.Topic)
+}
+
+func syncRoomStateToClient(room *Room, client *Client, conn *websocket.Conn, roomID string) {
+	room.Mutex.Lock()
+	needsTopic := room.CurrentTopic == ""
+	room.Mutex.Unlock()
+
+	if needsTopic {
+		if topic := lookupRoomTopic(roomID); topic != "" {
+			room.Mutex.Lock()
+			if room.CurrentTopic == "" {
+				room.CurrentTopic = topic
+			}
+			room.Mutex.Unlock()
+		}
+	}
+
+	room.Mutex.Lock()
+	currentTopic := room.CurrentTopic
+	peerMessages := make([]map[string]interface{}, 0)
+	for connRef, existing := range room.Clients {
+		if connRef == conn || existing.IsSpectator {
+			continue
+		}
+		if existing.Role != "" {
+			peerMessages = append(peerMessages, map[string]interface{}{
+				"type":   "roleSelection",
+				"role":   existing.Role,
+				"userId": existing.UserID,
+			})
+		}
+		peerMessages = append(peerMessages, map[string]interface{}{
+			"type":   "ready",
+			"ready":  existing.Ready,
+			"userId": existing.UserID,
+		})
+	}
+	room.Mutex.Unlock()
+
+	if currentTopic != "" {
+		_ = client.SafeWriteJSON(map[string]interface{}{
+			"type":  "topicChange",
+			"topic": currentTopic,
+		})
+	}
+
+	for _, msg := range peerMessages {
+		_ = client.SafeWriteJSON(msg)
 	}
 }
 
@@ -388,6 +457,8 @@ func WebsocketHandler(c *gin.Context) {
 		r.SafeWriteJSON(userDetailsMessage)
 		r.SafeWriteJSON(participantsMsg)
 	}
+
+	syncRoomStateToClient(room, client, conn, roomID)
 
 	if client.IsSpectator {
 		log.Printf("[ws] spectator connected: room=%s connectionId=%s user=%s", roomID, client.ConnectionID, client.Email)
@@ -657,6 +728,24 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 
 // handleTopicChange handles topic changes
 func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID string) {
+	room.Mutex.Lock()
+	if message.Topic != "" {
+		room.CurrentTopic = message.Topic
+	}
+	room.Mutex.Unlock()
+
+	if message.Topic != "" && db.MongoDatabase != nil {
+		go func(topic string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, _ = db.MongoDatabase.Collection("rooms").UpdateOne(
+				ctx,
+				bson.M{"_id": roomID},
+				bson.M{"$set": bson.M{"topic": topic}},
+			)
+		}(message.Topic)
+	}
+
 	// Broadcast topic change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
@@ -674,6 +763,7 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 			return
 		}
 		client.Role = message.Role
+		message.UserID = client.UserID
 	}
 	room.Mutex.Unlock()
 
@@ -689,6 +779,15 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 
 // handleReadyStatus handles ready status
 func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID string) {
+
+	room.Mutex.Lock()
+	if client, exists := room.Clients[conn]; exists {
+		if message.Ready != nil {
+			client.Ready = *message.Ready
+		}
+		message.UserID = client.UserID
+	}
+
 	if message.Ready == nil {
 		return
 	}
@@ -709,7 +808,10 @@ func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID
 		}
 	}
 
+
+
 	// Reconnecting clients recover readiness from the participant snapshot.
+
 	broadcastParticipants(room)
 }
 

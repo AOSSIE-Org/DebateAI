@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 
 import JudgmentPopup from "@/components/JudgementPopup";
@@ -78,7 +78,11 @@ interface UserDetails {
   avatarUrl?: string;
   displayName?: string;
   email?: string;
+
+  role?: string;
+
   role?: DebateRole;
+
   ready?: boolean;
 }
 
@@ -94,7 +98,7 @@ interface WSMessage {
   candidate?: RTCIceCandidateInit;
   message?: string;
   userDetails?: UserDetails;
-  roomParticipants?: UserDetails[];
+  roomParticipants?: Array<UserDetails & { role?: string; ready?: boolean }>;
   // Enhanced chat fields
   userId?: string;
   username?: string;
@@ -148,6 +152,9 @@ const WS_BASE_URL = BASE_URL.replace(
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const inviteToken = searchParams.get("invite");
   const { user: currentUser } = useUser();
   const currentUserId = currentUser?.id ?? null;
   useDebateWS(roomId ?? null);
@@ -187,6 +194,14 @@ const OnlineDebateRoom = (): JSX.Element => {
   const localStreamRef = useRef<MediaStream | null>(null);
   const localRoleRef = useRef<DebateRole | null>(null);
   const peerRoleRef = useRef<DebateRole | null>(null);
+
+  const opponentUserIdRef = useRef<string | null>(null);
+  const pendingPeerCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const currentUserIdRef = useRef<string | null>(currentUserId);
+  const establishDebateConnectionRef = useRef<() => Promise<void>>(
+    async () => {}
+  );
+
   const debatePhaseRef = useRef<DebatePhase>(DebatePhase.Setup);
   const currentUserIdRef = useRef<string | null>(currentUserId);
   const currentUserRef = useRef(currentUser);
@@ -201,6 +216,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const judgePollRef = useRef<NodeJS.Timeout | null>(null);
   const submissionStartedRef = useRef(false);
+  const joinAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -307,13 +323,107 @@ const OnlineDebateRoom = (): JSX.Element => {
   }, [peerRole]);
 
   useEffect(() => {
+
+    opponentUserIdRef.current = opponentUser?.id ?? null;
+  }, [opponentUser?.id]);
+
     debatePhaseRef.current = debatePhase;
   }, [debatePhase]);
+
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
     currentUserRef.current = currentUser;
   }, [currentUser, currentUserId]);
+
+  const flushPeerCandidates = useCallback(async (pc: RTCPeerConnection) => {
+    const pending = pendingPeerCandidatesRef.current;
+    pendingPeerCandidatesRef.current = [];
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch {
+        // Ignore stale ICE candidates.
+      }
+    }
+  }, []);
+
+  const shouldCreateDebateOffer = useCallback(() => {
+    const local = localRoleRef.current;
+    const peer = peerRoleRef.current;
+    if (local === "for") return true;
+    if (peer === "for") return false;
+    const userId = currentUserIdRef.current;
+    const opponentId = opponentUserIdRef.current;
+    if (userId && opponentId) {
+      return userId < opponentId;
+    }
+    return false;
+  }, []);
+
+  const establishDebateConnection = useCallback(async () => {
+    const pc = pcRef.current;
+    const ws = wsRef.current;
+    if (!pc || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!localStreamRef.current) return;
+    if (!shouldCreateDebateOffer()) return;
+
+    if (pc.signalingState === "stable" && pc.currentRemoteDescription) {
+      return;
+    }
+
+    if (pc.signalingState === "have-local-offer" && pc.localDescription) {
+      ws.send(
+        JSON.stringify({ type: "offer", offer: pc.localDescription.toJSON() })
+      );
+      return;
+    }
+
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({ type: "offer", offer }));
+    } catch (error) {
+      console.error("Failed to establish debate connection:", error);
+    }
+  }, [shouldCreateDebateOffer]);
+
+  useEffect(() => {
+    establishDebateConnectionRef.current = establishDebateConnection;
+  }, [establishDebateConnection]);
+
+  const applyParticipantRoles = useCallback(
+    (
+      participants: Array<UserDetails & { role?: string; ready?: boolean }>
+    ) => {
+      const userId = currentUserIdRef.current;
+      if (!userId) return;
+
+      for (const participant of participants) {
+        const normalizedRole =
+          participant.role === "for" || participant.role === "against"
+            ? participant.role
+            : null;
+
+        if (participant.id === userId) {
+          if (normalizedRole) {
+            setLocalRole((current) => current ?? normalizedRole);
+          }
+          if (typeof participant.ready === "boolean") {
+            setLocalReady(participant.ready);
+          }
+        } else {
+          if (normalizedRole) {
+            setPeerRole(normalizedRole);
+          }
+          if (typeof participant.ready === "boolean") {
+            setPeerReady(participant.ready);
+          }
+        }
+      }
+    },
+    []
+  );
 
   const startSpectatorOffer = useCallback(
     async (baseConnectionId: string, requestId?: string) => {
@@ -487,6 +597,8 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(
     null
   );
+  const [isChallengeRoom, setIsChallengeRoom] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   // Ordered list of debate phases
   const phaseOrder = useMemo<DebatePhase[]>(
@@ -936,6 +1048,83 @@ const OnlineDebateRoom = (): JSX.Element => {
     return false;
   }, [roomId, currentUser, setRoomOwnerId]);
 
+  const handleRematch = useCallback(async () => {
+    if (!roomId) return;
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`${BASE_URL}/rooms/${roomId}/rematch`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      let data: { id?: string; inviteToken?: string; error?: string } = {};
+      try {
+        data = await response.json();
+      } catch {
+        setJoinError("Failed to create rematch room");
+        return;
+      }
+
+      if (response.ok && data.id && data.inviteToken) {
+        navigate(`/debate-room/${data.id}?invite=${data.inviteToken}`);
+        return;
+      }
+
+      setJoinError(data.error || "Failed to create rematch room");
+    } catch {
+      setJoinError("Failed to create rematch room");
+    }
+  }, [roomId, navigate]);
+
+  useEffect(() => {
+    const joinChallengeRoom = async () => {
+      if (!roomId || !currentUserId) return;
+
+      const joinKey = `${roomId}:${inviteToken ?? ""}:${currentUserId}`;
+      if (joinAttemptedRef.current === joinKey) return;
+      joinAttemptedRef.current = joinKey;
+
+      try {
+        const token = getAuthToken();
+        const body: { inviteToken?: string } = {};
+        if (inviteToken) {
+          body.inviteToken = inviteToken;
+        }
+
+        const response = await fetch(`${BASE_URL}/rooms/${roomId}/join`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+          const room = await response.json();
+          if (room.inviteToken) {
+            setIsChallengeRoom(true);
+          }
+          if (room.topic) {
+            setTopic((current) => current || room.topic);
+          }
+        } else if (inviteToken) {
+          const data = await response.json();
+          setJoinError(data.error || "Failed to join challenge room");
+        }
+      } catch {
+        if (inviteToken) {
+          setJoinError("Failed to join challenge room");
+        }
+      }
+    };
+
+    joinChallengeRoom();
+  }, [roomId, currentUserId, inviteToken]);
+
   // Function to fetch room participants
   const fetchRoomParticipants = useCallback(
     async (retryCount = 0, background = false) => {
@@ -1185,13 +1374,27 @@ const OnlineDebateRoom = (): JSX.Element => {
       const data: WSMessage = JSON.parse(event.data);
       switch (data.type) {
         case "topicChange":
-          if (data.topic !== undefined) setTopic(data.topic);
+          if (data.topic !== undefined) {
+            setTopic((current) => current || data.topic || "");
+          }
           break;
         case "roleSelection":
-          if (data.role) setPeerRole(data.role);
+          if (data.role === "for" || data.role === "against") {
+            if (data.userId === currentUserIdRef.current) {
+              setLocalRole(data.role);
+            } else {
+              setPeerRole(data.role);
+            }
+          }
           break;
         case "ready":
-          if (data.ready !== undefined) setPeerReady(data.ready);
+          if (data.ready !== undefined) {
+            if (data.userId === currentUserIdRef.current) {
+              setLocalReady(data.ready);
+            } else {
+              setPeerReady(data.ready);
+            }
+          }
           break;
         case "phaseChange":
           if (data.phase) {
@@ -1269,6 +1472,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               data.roomParticipants
             );
             setRoomParticipants(data.roomParticipants);
+            applyParticipantRoles(data.roomParticipants);
             // Update local and opponent user details when participants change
             const activeUser = currentUserRef.current;
             if (activeUser && data.roomParticipants.length >= 1) {
@@ -1360,10 +1564,22 @@ const OnlineDebateRoom = (): JSX.Element => {
             break;
           }
           if (pcRef.current && data.offer) {
-            await pcRef.current.setRemoteDescription(data.offer!);
-            const answer = await pcRef.current.createAnswer();
-            await pcRef.current.setLocalDescription(answer);
-            wsRef.current?.send(JSON.stringify({ type: "answer", answer }));
+            try {
+              const pc = pcRef.current;
+              if (pc.signalingState === "have-local-offer") {
+                if (shouldCreateDebateOffer()) {
+                  break;
+                }
+                await pc.setLocalDescription({ type: "rollback" });
+              }
+              await pc.setRemoteDescription(data.offer);
+              await flushPeerCandidates(pc);
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              wsRef.current?.send(JSON.stringify({ type: "answer", answer }));
+            } catch (error) {
+              console.error("Failed to handle debate offer:", error);
+            }
           }
           break;
         case "answer":
@@ -1403,7 +1619,13 @@ const OnlineDebateRoom = (): JSX.Element => {
           ) {
             // Spectator answer meant for the other debater; ignore.
           } else if (pcRef.current && data.answer) {
-            await pcRef.current.setRemoteDescription(data.answer);
+            try {
+              const pc = pcRef.current;
+              await pc.setRemoteDescription(data.answer);
+              await flushPeerCandidates(pc);
+            } catch (error) {
+              console.error("Failed to handle debate answer:", error);
+            }
           }
           break;
         case "candidate":
@@ -1436,7 +1658,16 @@ const OnlineDebateRoom = (): JSX.Element => {
               }
             }
           } else if (pcRef.current && data.candidate) {
-            await pcRef.current.addIceCandidate(data.candidate);
+            try {
+              const pc = pcRef.current;
+              if (pc.remoteDescription?.type) {
+                await pc.addIceCandidate(data.candidate);
+              } else {
+                pendingPeerCandidatesRef.current.push(data.candidate);
+              }
+            } catch (error) {
+              console.error("Failed to add ICE candidate:", error);
+            }
           }
           break;
       }
@@ -1456,7 +1687,16 @@ const OnlineDebateRoom = (): JSX.Element => {
     };
 
     pc.ontrack = (event) => {
-      setRemoteStream(event.streams[0]);
+      const [stream] = event.streams;
+      if (stream) {
+        setRemoteStream(stream);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed") {
+        void establishDebateConnectionRef.current();
+      }
     };
 
     const getMedia = async () => {
@@ -1507,6 +1747,20 @@ const OnlineDebateRoom = (): JSX.Element => {
   useEffect(() => {
     flushSpectatorOfferQueue();
   }, [flushSpectatorOfferQueue]);
+
+  useEffect(() => {
+    if (roomParticipants.length < 2 || !localStream) return;
+    void establishDebateConnection();
+  }, [
+    roomParticipants.length,
+    localStream,
+    localRole,
+    peerRole,
+    opponentUser?.id,
+    localReady,
+    peerReady,
+    establishDebateConnection,
+  ]);
 
   // Attach streams to video elements
   useEffect(() => {
@@ -2072,7 +2326,11 @@ const OnlineDebateRoom = (): JSX.Element => {
       return;
     }
     setLocalRole(role);
-    const message = JSON.stringify({ type: "roleSelection", role });
+    const message = JSON.stringify({
+      type: "roleSelection",
+      role,
+      userId: currentUserIdRef.current,
+    });
     wsRef.current?.send(message);
   };
 
@@ -2088,6 +2346,16 @@ const OnlineDebateRoom = (): JSX.Element => {
     const newReadyState = !localReady;
     socket.send(JSON.stringify({ type: "ready", ready: newReadyState }));
     setLocalReady(newReadyState);
+
+    wsRef.current?.send(
+      JSON.stringify({
+        type: "ready",
+        ready: newReadyState,
+        userId: currentUserIdRef.current,
+      })
+    );
+
+
   };
 
   // Manage setup popup visibility
@@ -2113,18 +2381,9 @@ const OnlineDebateRoom = (): JSX.Element => {
       console.debug(
         `Countdown finished. Starting debate at ${DebatePhase.OpeningFor} for ${localRole}`
       );
-      if (localRole === "for") {
-        pcRef.current
-          ?.createOffer()
-          .then((offer) =>
-            pcRef.current!.setLocalDescription(offer).then(() => offer)
-          )
-          .then((offer) =>
-            wsRef.current?.send(JSON.stringify({ type: "offer", offer }))
-          );
-      }
+      void establishDebateConnection();
     }
-  }, [countdown, localRole]);
+  }, [countdown, localRole, establishDebateConnection]);
 
   // Clear input fields on phase change
   useEffect(() => {
@@ -2170,6 +2429,22 @@ const OnlineDebateRoom = (): JSX.Element => {
   if (!roomId) {
     return (
       <div className="p-6 text-center text-red-600">Room ID is missing.</div>
+    );
+  }
+
+  if (joinError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="bg-white rounded-lg shadow-md p-6 max-w-md text-center">
+          <p className="text-red-600 font-medium">{joinError}</p>
+          <Button
+            onClick={() => navigate("/startDebate")}
+            className="mt-4"
+          >
+            Back to Home
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -2457,6 +2732,8 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           opponentAvatarUrl={opponentUser?.avatarUrl || null}
           ratingSummary={ratingSummary}
+          showRematch={isChallengeRoom}
+          onRematch={handleRematch}
           onClose={() => setShowJudgment(false)}
         />
       )}

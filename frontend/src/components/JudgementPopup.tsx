@@ -81,6 +81,8 @@ type JudgmentPopupProps = {
   opponentDisplayName?: string | null;
   opponentAvatarUrl?: string | null;
   ratingSummary?: RatingSummary | null;
+  showRematch?: boolean;
+  onRematch?: () => void;
   onClose: () => void;
 };
 
@@ -122,6 +124,8 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   opponentDisplayName,
   opponentAvatarUrl,
   ratingSummary,
+  showRematch,
+  onRematch,
   onClose,
 }) => {
   const navigate = useNavigate();
@@ -734,6 +738,14 @@ const player2RatingSummary =
 
         {/* Buttons */}
         <div className='text-center mt-8'>
+          {showRematch && onRematch && (
+            <Button
+              onClick={onRematch}
+              className='bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 mr-4'
+            >
+              Rematch
+            </Button>
+          )}
           <Button
             onClick={handleGoHome}
             className='bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 mr-4'

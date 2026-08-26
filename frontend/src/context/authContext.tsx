@@ -134,6 +134,15 @@ const verifyToken = useCallback(async () => {
     verifyToken();
   }, [verifyToken]);
 
+  const getPostLoginPath = () => {
+    const returnUrl = sessionStorage.getItem('returnUrl');
+    if (returnUrl) {
+      sessionStorage.removeItem('returnUrl');
+      return returnUrl;
+    }
+    return '/startDebate';
+  };
+
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
@@ -174,7 +183,7 @@ const verifyToken = useCallback(async () => {
       };
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      navigate('/');
+      navigate(getPostLoginPath());
     } catch (error) {
       handleError(error);
     } finally {
@@ -247,7 +256,7 @@ const verifyToken = useCallback(async () => {
         };
         setUser(normalizedUser);
         localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-        navigate('/');
+        navigate(getPostLoginPath());
       }
     } catch (error) {
       handleError(error);
@@ -341,7 +350,7 @@ const verifyToken = useCallback(async () => {
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
       console.log('User after Google login:', data.user);
-      navigate('/');
+      navigate(getPostLoginPath());
     } catch (error) {
       handleError(error);
     } finally {
