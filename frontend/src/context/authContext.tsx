@@ -8,8 +8,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useSetAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
-// import type { User } from "@/types/user";
-// import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { normalizeUser } from "@/utils/normalizeUser";
 
 const baseURL = import.meta.env.VITE_BASE_URL;
@@ -96,29 +94,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const userData = responseData.profile;
 
-        // const normalizedUser: User = {
-        //   id: userData.id || userData._id,
-        //   email: userData.email,
-        //   displayName: userData.displayName || 'User',
-        //   bio: userData.bio || '',
-        //   rating: userData.rating || 1500,
-        //   rd: userData.rd || 350,
-        //   volatility: userData.volatility || 0.06,
-        //   lastRatingUpdate:
-        //     userData.lastRatingUpdate || new Date().toISOString(),
-        //   avatarUrl: userData.avatarUrl || DEFAULT_AVATAR_URL,
-        //   twitter: userData.twitter,
-        //   instagram: userData.instagram,
-        //   linkedin: userData.linkedin,
-        //   password: '',
-        //   nickname: userData.nickname || 'User',
-        //   isVerified: userData.isVerified || false,
-        //   verificationCode: userData.verificationCode,
-        //   resetPasswordCode: userData.resetPasswordCode,
-        //   createdAt: userData.createdAt || new Date().toISOString(),
-        //   updatedAt: userData.updatedAt || new Date().toISOString(),
-        // };
-
         const normalizedUser = normalizeUser(userData);
 
         // final safety check
@@ -152,30 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(data.accessToken);
       localStorage.setItem("token", data.accessToken);
       // Set user details in userAtom based on the new User type
-      // const normalizedUser: User = {
-      //   id: data.user?.id || data.user?._id || undefined,
-      //   email: data.user?.email || email,
-      //   displayName: data.user?.displayName || 'User',
-      //   bio: data.user?.bio || '',
-      //   rating: data.user?.rating || 1500,
-      //   rd: data.user?.rd || 350, // Default Glicko-2 RD value
-      //   volatility: data.user?.volatility || 0.06, // Default Glicko-2 volatility
-      //   lastRatingUpdate:
-      //     data.user?.lastRatingUpdate || new Date().toISOString(),
-      //   avatarUrl:
-      //     data.user?.avatarUrl || DEFAULT_AVATAR_URL,
-      //   twitter: data.user?.twitter || undefined,
-      //   instagram: data.user?.instagram || undefined,
-      //   linkedin: data.user?.linkedin || undefined,
-      //   password: '', // Password should not be stored in client-side state
-      //   nickname: data.user?.nickname || 'User',
-      //   isVerified: data.user?.isVerified || false,
-      //   verificationCode: data.user?.verificationCode || undefined,
-      //   resetPasswordCode: data.user?.resetPasswordCode || undefined,
-      //   createdAt: data.user?.createdAt || new Date().toISOString(),
-      //   updatedAt: data.user?.updatedAt || new Date().toISOString(),
-      // };
-
+     
       const normalizedUser = normalizeUser(data.user, { email });
 
       setUser(normalizedUser);
@@ -230,27 +182,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem("token", data.accessToken);
 
         // Set user details
-        // const normalizedUser: User = {
-        //   id: data.user?.id || data.user?._id || undefined,
-        //   email: data.user?.email || email,
-        //   displayName: data.user?.displayName || 'User',
-        //   bio: data.user?.bio || '',
-        //   rating: data.user?.rating || 1200,
-        //   rd: data.user?.rd || 350,
-        //   volatility: data.user?.volatility || 0.06,
-        //   lastRatingUpdate: data.user?.lastRatingUpdate || new Date().toISOString(),
-        //   avatarUrl: data.user?.avatarUrl || DEFAULT_AVATAR_URL,
-        //   twitter: data.user?.twitter || undefined,
-        //   instagram: data.user?.instagram || undefined,
-        //   linkedin: data.user?.linkedin || undefined,
-        //   password: '',
-        //   nickname: data.user?.nickname || 'User',
-        //   isVerified: true,
-        //   verificationCode: undefined,
-        //   resetPasswordCode: undefined,
-        //   createdAt: data.user?.createdAt || new Date().toISOString(),
-        //   updatedAt: data.user?.updatedAt || new Date().toISOString(),
-        // };
 
         const normalizedUser = normalizeUser(data.user, {
           email,
@@ -328,28 +259,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(data.accessToken);
       localStorage.setItem("token", data.accessToken);
       // Set user details in userAtom based on the new User type
-      // const normalizedUser: User = {
-      //   id: data.user?.id || data.user?._id || undefined,
-      //   email: data.user?.email || "googleuser@example.com",
-      //   displayName: data.user?.displayName || "Google User",
-      //   bio: data.user?.bio || "",
-      //   rating: data.user?.rating || 1500,
-      //   rd: data.user?.rd || 350,
-      //   volatility: data.user?.volatility || 0.06,
-      //   lastRatingUpdate:
-      //     data.user?.lastRatingUpdate || new Date().toISOString(),
-      //   avatarUrl: data.user?.avatarUrl || DEFAULT_AVATAR_URL,
-      //   twitter: data.user?.twitter || undefined,
-      //   instagram: data.user?.instagram || undefined,
-      //   linkedin: data.user?.linkedin || undefined,
-      //   password: "",
-      //   nickname: data.user?.nickname || "Google User",
-      //   isVerified: data.user?.isVerified || true, // Google login often implies verified
-      //   verificationCode: data.user?.verificationCode || undefined,
-      //   resetPasswordCode: data.user?.resetPasswordCode || undefined,
-      //   createdAt: data.user?.createdAt || new Date().toISOString(),
-      //   updatedAt: data.user?.updatedAt || new Date().toISOString(),
-      // };
+    
       const normalizedUser = normalizeUser(data.user, {
         displayName: "Google User",
         isVerified: true,
