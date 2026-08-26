@@ -15,8 +15,8 @@ export const normalizeUser = (
 ): User => {
   return {
     id: data?.id || data?._id || undefined,
-    email: data?.email || options?.email || "",
-    displayName: data?.displayName || options?.displayName || "User",
+    email: options?.email ?? data?.email ?? "",
+    displayName: options?.displayName ?? data?.displayName ?? "User",
     bio: data?.bio || "",
     rating: options?.rating ?? data?.rating ?? 1500,
     rd: data?.rd ?? 350,
