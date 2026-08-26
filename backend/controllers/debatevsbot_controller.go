@@ -3,7 +3,9 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -119,7 +121,8 @@ func CreateDebate(c *gin.Context) {
 	c.JSON(200, response)
 }
 
-func SendDebateMessage(c *gin.Context) {
+
+func SendDebateMessageStream(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
 		c.JSON(401, gin.H{"error": "Authorization token required"})
@@ -139,10 +142,48 @@ func SendDebateMessage(c *gin.Context) {
 		return
 	}
 
-	// Generate bot response with the additional context field.
-	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
+	// Set headers for Server-Sent Events
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
 
-	// Update debate history with the bot's response.
+	flusher, _ := c.Writer.(http.Flusher)
+
+	sendEvent := func(eventType string, data interface{}) {
+		payload, err := json.Marshal(data)
+		if err != nil {
+			return
+		}
+		fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", eventType, payload)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	// Stream bot response in real-time
+	botResponse, err := services.StreamBotResponse(
+		c.Request.Context(),
+		req.BotName,
+		req.BotLevel,
+		req.Topic,
+		req.History,
+		req.Stance,
+		req.Context,
+		150,
+		func(chunk string) error {
+			sendEvent("chunk", gin.H{"text": chunk})
+			return nil
+		},
+	)
+
+	if err != nil {
+		log.Printf("Stream error: %v", err)
+	}
+
+	// Update debate history with the bot's response
 	updatedHistory := append(req.History, models.Message{
 		Sender: "Bot",
 		Text:   botResponse,
@@ -164,17 +205,18 @@ func SendDebateMessage(c *gin.Context) {
 		debate.ID = primitive.NewObjectID()
 	}
 	if err := db.SaveDebateVsBot(debate); err != nil {
+		log.Printf("Error saving debate vs bot: %v", err)
 	}
 
-	response := DebateMessageResponse{
-		DebateId: debate.ID.Hex(),
-		BotName:  req.BotName,
-		BotLevel: req.BotLevel,
-		Topic:    req.Topic,
-		Stance:   req.Stance,
-		Response: botResponse,
-	}
-	c.JSON(200, response)
+	// Send completion event
+	sendEvent("done", gin.H{
+		"debateId": debate.ID.Hex(),
+		"botName":  req.BotName,
+		"botLevel": req.BotLevel,
+		"topic":    req.Topic,
+		"stance":   req.Stance,
+		"response": botResponse,
+	})
 }
 
 func JudgeDebate(c *gin.Context) {
