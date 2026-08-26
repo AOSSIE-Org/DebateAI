@@ -255,7 +255,7 @@ const DebateRoom: React.FC = () => {
   const [isBotStreaming, setIsBotStreaming] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const botTurnRef = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const botMessagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const bot = allBots.find((b) => b.name === debateData.botName) || allBots[0];
@@ -420,7 +420,7 @@ const DebateRoom: React.FC = () => {
   ]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    botMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [state.messages, streamingBotText, isBotThinking]);
 
   const getPhaseInstructions = (phaseIndex: number) => {
@@ -723,7 +723,7 @@ setPopup({ show: false, message: "" });
             )}
           </div>
         )}
-        <div ref={messagesEndRef} />
+        {sender === "Bot" && <div ref={botMessagesEndRef} />}
       </div>
     );
   };
