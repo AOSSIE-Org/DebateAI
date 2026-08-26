@@ -6,6 +6,7 @@ import { UserPlus, UserCheck, Users } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import defaultAvatar from '@/assets/avatar2.jpg';
 import ProfileHover from './ProfileHover';
+import LoadingSpinner from './LoadingSpinner';
 
 interface UserProfile {
   id: string;
@@ -271,7 +272,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 )}
                 {currentUser?.id && currentUser.id !== userId && (
                   <Button
-                    variant={isFollowing ? 'outline' : 'default'}
+                    variant={isFollowing ? "outline" : "default"}
                     size="sm"
                     onClick={handleFollow}
                     className="mt-2"
@@ -304,13 +305,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                <h3 className="font-semibold">Followers ({followers.length})</h3>
+                <h3 className="font-semibold">
+                  Followers ({followers.length})
+                </h3>
               </div>
               <Card>
                 <CardContent className="p-4">
                   {loadingFollowers ? (
                     <div className="text-center py-4 text-sm text-gray-500">
-                      Loading...
+                      <LoadingSpinner size="sm" />
                     </div>
                   ) : followers.length === 0 ? (
                     <div className="text-center py-4 text-sm text-gray-500">
@@ -326,10 +329,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           <div className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer">
                             <img
                               src={follower.avatarUrl || defaultAvatar}
-                              alt={follower.displayName || 'User'}
+                              alt={follower.displayName || "User"}
                               className="w-8 h-8 rounded-full object-cover"
                             />
-                            <span className="text-sm">{follower.displayName || follower.email || 'User'}</span>
+                            <span className="text-sm">
+                              {follower.displayName || follower.email || "User"}
+                            </span>
                           </div>
                         </ProfileHover>
                       ))}
@@ -343,13 +348,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                <h3 className="font-semibold">Following ({following.length})</h3>
+                <h3 className="font-semibold">
+                  Following ({following.length})
+                </h3>
               </div>
               <Card>
                 <CardContent className="p-4">
                   {loadingFollowing ? (
                     <div className="text-center py-4 text-sm text-gray-500">
-                      Loading...
+                      <LoadingSpinner size="sm" />
                     </div>
                   ) : following.length === 0 ? (
                     <div className="text-center py-4 text-sm text-gray-500">
@@ -365,10 +372,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           <div className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer">
                             <img
                               src={followed.avatarUrl || defaultAvatar}
-                              alt={followed.displayName || 'User'}
+                              alt={followed.displayName || "User"}
                               className="w-8 h-8 rounded-full object-cover"
                             />
-                            <span className="text-sm">{followed.displayName || followed.email || 'User'}</span>
+                            <span className="text-sm">
+                              {followed.displayName || followed.email || "User"}
+                            </span>
                           </div>
                         </ProfileHover>
                       ))}

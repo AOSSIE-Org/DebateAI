@@ -86,6 +86,7 @@ import {
   transcriptService,
   SavedDebateTranscript,
 } from "@/services/transcriptService";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const handleProfileAvatarLoadError = (
   event: React.SyntheticEvent<HTMLImageElement>
@@ -637,7 +638,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowers ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner/></div>
             ) : followers.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">No followers yet</div>
             ) : (
@@ -659,7 +660,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowing ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner size="sm" /></div>
             ) : following.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">Not following anyone yet</div>
             ) : (

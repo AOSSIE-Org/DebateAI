@@ -29,6 +29,7 @@ import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
 import SupportOpenSource from './Pages/SupportOpenSource';
+import LoadingSpinner from './components/LoadingSpinner';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -38,7 +39,7 @@ function ProtectedRoute() {
   }
   const { isAuthenticated, loading: isLoading } = authContext;
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner/>
   }
   return isAuthenticated ? <Outlet /> : <Navigate to='/' replace />;
 }
