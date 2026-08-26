@@ -483,6 +483,7 @@ const DebateRoom: React.FC = () => {
   };
 
   const handleNextTurn = () => {
+    if (isBotThinking || isBotStreaming) return;
     setState((prev) => {
       advanceTurn(prev);
       return prev;
@@ -824,9 +825,10 @@ setPopup({ show: false, message: "" });
                 {bot.rating ? `Rating: ${bot.rating}` : "Ready to argue!"}
               </div>
             </div>
-            {nextTurnPending && (
+            {nextTurnPending && !isBotThinking && !isBotStreaming && (
               <Button
                 onClick={handleNextTurn}
+                disabled={isBotThinking || isBotStreaming}
                 className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
               >
                 Next Turn

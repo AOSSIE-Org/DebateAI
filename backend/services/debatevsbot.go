@@ -185,7 +185,6 @@ Your debating style must strictly adhere to the following guidelines:
 Your stance is: %s.
 %s
 %s
-%s
 Provide an opening statement that embodies your persona and stance.
 [Your opening argument]
 %s %s`,
@@ -295,6 +294,11 @@ func StreamBotResponse(ctx context.Context, botName, botLevel, topic string, his
 	}
 
 	cleaned := cleanModelOutput(fullResponse.String())
+	if cleaned == "" {
+		errResp := personalityErrorResponse(botName, "A glitch in my logic, there is.")
+		_ = onChunk(errResp)
+		return errResp, nil
+	}
 	return cleaned, nil
 }
 
