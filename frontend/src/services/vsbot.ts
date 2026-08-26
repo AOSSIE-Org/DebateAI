@@ -109,6 +109,7 @@ export const sendDebateMessageStream = async (
   let accumulatedText = "";
   let debateId = "";
   let buffer = "";
+  let receivedDone = false;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -132,6 +133,19 @@ export const sendDebateMessageStream = async (
         }
       }
 
+      if (eventType === "error") {
+        let errorMsg = "Stream error";
+        if (dataStr) {
+          try {
+            const parsed = JSON.parse(dataStr);
+            errorMsg = parsed.error || parsed.message || dataStr;
+          } catch {
+            errorMsg = dataStr;
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
       if (dataStr) {
         try {
           const parsed = JSON.parse(dataStr);
@@ -141,6 +155,7 @@ export const sendDebateMessageStream = async (
               onChunk(parsed.text, accumulatedText);
             }
           } else if (eventType === "done") {
+            receivedDone = true;
             if (parsed.response) {
               accumulatedText = parsed.response;
             }
@@ -153,6 +168,10 @@ export const sendDebateMessageStream = async (
         }
       }
     }
+  }
+
+  if (!receivedDone) {
+    throw new Error("Stream ended before receiving done event");
   }
 
   return { response: accumulatedText, debateId };

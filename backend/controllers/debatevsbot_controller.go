@@ -181,6 +181,8 @@ func SendDebateMessageStream(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("Stream error: %v", err)
+		sendEvent("error", gin.H{"error": err.Error()})
+		return
 	}
 
 	// Update debate history with the bot's response
