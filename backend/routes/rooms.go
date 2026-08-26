@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"math"
-	mathrand "math/rand"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -29,6 +30,7 @@ type Room struct {
 	InviteToken     string        `json:"inviteToken,omitempty" bson:"inviteToken,omitempty"`
 	Topic           string        `json:"topic,omitempty" bson:"topic,omitempty"`
 	InvitedUsername string        `json:"invitedUsername,omitempty" bson:"invitedUsername,omitempty"`
+	RematchOfRoomID string        `json:"rematchOfRoomId,omitempty" bson:"rematchOfRoomId,omitempty"`
 }
 
 // Participant represents a user in a room.
@@ -42,8 +44,11 @@ type Participant struct {
 
 // generateRoomID creates a random six-digit room ID as a string.
 func generateRoomID() string {
-	mathrand.Seed(time.Now().UnixNano())
-	return strconv.Itoa(mathrand.Intn(900000) + 100000)
+	n, err := rand.Int(rand.Reader, big.NewInt(900000))
+	if err != nil {
+		return strconv.FormatInt(time.Now().UnixNano()%900000+100000, 10)
+	}
+	return strconv.Itoa(int(n.Int64()) + 100000)
 }
 
 func generateInviteToken() string {
@@ -152,7 +157,7 @@ func GetRoomsHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cursor, err := collection.Find(ctx, bson.D{})
+	cursor, err := collection.Find(ctx, bson.M{"type": bson.M{"$ne": "invite"}})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching rooms"})
 		return
@@ -220,10 +225,38 @@ func JoinRoomHandler(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid invite token"})
 			return
 		}
-		if len(room.Participants) >= 2 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Room is full"})
+		if room.InvitedUsername != "" && !strings.EqualFold(strings.TrimSpace(user.DisplayName), room.InvitedUsername) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "This challenge was sent to another user"})
 			return
 		}
+
+		filter := bson.M{
+			"_id":         roomId,
+			"inviteToken": input.InviteToken,
+			"$expr": bson.M{
+				"$lt": []interface{}{bson.M{"$size": "$participants"}, 2},
+			},
+		}
+		update := bson.M{
+			"$addToSet": bson.M{"participants": participant},
+		}
+		opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+		var updatedRoom Room
+		if err := roomCollection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updatedRoom); err != nil {
+			if err == mongo.ErrNoDocuments {
+				c.JSON(http.StatusConflict, gin.H{"error": "Room is full"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not join room"})
+			return
+		}
+
+		matchmakingService := services.GetMatchmakingService()
+		matchmakingService.RemoveFromPool(user.ID.Hex())
+
+		c.JSON(http.StatusOK, updatedRoom)
+		return
 	}
 
 	if alreadyIn {
@@ -418,9 +451,19 @@ func CreateChallengeHandler(c *gin.Context) {
 
 	opponentUsername := strings.TrimSpace(input.OpponentUsername)
 	if opponentUsername != "" {
-		userCollection := db.MongoDatabase.Collection("users")
-		var opponent roomUser
-		_ = userCollection.FindOne(ctx, bson.M{"displayName": opponentUsername}).Decode(&opponent)
+		if strings.EqualFold(opponentUsername, strings.TrimSpace(user.DisplayName)) {
+			opponentUsername = ""
+		} else {
+			userCollection := db.MongoDatabase.Collection("users")
+			var opponent roomUser
+			if err := userCollection.FindOne(ctx, bson.M{"displayName": opponentUsername}).Decode(&opponent); err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Opponent not found. Leave blank to share link with anyone."})
+				return
+			}
+			if opponent.ID == user.ID {
+				opponentUsername = ""
+			}
+		}
 	}
 
 	creatorParticipant := userToParticipant(user)
@@ -495,14 +538,23 @@ func RematchHandler(c *gin.Context) {
 		return
 	}
 
-	creatorParticipant := userToParticipant(user)
+	var existingRematch Room
+	if err := roomCollection.FindOne(ctx, bson.M{"rematchOfRoomId": roomId}).Decode(&existingRematch); err == nil {
+		c.JSON(http.StatusOK, existingRematch)
+		return
+	}
+
+	rematchParticipants := make([]Participant, len(room.Participants))
+	copy(rematchParticipants, room.Participants)
+
 	newRoom := Room{
-		ID:           generateRoomID(),
-		Type:         "invite",
-		OwnerID:      creatorParticipant.ID,
-		Participants: []Participant{creatorParticipant},
-		InviteToken:  generateInviteToken(),
-		Topic:        room.Topic,
+		ID:              generateRoomID(),
+		Type:            "invite",
+		OwnerID:         user.ID.Hex(),
+		Participants:    rematchParticipants,
+		InviteToken:     generateInviteToken(),
+		Topic:           room.Topic,
+		RematchOfRoomID: roomId,
 	}
 
 	if _, err := roomCollection.InsertOne(ctx, newRoom); err != nil {

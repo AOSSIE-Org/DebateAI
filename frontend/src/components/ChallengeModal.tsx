@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getAuthToken } from '@/utils/auth';
+import { useUser } from '@/hooks/useUser';
 
 interface ChallengeModalProps {
   onClose: () => void;
@@ -20,12 +21,14 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
 
 const ChallengeModal: React.FC<ChallengeModalProps> = ({ onClose }) => {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [opponentUsername, setOpponentUsername] = useState('');
   const [topic, setTopic] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [challenge, setChallenge] = useState<ChallengeRoom | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
 
   const inviteLink = challenge
     ? `${window.location.origin}/debate-room/${challenge.id}?invite=${challenge.inviteToken}`
@@ -40,6 +43,17 @@ const ChallengeModal: React.FC<ChallengeModalProps> = ({ onClose }) => {
     setLoading(true);
     setError('');
 
+    const trimmedOpponent = opponentUsername.trim();
+    const currentName = user?.displayName?.trim() ?? '';
+    const resolvedOpponent =
+      trimmedOpponent &&
+      currentName &&
+      trimmedOpponent.localeCompare(currentName, undefined, {
+        sensitivity: 'accent',
+      }) === 0
+        ? ''
+        : trimmedOpponent;
+
     try {
       const token = getAuthToken();
       const response = await fetch(`${BASE_URL}/rooms/challenge`, {
@@ -49,7 +63,7 @@ const ChallengeModal: React.FC<ChallengeModalProps> = ({ onClose }) => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          opponentUsername: opponentUsername.trim(),
+          opponentUsername: resolvedOpponent,
           topic: topic.trim(),
         }),
       });
@@ -74,9 +88,14 @@ const ChallengeModal: React.FC<ChallengeModalProps> = ({ onClose }) => {
 
   const handleCopy = async () => {
     if (!inviteLink) return;
-    await navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopyError('');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyError('Could not copy link. Please copy it manually from the field above.');
+    }
   };
 
   const handleEnterRoom = () => {
@@ -105,9 +124,12 @@ const ChallengeModal: React.FC<ChallengeModalProps> = ({ onClose }) => {
                   id='opponent'
                   value={opponentUsername}
                   onChange={(e) => setOpponentUsername(e.target.value)}
-                  placeholder='Their display name'
+                  placeholder='e.g. LogicLord (or leave blank)'
                   className='mt-1'
                 />
+                <p className='text-xs text-muted-foreground mt-1'>
+                  Leave blank to share the invite link with anyone.
+                </p>
               </div>
               <div>
                 <Label htmlFor='topic'>Debate topic</Label>
@@ -143,6 +165,9 @@ const ChallengeModal: React.FC<ChallengeModalProps> = ({ onClose }) => {
                 {copied ? <Check size={16} /> : <Copy size={16} />}
               </Button>
             </div>
+            {copyError && (
+              <p className='text-sm text-red-600 mb-3'>{copyError}</p>
+            )}
             <div className='flex gap-2'>
               <Button onClick={handleCopy} variant='outline' className='flex-1'>
                 {copied ? 'Copied!' : 'Copy Link'}
