@@ -4,15 +4,16 @@ import {
   useEffect,
   useCallback,
   ReactNode,
-} from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSetAtom } from 'jotai';
-import { userAtom } from '@/state/userAtom';
-import type { User } from '@/types/user';
-import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
+} from "react";
+import { useNavigate } from "react-router-dom";
+import { useSetAtom } from "jotai";
+import { userAtom } from "@/state/userAtom";
+// import type { User } from "@/types/user";
+// import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
+import { normalizeUser } from "@/utils/normalizeUser";
 
 const baseURL = import.meta.env.VITE_BASE_URL;
-const USER_CACHE_KEY = 'userProfile';
+const USER_CACHE_KEY = "userProfile";
 
 interface AuthContextType {
   token: string | null;
@@ -28,18 +29,18 @@ interface AuthContextType {
   confirmForgotPassword: (
     email: string,
     code: string,
-    newPassword: string
+    newPassword: string,
   ) => Promise<void>;
   googleLogin: (idToken: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(
-    localStorage.getItem('token')
+    localStorage.getItem("token"),
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,88 +49,90 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleError = (error: unknown) => {
     const message =
-      error instanceof Error ? error.message : 'An unexpected error occurred';
+      error instanceof Error ? error.message : "An unexpected error occurred";
     setError(message);
     throw error;
   };
 
-let currentRequest = 0;
-const verifyToken = useCallback(async () => {
-  const requestId = ++currentRequest;
+  let currentRequest = 0;
+  const verifyToken = useCallback(async () => {
+    const requestId = ++currentRequest;
 
-  const storedToken = localStorage.getItem('token');
-  if (!storedToken) return;
+    const storedToken = localStorage.getItem("token");
+    if (!storedToken) return;
 
-  try {
-    const response = await fetch(`${baseURL}/verifyToken`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${storedToken}` },
-    });
-
-    // ignore if outdated
-    if (requestId !== currentRequest) return;
-
-    if (!response.ok) {
-      localStorage.removeItem('token');
-      setToken(null);
-      setUser(null);
-      navigate('/login');
-      return;
-    }
-
-    setToken(storedToken);
-
-    const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${storedToken}` },
-    });
-
-    // ignore if outdated
-    if (requestId !== currentRequest) return;
-
-    if (userResponse.ok) {
-      const responseData = await userResponse.json();
+    try {
+      const response = await fetch(`${baseURL}/verifyToken`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
 
       // ignore if outdated
       if (requestId !== currentRequest) return;
 
-      const userData = responseData.profile;
+      if (!response.ok) {
+        localStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
+        navigate("/login");
+        return;
+      }
 
-      const normalizedUser: User = {
-        id: userData.id || userData._id,
-        email: userData.email,
-        displayName: userData.displayName || 'User',
-        bio: userData.bio || '',
-        rating: userData.rating || 1500,
-        rd: userData.rd || 350,
-        volatility: userData.volatility || 0.06,
-        lastRatingUpdate:
-          userData.lastRatingUpdate || new Date().toISOString(),
-        avatarUrl: userData.avatarUrl || DEFAULT_AVATAR_URL,
-        twitter: userData.twitter,
-        instagram: userData.instagram,
-        linkedin: userData.linkedin,
-        password: '',
-        nickname: userData.nickname || 'User',
-        isVerified: userData.isVerified || false,
-        verificationCode: userData.verificationCode,
-        resetPasswordCode: userData.resetPasswordCode,
-        createdAt: userData.createdAt || new Date().toISOString(),
-        updatedAt: userData.updatedAt || new Date().toISOString(),
-      };
+      setToken(storedToken);
 
-      // final safety check
+      const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
+
+      // ignore if outdated
       if (requestId !== currentRequest) return;
 
-      setUser(normalizedUser);
-      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+      if (userResponse.ok) {
+        const responseData = await userResponse.json();
+
+        // ignore if outdated
+        if (requestId !== currentRequest) return;
+
+        const userData = responseData.profile;
+
+        // const normalizedUser: User = {
+        //   id: userData.id || userData._id,
+        //   email: userData.email,
+        //   displayName: userData.displayName || 'User',
+        //   bio: userData.bio || '',
+        //   rating: userData.rating || 1500,
+        //   rd: userData.rd || 350,
+        //   volatility: userData.volatility || 0.06,
+        //   lastRatingUpdate:
+        //     userData.lastRatingUpdate || new Date().toISOString(),
+        //   avatarUrl: userData.avatarUrl || DEFAULT_AVATAR_URL,
+        //   twitter: userData.twitter,
+        //   instagram: userData.instagram,
+        //   linkedin: userData.linkedin,
+        //   password: '',
+        //   nickname: userData.nickname || 'User',
+        //   isVerified: userData.isVerified || false,
+        //   verificationCode: userData.verificationCode,
+        //   resetPasswordCode: userData.resetPasswordCode,
+        //   createdAt: userData.createdAt || new Date().toISOString(),
+        //   updatedAt: userData.updatedAt || new Date().toISOString(),
+        // };
+
+        const normalizedUser = normalizeUser(userData);
+
+        // final safety check
+        if (requestId !== currentRequest) return;
+
+        setUser(normalizedUser);
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+      }
+    } catch (error) {
+      console.log("error", error);
+      logout();
     }
-  } catch (error) {
-    console.log('error', error);
-    logout();
-  }
-}, [setUser]);
-  
+  }, [setUser]);
+
   useEffect(() => {
     verifyToken();
   }, [verifyToken]);
@@ -138,43 +141,46 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${baseURL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Login failed');
+      if (!response.ok) throw new Error(data.message || "Login failed");
 
       setToken(data.accessToken);
-      localStorage.setItem('token', data.accessToken);
+      localStorage.setItem("token", data.accessToken);
       // Set user details in userAtom based on the new User type
-      const normalizedUser: User = {
-        id: data.user?.id || data.user?._id || undefined,
-        email: data.user?.email || email,
-        displayName: data.user?.displayName || 'User',
-        bio: data.user?.bio || '',
-        rating: data.user?.rating || 1500,
-        rd: data.user?.rd || 350, // Default Glicko-2 RD value
-        volatility: data.user?.volatility || 0.06, // Default Glicko-2 volatility
-        lastRatingUpdate:
-          data.user?.lastRatingUpdate || new Date().toISOString(),
-        avatarUrl:
-          data.user?.avatarUrl || DEFAULT_AVATAR_URL,
-        twitter: data.user?.twitter || undefined,
-        instagram: data.user?.instagram || undefined,
-        linkedin: data.user?.linkedin || undefined,
-        password: '', // Password should not be stored in client-side state
-        nickname: data.user?.nickname || 'User',
-        isVerified: data.user?.isVerified || false,
-        verificationCode: data.user?.verificationCode || undefined,
-        resetPasswordCode: data.user?.resetPasswordCode || undefined,
-        createdAt: data.user?.createdAt || new Date().toISOString(),
-        updatedAt: data.user?.updatedAt || new Date().toISOString(),
-      };
+      // const normalizedUser: User = {
+      //   id: data.user?.id || data.user?._id || undefined,
+      //   email: data.user?.email || email,
+      //   displayName: data.user?.displayName || 'User',
+      //   bio: data.user?.bio || '',
+      //   rating: data.user?.rating || 1500,
+      //   rd: data.user?.rd || 350, // Default Glicko-2 RD value
+      //   volatility: data.user?.volatility || 0.06, // Default Glicko-2 volatility
+      //   lastRatingUpdate:
+      //     data.user?.lastRatingUpdate || new Date().toISOString(),
+      //   avatarUrl:
+      //     data.user?.avatarUrl || DEFAULT_AVATAR_URL,
+      //   twitter: data.user?.twitter || undefined,
+      //   instagram: data.user?.instagram || undefined,
+      //   linkedin: data.user?.linkedin || undefined,
+      //   password: '', // Password should not be stored in client-side state
+      //   nickname: data.user?.nickname || 'User',
+      //   isVerified: data.user?.isVerified || false,
+      //   verificationCode: data.user?.verificationCode || undefined,
+      //   resetPasswordCode: data.user?.resetPasswordCode || undefined,
+      //   createdAt: data.user?.createdAt || new Date().toISOString(),
+      //   updatedAt: data.user?.updatedAt || new Date().toISOString(),
+      // };
+
+      const normalizedUser = normalizeUser(data.user, { email });
+
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      navigate('/');
+      navigate("/");
     } catch (error) {
       handleError(error);
     } finally {
@@ -186,14 +192,14 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${baseURL}/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Signup failed');
+        throw new Error(data.message || "Signup failed");
       }
     } catch (error) {
       handleError(error);
@@ -206,14 +212,14 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${baseURL}/verifyEmail`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, confirmationCode: code }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Verification failed');
+        throw new Error(data.error || "Verification failed");
       }
 
       const data = await response.json();
@@ -221,33 +227,40 @@ const verifyToken = useCallback(async () => {
       // User is now verified and logged in
       if (data.accessToken) {
         setToken(data.accessToken);
-        localStorage.setItem('token', data.accessToken);
+        localStorage.setItem("token", data.accessToken);
 
         // Set user details
-        const normalizedUser: User = {
-          id: data.user?.id || data.user?._id || undefined,
-          email: data.user?.email || email,
-          displayName: data.user?.displayName || 'User',
-          bio: data.user?.bio || '',
-          rating: data.user?.rating || 1200,
-          rd: data.user?.rd || 350,
-          volatility: data.user?.volatility || 0.06,
-          lastRatingUpdate: data.user?.lastRatingUpdate || new Date().toISOString(),
-          avatarUrl: data.user?.avatarUrl || DEFAULT_AVATAR_URL,
-          twitter: data.user?.twitter || undefined,
-          instagram: data.user?.instagram || undefined,
-          linkedin: data.user?.linkedin || undefined,
-          password: '',
-          nickname: data.user?.nickname || 'User',
+        // const normalizedUser: User = {
+        //   id: data.user?.id || data.user?._id || undefined,
+        //   email: data.user?.email || email,
+        //   displayName: data.user?.displayName || 'User',
+        //   bio: data.user?.bio || '',
+        //   rating: data.user?.rating || 1200,
+        //   rd: data.user?.rd || 350,
+        //   volatility: data.user?.volatility || 0.06,
+        //   lastRatingUpdate: data.user?.lastRatingUpdate || new Date().toISOString(),
+        //   avatarUrl: data.user?.avatarUrl || DEFAULT_AVATAR_URL,
+        //   twitter: data.user?.twitter || undefined,
+        //   instagram: data.user?.instagram || undefined,
+        //   linkedin: data.user?.linkedin || undefined,
+        //   password: '',
+        //   nickname: data.user?.nickname || 'User',
+        //   isVerified: true,
+        //   verificationCode: undefined,
+        //   resetPasswordCode: undefined,
+        //   createdAt: data.user?.createdAt || new Date().toISOString(),
+        //   updatedAt: data.user?.updatedAt || new Date().toISOString(),
+        // };
+
+        const normalizedUser = normalizeUser(data.user, {
+          email,
           isVerified: true,
-          verificationCode: undefined,
-          resetPasswordCode: undefined,
-          createdAt: data.user?.createdAt || new Date().toISOString(),
-          updatedAt: data.user?.updatedAt || new Date().toISOString(),
-        };
+          rating: 1200,
+          clearVerificationCode: true,
+        });
         setUser(normalizedUser);
         localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-        navigate('/');
+        navigate("/");
       }
     } catch (error) {
       handleError(error);
@@ -260,14 +273,14 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${baseURL}/forgotPassword`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Password reset failed');
+        throw new Error(data.message || "Password reset failed");
       }
     } catch (error) {
       handleError(error);
@@ -279,19 +292,19 @@ const verifyToken = useCallback(async () => {
   const confirmForgotPassword = async (
     email: string,
     code: string,
-    newPassword: string
+    newPassword: string,
   ) => {
     setLoading(true);
     try {
       const response = await fetch(`${baseURL}/confirmForgotPassword`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code, newPassword }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Password update failed');
+        throw new Error(data.message || "Password update failed");
       }
     } catch (error) {
       handleError(error);
@@ -304,44 +317,48 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${baseURL}/googleLogin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Google login failed');
+      if (!response.ok) throw new Error(data.message || "Google login failed");
 
       setToken(data.accessToken);
-      localStorage.setItem('token', data.accessToken);
+      localStorage.setItem("token", data.accessToken);
       // Set user details in userAtom based on the new User type
-      const normalizedUser: User = {
-        id: data.user?.id || data.user?._id || undefined,
-        email: data.user?.email || 'googleuser@example.com',
-        displayName: data.user?.displayName || 'Google User',
-        bio: data.user?.bio || '',
-        rating: data.user?.rating || 1500,
-        rd: data.user?.rd || 350,
-        volatility: data.user?.volatility || 0.06,
-        lastRatingUpdate:
-          data.user?.lastRatingUpdate || new Date().toISOString(),
-        avatarUrl:
-          data.user?.avatarUrl || DEFAULT_AVATAR_URL,
-        twitter: data.user?.twitter || undefined,
-        instagram: data.user?.instagram || undefined,
-        linkedin: data.user?.linkedin || undefined,
-        password: '',
-        nickname: data.user?.nickname || 'Google User',
-        isVerified: data.user?.isVerified || true, // Google login often implies verified
-        verificationCode: data.user?.verificationCode || undefined,
-        resetPasswordCode: data.user?.resetPasswordCode || undefined,
-        createdAt: data.user?.createdAt || new Date().toISOString(),
-        updatedAt: data.user?.updatedAt || new Date().toISOString(),
-      };
+      // const normalizedUser: User = {
+      //   id: data.user?.id || data.user?._id || undefined,
+      //   email: data.user?.email || "googleuser@example.com",
+      //   displayName: data.user?.displayName || "Google User",
+      //   bio: data.user?.bio || "",
+      //   rating: data.user?.rating || 1500,
+      //   rd: data.user?.rd || 350,
+      //   volatility: data.user?.volatility || 0.06,
+      //   lastRatingUpdate:
+      //     data.user?.lastRatingUpdate || new Date().toISOString(),
+      //   avatarUrl: data.user?.avatarUrl || DEFAULT_AVATAR_URL,
+      //   twitter: data.user?.twitter || undefined,
+      //   instagram: data.user?.instagram || undefined,
+      //   linkedin: data.user?.linkedin || undefined,
+      //   password: "",
+      //   nickname: data.user?.nickname || "Google User",
+      //   isVerified: data.user?.isVerified || true, // Google login often implies verified
+      //   verificationCode: data.user?.verificationCode || undefined,
+      //   resetPasswordCode: data.user?.resetPasswordCode || undefined,
+      //   createdAt: data.user?.createdAt || new Date().toISOString(),
+      //   updatedAt: data.user?.updatedAt || new Date().toISOString(),
+      // };
+      const normalizedUser = normalizeUser(data.user, {
+        displayName: "Google User",
+        isVerified: true,
+        clearVerificationCode: true,
+      });
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      console.log('User after Google login:', data.user);
-      navigate('/');
+      console.log("User after Google login:", data.user);
+      navigate("/");
     } catch (error) {
       handleError(error);
     } finally {
@@ -351,10 +368,10 @@ const verifyToken = useCallback(async () => {
 
   const logout = () => {
     setToken(null);
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     localStorage.removeItem(USER_CACHE_KEY);
     setUser(null); // Clear userAtom on logout
-    navigate('/auth');
+    navigate("/auth");
   };
 
   return (
