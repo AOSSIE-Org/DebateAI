@@ -18,7 +18,7 @@ export const normalizeUser = (
     email: data?.email || options?.email || "",
     displayName: data?.displayName || options?.displayName || "User",
     bio: data?.bio || "",
-    rating: data?.rating ?? options?.rating ?? 1500,
+    rating: options?.rating ?? data?.rating ?? 1500,
     rd: data?.rd ?? 350,
     volatility: data?.volatility ?? 0.06,
     lastRatingUpdate: data?.lastRatingUpdate || new Date().toISOString(),
