@@ -369,20 +369,15 @@ func extractTopicFromTranscripts(transcripts map[string]string) string {
 }
 
 func lookupRoomTopic(ctx context.Context, roomID string) string {
-	if db.MongoClient == nil {
+	if db.MongoClient == nil || db.MongoDatabase == nil {
 		return ""
-	}
-
-	var database = db.MongoDatabase
-	if database == nil {
-		database = db.MongoClient.Database("DebateAI")
 	}
 
 	var room struct {
 		Topic        string `bson:"topic"`
 		CurrentTopic string `bson:"currentTopic"`
 	}
-	if err := database.Collection("rooms").FindOne(ctx, bson.M{"_id": roomID}).Decode(&room); err == nil {
+	if err := db.MongoDatabase.Collection("rooms").FindOne(ctx, bson.M{"_id": roomID}).Decode(&room); err == nil {
 		if topic := strings.TrimSpace(room.Topic); topic != "" {
 			return topic
 		}

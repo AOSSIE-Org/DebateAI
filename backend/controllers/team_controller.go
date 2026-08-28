@@ -556,6 +556,7 @@ func RemoveMember(c *gin.Context) {
 		return
 	}
 
+	services.RemoveFromMatchmaking(objectID)
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed successfully"})
 }
 
@@ -596,6 +597,7 @@ func DeleteTeam(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete team"})
 		return
 	}
+	services.RemoveFromMatchmaking(objectID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Team deleted successfully"})
 }

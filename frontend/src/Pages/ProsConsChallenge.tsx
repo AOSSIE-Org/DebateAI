@@ -16,6 +16,8 @@ interface Evaluation {
   score: number;
 }
 
+const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+
 const ProsConsChallenge: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [topic, setTopic] = useState<string | null>(null);
@@ -41,7 +43,7 @@ const ProsConsChallenge: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:1313/coach/pros-cons/topic", {
+      const response = await fetch(`${baseURL}/coach/pros-cons/topic`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -82,7 +84,7 @@ const ProsConsChallenge: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://localhost:1313/coach/pros-cons/submit", {
+      const response = await fetch(`${baseURL}/coach/pros-cons/submit`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

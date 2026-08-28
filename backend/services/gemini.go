@@ -8,7 +8,7 @@ import (
 	"google.golang.org/genai"
 )
 
-const defaultGeminiModel = "gemini-2.5-flash"
+const defaultGeminiModel = "gemini-3.6-flash"
 
 func initGemini(apiKey string) (*genai.Client, error) {
 	config := &genai.ClientConfig{}
