@@ -4,7 +4,6 @@ interface SpeechRecognitionErrorEvent extends Event {
   error: string; // e.g. "no-speech", "not-allowed"
   message: string; // descriptive message
 }
-
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
