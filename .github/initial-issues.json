@@ -1,0 +1,287 @@
+{
+  "issues": [
+    {
+      "title": "Documentation: Add Project Title, Description, Badges and Basic Info",
+      "body": "## Description\nAdd clear project title, description, badges, and logo/banner to README to establish project identity.\n\n## Tasks\n- [ ] Add clear project title and description\n- [ ] Include project logo/banner (if available)\n- [ ] Add favicon (if applicable)\n- [ ] Add informative badges (build status, license, version, tech stack, coverage, etc.)\n\n## Resources\n- [README Template](https://github.com/AOSSIE-Org/Template-Repo/blob/main/README_TEMPLATE.md)\n- [Shields.io](https://shields.io/) for badge generation\n",
+      "labels": [
+        "documentation",
+        "good-first-issue",
+        "setup"
+      ]
+    },
+    {
+      "title": "Documentation: Write Installation Instructions",
+      "body": "## Description\nWrite clear, step-by-step installation instructions for the project.\n\n## Tasks\n- [ ] Document prerequisites\n- [ ] Write installation steps\n- [ ] Include platform-specific instructions if needed\n- [ ] Add troubleshooting tips for common installation issues\n\n## Best Practices\n- Make it beginner-friendly\n- Test instructions on a fresh environment\n- Include commands that can be copy-pasted\n\n## Resources\n- [README Template](https://github.com/AOSSIE-Org/Template-Repo/blob/main/README_TEMPLATE.md)\n",
+      "labels": [
+        "documentation",
+        "good-first-issue",
+        "setup"
+      ]
+    },
+    {
+      "title": "Documentation: Add Usage Examples and Code Snippets",
+      "body": "## Description\nAdd practical usage examples and code snippets to help users get started quickly.\n\n## Tasks\n- [ ] Write basic usage examples\n- [ ] Add code snippets for common use cases\n- [ ] Include expected output/results\n- [ ] Add links to more detailed documentation if applicable\n\n## Resources\n- [README Template](https://github.com/AOSSIE-Org/Template-Repo/blob/main/README_TEMPLATE.md)\n",
+      "labels": [
+        "documentation",
+        "good-first-issue",
+        "setup"
+      ]
+    },
+    {
+      "title": "Documentation: Complete README Content",
+      "body": "## Description\nComplete the README with comprehensive project documentation including features, navigation, and visual elements.\n\n## Tasks\n- [ ] Document all major project features with examples\n- [ ] Add table of contents for easy navigation\n- [ ] Add link to CONTRIBUTING.md\n- [ ] Add Discord/communication channels information\n- [ ] Include screenshots/GIFs/demo links (if applicable)\n- [ ] Optimize images for web (file size)\n\n## Resources\n- [README Template](https://github.com/AOSSIE-Org/Template-Repo/blob/main/README_TEMPLATE.md)\n",
+      "labels": [
+        "documentation",
+        "good-first-issue",
+        "setup"
+      ]
+    },
+    {
+      "title": "CI/CD: Set up Build Workflow",
+      "body": "## Description\nConfigure GitHub Actions workflow for automated building.\n\n## Tasks\n- [ ] Create build workflow file in .github/workflows/\n- [ ] Configure build triggers (push, pull request)\n- [ ] Set up build steps for your project\n- [ ] Add build status badge to README\n- [ ] Test workflow execution\n\n## Resources\n- [GitHub Actions Documentation](https://docs.github.com/en/actions)\n",
+      "labels": [
+        "setup",
+        "automation",
+        "ci-cd"
+      ]
+    },
+    {
+      "title": "CI/CD: Set up Deployment Pipeline (GitHub Pages for frontend-only projects)",
+      "body": "## Description\nConfigure automated deployment workflow for production/staging environments.  For backend-free frontend projects, deploy to GitHub Pages.\n\n## Tasks\n- [ ] Create deployment workflow\n- [ ] Configure deployment triggers\n- [ ] For frontend-only projects:  Set up GitHub Pages deployment\n- [ ] For projects with backend:  Configure deployment to appropriate hosting service\n- [ ] Set up environment-specific configurations\n- [ ] Add deployment status checks\n- [ ] Test deployment process\n- [ ] Document deployment procedures\n\n## Notes\n- Frontend-only projects should use GitHub Pages for free hosting\n- Projects with backends should specify their deployment target (Heroku, AWS, etc.)",
+      "labels": [
+        "setup",
+        "automation",
+        "deployment",
+        "ci-cd"
+      ]
+    },
+    {
+      "title": "Security: Setup Dependabot",
+      "body": "## Description\nEnable and configure Dependabot for automated dependency updates and security alerts.\n\n## Tasks\n- [ ] Enable Dependabot alerts in repository settings\n- [ ] Enable Dependabot security updates\n- [ ] Create or review .github/dependabot.yml\n- [ ] Configure update schedule and package ecosystems\n- [ ] Set up notification preferences\n- [ ] Review existing security alerts\n- [ ] Test Dependabot pull requests\n\n## Resources\n- [Dependabot Documentation](https://docs.github.com/en/code-security/dependabot)\n- [Dependabot Configuration Options](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file)\n",
+      "labels": [
+        "security",
+        "dependencies",
+        "setup"
+      ]
+    },
+    {
+      "title": "Code Quality: Setup Linting",
+      "body": "## Description\nConfigure code linting tools to maintain code quality and integrate into CI pipeline.\n\n## Tasks\n- [ ] Choose appropriate linter (ESLint, Flake8, RuboCop, etc.)\n- [ ] Install linter dependencies\n- [ ] Create linter configuration file\n- [ ] Run linter on existing code\n- [ ] Fix or document linting issues\n- [ ] Create linting workflow in .github/workflows/\n- [ ] Configure linter to run on pull requests\n- [ ] Add linting status badge to README\n- [ ] Update CONTRIBUTING.md with linting requirements\n\n## Resources\n- [GitHub Actions Documentation](https://docs.github.com/en/actions)\n- Check CONTRIBUTING.md for code style guidelines\n",
+      "labels": [
+        "code-quality",
+        "setup",
+        "automation"
+      ]
+    },
+    {
+      "title": "Code Quality: Configure CodeRabbit Multi-Repo Analysis (if applicable)",
+      "body": "## Description\nCodeRabbit supports multi-repo analysis, which lets it use other repositories as context when reviewing PRs. The `.coderabbit.yaml` in this repository already contains a commented-out `knowledge_base` section ready to be filled in.\n\n## When is this useful?\n- **Microservices** — a change to one service's API may break consumers in other repos\n- **Shared libraries** — modifications to a shared utility can have ripple effects across multiple repos\n- **API contracts** — when a backend API changes, frontend/mobile repos may need coordinated updates\n- **Database schemas** — schema changes can affect all services querying the same data model\n- **Frontend ↔ backend** — link tightly coupled client/server repos for cross-repo awareness\n\n> **Note:** Do not configure this at the org level — link only the repos directly relevant to this project.\n\n## Tasks\n- [ ] Identify related repositories that would provide useful context for PR reviews\n- [ ] Open `.coderabbit.yaml` and locate the commented-out `knowledge_base` block\n- [ ] Uncomment the block and replace the placeholder values with the actual org and repo names\n- [ ] Open a PR with the change and verify CodeRabbit uses the linked repos as context\n\n## Example\n```yaml\nknowledge_base:\n  linked_repositories:\n    - repository: \"your-org/related-repo\"\n      instructions: \"Brief description of what this repo contains and why it's relevant\"\n```\n\n## Resources\n- [CodeRabbit Multi-Repo Analysis Docs](https://docs.coderabbit.ai/knowledge-base/multi-repo-analysis)\n\n**Note**: If this project has no meaningfully related repositories, you can close this issue.\n",
+      "labels": [
+        "code-quality",
+        "setup",
+        "good-first-issue"
+      ]
+    },
+
+    {
+      "title": "Frontend: Add Required Footer Elements(if applicable)",
+      "body": "## Description\nIf this is a frontend project, ensure it has a proper footer with all required elements.\n\n## Tasks\n- [ ] Verify footer exists on all pages\n- [ ] Add copyright statement: \"\u00a9 2025 AOSSIE\"\n- [ ] Add \"KYA (Know Your Assumptions)\" link/element\n- [ ] Ensure footer is consistent across all pages\n\n## Requirements\nAll AOSSIE frontends must include:\n- Copyright statement: `\u00a9 2025 AOSSIE`\n- KYA (Know Your Assumptions)\n\n## Resources\n- [Bene](https://ergo.bene.stability.nexus/) for Ergo is a project that does KYA very nicely, as a modal that is shown when the user first visits the website and also when the user clicks the link in the footer. We should follow this approach.\n- [KYA Template](https://github.com/StabilityNexus/Info/blob/main/KYA.md) - Use this template for creating your KYA content.\n\n**Note**: If this is not a frontend project, you can close this issue.\n",
+      "labels": [
+        "frontend",
+        "documentation",
+        "setup"
+      ]
+    },
+    {
+      "title": "Frontend: Setup Social Share Button (if applicable)",
+      "body": "## Description\nIf this is a frontend project, integrate the AOSSIE Social Share Button to allow users to easily share content across multiple social platforms.\n\n## Tasks\n- [ ] Install the SocialShareButton package\n- [ ] Configure share button with appropriate platforms\n- [ ] Customize button styling to match project theme\n- [ ] Add share button to relevant pages/components\n- [ ] Test sharing functionality across different platforms\n- [ ] Add documentation for share button usage\n\n## About\nThe Social Share Button is a lightweight JavaScript library that enables easy sharing to multiple social platforms including Facebook, Twitter, LinkedIn, Reddit, WhatsApp, Telegram, and more.\n\n## Resources\n- [AOSSIE Social Share Button Repository](https://github.com/AOSSIE-Org/SocialShareButton)\n- Check the README for installation and configuration instructions\n\n**Note**: If this is not a frontend project, you can close this issue.\n",
+      "labels": [
+        "frontend",
+        "enhancement",
+        "setup"
+      ]
+    },
+    {
+      "title": "Frontend: Implement Responsive Design for Mobile (if applicable)",
+      "body": "## Description\nEnsure the frontend displays properly across all screen sizes, especially mobile devices. Many AOSSIE projects have frontends where element sizes do not adjust well for smaller screens.\n\n## Tasks\n- [ ] Audit all pages for mobile responsiveness\n- [ ] Implement responsive CSS using media queries or modern frameworks\n- [ ] Test on various screen sizes (mobile, tablet, desktop)\n- [ ] Ensure touch-friendly interactive elements (minimum 44x44px)\n- [ ] Fix any text overflow or layout breaking issues\n- [ ] Optimize images for different screen sizes\n- [ ] Test on actual mobile devices (iOS and Android)\n- [ ] Ensure proper viewport meta tag is set\n- [ ] Verify navigation/menu works well on mobile\n- [ ] Check that all buttons and forms are easily usable on mobile\n\n## Best Practices\n- Use mobile-first approach\n- Use relative units (rem, em, %, vw, vh) instead of fixed pixels\n- Test across multiple devices and browsers\n- Consider using CSS frameworks with built-in responsiveness\n- Ensure proper spacing and padding for touch targets\n\n## Resources\n- [Responsive Web Design Basics](https://web.dev/responsive-web-design-basics/)\n- [MDN Responsive Design Guide](https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout/Responsive_Design)\n\n**Note**: If this is not a frontend project, you can close this issue.\n",
+      "labels": [
+        "frontend",
+        "enhancement",
+        "mobile",
+        "ux"
+      ]
+    },
+    {
+      "title": "Frontend: Implement SEO Meta Tags (if applicable)",
+      "body": "## Description\nAdd proper meta tags for SEO and social media sharing.\n\n## Tasks\n- [ ] Add proper meta tags (title, description, keywords)\n- [ ] Implement Open Graph tags for social media\n- [ ] Add Twitter Card meta tags\n- [ ] Add favicon and app icons\n- [ ] Test meta tags with social media validators\n\n## Best Practices\n- Keep meta descriptions under 160 characters\n- Use descriptive, keyword-rich titles (50-60 characters)\n\n## Resources\n- [MDN SEO Basics](https://developer.mozilla.org/en-US/docs/Glossary/SEO)\n\n**Note**: If this is not a frontend project, you can close this issue.\n",
+      "labels": [
+        "frontend",
+        "enhancement",
+        "seo"
+      ]
+    },
+    {
+      "title": "Frontend: Implement SEO Technical Setup (if applicable)",
+      "body": "## Description\nSet up technical SEO infrastructure for search engine visibility.\n\n## Tasks\n- [ ] Create and submit sitemap.xml\n- [ ] Configure robots.txt properly\n- [ ] Add canonical URLs to prevent duplicate content\n- [ ] Implement structured data (Schema.org markup)\n- [ ] Test with Google Search Console\n- [ ] Verify with SEO audit tools\n\n## Resources\n- [Google SEO Starter Guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)\n- [Schema.org Documentation](https://schema.org/)\n- [Google Search Console](https://search.google.com/search-console)\n\n**Note**: If this is not a frontend project, you can close this issue.\n",
+      "labels": [
+        "frontend",
+        "enhancement",
+        "seo"
+      ]
+    },
+    {
+      "title": "Frontend: Optimize SEO Content Structure (if applicable)",
+      "body": "## Description\nOptimize content structure and semantics for better SEO.\n\n## Tasks\n- [ ] Optimize page titles and headings (H1, H2, etc.)\n- [ ] Add alt text to all images\n- [ ] Ensure proper internal linking structure\n- [ ] Use semantic HTML5 elements\n- [ ] Ensure content is unique and valuable\n\n## Best Practices\n- Use HTTPS (secure connections)\n- Optimize for Core Web Vitals (LCP, FID, CLS)\n- Make site mobile-friendly (mobile-first indexing)\n\n## Resources\n- [Google SEO Starter Guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)\n\n**Note**: If this is not a frontend project, you can close this issue.\n",
+      "labels": [
+        "frontend",
+        "enhancement",
+        "seo"
+      ]
+    },
+    {
+      "title": "Blockchain: Add Token List Support for ERC20 Selection (if applicable)",
+      "body": "## Description\nIf this is an EVM-based blockchain project that allows users to deploy contracts with custom ERC20 tokens, improve the user experience by allowing users to select tokens from a curated list in addition to manually inputting contract addresses.\n\n## Context\nCurrently, some AOSSIE EVM-based projects only support manual ERC20 contract address input. Users should also be able to choose from a pre-populated list of supported tokens for better UX.\n\n## Tasks\n- [ ] Check if this project involves ERC20 token selection for contract deployment\n- [ ] Integrate the StabilityNexus TokenList\n- [ ] Implement UI dropdown/selector for supported tokens\n- [ ] Keep the option for manual contract address input\n- [ ] Validate manually entered contract addresses\n- [ ] Add token logo/icon display in the selector\n- [ ] Implement token search/filter functionality\n- [ ] Add proper error handling for invalid addresses\n- [ ] Test with various tokens from the list\n- [ ] Update documentation with new token selection feature\n\n## Benefits\n- Improved user experience\n- Reduced errors from manual address input\n- Visual token identification with logos\n- Faster token selection\n\n## Resources\n- [StabilityNexus TokenList](https://github.com/StabilityNexus/TokenList) - Check README for integration details and supported tokens\n\n**Note**: If this is not an EVM-based blockchain project, you can close this issue.\n",
+      "labels": [
+        "blockchain",
+        "enhancement",
+        "ux"
+      ]
+    },
+    {
+      "title": "Backend: Implement Consistent Error Handling (if applicable)",
+      "body": "## Description\nStandardize error handling across the entire application (backend and frontend) to ensure consistent user experience and easier debugging.\n\n## Tasks\n- [ ] Define standard error response format (status code, message, error code)\n- [ ] Implement centralized error handling middleware/utilities\n- [ ] Create custom error classes for different error types\n- [ ] Add proper HTTP status codes for all error scenarios\n- [ ] Implement user-friendly error messages for frontend\n- [ ] Add detailed error logging for debugging\n- [ ] Handle validation errors consistently\n- [ ] Implement global error boundaries (frontend)\n- [ ] Add error monitoring/tracking integration\n- [ ] Document error codes and their meanings\n- [ ] Test error scenarios thoroughly\n\n## Best Practices\n- Never expose sensitive information in error messages\n- Use appropriate HTTP status codes\n- Log errors with context (request ID, user ID, timestamp)\n- Provide actionable error messages to users\n- Differentiate between client and server errors\n\n## Resources\n- [HTTP Status Codes Guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)\n- [Error Handling Best Practices](https://www.freecodecamp.org/news/error-handling-in-javascript/)\n",
+      "labels": [
+        "backend",
+        "enhancement",
+        "good-first-issue"
+      ]
+    },
+    {
+      "title": "Backend: Add API Rate Limiting (if applicable)",
+      "body": "## Description\nImplement rate limiting on API endpoints to prevent abuse, DDoS attacks, and ensure fair usage across all users.\n\n## Tasks\n- [ ] Identify endpoints that need rate limiting\n- [ ] Choose rate limiting strategy (IP-based, user-based, or both)\n- [ ] Implement rate limiting middleware\n- [ ] Define rate limits for different endpoint types\n- [ ] Add proper HTTP 429 responses when limit exceeded\n- [ ] Include rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)\n- [ ] Implement different tiers for authenticated vs anonymous users\n- [ ] Add rate limit monitoring and alerts\n- [ ] Document rate limits in API documentation\n- [ ] Test rate limiting behavior\n- [ ] Consider implementing exponential backoff suggestions\n\n## Recommended Limits\n- Public endpoints: 100 requests per 15 minutes\n- Authenticated users: 1000 requests per hour\n- Admin/privileged users: Higher or no limits\n\n## Resources\n- [Rate Limiting Strategies](https://cloud.google.com/architecture/rate-limiting-strategies-techniques)\n\n**Note**: If this project doesn't have an API backend, you can close this issue.\n",
+      "labels": [
+        "backend",
+        "security",
+        "enhancement"
+      ]
+    },
+    {
+      "title": "Blockchain: Comprehensive Smart Contract Testing (if applicable)",
+      "body": "## Description\nImplement thorough unit and integration tests for all smart contracts to ensure security, correctness, and reliability.\n\n## Tasks\n- [ ] Setup testing framework (Hardhat, Foundry, or Truffle)\n- [ ] Write unit tests for all contract functions\n- [ ] Test edge cases and boundary conditions\n- [ ] Implement integration tests for contract interactions\n- [ ] Test access control and permission mechanisms\n- [ ] Test event emissions\n- [ ] Add gas consumption tests\n- [ ] Test upgrade mechanisms (if upgradeable contracts)\n- [ ] Implement fuzzing tests for critical functions\n- [ ] Test failure scenarios and reverts\n- [ ] Achieve minimum 90% code coverage\n- [ ] Add continuous testing in CI/CD pipeline\n- [ ] Document test scenarios and expected behaviors\n\n## Test Categories\n- Unit tests for individual functions\n- Integration tests for multi-contract scenarios\n- Fork tests against mainnet state\n- Invariant/property-based tests\n\n## Resources\n- [Hardhat Testing Guide](https://hardhat.org/tutorial/testing-contracts)\n- [Foundry Testing](https://book.getfoundry.sh/forge/tests)\n- [Smart Contract Testing Best Practices](https://ethereum.org/en/developers/docs/smart-contracts/testing/)\n\n**Note**: If this project doesn't involve smart contracts, you can close this issue.\n",
+      "labels": [
+        "blockchain",
+        "testing",
+        "security"
+      ]
+    },
+    {
+      "title": "Blockchain: Gas Optimization Audit (if applicable)",
+      "body": "## Description\nAudit and optimize smart contract gas usage to reduce transaction costs for users. This is an ongoing task where community members can continuously suggest optimizations.\n\n## Tasks\n- [ ] Run gas reporter on all contract functions\n- [ ] Identify gas-heavy operations\n- [ ] Optimize storage usage (use packed structs, minimize storage writes)\n- [ ] Use memory instead of storage where appropriate\n- [ ] Optimize loops and iterations\n- [ ] Use appropriate data types (uint256 vs smaller types)\n- [ ] Remove unnecessary operations and redundant checks\n- [ ] Consider using libraries for common operations\n- [ ] Batch operations where possible\n- [ ] Optimize modifier usage\n- [ ] Use events instead of storage for historical data\n- [ ] Document gas costs for major operations\n- [ ] Compare gas usage before/after optimizations\n\n## Ongoing Optimization\nThis issue can remain open for community members to continuously suggest and implement gas optimizations as new patterns emerge.\n\n## Resources\n- [Gas Optimization Techniques](https://www.rareskills.io/post/gas-optimization)\n- [OpenZeppelin Gas Optimization Tips](https://docs.openzeppelin.com/contracts/4.x/api/utils)\n\n**Note**: If this project doesn't involve smart contracts, you can close this issue.\n",
+      "labels": [
+        "blockchain",
+        "optimization",
+        "help-wanted"
+      ]
+    },
+    {
+      "title": "Blockchain: Run Automated Security Analysis Tools (if applicable)",
+      "body": "## Description\nRun automated security tools to identify potential vulnerabilities in smart contracts.\n\n## Tasks\n- [ ] Set up Slither for static analysis\n- [ ] Run Mythril for security scanning\n- [ ] Review and fix identified issues\n- [ ] Integrate security tools into CI pipeline\n- [ ] Document findings and resolutions\n\n## Resources\n- [Slither Documentation](https://github.com/crytic/slither)\n- [Mythril Documentation](https://github.com/ConsenSys/mythril)\n\n**Note**: If this project doesn't involve smart contracts, you can close this issue.\n",
+      "labels": [
+        "blockchain",
+        "security",
+        "automation"
+      ]
+    },
+    {
+      "title": "Blockchain: Manual Security Audit Checklist (if applicable)",
+      "body": "## Description\nPerform manual security review of smart contracts against common vulnerabilities.\n\n## Security Checks\n- [ ] Reentrancy protection (use ReentrancyGuard)\n- [ ] Integer overflow/underflow (use SafeMath or Solidity 0.8+)\n- [ ] Access control mechanisms properly implemented\n- [ ] Input validation on all external functions\n- [ ] Check for unchecked return values\n- [ ] Verify proper use of tx.origin vs msg.sender\n- [ ] Review delegatecall usage for security\n- [ ] Check for front-running vulnerabilities\n- [ ] Verify timestamp dependence issues\n- [ ] Review randomness generation (avoid block.timestamp)\n- [ ] Check for denial of service vulnerabilities\n- [ ] Verify proper event logging\n- [ ] Review upgrade mechanisms (if proxy pattern used)\n- [ ] Check for signature replay attacks\n- [ ] Verify proper handling of ETH/token transfers\n\n## Audit Steps\n- [ ] Manual code review by team members\n- [ ] Create security documentation\n- [ ] Consider professional third-party audit\n- [ ] Setup bug bounty program\n\n## Resources\n- [Smart Contract Security Best Practices](https://consensys.github.io/smart-contract-best-practices/)\n- [SWC Registry - Vulnerability Classification](https://swcregistry.io/)\n- [OpenZeppelin Security Tools](https://www.openzeppelin.com/security-audits)\n\n**Note**: If this project doesn't involve smart contracts, you can close this issue.\n",
+      "labels": [
+        "blockchain",
+        "security",
+        "critical"
+      ]
+    },
+    {
+      "title": "Blockchain: Handle Network Switching Gracefully (if applicable)",
+      "body": "## Description\nIf this is a blockchain frontend project, implement proper handling when users switch networks in their wallet to ensure smooth user experience and prevent errors.\n\n## Tasks\n- [ ] Detect network changes in wallet\n- [ ] Display current network to user\n- [ ] Show warning when user is on wrong network\n- [ ] Implement automatic network switching prompt\n- [ ] Handle unsupported networks gracefully\n- [ ] Pause/disable actions when on wrong network\n- [ ] Update UI state when network changes\n- [ ] Re-fetch data after network switch\n- [ ] Clear cached data specific to previous network\n- [ ] Test switching between different networks\n- [ ] Add network configuration for all supported chains\n- [ ] Implement fallback RPC endpoints\n- [ ] Display network-specific information (gas prices, block time)\n\n## Best Practices\n- Never assume the network won't change\n- Always validate network before transactions\n- Provide clear feedback about required network\n- Store network-specific data separately\n\n## Resources\n- [MetaMask Network Detection](https://docs.metamask.io/wallet/how-to/detect-network/)\n- [Wagmi Network Handling](https://wagmi.sh/react/hooks/useNetwork)\n\n**Note**: If this is not a blockchain frontend project, you can close this issue.\n",
+      "labels": [
+        "blockchain",
+        "frontend",
+        "enhancement",
+        "ux"
+      ]
+    },
+    {
+      "title": "Testing: Add Comprehensive Test Suite",
+      "body": "## Description\nImplement comprehensive testing including unit, integration, and E2E tests to ensure code quality and reliability.\n\n## Tasks\n\n### Unit Testing\n- [ ] Set up testing framework (Jest, pytest, etc.)\n- [ ] Write unit tests for core modules/functions\n- [ ] Achieve minimum 80% code coverage\n- [ ] Test edge cases and error conditions\n- [ ] Keep tests isolated and independent\n- [ ] Use descriptive test names\n- [ ] Mock external dependencies\n\n### Integration Testing\n- [ ] Identify critical integration points\n- [ ] Write integration tests for API endpoints\n- [ ] Test database interactions\n- [ ] Test external service integrations\n- [ ] Add integration tests to CI pipeline\n\n### End-to-End Testing (if applicable)\n- [ ] Set up E2E testing framework (Playwright, Cypress, Selenium)\n- [ ] Identify critical user journeys\n- [ ] Write E2E tests for main workflows\n- [ ] Add visual regression testing (optional)\n- [ ] Configure E2E tests in CI pipeline\n\n## Best Practices\n- Integrate all tests into CI pipeline\n- Add test documentation\n- Run tests automatically on PRs\n- Keep test suites fast and reliable\n\n## Resources\n- Check your language/framework testing documentation\n- [Playwright Documentation](https://playwright.dev/)\n- [Cypress Documentation](https://www.cypress.io/)\n\n**Note**: E2E tests only applicable for projects with UI components.\n",
+      "labels": [
+        "testing",
+        "enhancement",
+        "good-first-issue"
+      ]
+    },
+    {
+      "title": "Performance: Optimize Bundle Size and Add Monitoring (if applicable)",
+      "body": "## Description\nOptimize frontend bundle size to improve load times and set up performance monitoring.\n\n## Tasks\n- [ ] Analyze current bundle size\n- [ ] Implement code splitting\n- [ ] Enable tree shaking\n- [ ] Optimize dependencies (remove unused)\n- [ ] Add compression (gzip/brotli)\n- [ ] Lazy load non-critical components\n- [ ] Add bundle size monitoring\n- [ ] Set up performance monitoring tool\n- [ ] Configure performance alerts\n- [ ] Track Core Web Vitals\n- [ ] Document performance baselines\n\n## Tools\n- [Webpack Bundle Analyzer](https://github.com/webpack-contrib/webpack-bundle-analyzer)\n- [Source Map Explorer](https://github.com/danvk/source-map-explorer)\n- [Lighthouse](https://developers.google.com/web/tools/lighthouse)\n\n**Note**: Only applicable for frontend projects.\n",
+      "labels": [
+        "frontend",
+        "performance",
+        "optimization"
+      ]
+    },
+    {
+      "title": "Documentation: Add API Documentation (if applicable)",
+      "body": "## Description\nCreate comprehensive API documentation for backend endpoints.\n\n## Tasks\n- [ ] Choose documentation format (OpenAPI/Swagger, etc.)\n- [ ] Document all API endpoints\n- [ ] Include request/response examples\n- [ ] Document authentication requirements\n- [ ] Add error response documentation\n- [ ] Set up interactive API documentation (Swagger UI)\n- [ ] Keep documentation in sync with code\n\n## Tools\n- [Swagger/OpenAPI](https://swagger.io/)\n- [Postman](https://www.postman.com/)\n- [Redoc](https://redocly.com/)\n\n**Note**: Only applicable for projects with API backends.\n",
+      "labels": [
+        "backend",
+        "documentation",
+        "api"
+      ]
+    },
+    {
+      "title": "Security: Add Environment Variable Validation",
+      "body": "## Description\nImplement validation for environment variables to catch configuration errors early.\n\n## Tasks\n- [ ] List all required environment variables\n- [ ] Add validation on application startup\n- [ ] Provide clear error messages for missing/invalid vars\n- [ ] Document all environment variables\n- [ ] Add .env.example file with all required variables\n- [ ] Implement type checking for environment values\n\n## Best Practices\n- Fail fast if required variables are missing\n- Never commit actual .env files\n- Use descriptive variable names\n- Document variable purposes and formats\n",
+      "labels": [
+        "security",
+        "enhancement",
+        "good-first-issue"
+      ]
+    },
+    {
+      "title": "Security: Implement Input Validation and Sanitization",
+      "body": "## Description\nAdd comprehensive input validation to prevent security vulnerabilities.\n\n## Tasks\n- [ ] Identify all user input points\n- [ ] Implement validation for all inputs\n- [ ] Add sanitization to prevent XSS\n- [ ] Validate file uploads (type, size, content)\n- [ ] Use parameterized queries to prevent SQL injection\n- [ ] Add rate limiting on input-heavy endpoints\n- [ ] Document validation rules\n\n## Best Practices\n- Validate on both client and server side\n- Use allowlist validation (not blocklist)\n- Sanitize output when displaying user content\n- Never trust client-side validation alone\n\n## Resources\n- [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)\n",
+      "labels": [
+        "security",
+        "enhancement",
+        "critical"
+      ]
+    },
+    {
+      "title": "Database: Setup Migrations and Seeding (if applicable)",
+      "body": "## Description\nSet up database migration system for version-controlled schema changes and seeding scripts for development.\n\n## Tasks\n- [ ] Choose migration tool (Flyway, Liquibase, Alembic, etc.)\n- [ ] Set up migration infrastructure\n- [ ] Create initial migration for current schema\n- [ ] Add migration scripts to version control\n- [ ] Create seed data scripts for development\n- [ ] Add commands to run migrations and seeds\n- [ ] Document migration and seeding workflow\n- [ ] Test migrations (up and down)\n- [ ] Ensure seeds are idempotent\n\n## Best Practices\n- Never modify existing migrations\n- Always make migrations reversible when possible\n- Never run seeds in production\n- Test migrations on staging before production\n- Back up database before running migrations\n\n## Resources\n- [Flyway](https://flywaydb.org/) (Java)\n- [Alembic](https://alembic.sqlalchemy.org/) (Python)\n- [Knex.js](http://knexjs.org/) (Node.js)\n\n**Note**: Only applicable for projects with databases.\n",
+      "labels": [
+        "database",
+        "backend",
+        "setup"
+      ]
+    },
+    {
+      "title": "Logging: Implement Structured Logging (if applicable)",
+      "body": "## Description\nImplement structured logging for better log analysis and debugging.\n\n## Tasks\n- [ ] Choose logging library with structured logging support\n- [ ] Replace console.log/print with proper logger\n- [ ] Add log levels (debug, info, warn, error)\n- [ ] Include context in logs (request ID, user ID, etc.)\n- [ ] Add log aggregation (optional)\n- [ ] Configure log rotation\n- [ ] Document logging standards\n\n## Log Levels\n- ERROR: Application errors that need attention\n- WARN: Warning conditions\n- INFO: Informational messages\n- DEBUG: Detailed debug information\n\n## Tools\n- [Winston](https://github.com/winstonjs/winston) (Node.js)\n- [Loguru](https://github.com/Delgan/loguru) (Python)\n- [Serilog](https://serilog.net/) (.NET)\n\n## Resources\n- [Structured Logging Best Practices](https://www.honeycomb.io/blog/structured-logging-and-your-team)\n",
+      "labels": [
+        "backend",
+        "logging",
+        "enhancement"
+      ]
+    },
+    {
+      "title": "Setup: Add GitHub Repository Social Preview Image",
+      "body": "## Description\nAdd a social preview image to the GitHub repository to improve visibility and branding when the repository link is shared on social media, messaging apps, or other platforms.\n\n## Tasks\n- [ ] Design or create a social preview image (recommended size: 1280×640 px)\n- [ ] Go to the repository **Settings** on GitHub\n- [ ] Scroll down to the **Social preview** section\n- [ ] Upload the image\n- [ ] Verify the preview looks correct by sharing the repository link\n\n## Image Guidelines\n- Recommended size: **1280×640 px**\n- File formats: PNG, JPG, or GIF\n- Keep file size reasonable (under 1 MB)\n- Include project name, logo, and a short tagline if possible\n- Use high contrast and readable fonts\n- Ensure the image represents the project clearly\n\n## Why This Matters\nWhen users share the repository link on platforms like Twitter, LinkedIn, Slack, or Discord, GitHub automatically uses this image as the link preview thumbnail. A professional social preview image improves the project's credibility and recognition.\n\n## Resources\n- [GitHub Docs: Customizing your repository's social media preview](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview)\n- [Canva](https://www.canva.com/) for designing the image\n- [Figma](https://www.figma.com/) for more advanced design\n",
+      "labels": [
+        "documentation",
+        "setup",
+        "good-first-issue"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,256 @@
+name: Best Practices
+
+on:
+  push:
+    paths:
+      - 'BestPracticesChecklist.md'
+  schedule:
+    - cron: '0 9 * * 1' # Every Monday 9am UTC (for criteria sync)
+  workflow_dispatch:
+
+jobs:
+
+  # Runs when BestPracticesChecklist.md changes
+  update-score:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse checklist and compute score
+        run: |
+          python3 << 'EOF'
+          import json, re
+          from datetime import date
+
+          CATEGORY_HEADERS = {
+              "## 🏗️ Basics":        "basics",
+              "## 🔄 Change Control": "change_control",
+              "## 🐛 Reporting":      "reporting",
+              "## ✅ Quality":        "quality",
+              "## 🔐 Security":       "security",
+              "## 🔬 Analysis":       "analysis",
+          }
+
+          CATEGORY_TOTALS = {
+              "basics": 8,
+              "change_control": 6,
+              "reporting": 8,
+              "quality": 11,
+              "security": 9,
+              "analysis": 7,
+          }
+
+          with open("BestPracticesChecklist.md") as f:
+              content = f.read()
+
+          lines = content.splitlines()
+          current_cat = None
+          counts = {k: 0 for k in CATEGORY_TOTALS}
+
+          for line in lines:
+              stripped = line.strip()
+              for header, cat in CATEGORY_HEADERS.items():
+                  if stripped == header:
+                      current_cat = cat
+                      break
+              # [x] = Met, [~] = N/A (counts as met)
+              if current_cat and re.match(r'- \[[xX~]\]', stripped):
+                  counts[current_cat] += 1
+
+          total_met = sum(counts.values())
+          total = sum(CATEGORY_TOTALS.values())
+          percent = round((total_met / total) * 100) if total > 0 else 0
+
+          if percent >= 80:
+              color = "brightgreen"
+          elif percent >= 60:
+              color = "yellow"
+          elif percent >= 40:
+              color = "orange"
+          else:
+              color = "red"
+
+          status = {
+              "schemaVersion": 1,
+              "label": "Best Practices",
+              "message": f"{percent}%",
+              "schema": "aossie-best-practices-v1",
+              "updated": str(date.today()),
+              "met": total_met,
+              "total": total,
+              "percent": percent,
+              "color": color,
+              "categories": {
+                  cat: {"met": counts[cat], "total": CATEGORY_TOTALS[cat]}
+                  for cat in CATEGORY_TOTALS
+              }
+          }
+
+          with open("checklist-status.json", "w") as f:
+              json.dump(status, f, indent=2)
+
+          print(f"Score: {total_met}/{total} ({percent}%)")
+          EOF
+
+      - name: Update score table in checklist
+        run: |
+          python3 << 'EOF'
+          import json, re
+
+          with open("checklist-status.json") as f:
+              s = json.load(f)
+
+          def emoji(met, total):
+              pct = met / total * 100 if total else 0
+              return "✅" if pct == 100 else ("🟡" if pct >= 50 else "🔴")
+
+          c = s["categories"]
+          table = f"""| Category           | Met | Total | Status |
+          |--------------------|-----|-------|--------|
+          | Basics             | {c['basics']['met']}   | {c['basics']['total']}     | {emoji(c['basics']['met'], c['basics']['total'])}     |
+          | Change Control     | {c['change_control']['met']}   | {c['change_control']['total']}     | {emoji(c['change_control']['met'], c['change_control']['total'])}     |
+          | Reporting          | {c['reporting']['met']}   | {c['reporting']['total']}     | {emoji(c['reporting']['met'], c['reporting']['total'])}     |
+          | Quality            | {c['quality']['met']}   | {c['quality']['total']}     | {emoji(c['quality']['met'], c['quality']['total'])}     |
+          | Security           | {c['security']['met']}   | {c['security']['total']}     | {emoji(c['security']['met'], c['security']['total'])}     |
+          | Analysis           | {c['analysis']['met']}   | {c['analysis']['total']}     | {emoji(c['analysis']['met'], c['analysis']['total'])}     |
+          | **Total**          | **{s['met']}** | **{s['total']}** | **{s['percent']}%** |"""
+
+          with open("BestPracticesChecklist.md") as f:
+              content = f.read()
+
+          marker = "<!-- Auto-updated by checklist-score.yml workflow — do not edit manually -->"
+          if marker not in content:
+              print("⚠️ Warning: Auto-update marker not found in BestPracticesChecklist.md")
+
+          new_content = re.sub(
+              r'(?<=<!-- Auto-updated by checklist-score\.yml workflow — do not edit manually -->\n).*?(?=\n---)',
+              table.strip(),
+              content,
+              flags=re.DOTALL
+          )
+
+          if new_content == content:
+              print("⚠️ Warning: Table was not updated - check marker format")
+
+          with open("BestPracticesChecklist.md", "w") as f:
+              f.write(new_content)
+          EOF
+
+      - name: Commit updated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add checklist-status.json BestPracticesChecklist.md
+          if ! git diff --staged --quiet; then
+           git commit -m "chore: update best practices score [skip ci]"
+           git fetch origin ${{ github.ref_name }}
+           if ! git rebase origin/${{ github.ref_name }}; then
+             git rebase --abort
+             exit 1
+           fi
+           git push
+          fi
+
+  # Fetches OpenSSF criteria → diffs → opens PR if changed (Runs ONLY in template-repo on schedule)
+  sync-criteria:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    if: |
+      github.repository == 'AOSSIE-Org/Template-Repo' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch upstream OpenSSF criteria
+        run: |
+          curl -sf \
+            "https://raw.githubusercontent.com/coreinfrastructure/best-practices-badge/main/docs/criteria/criteria.md" \
+            -o upstream_criteria.md || \
+          curl -sf \
+            "https://raw.githubusercontent.com/coreinfrastructure/best-practices-badge/main/docs/criteria.md" \
+            -o upstream_criteria.md || {
+              echo "::error::Failed to fetch upstream OpenSSF criteria from both URLs"
+              exit 1
+            }
+
+      - name: Ensure maintenance label exists
+        run: gh label create maintenance --description "Maintenance tasks" --color "FBCA04" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Diff upstream vs checklist and open PR if changed
+        run: |
+          python3 << 'EOF'
+          import re, subprocess, sys
+          from datetime import date
+
+          with open("upstream_criteria.md") as f:
+              upstream_content = f.read()
+
+          with open("BestPracticesChecklist.md") as f:
+              local_content = f.read()
+
+          upstream_ids = set(re.findall(r'\[([a-z][a-z0-9_]+)\]\(#\1\)', upstream_content))
+          local_ids    = set(re.findall(r'\*\*([a-z][a-z0-9_]+)\*\*', local_content))
+          
+          if not upstream_ids:
+              print("⚠️ Warning: No criteria IDs found in upstream. Format may have changed.")
+              sys.exit(0)
+
+          added   = upstream_ids - local_ids
+          removed = local_ids - upstream_ids
+
+          if not added and not removed:
+              print("✅ In sync with upstream. No PR needed.")
+              sys.exit(0)
+
+          lines = ["# OpenSSF Criteria Sync Report\n"]
+          if added:
+              lines.append("## 🆕 New criteria to add to checklist\n")
+              lines += [f"- `{c}`" for c in sorted(added)]
+          if removed:
+              lines.append("\n## ❌ Criteria removed from OpenSSF (review checklist)\n")
+              lines += [f"- `{c}`" for c in sorted(removed)]
+
+          report = "\n".join(lines)
+          print(report)
+
+          branch = f"chore/openssf-sync-{date.today()}"
+          subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+          subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=True)
+          subprocess.run(["git", "checkout", "-b", branch], check=True)
+
+          with open(".github/openssf_criteria_diff.md", "w") as f:
+              f.write(report)
+
+          subprocess.run(["git", "add", ".github/openssf_criteria_diff.md"], check=True)
+          subprocess.run(["git", "commit", "-m", f"chore: OpenSSF criteria diff {date.today()}"], check=True)
+          subprocess.run(["git", "push", "origin", branch], check=True)
+
+          # Check if PR already exists for this branch
+          result = subprocess.run(
+              ["gh", "pr", "list", "--head", branch, "--json", "number"],
+              capture_output=True, text=True
+          )
+          if result.returncode == 0 and result.stdout.strip() != "[]":
+              print(f"PR already exists for branch {branch}, skipping creation")
+              sys.exit(0)
+
+          subprocess.run([
+              "gh", "pr", "create",
+              "--title", "🔄 OpenSSF Criteria Update - Action Required",
+              "--body", report,
+              "--base", "main",
+              "--head", branch,
+              "--label", "maintenance"
+          ], check=True)
+          EOF
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
