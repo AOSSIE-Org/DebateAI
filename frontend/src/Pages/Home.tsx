@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "@/context/authContext";
@@ -6,10 +6,11 @@ import DebateCover from "../assets/DebateCover4.svg";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 import AOSSIELogo from "@/assets/aossie.png";
-
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const authContext = useContext(AuthContext);
+  const [loading, setLoading] = useState<null | "online" | "bot">(null);
+  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
   const signupHandler = () => {
     navigate('/auth', { state: { isSignUp: true } });
@@ -19,20 +20,32 @@ const Home: React.FC = () => {
     navigate('/auth', { state: { isSignUp: false } });
   };
 
-  const handlePlayDebateClick = () => {
+  const handlePlayDebateClick = async () => {
+    setLoading("online");
+
+    await delay(800);
+
     if (authContext?.isAuthenticated) {
-      navigate('/game');  
+      navigate('/game');
     } else {
       navigate('/auth', { state: { isSignUp: false } });
     }
+
+    setLoading(null);
   };
 
-  const handlePlayBotClick = () => {
+  const handlePlayBotClick = async () => {
+    setLoading("bot");
+
+    await delay(800);
+
     if (authContext?.isAuthenticated) {
-      navigate('/bot-selection');  // Navigate to bot selection page
+      navigate('/bot-selection');
     } else {
-      navigate('/auth', { state: { isSignUp: false } });  // Navigate to login page if not authenticated
+      navigate('/auth', { state: { isSignUp: false } });
     }
+
+    setLoading(null);
   };
 
   const logoutHandler = () =>{
