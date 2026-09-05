@@ -42,7 +42,7 @@ func GetJWTSecret() string {
 
 // ExtractNameFromEmail extracts the username before '@'
 func ExtractNameFromEmail(email string) string {
-	re := regexp.MustCompile(`^([^@]+)`)
+	re := regexp.MustCompile(`^([a-zA-Z0-9._%+-]+)@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	match := re.FindStringSubmatch(email)
 	if len(match) < 2 {
 		return email
