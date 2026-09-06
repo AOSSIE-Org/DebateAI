@@ -512,7 +512,10 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                               {message.sender}
                             </span>
                             {message.phase && (
-                              <Badge variant='outline' className='text-xs'>
+                              <Badge
+                                variant='outline'
+                                className='text-xs text-current [.contrast_&]:border-black'
+                              >
                                 {message.phase}
                               </Badge>
                             )}
