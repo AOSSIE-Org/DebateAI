@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "@/context/authContext";
-import DebateCover from "../assets/DebateCover4.svg";
+import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 import AOSSIELogo from "@/assets/aossie.png";
