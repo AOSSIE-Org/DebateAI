@@ -63,7 +63,7 @@ const RightSection: React.FC<RightSectionProps> = ({
       </div>
       {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
         <Button
-          className="border-black dark:border-white"
+          className="border-foreground dark:border-white"
           onClick={toggleAuthMode}
           variant="outline"
         >

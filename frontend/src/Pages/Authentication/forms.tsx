@@ -80,14 +80,14 @@ const handleGoogleLogin = useCallback(
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 dark:border-white"
+        className="mb-2 border-border dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-1 dark:border-white"
+        className="mb-1 border-border dark:border-white"
       />
       {localError && (
         <p className="text-red-500 text-sm mt-2">
@@ -112,7 +112,7 @@ const handleGoogleLogin = useCallback(
           Reset Password
         </span>
       </p>
-      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
+      <Button type="submit" className="w-full mb-2 border border-border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
       <div id="googleSignInButton" className="w-full"></div>
