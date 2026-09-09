@@ -231,7 +231,7 @@ func DebateWebsocketHandler(c *gin.Context) {
 	// Send initial poll snapshot
 	snapshot, err := loadPollSnapshot(debateID)
 	if err == nil && snapshot != nil {
-		conn.WriteJSON(snapshot)
+		client.WriteJSON(snapshot)
 	} else if err != nil {
 	}
 
@@ -254,7 +254,7 @@ func DebateWebsocketHandler(c *gin.Context) {
 		},
 		"timestamp": time.Now().Unix(),
 	}
-	conn.WriteJSON(presenceEvent)
+	client.WriteJSON(presenceEvent)
 
 	// Read pump
 	go readPump(client, hub)
