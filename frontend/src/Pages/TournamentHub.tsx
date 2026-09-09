@@ -205,7 +205,7 @@ export default function TournamentPage() {
                   className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden flex flex-col"
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
-                  <h2 className="text-2xl font-bold mb-2 text-accent-foreground tracking-tight">
+                  <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
                     {t.name}
                   </h2>
                   <button
