@@ -84,7 +84,7 @@ const Home: React.FC = () => {
       <div className="flex items-center justify-center">
         <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
           <div className="w-full md:w-2/3 p-4 md:p-16">
-            <img src={DebateCover} alt="Debate Cover" className="w-full object-cover" />
+            <DebateCoverIllustration className="w-full object-cover" />
           </div>
           <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <h3 className="text-xl md:text-4xl font-bold text-center">

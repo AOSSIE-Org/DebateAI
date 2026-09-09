@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 
-import DebateCover from "../assets/DebateCover4.svg";
+import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { Button } from "../components/ui/button";
 import { AuthContext } from "../context/authContext";
 import DebatePopup from "@/components/DebatePopup";
@@ -35,9 +35,7 @@ const StartDebate = () => {
       <div className="flex items-center justify-center flex-1">
         <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
           <div className="w-full md:w-2/3 p-4 md:p-16">
-            <img
-              src={DebateCover}
-              alt="Debate Cover"
+            <DebateCoverIllustration
               className="w-full object-cover"
             />
           </div>
