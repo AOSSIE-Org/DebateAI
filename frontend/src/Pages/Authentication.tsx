@@ -15,8 +15,8 @@ const LeftSection = () => (
         Arguehub
       </Link>
     </div>
-    <div className="flex justify-center items-center flex-1 p-10">
-      <DebateCoverIllustration className="max-w-full max-h-full object-contain" />
+    <div className="flex justify-center items-center flex-1 min-h-0 p-6">
+  <DebateCoverIllustration className="max-w-full max-h-full object-contain" />
     </div>
     <div>
       <blockquote className="space-y-2">
