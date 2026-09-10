@@ -162,6 +162,14 @@ interface FollowUser {
   avatarUrl?: string;
 }
 
+const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> = {
+  twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
+  instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
+  linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
+};
+
+const BIO_MAX_LENGTH = 300;
+
 const Profile: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -204,8 +212,8 @@ const Profile: React.FC = () => {
     from: undefined,
     to: undefined,
   });
-const inputRef = useRef<HTMLInputElement>(null);
-const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -377,12 +385,16 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
             id={field}
             type="text"
             value={(dashboard?.profile[field] as string) || ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              const rules = socialValidation[field as string];
+              let val = e.target.value;
+              if (field === "linkedin") val = val.toLowerCase();
+              val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
               setDashboard({
                 ...dashboard!,
-                profile: { ...dashboard!.profile, [field]: e.target.value },
-              })
-            }
+                profile: { ...dashboard!.profile, [field]: val },
+              });
+            }}
             placeholder={placeholder}
             className="text-sm w-full"
           />
@@ -402,19 +414,19 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
         </div>
       </form>
     ) : (
-      <div className="flex items-center justify-between mb-2 w-full">
+      <div className="flex items-center justify-between mb-2 w-full min-w-0">
         {dashboard?.profile[field] ? (
           <a
             href={
               field === "twitter"
                 ? `https://twitter.com/${dashboard.profile[field]}`
                 : field === "instagram"
-                ? `https://instagram.com/${dashboard.profile[field]}`
-                : `https://linkedin.com/in/${dashboard.profile[field]}`
+                  ? `https://instagram.com/${dashboard.profile[field]}`
+                  : `https://linkedin.com/in/${dashboard.profile[field]}`
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline flex items-center gap-2 truncate"
+            className="text-sm text-primary hover:underline flex items-center gap-2 truncate min-w-0"
           >
             <Icon className="w-4 h-4 text-primary flex-shrink-0" />
             <span className="truncate">
@@ -448,6 +460,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
       >
         <Label htmlFor="bio" className="text-sm">Bio</Label>
         <Textarea
+          maxLength={BIO_MAX_LENGTH}
           id="bio"
           value={dashboard?.profile.bio || ""}
           onChange={(e) =>
@@ -459,14 +472,30 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
           placeholder="Share your story"
           className="text-sm w-full resize-none h-20"
         />
+        <p className={`text-xs text-right ${(dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
+          ? "text-red-500"
+          : (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH - 60
+            ? "text-orange-500"
+            : "text-muted-foreground"
+          }`}>
+          {dashboard?.profile.bio?.length || 0} / {BIO_MAX_LENGTH}
+        </p>
         <div className="flex gap-2">
-          <Button type="submit" size="sm" variant="default" className="flex-1">Save</Button>
+          <Button
+            type="submit"
+            size="sm"
+            variant="default"
+            className="flex-1"
+            disabled={(dashboard?.profile.bio?.length || 0) > BIO_MAX_LENGTH}
+          >
+            Save
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => setEditingField(null)} className="flex-1">Cancel</Button>
         </div>
       </form>
     ) : (
-      <div className="flex items-start justify-between mb-2 w-full">
-        <span className="text-sm text-foreground whitespace-pre-wrap overflow-hidden">
+      <div className="flex items-start justify-between mb-2 w-full min-w-0">
+        <span className="text-sm text-foreground whitespace-pre-wrap overflow-hidden break-words min-w-0">
           {dashboard?.profile.bio || "Add your bio"}
         </span>
         <button
