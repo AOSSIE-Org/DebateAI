@@ -6,7 +6,7 @@ import DebateCoverIllustration from '../components/DebateCoverIllustration';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white">
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white overflow-y-auto">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
         <svg>
@@ -16,7 +16,11 @@ const LeftSection = () => (
       </Link>
     </div>
     <div className="flex justify-center items-center flex-1 min-h-0 p-6">
-  <DebateCoverIllustration className="max-w-full max-h-full object-contain" />
+      <DebateCoverIllustration
+        className="max-w-full max-h-full object-contain"
+        role="img"
+        aria-label="Debate Cover"
+      />
     </div>
     <div>
       <blockquote className="space-y-2">

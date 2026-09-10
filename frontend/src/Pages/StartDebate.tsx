@@ -37,13 +37,15 @@ const StartDebate = () => {
           <div className="w-full md:w-2/3 p-4 md:p-16">
             <DebateCoverIllustration
               className="w-full object-cover"
+              role="img"
+              aria-label="Debate Cover"
             />
           </div>
           <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <div className="flex flex-col items-center mb-6">
-              <a 
-                href="https://aossie.org" 
-                target="_blank" 
+              <a
+                href="https://aossie.org"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="mb-2 hover:opacity-80 transition-opacity"
               >
