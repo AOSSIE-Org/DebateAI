@@ -106,7 +106,7 @@ const handleGoogleLogin = useCallback(
         <div className='pl-2'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted-foreground dark:text-white mb-4">
+      <p className="text-sm text-muted-foreground dark:text-white [.contrast_&]:text-white mb-4">
         Forgot your password?{' '}
         <span className="underline cursor-pointer" onClick={startForgotPassword}>
           Reset Password
@@ -191,21 +191,21 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         placeholder="name@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 dark:border-white"
+        className="mb-2 border-border dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mb-2 dark:border-white"
+        className="mb-2 border-border dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="confirm password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4 dark:border-white"
+        className="mb-4 border-border dark:border-white"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -313,7 +313,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="name@example.com"
-          className="w-full mb-4 dark:border-white"
+          className="w-full mb-4 border-border dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white">
