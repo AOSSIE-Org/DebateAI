@@ -37,19 +37,24 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
       return;
     }
     setLocalError(null);
-    await login(email, password);
+    try {
+      await login(email, password);
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
-
-
-
-const handleGoogleLogin = useCallback(
-  (response: { credential: string; select_by: string }) => {
-    const idToken = response.credential;
-    googleLogin(idToken);
-  },
-  [googleLogin]
-);
+  const handleGoogleLogin = useCallback(
+    async (response: { credential: string; select_by: string }) => {
+      try {
+        const idToken = response.credential;
+        await googleLogin(idToken);
+      } catch {
+        // Handled by authContext error state
+      }
+    },
+    [googleLogin]
+  );
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
@@ -160,17 +165,25 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       return;
     }
     clearError();
-    await signup(email, password);
-    startOtpVerification(email);
+    try {
+      await signup(email, password);
+      startOtpVerification(email);
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
- const handleGoogleLogin = useCallback(
-  (response: { credential: string; select_by: string }) => {
-    const idToken = response.credential;
-    googleLogin(idToken);
-  },
-  [googleLogin]
-);
+  const handleGoogleLogin = useCallback(
+    async (response: { credential: string; select_by: string }) => {
+      try {
+        const idToken = response.credential;
+        await googleLogin(idToken);
+      } catch {
+        // Handled by authContext error state
+      }
+    },
+    [googleLogin]
+  );
 
 
   useEffect(() => {
@@ -273,8 +286,12 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    await verifyEmail(email, otp);
-    handleOtpVerified();
+    try {
+      await verifyEmail(email, otp);
+      handleOtpVerified();
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
   return (
@@ -390,10 +407,14 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
       return;
     }
 
-    await confirmForgotPassword(email, code, newPassword);
-    clearError();
-    await login(email, newPassword);
-    handlePasswordReset();
+    try {
+      await confirmForgotPassword(email, code, newPassword);
+      clearError();
+      await login(email, newPassword);
+      handlePasswordReset();
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
   return (
