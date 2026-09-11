@@ -1,6 +1,6 @@
 import { getAuthToken } from '@/utils/auth';
 
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
 export type DebateMessage = {
   sender: "User" | "Bot" | "Judge";

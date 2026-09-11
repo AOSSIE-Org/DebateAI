@@ -1,4 +1,4 @@
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
 export interface Admin {
   id: string;
