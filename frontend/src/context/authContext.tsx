@@ -11,7 +11,7 @@ import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
 import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
 
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 const USER_CACHE_KEY = 'userProfile';
 
 interface AuthContextType {

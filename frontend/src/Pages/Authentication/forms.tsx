@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useContext, useState, useEffect } from 'react';
@@ -279,7 +278,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
 
-  const baseURL = import.meta.env.VITE_BASE_URL;
+  const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

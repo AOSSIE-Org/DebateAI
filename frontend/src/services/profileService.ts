@@ -1,4 +1,4 @@
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
 export const getProfile = async (token: string) => {
   const response = await fetch(`${baseURL}/user/fetchprofile`, {
