@@ -155,7 +155,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
             />
             <button
               onClick={handleJoinRoom}
-              className='bg-secondary text-secondary-foreground px-6 py-3 rounded-lg hover:bg-secondary/90 transition w-full'
+              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full'
             >
               Join Room
             </button>

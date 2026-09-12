@@ -6,7 +6,7 @@ import DebateCoverIllustration from '../components/DebateCoverIllustration';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white overflow-y-auto">
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white overflow-y-auto [.contrast_&]:text-white">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
         <svg>
@@ -24,10 +24,10 @@ const LeftSection = () => (
     </div>
     <div>
       <blockquote className="space-y-2">
-        <p className="text-lg text-black dark:text-white">
+        <p className="text-lg text-black dark:text-white [.contrast_&]:text-white">
           "We cannot solve our problems with the same thinking we used when we created them."
         </p>
-        <footer className="text-sm text-black dark:text-white">Albert Einstein</footer>
+        <footer className="text-sm text-black dark:text-white [.contrast_&]:text-white">Albert Einstein</footer>
       </blockquote>
     </div>
   </div>
@@ -67,7 +67,7 @@ const RightSection: React.FC<RightSectionProps> = ({
       </div>
       {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
         <Button
-          className="border-black dark:border-white"
+          className="border-foreground dark:border-white"
           onClick={toggleAuthMode}
           variant="outline"
         >
@@ -110,7 +110,7 @@ const RightSection: React.FC<RightSectionProps> = ({
 const Authentication = () => {
   const location = useLocation();
   // Extend authMode to include 'resetPassword'
-  const [authMode, setAuthMode] = useState<
+  const [authMode, setAuthMode] = useState
     'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
   >(location.state?.isSignUp ? 'signup' : 'login');
 

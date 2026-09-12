@@ -65,7 +65,7 @@ export const useDebateWS = (debateId: string | null) => {
 
     // Get WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const apiUrl = import.meta.env.VITE_API_URL;
+    const apiUrl = import.meta.env.VITE_BASE_URL;
     let host = window.location.host;
     if (apiUrl) {
       try {
