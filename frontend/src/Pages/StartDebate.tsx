@@ -36,7 +36,7 @@ const StartDebate = () => {
         <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
           <div className="w-full md:w-2/3 p-4 md:p-16">
             <DebateCoverIllustration
-              className="w-full object-cover"
+              className="w-full h-auto object-cover"
               role="img"
               aria-label="Debate Cover"
             />
