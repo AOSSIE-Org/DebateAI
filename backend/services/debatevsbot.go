@@ -185,7 +185,6 @@ Your debating style must strictly adhere to the following guidelines:
 Your stance is: %s.
 %s
 %s
-%s
 Provide an opening statement that embodies your persona and stance.
 [Your opening argument]
 %s %s`,
@@ -265,31 +264,44 @@ Please provide your full argument.`,
 	)
 }
 
-// GenerateBotResponse generates a response from the debate bot using the Gemini client library.
-// It uses the bot’s personality to handle errors and responses vividly.
-func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
+
+// StreamBotResponse streams the bot's response chunks through onChunk callback in real-time.
+// It returns the full accumulated response.
+func StreamBotResponse(ctx context.Context, botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int, onChunk func(string) error) (string, error) {
 	if geminiClient == nil {
-		return personalityErrorResponse(botName, "My systems are offline, it seems.")
+		errResp := personalityErrorResponse(botName, "My systems are offline, it seems.")
+		_ = onChunk(errResp)
+		return errResp, nil
 	}
 
 	bot := GetBotPersonality(botName)
 	// Construct prompt with enhanced personality integration
 	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
-	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	var fullResponse strings.Builder
+	err := generateDefaultModelStream(ctx, prompt, func(chunk string) error {
+		fullResponse.WriteString(chunk)
+		return onChunk(chunk)
+	})
+
 	if err != nil {
-		log.Printf("❌ Gemini error in GenerateBotResponse: %v", err)
-		return personalityErrorResponse(botName, "A glitch in my logic, there is.")
+		if fullResponse.Len() == 0 {
+			errResp := personalityErrorResponse(botName, "A glitch in my logic, there is.")
+			_ = onChunk(errResp)
+			return errResp, nil
+		}
+		return fullResponse.String(), err
 	}
-	if response == "" {
-		return personalityErrorResponse(botName, "Lost in translation, my thoughts are.")
+
+	cleaned := cleanModelOutput(fullResponse.String())
+	if cleaned == "" {
+		errResp := personalityErrorResponse(botName, "A glitch in my logic, there is.")
+		_ = onChunk(errResp)
+		return errResp, nil
 	}
-	if strings.Contains(strings.ToLower(response), "clarify") {
-		return personalityClarificationRequest(botName)
-	}
-	return response
+	return cleaned, nil
 }
+
 
 // personalityErrorResponse returns a personality-specific error message
 func personalityErrorResponse(botName, defaultMsg string) string {

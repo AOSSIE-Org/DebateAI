@@ -51,3 +51,32 @@ func cleanModelOutput(text string) string {
 func generateDefaultModelText(ctx context.Context, prompt string) (string, error) {
 	return generateModelText(ctx, defaultGeminiModel, prompt)
 }
+
+func generateDefaultModelStream(ctx context.Context, prompt string, onChunk func(string) error) error {
+	if geminiClient == nil {
+		return errors.New("gemini client not initialized")
+	}
+
+	config := &genai.GenerateContentConfig{
+		SafetySettings: []*genai.SafetySetting{
+			{Category: genai.HarmCategoryHarassment, Threshold: genai.HarmBlockThresholdBlockNone},
+			{Category: genai.HarmCategoryHateSpeech, Threshold: genai.HarmBlockThresholdBlockNone},
+			{Category: genai.HarmCategorySexuallyExplicit, Threshold: genai.HarmBlockThresholdBlockNone},
+			{Category: genai.HarmCategoryDangerousContent, Threshold: genai.HarmBlockThresholdBlockNone},
+		},
+	}
+
+	for resp, err := range geminiClient.Models.GenerateContentStream(ctx, defaultGeminiModel, genai.Text(prompt), config) {
+		if err != nil {
+			return err
+		}
+		chunkText := resp.Text()
+		if chunkText != "" {
+			if err := onChunk(chunkText); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+

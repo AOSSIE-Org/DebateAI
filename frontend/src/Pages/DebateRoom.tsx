@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
+import { sendDebateMessageStream, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
@@ -250,9 +250,12 @@ const DebateRoom: React.FC = () => {
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
+  const [streamingBotText, setStreamingBotText] = useState("");
+  const [isBotThinking, setIsBotThinking] = useState(false);
+  const [isBotStreaming, setIsBotStreaming] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const botTurnRef = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const botMessagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const bot = allBots.find((b) => b.name === debateData.botName) || allBots[0];
@@ -417,8 +420,8 @@ const DebateRoom: React.FC = () => {
   ]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [state.messages]);
+    botMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [state.messages, streamingBotText, isBotThinking]);
 
   const getPhaseInstructions = (phaseIndex: number) => {
     switch (phaseIndex) {
@@ -480,6 +483,7 @@ const DebateRoom: React.FC = () => {
   };
 
   const handleNextTurn = () => {
+    if (isBotThinking || isBotStreaming) return;
     setState((prev) => {
       advanceTurn(prev);
       return prev;
@@ -526,14 +530,28 @@ const DebateRoom: React.FC = () => {
           : "Provide your answer";
       }
 
-      const { response } = await sendDebateMessage({
-        botLevel: debateData.botLevel,
-        topic: debateData.topic,
-        history: state.messages,
-        botName: debateData.botName,
-        stance: state.botStance,
-        context,
-      });
+      setIsBotThinking(true);
+      setIsBotStreaming(true);
+      setStreamingBotText("");
+
+      const { response } = await sendDebateMessageStream(
+        {
+          botLevel: debateData.botLevel,
+          topic: debateData.topic,
+          history: state.messages,
+          botName: debateData.botName,
+          stance: state.botStance,
+          context,
+        },
+        (_chunk, accumulated) => {
+          setIsBotThinking(false);
+          setStreamingBotText(accumulated);
+        }
+      );
+
+      setIsBotThinking(false);
+      setIsBotStreaming(false);
+      setStreamingBotText("");
 
       const botMessage: Message = {
         sender: "Bot",
@@ -554,6 +572,10 @@ const DebateRoom: React.FC = () => {
       });
     } catch (error) {
       console.error("Bot error:", error);
+      setIsBotThinking(false);
+      setIsBotStreaming(false);
+      setStreamingBotText("");
+
       // Even on error, advance turn to prevent getting stuck
       setState((prev) => {
         const errorMessage: Message = {
@@ -676,7 +698,32 @@ setPopup({ show: false, message: "" });
             {msg.text}
           </div>
         ))}
-        <div ref={messagesEndRef} />
+        {sender === "Bot" && (isBotThinking || isBotStreaming) && (
+          <div className="p-3 bg-muted rounded-lg shadow-sm text-foreground break-words border border-primary/30 transition-all duration-200">
+            <span className="text-xs text-muted-foreground block mb-1">
+              {phases[state.currentPhase]?.name || "In Progress"}
+            </span>
+            {isBotThinking && (
+              <div className="flex items-center gap-2 py-1">
+                <div className="flex items-center space-x-1.5">
+                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce"></span>
+                </div>
+                <span className="text-xs text-muted-foreground italic ml-1.5">
+                  {debateData.botName} is typing...
+                </span>
+              </div>
+            )}
+            {isBotStreaming && streamingBotText && (
+              <div className="whitespace-pre-wrap leading-relaxed">
+                <span>{streamingBotText}</span>
+                <span className="inline-block w-2 h-4 bg-primary ml-1 animate-pulse align-middle" />
+              </div>
+            )}
+          </div>
+        )}
+        {sender === "Bot" && <div ref={botMessagesEndRef} />}
       </div>
     );
   };
@@ -778,9 +825,10 @@ setPopup({ show: false, message: "" });
                 {bot.rating ? `Rating: ${bot.rating}` : "Ready to argue!"}
               </div>
             </div>
-            {nextTurnPending && (
+            {nextTurnPending && !isBotThinking && !isBotStreaming && (
               <Button
                 onClick={handleNextTurn}
+                disabled={isBotThinking || isBotStreaming}
                 className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
               >
                 Next Turn
