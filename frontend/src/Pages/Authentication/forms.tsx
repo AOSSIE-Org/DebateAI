@@ -122,13 +122,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         <div className='pl-2'>show password</div>
       </div>
       {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-      <p className="text-sm text-muted-foreground dark:text-white mb-4">
+      <p className="text-sm text-muted-foreground dark:text-white [.contrast_&]:text-white mb-4">
         Forgot your password?{' '}
         <span className="underline cursor-pointer" onClick={startForgotPassword}>
           Reset Password
         </span>
       </p>
-      <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
+      <Button type="submit" className="w-full mb-2 border border-border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
       <div id="googleSignInButton" className="w-full"></div>
@@ -366,7 +366,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
             if (error) setError('');
           }}
           placeholder="name@example.com"
-          className="w-full mb-4 dark:border-white"
+          className="w-full mb-4 border-border dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         <Button type="submit" className="w-full border dark:border-white">
