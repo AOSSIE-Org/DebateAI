@@ -375,7 +375,7 @@ const TeamBuilder: React.FC = () => {
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
                 maxLength={6}
-                className="flex-1"
+                className="flex-1 [.contrast_&]:border-border"
                 onKeyPress={(e) => e.key === "Enter" && handleJoinByCode()}
               />
               <Button
@@ -415,7 +415,7 @@ const TeamBuilder: React.FC = () => {
                   placeholder="Enter a catchy team name..."
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  className="flex-1"
+                  className="flex-1 [.contrast_&]:border-border"
                   onKeyPress={(e) => e.key === "Enter" && handleCreateTeam()}
                 />
                 <Button
@@ -427,7 +427,7 @@ const TeamBuilder: React.FC = () => {
                 </Button>
               </div>
               <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-gray-700 dark:text-white [.contrast_&]:text-white">
                   <FaUsers className="inline mr-2" />
                   Team Size
                 </label>
