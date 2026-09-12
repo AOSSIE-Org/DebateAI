@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { getAuthToken } from "@/utils/auth";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 // Define debate phases as an enum (same as OnlineDebateRoom)
 enum DebatePhase {
@@ -1691,10 +1692,10 @@ const TeamDebateRoom: React.FC = () => {
             Team Debate: {topic || "No topic set"}
           </h1>
           <p className="mt-2 text-sm text-gray-700">
-            Phase: <span className="font-medium">{debatePhase}</span> |
-            My Team: <span className="font-medium">{myTeamName}</span> |
-            Opponent: <span className="font-medium">{opponentTeamName}</span> |
-            Current Turn:{" "}
+            Phase: <span className="font-medium">{debatePhase}</span> | My Team:{" "}
+            <span className="font-medium">{myTeamName}</span> | Opponent:{" "}
+            <span className="font-medium">{opponentTeamName}</span> | Current
+            Turn:{" "}
             <span className="font-semibold text-orange-600">
               {isMyTurn ? "Your Team" : "Opponent Team"} to{" "}
               {debatePhase.includes("Question")
@@ -1704,7 +1705,7 @@ const TeamDebateRoom: React.FC = () => {
                 : "make a statement"}
             </span>
           </p>
-            </div>
+        </div>
       </div>
 
       {/* Setup Popup */}
@@ -1715,10 +1716,7 @@ const TeamDebateRoom: React.FC = () => {
 
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-primary"></div>
-                <span className="ml-2 text-sm text-muted-foreground">
-                  Loading...
-                </span>
+                <LoadingSpinner size="sm" />
               </div>
             ) : (
               <>
@@ -1743,7 +1741,7 @@ const TeamDebateRoom: React.FC = () => {
                     placeholder="Or enter a custom debate topic"
                     className="border border-border rounded p-2 w-full bg-input text-foreground"
                   />
-                        </div>
+                </div>
 
                 <div className="mb-6">
                   <div className="text-sm mb-2">
@@ -1781,8 +1779,8 @@ const TeamDebateRoom: React.FC = () => {
                         Against
                       </button>
                     </div>
-                )}
-              </div>
+                  )}
+                </div>
 
                 <div>
                   {/* Players List - Side by Side */}
@@ -1794,12 +1792,19 @@ const TeamDebateRoom: React.FC = () => {
                       </h3>
                       <div className="space-y-3">
                         {myTeamMembers.map((member) => {
-                          const isReady = playerReadyStatus.get(member.userId) ?? false;
+                          const isReady =
+                            playerReadyStatus.get(member.userId) ?? false;
                           return (
-                            <div key={member.userId} className="flex items-center gap-3">
+                            <div
+                              key={member.userId}
+                              className="flex items-center gap-3"
+                            >
                               <div className="relative">
                                 <img
-                                  src={member.avatarUrl || "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"}
+                                  src={
+                                    member.avatarUrl ||
+                                    "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
+                                  }
                                   alt={member.displayName}
                                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                 />
@@ -1831,12 +1836,19 @@ const TeamDebateRoom: React.FC = () => {
                       </h3>
                       <div className="space-y-3">
                         {opponentTeamMembers.map((member) => {
-                          const isReady = playerReadyStatus.get(member.userId) ?? false;
+                          const isReady =
+                            playerReadyStatus.get(member.userId) ?? false;
                           return (
-                            <div key={member.userId} className="flex items-center gap-3">
+                            <div
+                              key={member.userId}
+                              className="flex items-center gap-3"
+                            >
                               <div className="relative">
                                 <img
-                                  src={member.avatarUrl || "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"}
+                                  src={
+                                    member.avatarUrl ||
+                                    "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
+                                  }
                                   alt={member.displayName}
                                   className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
                                 />
@@ -1877,7 +1889,8 @@ const TeamDebateRoom: React.FC = () => {
                       <span className="text-green-600 font-semibold">
                         Debate starting in {countdown}...
                       </span>
-                    ) : team1ReadyCount !== team1MembersCount || team2ReadyCount !== team2MembersCount ? (
+                    ) : team1ReadyCount !== team1MembersCount ||
+                      team2ReadyCount !== team2MembersCount ? (
                       <span>Waiting for all team members to be ready...</span>
                     ) : (
                       <span>All teams ready! Debate starting soon...</span>
@@ -1971,16 +1984,40 @@ const TeamDebateRoom: React.FC = () => {
                       <button
                         onClick={toggleCamera}
                         className="ml-2 p-1 rounded bg-white bg-opacity-20 hover:bg-opacity-30 transition"
-                        title={isCameraOn ? "Turn camera off" : "Turn camera on"}
+                        title={
+                          isCameraOn ? "Turn camera off" : "Turn camera on"
+                        }
                       >
                         {isCameraOn ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="white">
-                            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="white"
+                          >
+                            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
                           </svg>
                         ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="white">
-                            <path d="M21 6.5l-4-4v3.5H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h13v3.5l4-4v-11z" fill="white" opacity="0.5"/>
-                            <line x1="2" y1="2" x2="22" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="white"
+                          >
+                            <path
+                              d="M21 6.5l-4-4v3.5H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h13v3.5l4-4v-11z"
+                              fill="white"
+                              opacity="0.5"
+                            />
+                            <line
+                              x1="2"
+                              y1="2"
+                              x2="22"
+                              y2="22"
+                              stroke="white"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
                           </svg>
                         )}
                       </button>
@@ -1989,8 +2026,15 @@ const TeamDebateRoom: React.FC = () => {
                   {isCurrentUser && !isCameraOn ? (
                     <div className="w-full h-48 bg-gray-800 flex items-center justify-center">
                       <div className="text-center text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-12 w-12 mx-auto mb-2"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
                         </svg>
                         <p className="text-sm">Camera Off</p>
                       </div>
@@ -2006,9 +2050,14 @@ const TeamDebateRoom: React.FC = () => {
                             }
                           } else {
                             remoteVideoRefs.current.set(member.userId, el);
-                            const existingStream = remoteStreams.get(member.userId);
+                            const existingStream = remoteStreams.get(
+                              member.userId
+                            );
                             if (existingStream) {
-                              attachStreamToVideo(member.userId, existingStream);
+                              attachStreamToVideo(
+                                member.userId,
+                                existingStream
+                              );
                             }
                           }
                         }
@@ -2017,7 +2066,10 @@ const TeamDebateRoom: React.FC = () => {
                       muted={isCurrentUser}
                       playsInline
                       className="w-full h-48 object-cover"
-                      style={{ display: isCurrentUser && !isCameraOn ? 'none' : 'block' }}
+                      style={{
+                        display:
+                          isCurrentUser && !isCameraOn ? "none" : "block",
+                      }}
                     />
                   )}
                 </div>
@@ -2026,49 +2078,74 @@ const TeamDebateRoom: React.FC = () => {
           </div>
           <div className="p-3 bg-gray-50 border-t">
             <p className="text-xs text-center text-gray-600">
-              Time: {formatTime(isMyTurn ? timer : phaseDurations[debatePhase] || 0)}
+              Time:{" "}
+              {formatTime(isMyTurn ? timer : phaseDurations[debatePhase] || 0)}
             </p>
-            {isMyTurn && debatePhase !== DebatePhase.Setup && debatePhase !== DebatePhase.Finished && (
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-green-600">
-                  {isListening ? "Recording & Speech Recognition Active" : "Waiting..."}
-                </span>
-              </div>
-            )}
-            {/* Camera Toggle Button - Only show for current user's team */}
-            {currentUser && myTeamMembers.some(m => m.userId === currentUser.id) && (
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <button
-                  onClick={toggleCamera}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                    isCameraOn
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-gray-400 text-white hover:bg-gray-500"
-                  }`}
-                  title={isCameraOn ? "Turn camera off" : "Turn camera on"}
-                >
-                  <span className="flex items-center gap-1.5">
-                    {isCameraOn ? (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
-                        </svg>
-                        Camera On
-                      </>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
-                          <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                        Camera Off
-                      </>
-                    )}
+            {isMyTurn &&
+              debatePhase !== DebatePhase.Setup &&
+              debatePhase !== DebatePhase.Finished && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-green-600">
+                    {isListening
+                      ? "Recording & Speech Recognition Active"
+                      : "Waiting..."}
                   </span>
-                </button>
-              </div>
-            )}
+                </div>
+              )}
+            {/* Camera Toggle Button - Only show for current user's team */}
+            {currentUser &&
+              myTeamMembers.some((m) => m.userId === currentUser.id) && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <button
+                    onClick={toggleCamera}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                      isCameraOn
+                        ? "bg-blue-500 text-white hover:bg-blue-600"
+                        : "bg-gray-400 text-white hover:bg-gray-500"
+                    }`}
+                    title={isCameraOn ? "Turn camera off" : "Turn camera on"}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {isCameraOn ? (
+                        <>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+                          </svg>
+                          Camera On
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+                            <line
+                              x1="2"
+                              y1="2"
+                              x2="22"
+                              y2="22"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          Camera Off
+                        </>
+                      )}
+                    </span>
+                  </button>
+                </div>
+              )}
           </div>
         </div>
 
@@ -2116,7 +2193,8 @@ const TeamDebateRoom: React.FC = () => {
           </div>
           <div className="p-3 bg-gray-50 border-t">
             <p className="text-xs text-center text-gray-600">
-              Time: {formatTime(!isMyTurn ? timer : phaseDurations[debatePhase] || 0)}
+              Time:{" "}
+              {formatTime(!isMyTurn ? timer : phaseDurations[debatePhase] || 0)}
             </p>
           </div>
         </div>
