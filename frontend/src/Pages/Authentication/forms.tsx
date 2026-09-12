@@ -20,32 +20,41 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     throw new Error('LoginForm must be used within an AuthProvider');
   }
 
-  const { login, googleLogin, error, loading } = authContext;
+  const { login, googleLogin, error, loading, clearError } = authContext;
 
   const [localError, setLocalError] = useState<string | null>(null);
 
+  useEffect(() => {
+    clearError();
+  }, []);
 
-const MIN_PASSWORD_LENGTH = 8;
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-    return;
-  }
-  setLocalError(null);
-  await login(email, password);
-};
+  const MIN_PASSWORD_LENGTH = 8;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+    setLocalError(null);
+    try {
+      await login(email, password);
+    } catch {
+      // Handled by authContext error state
+    }
+  };
 
-
-
-
-const handleGoogleLogin = useCallback(
-  (response: { credential: string; select_by: string }) => {
-    const idToken = response.credential;
-    googleLogin(idToken);
-  },
-  [googleLogin]
-);
+  const handleGoogleLogin = useCallback(
+    async (response: { credential: string; select_by: string }) => {
+      try {
+        const idToken = response.credential;
+        await googleLogin(idToken);
+      } catch {
+        // Handled by authContext error state
+      }
+    },
+    [googleLogin]
+  );
   useEffect(() => {
     const google = window.google;
     if (!google?.accounts) {
@@ -79,21 +88,28 @@ const handleGoogleLogin = useCallback(
         type="email"
         placeholder="name@example.com"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 border-border dark:border-white"
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (error) clearError();
+        }}
+        className="mb-2 dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="mb-1 border-border dark:border-white"
+        onChange={(e) => {
+          setPassword(e.target.value);
+          if (error) clearError();
+          if (localError) setLocalError(null);
+        }}
+        className="mb-1 dark:border-white"
       />
       {localError && (
         <p className="text-red-500 text-sm mt-2">
           {localError}
         </p>
-)}
+      )}
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
           <Input
@@ -135,7 +151,11 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     throw new Error('SignUpForm must be used within an AuthProvider');
   }
 
-  const { signup, googleLogin, error, loading } = authContext;
+  const { signup, googleLogin, error, loading, clearError } = authContext;
+
+  useEffect(() => {
+    clearError();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,18 +164,26 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       authContext.handleError('Passwords do not match');
       return;
     }
-
-    await signup(email, password);
-    startOtpVerification(email);
+    clearError();
+    try {
+      await signup(email, password);
+      startOtpVerification(email);
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
- const handleGoogleLogin = useCallback(
-  (response: { credential: string; select_by: string }) => {
-    const idToken = response.credential;
-    googleLogin(idToken);
-  },
-  [googleLogin]
-);
+  const handleGoogleLogin = useCallback(
+    async (response: { credential: string; select_by: string }) => {
+      try {
+        const idToken = response.credential;
+        await googleLogin(idToken);
+      } catch {
+        // Handled by authContext error state
+      }
+    },
+    [googleLogin]
+  );
 
 
   useEffect(() => {
@@ -190,22 +218,31 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         type="email"
         placeholder="name@example.com"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="mb-2 border-border dark:border-white"
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (error) clearError();
+        }}
+        className="mb-2 dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="mb-2 border-border dark:border-white"
+        onChange={(e) => {
+          setPassword(e.target.value);
+          if (error) clearError();
+        }}
+        className="mb-2 dark:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
         placeholder="confirm password"
         value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mb-4 border-border dark:border-white"
+        onChange={(e) => {
+          setConfirmPassword(e.target.value);
+          if (error) clearError();
+        }}
+        className="mb-4 dark:border-white"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -240,12 +277,21 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
     throw new Error('OTPVerificationForm must be used within an AuthProvider');
   }
 
-  const { verifyEmail, error, loading } = authContext;
+  const { verifyEmail, error, loading, clearError } = authContext;
+
+  useEffect(() => {
+    clearError();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await verifyEmail(email, otp);
-    handleOtpVerified();
+    clearError();
+    try {
+      await verifyEmail(email, otp);
+      handleOtpVerified();
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
   return (
@@ -256,7 +302,10 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
         <Input
           type="text"
           value={otp}
-          onChange={(e) => setOtp(e.target.value)}
+          onChange={(e) => {
+            setOtp(e.target.value);
+            if (error) clearError();
+          }}
           placeholder="Enter OTP"
           className="w-full mb-4 dark:border-white"
         />
@@ -293,7 +342,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
       });
 
       if (!response.ok) {
-        setError('Failed to send reset password code. Please try again.');
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || data.message || 'Failed to send reset password code. Please try again.');
         return;
       }
 
@@ -311,7 +361,10 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
         <Input
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (error) setError('');
+          }}
           placeholder="name@example.com"
           className="w-full mb-4 border-border dark:border-white"
         />
@@ -340,7 +393,11 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
     throw new Error('ResetPasswordForm must be used within an AuthProvider');
   }
 
-  const { confirmForgotPassword, login, error, loading } = authContext;
+  const { confirmForgotPassword, login, error, loading, clearError } = authContext;
+
+  useEffect(() => {
+    clearError();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,9 +407,14 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
       return;
     }
 
-    await confirmForgotPassword(email, code, newPassword);
-    await login(email, newPassword);
-    handlePasswordReset();
+    try {
+      await confirmForgotPassword(email, code, newPassword);
+      clearError();
+      await login(email, newPassword);
+      handlePasswordReset();
+    } catch {
+      // Handled by authContext error state
+    }
   };
 
   return (
@@ -362,21 +424,30 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
         <Input
           type="text"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          onChange={(e) => {
+            setCode(e.target.value);
+            if (error) clearError();
+          }}
           placeholder="Enter Code"
           className="w-full mb-2 border dark:border-white"
         />
         <Input
           type={passwordVisible ? "text" : "password"}
           value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
+          onChange={(e) => {
+            setNewPassword(e.target.value);
+            if (error) clearError();
+          }}
           placeholder="New Password"
           className="w-full mb-2 dark:border-white"
         />
         <Input
           type={passwordVisible ? "text" : "password"}
           value={confirmNewPassword}
-          onChange={(e) => setConfirmNewPassword(e.target.value)}
+          onChange={(e) => {
+            setConfirmNewPassword(e.target.value);
+            if (error) clearError();
+          }}
           placeholder="Confirm New Password"
           className="w-full mb-4 dark:border-white"
         />
