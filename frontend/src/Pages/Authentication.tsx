@@ -110,7 +110,7 @@ const RightSection: React.FC<RightSectionProps> = ({
 const Authentication = () => {
   const location = useLocation();
   // Extend authMode to include 'resetPassword'
-  const [authMode, setAuthMode] = useState
+  const [authMode, setAuthMode] = useState<
     'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
   >(location.state?.isSignUp ? 'signup' : 'login');
 
