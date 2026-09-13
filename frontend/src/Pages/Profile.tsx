@@ -397,7 +397,7 @@ const Profile: React.FC = () => {
               });
             }}
             placeholder={placeholder}
-            className="text-sm w-full"
+            className="text-sm w-full [.contrast_&]:border-border"
           />
         </div>
         <div className="flex gap-2">
@@ -769,7 +769,7 @@ const Profile: React.FC = () => {
                   }, 300);
                 }}
                 ref={inputRef}
-                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs"
+                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs [.contrast_&]:border-border"
                 placeholder="Enter display name"
               />
               {usernameStatus === "checking" && (
@@ -942,7 +942,7 @@ const Profile: React.FC = () => {
                 <CardTitle className="text-foreground text-base sm:text-lg">Ratings</CardTitle>
                 <div className="flex flex-wrap gap-2 items-center">
                   <Select value={eloFilter} onValueChange={(value: "7days" | "30days" | "all" | "custom") => setEloFilter(value)}>
-                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs">
+                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs [.contrast_&]:border-border">
                       <SelectValue placeholder="Select filter" />
                     </SelectTrigger>
                     <SelectContent>
