@@ -204,7 +204,8 @@ func SignUp(ctx *gin.Context) {
 
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
+		db.MongoDatabase.Collection("users").DeleteOne(dbCtx, bson.M{"_id": newUser.ID})
+		ctx.JSON(500, gin.H{"error": "Failed to send verification email"})
 		return
 	}
 
