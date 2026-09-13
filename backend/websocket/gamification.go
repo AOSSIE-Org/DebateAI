@@ -23,6 +23,13 @@ func (gc *GamificationClient) SafeWriteJSON(v interface{}) error {
 	return gc.Conn.WriteJSON(v)
 }
 
+// SafeWriteMessage safely writes raw WebSocket messages to the gamification client's connection
+func (gc *GamificationClient) SafeWriteMessage(messageType int, data []byte) error {
+	gc.writeMu.Lock()
+	defer gc.writeMu.Unlock()
+	return gc.Conn.WriteMessage(messageType, data)
+}
+
 // Global gamification hub for broadcasting events to all connected clients
 var (
 	gamificationClients = make(map[*GamificationClient]bool)

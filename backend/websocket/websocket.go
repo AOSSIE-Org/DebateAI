@@ -269,24 +269,24 @@ func WebsocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Create the room if it doesn't exist.
-	roomsMutex.Lock()
-	if _, exists := rooms[roomID]; !exists {
-		rooms[roomID] = &Room{Clients: make(map[*websocket.Conn]*Client)}
-	}
-	room := rooms[roomID]
-	roomsMutex.Unlock()
-
 	// Upgrade the connection.
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 
+	// Create the room if it doesn't exist.
+	roomsMutex.Lock()
+	if _, exists := rooms[roomID]; !exists {
+		rooms[roomID] = &Room{Clients: make(map[*websocket.Conn]*Client)}
+	}
+	room := rooms[roomID]
+	room.Mutex.Lock()
+	roomsMutex.Unlock()
+
 	// Check if this is a spectator connection (they want to receive video streams)
 	// Allow spectators to connect even if room has 2 debaters
 	isSpectator := strings.EqualFold(c.Query("spectator"), "true")
-	room.Mutex.Lock()
 	currentDebaters := 0
 	for _, existing := range room.Clients {
 		if !existing.IsSpectator {
@@ -300,7 +300,6 @@ func WebsocketHandler(c *gin.Context) {
 		conn.Close()
 		return
 	}
-	room.Mutex.Unlock()
 
 	if avatarURL == "" {
 		avatarURL = "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
@@ -332,11 +331,7 @@ func WebsocketHandler(c *gin.Context) {
 		client.ConnectionID = uuid.New().String()
 	}
 
-	// Mark as spectator if needed (we can add a field to Client struct for this)
-	// For now, we'll handle it through the message handlers
-
-	// Send current participants to the new client
-	room.Mutex.Lock()
+	// Add client to room
 	room.Clients[conn] = client
 	room.Mutex.Unlock()
 
@@ -414,14 +409,18 @@ func WebsocketHandler(c *gin.Context) {
 				delete(room.Clients, conn)
 			}
 			clientCount = len(room.Clients)
+			room.Mutex.Unlock()
 
 			// If room is empty, delete it.
 			if clientCount == 0 {
 				roomsMutex.Lock()
-				delete(rooms, roomID)
+				room.Mutex.Lock()
+				if len(room.Clients) == 0 {
+					delete(rooms, roomID)
+				}
+				room.Mutex.Unlock()
 				roomsMutex.Unlock()
 			}
-			room.Mutex.Unlock()
 
 			if exists && disconnectedClient.IsSpectator {
 				log.Printf("[ws] spectator disconnected: room=%s connectionId=%s user=%s", roomID, disconnectedClient.ConnectionID, disconnectedClient.Email)
@@ -642,7 +641,7 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 				"currentTurn": currentTurn,
 				"phase":       message.Phase,
 			}
-			if err := clientConn.WriteJSON(response); err != nil {
+			if err := client.SafeWriteJSON(response); err != nil {
 			}
 		}
 	}
