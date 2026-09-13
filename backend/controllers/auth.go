@@ -137,6 +137,7 @@ func SignUp(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -224,6 +225,7 @@ func VerifyEmail(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -284,6 +286,7 @@ func Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": "Check email and password format"})
 		return
 	}
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -411,6 +414,7 @@ func ForgotPassword(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Check email format"})
 		return
 	}
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -456,6 +460,7 @@ func VerifyForgotPassword(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Invalid input", "message": err.Error()})
 		return
 	}
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
 
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
