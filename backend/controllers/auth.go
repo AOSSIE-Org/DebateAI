@@ -487,9 +487,21 @@ func VerifyForgotPassword(ctx *gin.Context) {
 			"updatedAt":               now,
 		},
 	}
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
+	result, err := db.MongoDatabase.Collection("users").UpdateOne(
+		dbCtx,
+		bson.M{
+			"email":                   request.Email,
+			"resetPasswordCode":       request.Code,
+			"resetPasswordCodeExpiry": bson.M{"$gt": now},
+		},
+		update,
+	)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to reset password", "message": err.Error()})
+		return
+	}
+	if result.MatchedCount == 0 {
+		ctx.JSON(400, gin.H{"error": "Reset code is invalid or has expired. Please request a new one."})
 		return
 	}
 
