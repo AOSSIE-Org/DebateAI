@@ -31,6 +31,7 @@ import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
 import SupportOpenSource from './Pages/SupportOpenSource';
+import PageTitle from './components/PageTitle';
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -115,6 +116,7 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
+        <PageTitle/>
         <AppRoutes />
       </ThemeProvider>
     </AuthProvider>
