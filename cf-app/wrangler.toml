@@ -1,0 +1,54 @@
+# Cloudflare Workers config for the DebateAI Next.js app (deployed via @opennextjs/cloudflare).
+name = "debateai"
+# Custom entry that wraps the OpenNext handler (WebSocket routing + cron).
+# `opennextjs-cloudflare build` still generates .open-next/worker.js, which this imports.
+main = "src/worker/index.ts"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+
+# OpenNext emits static assets here.
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# --- D1: replaces MongoDB -------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "debateai"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"   # `wrangler d1 create debateai`
+migrations_dir = "migrations"
+
+# --- KV: replaces Redis (ephemeral / TTL state) -------------------------------
+# matchmaking pool entries, rate-limit counters, verification + reset codes,
+# live-debate poll snapshots, spectator vote sets.
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"           # `wrangler kv namespace create KV`
+
+# --- Durable Objects: the only piece Workers cannot do without --------------
+# Stateful WebSocket coordination + turn timers for live debates.
+[[durable_objects.bindings]]
+name = "DEBATE_ROOM"
+class_name = "DebateRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DebateRoom"]
+
+# --- Cron: replaces the Go background goroutines ------------------------------
+# periodic matchmaking sweep + stale-pool cleanup (was services.periodicMatchmaking).
+[triggers]
+crons = ["* * * * *"]
+
+# --- Vars (non-secret). Secrets go in `wrangler secret put` / .dev.vars ------
+[vars]
+JWT_EXPIRY_MINUTES = "1440"
+APP_BASE_URL = "http://localhost:3000"
+EMAIL_FROM = "DebateAI <no-reply@debateai.example>"
+EMAIL_PROVIDER = "resend"       # resend | mailchannels | console
+GOOGLE_OAUTH_CLIENT_ID = ""     # public; also fine to keep as a secret
+
+# Secrets (set with `wrangler secret put <NAME>`), do NOT put values here:
+#   JWT_SECRET            - HS256 signing key; use the SAME value as the Go backend to keep tokens interoperable
+#   GEMINI_API_KEY        - Google Generative Language API key
+#   RESEND_API_KEY        - only when EMAIL_PROVIDER=resend

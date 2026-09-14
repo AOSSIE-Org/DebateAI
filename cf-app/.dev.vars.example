@@ -1,0 +1,13 @@
+# Copy to `.dev.vars` for local `wrangler`/`next dev`. Never commit `.dev.vars`.
+# Use the SAME JWT_SECRET as the existing Go backend so tokens stay interoperable
+# during a phased migration.
+JWT_SECRET="dev-secret-change-me"
+JWT_EXPIRY_MINUTES="1440"
+APP_BASE_URL="http://localhost:3000"
+
+GOOGLE_OAUTH_CLIENT_ID=""
+GEMINI_API_KEY=""
+
+EMAIL_PROVIDER="console"        # console = log the email instead of sending
+EMAIL_FROM="DebateAI <no-reply@debateai.example>"
+RESEND_API_KEY=""
