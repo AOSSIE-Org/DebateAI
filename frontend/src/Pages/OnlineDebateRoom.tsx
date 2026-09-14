@@ -200,6 +200,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const animationRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const judgePollRef = useRef<NodeJS.Timeout | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submissionStartedRef = useRef(false);
 
   useEffect(() => {
@@ -207,6 +208,10 @@ const OnlineDebateRoom = (): JSX.Element => {
       if (judgePollRef.current) {
         clearInterval(judgePollRef.current);
         judgePollRef.current = null;
+      }
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = null;
       }
     };
   }, []);
@@ -2179,8 +2184,13 @@ const OnlineDebateRoom = (): JSX.Element => {
       await navigator.clipboard.writeText(roomId);
       setRoomIdCopied(true);
 
-      setTimeout(() => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+
+      copyTimeoutRef.current = setTimeout(() => {
         setRoomIdCopied(false);
+        copyTimeoutRef.current = null;
       }, 2000);
     } catch (error) {
       console.error("Failed to copy room code:", error);
