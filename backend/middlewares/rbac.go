@@ -73,7 +73,7 @@ m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
 		if err != nil {
 			return fmt.Errorf("failed to create Casbin model: %w", err)
 		}
-		
+
 		// Create enforcer with model and adapter
 		enforcer, err = casbin.NewEnforcer(m, adapter)
 		if err != nil {
@@ -124,7 +124,7 @@ func ensureDefaultPolicies() {
 			log.Printf("Added default policy: %s can %s %s", policy.role, policy.action, policy.resource)
 		}
 	}
-	
+
 	// Save policies to database
 	if err := enforcer.SavePolicy(); err != nil {
 		log.Printf("Warning: Failed to save policies: %v", err)
@@ -163,12 +163,17 @@ func AdminAuthMiddleware(configPath string) gin.HandlerFunc {
 			return
 		}
 
-		email := claims["sub"].(string)
-		
+		email, ok := claims["sub"].(string)
+		if !ok || email == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
+
 		// Check if user is an admin
 		dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		var admin models.Admin
 		err = db.MongoDatabase.Collection("admins").FindOne(dbCtx, bson.M{"email": email}).Decode(&admin)
 		if err != nil {
@@ -196,9 +201,15 @@ func RBACMiddleware(resource, action string) gin.HandlerFunc {
 			return
 		}
 
-		role := adminRole.(string)
+		role, ok := adminRole.(string)
+		if !ok {
+			log.Printf("RBACMiddleware: Admin role has unexpected type")
+			c.JSON(http.StatusForbidden, gin.H{"error": "Admin role not found"})
+			c.Abort()
+			return
+		}
 		log.Printf("RBACMiddleware: Checking permission for role=%s, resource=%s, action=%s", role, resource, action)
-		
+
 		// Check permission using Casbin
 		allowed, err := enforcer.Enforce(role, resource, action)
 		if err != nil {
@@ -241,15 +252,15 @@ func LogAdminAction(c *gin.Context, action, resourceType string, resourceID prim
 	if !exists {
 		return fmt.Errorf("adminID not found in context")
 	}
-	
+
 	adminEmail, exists := c.Get("adminEmail")
 	if !exists {
 		return fmt.Errorf("adminEmail not found in context")
 	}
-	
+
 	ipAddress := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
-	
+
 	// Extract device info from User-Agent (simplified)
 	deviceInfo := "Unknown"
 	if strings.Contains(userAgent, "Mobile") {
@@ -260,10 +271,19 @@ func LogAdminAction(c *gin.Context, action, resourceType string, resourceID prim
 		deviceInfo = "Desktop"
 	}
 
+	adminIDValue, ok := adminID.(primitive.ObjectID)
+	if !ok {
+		return fmt.Errorf("adminID has unexpected type")
+	}
+	adminEmailValue, ok := adminEmail.(string)
+	if !ok {
+		return fmt.Errorf("adminEmail has unexpected type")
+	}
+
 	logEntry := models.AdminActionLog{
 		ID:           primitive.NewObjectID(),
-		AdminID:      adminID.(primitive.ObjectID),
-		AdminEmail:   adminEmail.(string),
+		AdminID:      adminIDValue,
+		AdminEmail:   adminEmailValue,
 		Action:       action,
 		ResourceType: resourceType,
 		ResourceID:   resourceID,
@@ -304,4 +324,3 @@ func validateAdminJWT(tokenString, secret string) (map[string]interface{}, error
 	}
 	return nil, fmt.Errorf("invalid token")
 }
-
