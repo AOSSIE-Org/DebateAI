@@ -430,8 +430,9 @@ func ForgotPassword(ctx *gin.Context) {
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
-			"resetPasswordCode": resetCode,
-			"updatedAt":         now,
+			"resetPasswordCode":       resetCode,
+			"resetPasswordCodeExpiry": now.Add(15 * time.Minute),
+			"updatedAt":               now,
 		},
 	}
 	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
@@ -471,6 +472,11 @@ func VerifyForgotPassword(ctx *gin.Context) {
 		return
 	}
 
+	if user.ResetPasswordCodeExpiry.IsZero() || time.Now().After(user.ResetPasswordCodeExpiry) {
+		ctx.JSON(400, gin.H{"error": "Reset code has expired. Please request a new one."})
+		return
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to hash password", "message": err.Error()})
@@ -480,14 +486,27 @@ func VerifyForgotPassword(ctx *gin.Context) {
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
-			"password":          string(hashedPassword),
-			"resetPasswordCode": "",
-			"updatedAt":         now,
+			"password":                string(hashedPassword),
+			"resetPasswordCode":       "",
+			"resetPasswordCodeExpiry": time.Time{},
+			"updatedAt":               now,
 		},
 	}
-	_, err = db.MongoDatabase.Collection("users").UpdateOne(dbCtx, bson.M{"email": request.Email}, update)
+	result, err := db.MongoDatabase.Collection("users").UpdateOne(
+		dbCtx,
+		bson.M{
+			"email":                   request.Email,
+			"resetPasswordCode":       request.Code,
+			"resetPasswordCodeExpiry": bson.M{"$gt": now},
+		},
+		update,
+	)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": "Failed to reset password", "message": err.Error()})
+		return
+	}
+	if result.MatchedCount == 0 {
+		ctx.JSON(400, gin.H{"error": "Reset code is invalid or has expired. Please request a new one."})
 		return
 	}
 
