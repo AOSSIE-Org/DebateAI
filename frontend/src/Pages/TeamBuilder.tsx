@@ -100,6 +100,7 @@ const TeamBuilder: React.FC = () => {
   const [editTeamName, setEditTeamName] = useState<string>("");
   const [searchCode, setSearchCode] = useState<string>("");
   const [joiningByCode, setJoiningByCode] = useState(false);
+  const [joinByCodeError, setJoinByCodeError] = useState<string>("");
 
   // Fetch available teams
   const fetchAvailableTeams = useCallback(async () => {
@@ -311,11 +312,12 @@ const TeamBuilder: React.FC = () => {
 
   const handleJoinByCode = async (): Promise<void> => {
     if (!searchCode.trim()) {
-      setError("Please enter a team code");
+      setJoinByCodeError("Please enter a team code");
       return;
     }
 
     setJoiningByCode(true);
+    setJoinByCodeError("");
     try {
       const team = await getTeamByCode(searchCode.toUpperCase());
       await joinTeam(team.id);
@@ -325,8 +327,8 @@ const TeamBuilder: React.FC = () => {
       fetchAvailableTeams();
       setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
-      setError((error as Error).message || "Failed to join team");
-      setTimeout(() => setError(""), 5000);
+      setJoinByCodeError((error as Error).message || "Failed to join team");
+      setTimeout(() => setJoinByCodeError(""), 5000);
     } finally {
       setJoiningByCode(false);
     }
@@ -370,17 +372,25 @@ const TeamBuilder: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
-              <Input
-                placeholder="Enter 6-character team code..."
-                value={searchCode}
-                onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-                maxLength={6}
-                className="flex-1 [.contrast_&]:border-border"
-                onKeyPress={(e) => e.key === "Enter" && handleJoinByCode()}
-              />
+              <div className="flex-1 space-y-2">
+                <Input
+                  placeholder="Enter 6-character team code..."
+                  value={searchCode}
+                  onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="[.contrast_&]:border-border"
+                  onKeyPress={(e) => e.key === "Enter" && handleJoinByCode()}
+                />
+                {joinByCodeError && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded text-destructive text-sm">
+                    {joinByCodeError}
+                  </div>
+                )}
+              </div>
               <Button
                 onClick={handleJoinByCode}
                 disabled={joiningByCode || !searchCode.trim()}
+                className="self-start"
               >
                 {joiningByCode ? "Joining..." : "Join Team"}
               </Button>

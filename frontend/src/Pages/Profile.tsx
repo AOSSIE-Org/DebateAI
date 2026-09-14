@@ -57,7 +57,6 @@ import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import {
   PieChart,
   Pie,
-  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
@@ -397,7 +396,7 @@ const Profile: React.FC = () => {
               });
             }}
             placeholder={placeholder}
-            className="text-sm w-full"
+            className="text-sm w-full [.contrast_&]:border-border"
           />
         </div>
         <div className="flex gap-2">
@@ -769,7 +768,7 @@ const Profile: React.FC = () => {
                   }, 300);
                 }}
                 ref={inputRef}
-                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs"
+                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs [.contrast_&]:border-border"
                 placeholder="Enter display name"
               />
               {usernameStatus === "checking" && (
@@ -900,8 +899,9 @@ const Profile: React.FC = () => {
 
       <div className="flex-1 flex flex-col space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Keep chart canvases constrained to their cards so Recharts responds to every container resize. */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
-            <CardContent className="flex-1 p-4">
+            <CardContent className="flex-1 min-h-0 min-w-0 p-4">
               {totalMatches === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
@@ -911,26 +911,24 @@ const Profile: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                <ChartContainer config={donutChartConfig} className="mx-auto w-full h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                      <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
-                        <LabelList
-                          content={({ viewBox }) => {
-                            if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                              return (
-                                <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                                  <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
-                                  <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
-                                </text>
-                              );
-                            }
-                          }}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={donutChartConfig} className="mx-auto h-full min-h-0 w-full min-w-0">
+                  <PieChart>
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                    <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
+                      <LabelList
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                                <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
+                                <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
+                              </text>
+                            );
+                          }
+                        }}
+                      />
+                    </Pie>
+                  </PieChart>
                 </ChartContainer>
               )}
             </CardContent>
@@ -942,7 +940,7 @@ const Profile: React.FC = () => {
                 <CardTitle className="text-foreground text-base sm:text-lg">Ratings</CardTitle>
                 <div className="flex flex-wrap gap-2 items-center">
                   <Select value={eloFilter} onValueChange={(value: "7days" | "30days" | "all" | "custom") => setEloFilter(value)}>
-                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs">
+                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs [.contrast_&]:border-border">
                       <SelectValue placeholder="Select filter" />
                     </SelectTrigger>
                     <SelectContent>
@@ -985,18 +983,16 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-2 flex-1">
+            <CardContent className="p-2 flex-1 min-h-0 min-w-0">
               {filteredEloHistory.length > 0 && !(eloFilter === "custom" && filteredEloHistory.length === 1 && filteredEloHistory[0].elo === profile.rating) ? (
-                <ChartContainer config={eloChartConfig} className="w-full h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
-                      <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
-                      <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
-                      <ChartTooltip content={<CustomTooltip />} />
-                      <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={eloChartConfig} className="h-full min-h-0 w-full min-w-0">
+                  <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
+                    <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
+                    <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
+                    <ChartTooltip content={<CustomTooltip />} />
+                    <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
+                  </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
