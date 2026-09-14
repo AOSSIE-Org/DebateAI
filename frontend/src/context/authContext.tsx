@@ -144,7 +144,14 @@ const verifyToken = useCallback(async () => {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Login failed');
+      if (!response.ok) {
+        const message = data.error || data.message || 'Login failed';
+        const err = new Error(message) as Error & { code?: string };
+        if (message === 'Email not verified') {
+          err.code = 'EMAIL_NOT_VERIFIED';
+        }
+        throw err;
+      }
 
       setToken(data.accessToken);
       localStorage.setItem('token', data.accessToken);
