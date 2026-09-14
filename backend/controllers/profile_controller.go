@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -310,6 +311,35 @@ func UpdateProfile(ctx *gin.Context) {
 		return
 	}
 
+	bio := strings.TrimSpace(updateData.Bio)
+	twitter := strings.TrimSpace(updateData.Twitter)
+	instagram := strings.TrimSpace(updateData.Instagram)
+	linkedin := strings.TrimSpace(updateData.LinkedIn)
+
+	if len([]rune(bio)) > 300 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Bio cannot exceed 300 characters"})
+		return
+	}
+
+	twitterPattern := regexp.MustCompile(`^[a-zA-Z0-9_]*$`)
+	instagramPattern := regexp.MustCompile(`^[a-zA-Z0-9_.]*$`)
+	linkedinPattern := regexp.MustCompile(`^[a-z0-9-]*$`)
+
+	if len(twitter) > 15 || !twitterPattern.MatchString(twitter) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Twitter username"})
+		return
+	}
+
+	if len(instagram) > 30 || !instagramPattern.MatchString(instagram) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Instagram username"})
+		return
+	}
+
+	if len(linkedin) > 100 || !linkedinPattern.MatchString(linkedin) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid LinkedIn username"})
+		return
+	}
+
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -326,10 +356,10 @@ func UpdateProfile(ctx *gin.Context) {
 
 	setFields := bson.M{
 		"displayName": newDisplayName,
-		"bio":         strings.TrimSpace(updateData.Bio),
-		"twitter":     strings.TrimSpace(updateData.Twitter),
-		"instagram":   strings.TrimSpace(updateData.Instagram),
-		"linkedin":    strings.TrimSpace(updateData.LinkedIn),
+		"bio":         bio,
+		"twitter":     twitter,
+		"instagram":   instagram,
+		"linkedin":    linkedin,
 		"avatarUrl":   strings.TrimSpace(updateData.AvatarURL),
 		"updatedAt":   time.Now(),
 	}

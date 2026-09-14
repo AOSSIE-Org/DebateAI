@@ -621,7 +621,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   return (
     <div className={`comment-tree ${className}`}>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Comments</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Comments</h3>
         {error && (
           <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
             {error}

@@ -205,7 +205,7 @@ export default function TournamentPage() {
                   className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden flex flex-col"
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
-                  <h2 className="text-2xl font-bold mb-2 text-accent-foreground tracking-tight">
+                  <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
                     {t.name}
                   </h2>
                   <button
@@ -280,7 +280,7 @@ export default function TournamentPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
                   placeholder="e.g. Autumn Argument Arena"
                 />
               </div>
@@ -295,7 +295,7 @@ export default function TournamentPage() {
                   onChange={(e) => setDate(e.target.value)}
                   required
                   min={new Date().toISOString().split("T")[0]}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
                 />
               </div>
               <div>
@@ -309,7 +309,7 @@ export default function TournamentPage() {
                     setCustomParticipants("");
                     setCustomError("");
                   }}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
                 >
                   <option value="4">4 players</option>
                   <option value="8">8 players</option>
@@ -351,7 +351,7 @@ export default function TournamentPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
                   placeholder="Describe your epic tournament..."
                 />
               </div>

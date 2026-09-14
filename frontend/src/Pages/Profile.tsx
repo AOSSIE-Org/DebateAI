@@ -57,7 +57,6 @@ import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import {
   PieChart,
   Pie,
-  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
@@ -86,6 +85,7 @@ import {
   transcriptService,
   SavedDebateTranscript,
 } from "@/services/transcriptService";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const handleProfileAvatarLoadError = (
   event: React.SyntheticEvent<HTMLImageElement>
@@ -162,6 +162,14 @@ interface FollowUser {
   avatarUrl?: string;
 }
 
+const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> = {
+  twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
+  instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
+  linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
+};
+
+const BIO_MAX_LENGTH = 300;
+
 const Profile: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -204,8 +212,8 @@ const Profile: React.FC = () => {
     from: undefined,
     to: undefined,
   });
-const inputRef = useRef<HTMLInputElement>(null);
-const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -377,14 +385,18 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
             id={field}
             type="text"
             value={(dashboard?.profile[field] as string) || ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              const rules = socialValidation[field as string];
+              let val = e.target.value;
+              if (field === "linkedin") val = val.toLowerCase();
+              val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
               setDashboard({
                 ...dashboard!,
-                profile: { ...dashboard!.profile, [field]: e.target.value },
-              })
-            }
+                profile: { ...dashboard!.profile, [field]: val },
+              });
+            }}
             placeholder={placeholder}
-            className="text-sm w-full"
+            className="text-sm w-full [.contrast_&]:border-border"
           />
         </div>
         <div className="flex gap-2">
@@ -402,19 +414,19 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
         </div>
       </form>
     ) : (
-      <div className="flex items-center justify-between mb-2 w-full">
+      <div className="flex items-center justify-between mb-2 w-full min-w-0">
         {dashboard?.profile[field] ? (
           <a
             href={
               field === "twitter"
                 ? `https://twitter.com/${dashboard.profile[field]}`
                 : field === "instagram"
-                ? `https://instagram.com/${dashboard.profile[field]}`
-                : `https://linkedin.com/in/${dashboard.profile[field]}`
+                  ? `https://instagram.com/${dashboard.profile[field]}`
+                  : `https://linkedin.com/in/${dashboard.profile[field]}`
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline flex items-center gap-2 truncate"
+            className="text-sm text-primary hover:underline flex items-center gap-2 truncate min-w-0"
           >
             <Icon className="w-4 h-4 text-primary flex-shrink-0" />
             <span className="truncate">
@@ -448,6 +460,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
       >
         <Label htmlFor="bio" className="text-sm">Bio</Label>
         <Textarea
+          maxLength={BIO_MAX_LENGTH}
           id="bio"
           value={dashboard?.profile.bio || ""}
           onChange={(e) =>
@@ -459,14 +472,30 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
           placeholder="Share your story"
           className="text-sm w-full resize-none h-20"
         />
+        <p className={`text-xs text-right ${(dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
+          ? "text-red-500"
+          : (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH - 60
+            ? "text-orange-500"
+            : "text-muted-foreground"
+          }`}>
+          {dashboard?.profile.bio?.length || 0} / {BIO_MAX_LENGTH}
+        </p>
         <div className="flex gap-2">
-          <Button type="submit" size="sm" variant="default" className="flex-1">Save</Button>
+          <Button
+            type="submit"
+            size="sm"
+            variant="default"
+            className="flex-1"
+            disabled={(dashboard?.profile.bio?.length || 0) > BIO_MAX_LENGTH}
+          >
+            Save
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => setEditingField(null)} className="flex-1">Cancel</Button>
         </div>
       </form>
     ) : (
-      <div className="flex items-start justify-between mb-2 w-full">
-        <span className="text-sm text-foreground whitespace-pre-wrap overflow-hidden">
+      <div className="flex items-start justify-between mb-2 w-full min-w-0">
+        <span className="text-sm text-foreground whitespace-pre-wrap overflow-hidden break-words min-w-0">
           {dashboard?.profile.bio || "Add your bio"}
         </span>
         <button
@@ -637,7 +666,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowers ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner/></div>
             ) : followers.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">No followers yet</div>
             ) : (
@@ -659,7 +688,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowing ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner size="sm" /></div>
             ) : following.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">Not following anyone yet</div>
             ) : (
@@ -739,7 +768,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
                   }, 300);
                 }}
                 ref={inputRef}
-                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs"
+                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs [.contrast_&]:border-border"
                 placeholder="Enter display name"
               />
               {usernameStatus === "checking" && (
@@ -870,8 +899,9 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
       <div className="flex-1 flex flex-col space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Keep chart canvases constrained to their cards so Recharts responds to every container resize. */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
-            <CardContent className="flex-1 p-4">
+            <CardContent className="flex-1 min-h-0 min-w-0 p-4">
               {totalMatches === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
@@ -881,26 +911,24 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
                   </Button>
                 </div>
               ) : (
-                <ChartContainer config={donutChartConfig} className="mx-auto w-full h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                      <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
-                        <LabelList
-                          content={({ viewBox }) => {
-                            if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                              return (
-                                <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                                  <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
-                                  <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
-                                </text>
-                              );
-                            }
-                          }}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={donutChartConfig} className="mx-auto h-full min-h-0 w-full min-w-0">
+                  <PieChart>
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                    <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
+                      <LabelList
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                                <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
+                                <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
+                              </text>
+                            );
+                          }
+                        }}
+                      />
+                    </Pie>
+                  </PieChart>
                 </ChartContainer>
               )}
             </CardContent>
@@ -912,7 +940,7 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
                 <CardTitle className="text-foreground text-base sm:text-lg">Ratings</CardTitle>
                 <div className="flex flex-wrap gap-2 items-center">
                   <Select value={eloFilter} onValueChange={(value: "7days" | "30days" | "all" | "custom") => setEloFilter(value)}>
-                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs">
+                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs [.contrast_&]:border-border">
                       <SelectValue placeholder="Select filter" />
                     </SelectTrigger>
                     <SelectContent>
@@ -955,18 +983,16 @@ const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-2 flex-1">
+            <CardContent className="p-2 flex-1 min-h-0 min-w-0">
               {filteredEloHistory.length > 0 && !(eloFilter === "custom" && filteredEloHistory.length === 1 && filteredEloHistory[0].elo === profile.rating) ? (
-                <ChartContainer config={eloChartConfig} className="w-full h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
-                      <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
-                      <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
-                      <ChartTooltip content={<CustomTooltip />} />
-                      <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={eloChartConfig} className="h-full min-h-0 w-full min-w-0">
+                  <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
+                    <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
+                    <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
+                    <ChartTooltip content={<CustomTooltip />} />
+                    <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
+                  </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">

@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +30,8 @@ import {
   Eye,
   Calendar,
   User,
+  Search,
+  X,
 } from 'lucide-react';
 import {
   transcriptService,
@@ -47,9 +57,40 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [creatingPost, setCreatingPost] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [outcomeFilter, setOutcomeFilter] = useState<string>('all');
+  const [modeFilter, setModeFilter] = useState<string>('all');
+
   useEffect(() => {
     fetchTranscripts();
   }, []);
+
+  const filteredTranscripts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return transcripts.filter((transcript) => {
+      const matchesSearch =
+        query === '' ||
+        transcript.topic.toLowerCase().includes(query) ||
+        transcript.opponent.toLowerCase().includes(query);
+
+      const matchesOutcome =
+        outcomeFilter === 'all' || transcript.result === outcomeFilter;
+
+      const matchesMode =
+        modeFilter === 'all' || transcript.debateType === modeFilter;
+
+      return matchesSearch && matchesOutcome && matchesMode;
+    });
+  }, [transcripts, searchQuery, outcomeFilter, modeFilter]);
+
+  const filtersActive =
+    searchQuery.trim() !== '' || outcomeFilter !== 'all' || modeFilter !== 'all';
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setOutcomeFilter('all');
+    setModeFilter('all');
+  };
 
   const fetchTranscripts = async () => {
     try {
@@ -242,8 +283,71 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
               </p>
             </div>
           ) : (
+            <>
+              <div className='flex flex-col sm:flex-row gap-2 mb-4'>
+                <div className='relative flex-1'>
+                  <Search className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground' />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder='Search topic or opponent...'
+                    aria-label='Search transcripts by topic or opponent'
+                    className='pl-9 [.contrast_&]:border-border'
+                  />
+                </div>
+                <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+                  <SelectTrigger className='sm:w-[160px] [.contrast_&]:border-border'>
+                    <SelectValue placeholder='All Outcomes' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>All Outcomes</SelectItem>
+                    <SelectItem value='win'>Win</SelectItem>
+                    <SelectItem value='loss'>Loss</SelectItem>
+                    <SelectItem value='draw'>Draw</SelectItem>
+                    <SelectItem value='pending'>Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={modeFilter} onValueChange={setModeFilter}>
+                  <SelectTrigger className='sm:w-[160px] [.contrast_&]:border-border'>
+                    <SelectValue placeholder='All Modes' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>All Modes</SelectItem>
+                    <SelectItem value='user_vs_bot'>User vs Bot</SelectItem>
+                    <SelectItem value='user_vs_user'>User vs User</SelectItem>
+                  </SelectContent>
+                </Select>
+                {filtersActive && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={handleClearFilters}
+                    className='h-9 px-3 whitespace-nowrap'
+                  >
+                    <X className='w-3 h-3 mr-1' />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
+              {filtersActive && (
+                <div className='mb-3'>
+                  <Badge variant='secondary'>
+                    Showing {filteredTranscripts.length} of {transcripts.length}
+                  </Badge>
+                </div>
+              )}
+
+              {filteredTranscripts.length === 0 ? (
+                <div className='text-center py-8'>
+                  <Search className='w-10 h-10 text-muted-foreground mx-auto mb-3' />
+                  <p className='text-sm text-muted-foreground'>
+                    No transcripts match your search or filters
+                  </p>
+                </div>
+              ) : (
             <div className='space-y-3'>
-              {transcripts.map((transcript) => (
+              {filteredTranscripts.map((transcript) => (
                 <div
                   key={transcript.id}
                   className='border rounded-lg p-4 hover:bg-muted/50 transition-colors'
@@ -317,6 +421,8 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                 </div>
               ))}
             </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -406,7 +512,10 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                               {message.sender}
                             </span>
                             {message.phase && (
-                              <Badge variant='outline' className='text-xs'>
+                              <Badge
+                                variant='outline'
+                                className='text-xs text-current [.contrast_&]:border-black'
+                              >
                                 {message.phase}
                               </Badge>
                             )}
