@@ -327,7 +327,6 @@ func cleanupOldRateLimits() {
 // checkAndAwardBadges checks if user qualifies for automatic badges
 func checkAndAwardBadges(ctx context.Context, userID primitive.ObjectID, user models.User) {
 	userCollection := db.MongoDatabase.Collection("users")
-	updateStreakAndActivity(ctx, userID, &user)
 	hasBadge := make(map[string]bool)
 	for _, badge := range user.Badges {
 		hasBadge[badge] = true
