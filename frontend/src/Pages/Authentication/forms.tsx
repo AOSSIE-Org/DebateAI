@@ -8,9 +8,10 @@ import { useCallback } from "react";
 interface LoginFormProps {
   startForgotPassword: () => void;
   infoMessage?: string;
+  startOtpVerification: (email: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage, startOtpVerification }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -33,7 +34,14 @@ const handleSubmit = async (e: React.FormEvent) => {
     return;
   }
   setLocalError(null);
-  await login(email, password);
+  try{
+    await login(email, password);
+  }catch (err) {
+      const code = (err as Error & { code?: string }).code;
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        startOtpVerification(email);
+      } 
+    } 
 };
 
 

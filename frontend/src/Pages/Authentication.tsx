@@ -76,7 +76,11 @@ const RightSection: React.FC<RightSectionProps> = ({
       {authMode === 'login' && (
         <>
           <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
-          <LoginForm startForgotPassword={startForgotPassword} infoMessage={infoMessage} />
+          <LoginForm
+            startForgotPassword={startForgotPassword}
+            infoMessage={infoMessage}
+            startOtpVerification={startOtpVerification}
+          />
         </>
       )}
       {authMode === 'signup' && (
