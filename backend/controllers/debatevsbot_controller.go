@@ -409,6 +409,7 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	}
 
 	// Check for badges (FirstWin, etc.)
+	updateStreakAndActivity(ctx, userID, &updatedUser)
 	hasBadge := make(map[string]bool)
 	for _, badge := range updatedUser.Badges {
 		hasBadge[badge] = true
