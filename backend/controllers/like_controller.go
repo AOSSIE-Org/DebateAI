@@ -59,8 +59,8 @@ func ToggleLikeHandler(c *gin.Context) {
 	if alreadyLiked {
 		// Unlike - remove user like and decrement count
 		// Use DEL to remove the key atomically
-		_, err = db.RedisClient.Del(ctx, userKey).Result()
-		if err == nil {
+		deleted, err := db.RedisClient.Del(ctx, userKey).Result()
+		if err == nil && deleted > 0 {
 			db.RedisClient.ZIncrBy(ctx, key, -1, postID)
 
 			// Update MongoDB like count (decrement)
