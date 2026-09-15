@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "@/context/authContext";
-import DebateCover from "../assets/DebateCover4.svg";
+import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 import AOSSIELogo from "@/assets/aossie.png";
@@ -21,7 +21,7 @@ const Home: React.FC = () => {
 
   const handlePlayDebateClick = () => {
     if (authContext?.isAuthenticated) {
-      navigate('/game');  
+      navigate('/game');
     } else {
       navigate('/auth', { state: { isSignUp: false } });
     }
@@ -35,7 +35,7 @@ const Home: React.FC = () => {
     }
   };
 
-  const logoutHandler = () =>{
+  const logoutHandler = () => {
     authContext?.logout()
     navigate("/")
   }
@@ -44,9 +44,9 @@ const Home: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-background">
       <nav className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4">
-          <a 
-            href="https://aossie.org" 
-            target="_blank" 
+          <a
+            href="https://aossie.org"
+            target="_blank"
             rel="noopener noreferrer"
             className="p-1 hover:opacity-80 transition-opacity"
           >
@@ -62,14 +62,14 @@ const Home: React.FC = () => {
             <Button onClick={logoutHandler} variant="destructive" size="sm">Log out</Button>
           ) : (
             <>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="text-foreground hover:bg-accent"
                 onClick={loginHandler}
               >
                 Login
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 className="font-bold border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                 onClick={signupHandler}
@@ -84,7 +84,11 @@ const Home: React.FC = () => {
       <div className="flex items-center justify-center">
         <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
           <div className="w-full md:w-2/3 p-4 md:p-16">
-            <img src={DebateCover} alt="Debate Cover" className="w-full object-cover" />
+            <DebateCoverIllustration
+              className="w-full h-auto object-cover"
+              role="img"
+              aria-label="Debate Cover"
+            />
           </div>
           <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <h3 className="text-xl md:text-4xl font-bold text-center">

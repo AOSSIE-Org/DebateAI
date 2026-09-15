@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
 import { Link, useLocation } from 'react-router-dom';
-import DebateCover from '../assets/DebateCover4.svg';
+import DebateCoverIllustration from '../components/DebateCoverIllustration';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white [.contrast_&]:text-white">
+  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white overflow-y-auto [.contrast_&]:text-white">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
         <svg>
@@ -15,8 +15,12 @@ const LeftSection = () => (
         Arguehub
       </Link>
     </div>
-    <div className="flex justify-center items-center flex-1 p-10">
-      <img src={DebateCover} alt="Debate Cover" className="max-w-full max-h-full object-contain" />
+    <div className="flex justify-center items-center flex-1 min-h-0 p-6">
+      <DebateCoverIllustration
+        className="max-w-full max-h-full object-contain"
+        role="img"
+        aria-label="Debate Cover"
+      />
     </div>
     <div>
       <blockquote className="space-y-2">
@@ -73,30 +77,30 @@ const RightSection: React.FC<RightSectionProps> = ({
     </div>
     <div className="flex flex-col items-center justify-center w-full px-6">
       <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-xl p-8 backdrop-blur-sm">
-      {authMode === 'login' && (
-        <>
-          <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
-          <LoginForm startForgotPassword={startForgotPassword} infoMessage={infoMessage} />
-        </>
-      )}
-      {authMode === 'signup' && (
-        <>
-          <h3 className="text-2xl font-medium my-4">Create an account</h3>
-          <SignUpForm startOtpVerification={startOtpVerification} />
-        </>
-      )}
-      {authMode === 'otpVerification' && (
-        <OTPVerificationForm email={emailForOTP} handleOtpVerified={handleOtpVerified} />
-      )}
-      {authMode === 'forgotPassword' && (
-        <ForgotPasswordForm startResetPassword={startResetPassword} />
-      )}
-      {authMode === 'resetPassword' && (
-        <ResetPasswordForm
-          email={emailForPasswordReset}
-          handlePasswordReset={handlePasswordReset}
-        />
-      )}
+        {authMode === 'login' && (
+          <>
+            <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
+            <LoginForm startForgotPassword={startForgotPassword} infoMessage={infoMessage} />
+          </>
+        )}
+        {authMode === 'signup' && (
+          <>
+            <h3 className="text-2xl font-medium my-4">Create an account</h3>
+            <SignUpForm startOtpVerification={startOtpVerification} />
+          </>
+        )}
+        {authMode === 'otpVerification' && (
+          <OTPVerificationForm email={emailForOTP} handleOtpVerified={handleOtpVerified} />
+        )}
+        {authMode === 'forgotPassword' && (
+          <ForgotPasswordForm startResetPassword={startResetPassword} />
+        )}
+        {authMode === 'resetPassword' && (
+          <ResetPasswordForm
+            email={emailForPasswordReset}
+            handlePasswordReset={handlePasswordReset}
+          />
+        )}
       </div>
     </div>
   </div>
