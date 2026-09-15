@@ -1,2 +1,6 @@
 .env
 config.prod.yml
+.DS_Store
+server
+main
+*.exe

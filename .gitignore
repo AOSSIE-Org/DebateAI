@@ -3,3 +3,13 @@
 *.env
 config.prod.yml
 vite.config.ts.timestamp-*.mjs
+.DS_Store
+
+# Temporary previews and captures
+*_preview.png
+*_capture.png
+
+# Binaries
+server
+main
+*.exe

@@ -217,4 +217,41 @@ export const transcriptService = {
     const data = await response.json();
     return data.stats;
   },
+
+  // Export transcript as PDF
+  async exportTranscriptPDF(id: string): Promise<void> {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/transcript/${id}/export?format=pdf`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      let msg = 'Failed to export PDF';
+      try {
+        const errorData = await response.json();
+        msg = errorData.error || msg;
+      } catch {
+        msg = response.statusText || msg;
+      }
+      throw new Error(msg);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `debate-transcript-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Delay URL revocation to prevent download cancellation in some browsers
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  },
 };

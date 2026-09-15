@@ -30,8 +30,8 @@ import {
   Eye,
   Calendar,
   User,
+  Download,
   Search,
-  X,
 } from 'lucide-react';
 import {
   transcriptService,
@@ -55,7 +55,20 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     useState<SavedDebateTranscript | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [creatingPost, setCreatingPost] = useState(false);
+
+
+  const handleExportPDF = async (id: string) => {
+    try {
+      setExportingId(id);
+      await transcriptService.exportTranscriptPDF(id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to export PDF');
+    } finally {
+      setExportingId(null);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState<string>('all');
@@ -407,6 +420,18 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                         <Eye className='w-3 h-3 mr-1' />
                         View
                       </Button>
+                      {transcript.result !== 'pending' && (
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => handleExportPDF(transcript.id)}
+                        disabled={exportingId === transcript.id}
+                        className='h-8 px-2'
+                      >
+                        <Download className='w-3 h-3 mr-1' />
+                        {exportingId === transcript.id ? 'Exporting...' : 'PDF'}
+                      </Button>
+                      )}
                       <Button
                         variant='outline'
                         size='sm'
@@ -565,12 +590,23 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
 
               <Separator />
 
-              <div className='flex justify-between items-center'>
+              <div className='flex items-center justify-end gap-3'>
+                {selectedTranscript.result !== 'pending' && (
+                <Button
+                  onClick={() => handleExportPDF(selectedTranscript.id)}
+                  disabled={exportingId === selectedTranscript.id}
+                  variant='outline'
+                  className='flex items-center gap-2'
+                >
+                  <Download className='w-4 h-4' />
+                  {exportingId === selectedTranscript.id ? 'Exporting...' : 'Download PDF'}
+                </Button>
+                )}
                 <Button
                   onClick={handleCreatePost}
                   disabled={creatingPost}
-                  className='flex items-center gap-2'
                   variant='default'
+                  className='flex items-center gap-2'
                 >
                   <Share2 className='w-4 h-4' />
                   {creatingPost ? 'Creating Post...' : 'Create Post'}

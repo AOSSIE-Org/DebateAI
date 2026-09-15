@@ -21,6 +21,7 @@ func SetupTranscriptRoutes(router *gin.RouterGroup) {
 	// Transcript CRUD operations
 	router.GET("/transcripts", controllers.GetUserTranscriptsHandler)
 	router.GET("/transcript/:id", controllers.GetTranscriptByIDHandler)
+	router.GET("/transcript/:id/export", controllers.ExportTranscriptPDFHandler)
 	router.DELETE("/transcript/:id", controllers.DeleteTranscriptHandler)
 
 	// Utility endpoint to clean up pending transcripts
