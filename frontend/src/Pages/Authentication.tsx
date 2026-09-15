@@ -40,7 +40,7 @@ const LeftSection = () => (
           Albert Einstein
         </footer>
       </blockquote>
-    </div>git add frontend/src/Pages/Authentication.ts
+    </div>
   </div>
 );
 
