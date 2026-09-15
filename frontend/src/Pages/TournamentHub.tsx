@@ -14,6 +14,12 @@ export interface Tournament {
 const MIN_PARTICIPANTS = 4;
 const MAX_PARTICIPANTS = 64;
 
+const NAME_MIN_LENGTH = 3;
+const NAME_MAX_LENGTH = 60;
+
+const DESCRIPTION_MIN_LENGTH = 10;
+const DESCRIPTION_MAX_LENGTH = 300;
+
 export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
     {
@@ -51,12 +57,54 @@ export default function TournamentPage() {
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
   const [participantOption, setParticipantOption] = useState<string>("8");
+  const [nameError, setNameError] = useState("");
+  const [descriptionError, setDescriptionError] = useState("");
   const [customParticipants, setCustomParticipants] = useState<string>("");
   const [customError, setCustomError] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const isPowerOfTwo = (n: number) => n > 1 && (n & (n - 1)) === 0;
+
+  const validateName = (value: string): string => {
+    const trimmedName = value.trim();
+
+    if (!trimmedName) {
+      return "Tournament name is required.";
+    }
+
+    if (trimmedName.length < NAME_MIN_LENGTH) {
+      return `Tournament name must be at least ${NAME_MIN_LENGTH} characters.`;
+    }
+
+    if (trimmedName.length > NAME_MAX_LENGTH) {
+      return `Tournament name must not exceed ${NAME_MAX_LENGTH} characters.`;
+    }
+
+    if (!/[\p{L}\p{N}]/u.test(trimmedName)) {
+      return "Tournament name must contain at least one letter or number.";
+    }
+
+    return "";
+  };
+
+  const validateDescription = (value: string): string => {
+    const trimmedDescription = value.trim();
+
+    if (!trimmedDescription) {
+      return "Tournament description is required.";
+    }
+
+    if (trimmedDescription.length < DESCRIPTION_MIN_LENGTH) {
+      return `Description must be at least ${DESCRIPTION_MIN_LENGTH} characters.`;
+    }
+
+    if (trimmedDescription.length > DESCRIPTION_MAX_LENGTH) {
+      return `Description must not exceed ${DESCRIPTION_MAX_LENGTH} characters.`;
+    }
+
+    return "";
+  };
 
   const getMaxParticipants = (): number | null => {
     if (participantOption === "custom") {
@@ -81,8 +129,19 @@ export default function TournamentPage() {
 
   const handleCreate = (e: FormEvent) => {
     e.preventDefault();
-    if (!name) {
-      setError("Tournament name is required.");
+
+    const trimmedName = name.trim();
+    const trimmedDescription = description.trim();
+
+    const nameValidationError = validateName(trimmedName);
+    const descriptionValidationError =
+      validateDescription(trimmedDescription);
+
+    setNameError(nameValidationError);
+    setDescriptionError(descriptionValidationError);
+    setError("");
+
+    if (nameValidationError || descriptionValidationError) {
       return;
     }
 
@@ -236,9 +295,8 @@ export default function TournamentPage() {
                       <div
                         className="bg-primary h-2.5 rounded-full transition-all duration-500"
                         style={{
-                          width: `${
-                            (t.currentParticipants / t.maxParticipants) * 100
-                          }%`,
+                          width: `${(t.currentParticipants / t.maxParticipants) * 100
+                            }%`,
                         }}
                       ></div>
                     </div>
@@ -272,17 +330,42 @@ export default function TournamentPage() {
             )}
             <form onSubmit={handleCreate} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="tournament-name"
+                  className="block text-sm font-medium text-foreground"
+                >
                   Tournament Name
                 </label>
+
                 <input
+                  id="tournament-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+
+                    if (nameError) {
+                      setNameError(validateName(e.target.value));
+                    }
+                  }}
+                  onBlur={() => setNameError(validateName(name))}
                   required
+                  minLength={NAME_MIN_LENGTH}
+                  maxLength={NAME_MAX_LENGTH}
+                  aria-invalid={Boolean(nameError)}
+                  aria-describedby={nameError ? "tournament-name-error" : undefined}
                   className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
                   placeholder="e.g. Autumn Argument Arena"
                 />
+
+                {nameError && (
+                  <p
+                    id="tournament-name-error"
+                    className="text-destructive text-xs mt-1"
+                  >
+                    {nameError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground">
@@ -344,16 +427,54 @@ export default function TournamentPage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="tournament-description"
+                  className="block text-sm font-medium text-foreground"
+                >
                   Description
                 </label>
+
                 <textarea
+                  id="tournament-description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+
+                    if (descriptionError) {
+                      setDescriptionError(validateDescription(e.target.value));
+                    }
+                  }}
+                  onBlur={() =>
+                    setDescriptionError(validateDescription(description))
+                  }
                   rows={4}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
+                  required
+                  minLength={DESCRIPTION_MIN_LENGTH}
+                  maxLength={DESCRIPTION_MAX_LENGTH}
+                  aria-invalid={Boolean(descriptionError)}
+                  aria-describedby={
+                    descriptionError ? "tournament-description-error" : undefined
+                  }
+                  className="mt-1 block w-full min-h-[100px] max-h-[300px] resize-y overflow-auto border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
                   placeholder="Describe your epic tournament..."
                 />
+
+                <div className="mt-1 flex justify-between gap-2">
+                  <div>
+                    {descriptionError && (
+                      <p
+                        id="tournament-description-error"
+                        className="text-destructive text-xs"
+                      >
+                        {descriptionError}
+                      </p>
+                    )}
+                  </div>
+
+                  <span className="text-muted-foreground text-xs whitespace-nowrap">
+                    {description.length}/{DESCRIPTION_MAX_LENGTH}
+                  </span>
+                </div>
               </div>
               <button
                 type="submit"
