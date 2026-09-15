@@ -1,0 +1,210 @@
+name: Setup Repository Labels
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [main, master]
+    paths:
+      - '.github/workflows/setup-labels.yml'
+
+permissions:
+  issues: write
+
+jobs:
+  create-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create all required labels
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Define all labels with colors and descriptions
+            const requiredLabels = [
+              // ==================== CONTRIBUTOR LABELS ====================
+              { 
+                name: 'org-member', 
+                color: '0E8A16', 
+                description: 'Member of the organization with admin/maintain permissions' 
+              },
+              { 
+                name: 'first-time-contributor', 
+                color: '7057FF', 
+                description: 'First PR of an external contributor' 
+              },
+              { 
+                name: 'repeat-contributor', 
+                color: '6F42C1', 
+                description: 'PR from an external contributor who already had PRs merged' 
+              },
+              
+              // ==================== ISSUE TRACKING LABELS ====================
+              { 
+                name: 'no-issue-linked', 
+                color: 'D73A4A', 
+                description: 'PR is not linked to any issue' 
+              },
+              
+              // ==================== FILE TYPE LABELS ====================
+              { 
+                name: 'documentation', 
+                color: '0075CA', 
+                description: 'Changes to documentation files' 
+              },
+              { 
+                name: 'frontend', 
+                color: 'FEF2C0', 
+                description: 'Changes to frontend code' 
+              },
+              { 
+                name: 'backend', 
+                color: 'BFD4F2', 
+                description: 'Changes to backend code' 
+              },
+              { 
+                name: 'javascript', 
+                color: 'F1E05A', 
+                description: 'JavaScript/TypeScript code changes' 
+              },
+              { 
+                name: 'python', 
+                color: '3572A5', 
+                description: 'Python code changes' 
+              },
+              { 
+                name: 'configuration', 
+                color: 'EDEDED', 
+                description: 'Configuration file changes' 
+              },
+              { 
+                name: 'github-actions', 
+                color: '2088FF', 
+                description: 'GitHub Actions workflow changes' 
+              },
+              { 
+                name: 'dependencies', 
+                color: '0366D6', 
+                description: 'Dependency file changes' 
+              },
+              { 
+                name: 'tests', 
+                color: 'C5DEF5', 
+                description: 'Test file changes' 
+              },
+              { 
+                name: 'docker', 
+                color: '0DB7ED', 
+                description: 'Docker-related changes' 
+              },
+              { 
+                name: 'ci-cd', 
+                color: '6E5494', 
+                description: 'CI/CD pipeline changes' 
+              },
+              
+              // ==================== SIZE LABELS ====================
+              { 
+                name: 'size/XS', 
+                color: '00FF00', 
+                description: 'Extra small PR (≤10 lines changed)' 
+              },
+              { 
+                name: 'size/S', 
+                color: '77FF00', 
+                description: 'Small PR (11-50 lines changed)' 
+              },
+              { 
+                name: 'size/M', 
+                color: 'FFFF00', 
+                description: 'Medium PR (51-200 lines changed)' 
+              },
+              { 
+                name: 'size/L', 
+                color: 'FF9900', 
+                description: 'Large PR (201-500 lines changed)' 
+              },
+              { 
+                name: 'size/XL', 
+                color: 'FF0000', 
+                description: 'Extra large PR (>500 lines changed)' 
+              }
+            ];
+            
+            console.log('='.repeat(60));
+            console.log('🏷️  REPOSITORY LABEL SETUP');
+            console.log('='.repeat(60));
+            console.log(`Total labels to create: ${requiredLabels.length}\n`);
+            
+            // Get existing labels with pagination
+            const existingLabels = await github.paginate(
+              github.rest.issues.listLabelsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              }
+            );
+            
+            const existingLabelNames = existingLabels.map(label => label.name);
+            
+            let created = 0;
+            let updated = 0;
+            let skipped = 0;
+            let failed = 0;
+            
+            // Process each label
+            for (const label of requiredLabels) {
+              try {
+                if (!existingLabelNames.includes(label.name)) {
+                  // Create new label
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  console.log(`✅ Created: ${label.name} (#${label.color})`);
+                  created++;
+                } else {
+                  // Update existing label (in case color/description changed)
+                  const existingLabel = existingLabels.find(l => l.name === label.name);
+                  if (existingLabel.color !== label.color || existingLabel.description !== label.description) {
+                    await github.rest.issues.updateLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name: label.name,
+                      color: label.color,
+                      description: label.description
+                    });
+                    console.log(`🔄 Updated: ${label.name} (#${label.color})`);
+                    updated++;
+                  } else {
+                    console.log(`⏭️  Skipped: ${label.name} (already exists)`);
+                    skipped++;
+                  }
+                }
+              } catch (error) {
+                console.log(`❌ Failed: ${label.name} - ${error.message}`);
+                failed++;
+              }
+            }
+            
+            // Summary
+            console.log('\n' + '='.repeat(60));
+            console.log('📊 SUMMARY');
+            console.log('='.repeat(60));
+            console.log(`✅ Created:  ${created}`);
+            console.log(`🔄 Updated:  ${updated}`);
+            console.log(`⏭️  Skipped:  ${skipped}`);
+            console.log(`❌ Failed:   ${failed}`);
+            console.log('='.repeat(60));
+            
+            // Fail the step if any labels failed to create/update
+            if (failed > 0) {
+              core.setFailed(`Label setup failed! ${failed} label(s) could not be created or updated.`);
+            } else if (created > 0 || updated > 0) {
+              console.log('\n🎉 Label setup complete! Your repository is ready.');
+            } else {
+              console.log('\n✨ All labels are already up to date.');
+            }

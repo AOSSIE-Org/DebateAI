@@ -1,0 +1,62 @@
+name: Good First Issue
+description: A beginner-friendly issue to get started with contributing
+title: "[GOOD FIRST ISSUE]: "
+labels: ["good first issue", "triage-needed"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Welcome! This is a beginner-friendly issue perfect for first-time contributors.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Background information about this issue
+      placeholder: Explain the context and why this issue exists...
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-needs-to-be-done
+    attributes:
+      label: What Needs to Be Done
+      description: Clear description of the task
+      placeholder: |
+        List the specific tasks to complete:
+        - Task 1
+        - Task 2
+        - Task 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: resources
+    attributes:
+      label: Resources
+      description: Helpful resources for completing this task
+      value: |
+        - [Contribution Guide - Start Here!](https://github.com/AOSSIE-Org/DebateAI/blob/main/CONTRIBUTING.md)
+        - [Discord Channel](https://discord.gg/hjUhu33uAn)
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## AI Notice - Important!
+        
+        We encourage contributors to use AI tools responsibly when creating Pull Requests. While AI can be a valuable aid, it is essential to ensure that your contributions meet the task requirements, build successfully, include relevant tests, and pass all linters. Submissions that do not meet these standards may be closed without warning to maintain the quality and integrity of the project. Please take the time to understand the changes you are proposing and their impact.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Getting Started
+      description: Before you begin, please confirm the following
+      options:
+        - label: I have joined the [Discord server](https://discord.gg/hjUhu33uAn) and will post updates there
+          required: true
+        - label: I have read the [Contribution Guide](https://github.com/AOSSIE-Org/DebateAI/blob/main/CONTRIBUTING.md)
+          required: true
+        - label: I understand this issue is assigned on a first-come, first-served basis
+          required: true

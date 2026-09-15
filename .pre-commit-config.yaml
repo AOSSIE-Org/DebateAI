@@ -1,0 +1,52 @@
+# Pre-commit hooks configuration
+# Documentation: https://pre-commit.com/
+#
+# Installation:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Usage:
+#   pre-commit run --all-files    # Run on all files
+#   pre-commit run <hook-id>      # Run specific hook
+#
+# For queries and documentation, visit: https://pre-commit.com/hooks.html
+
+repos:
+  # ----------------------------------
+  # 1. Universal Git / file hygiene
+  # ----------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # ----------------------------------
+  # 2. Config & data files validation
+  # ----------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+
+  # ----------------------------------
+  # 3. Security (language-agnostic)
+  # ----------------------------------
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+  
+  # args: ['--baseline', '.secrets.baseline'] (Maintainers should add a .secrets.baseline file for secret scanning.)
+
+# ==============================================================================
+# IMPORTANT: 
+# Pre-commit runs locally every time you commit; only simple logic should be included here.
+# Heavy operations should be handled by CI/CD pipelines (GitHub Actions, etc.)
+# ==============================================================================

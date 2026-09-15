@@ -1,0 +1,153 @@
+name: Mark stale issues and pull requests
+
+on:
+  schedule:
+    # Runs every hour at minute 35.
+    # `@maintainer`: For most repos a daily schedule is sufficient, e.g. '0 1 * * *'
+    - cron: "0 1 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  stale:
+    permissions:
+      issues: write        # required: mark stale, comment, and close issues
+      pull-requests: write # required: mark stale, comment, and close PRs
+      # contents: write    # @maintainer: uncomment if you enable delete-branch: true
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/stale@v11
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # ── Stale & close timing ────────────────────────────────────────────
+          # Issues inactive for 90 days are marked stale
+          days-before-issue-stale: 90
+          # PRs inactive for 14 days are marked stale
+          days-before-pr-stale: 14
+          # Close stale issues after 7 more days of inactivity
+          days-before-issue-close: 7
+          # Close stale PRs after 7 more days of inactivity
+          days-before-pr-close: 7
+
+          # ── Messages ────────────────────────────────────────────────────────
+          stale-issue-message: >
+            Hello 👋 This issue has been open for more than 3 months with no activity.
+            If it is still relevant, please leave a comment to keep it alive — community
+            support is always welcome! If you found a fix, please open a pull request. 🙏
+            This issue will be automatically closed in **7 days** if there is no further activity.
+
+          stale-pr-message: >
+            Hello 👋 This PR has had no activity for more than 2 weeks.
+            If you are still working on it, please push an update or leave a comment.
+            Ping a maintainer if you believe it is ready for review or merge!
+            This PR will be automatically closed in **7 days** if there is no further activity.
+
+          # Message posted when a stale issue is actually closed
+          close-issue-message: >
+            This issue was automatically closed after being stale for 7 days with no activity. 😔
+            If you believe this was closed in error, feel free to reopen it with additional context.
+            Thank you for contributing to AOSSIE! 🙏
+
+          # Message posted when a stale PR is actually closed
+          close-pr-message: >
+            This PR was automatically closed after being stale for 7 days with no activity. 😔
+            If you would like to continue, please reopen it and ping a maintainer for a review.
+            Thank you for your contribution to AOSSIE! 🙏
+
+          # ── Labels ──────────────────────────────────────────────────────────
+          stale-issue-label: 'Stale'
+          stale-pr-label: 'Stale'
+          # Reason shown on GitHub when an issue is closed automatically
+          close-issue-reason: 'not_planned'
+
+          # @maintainer: Uncomment and set a label to apply when issues are auto-closed
+          # close-issue-label: 'Closed - Stale'
+
+          # @maintainer: Uncomment and set a label to apply when PRs are auto-closed
+          # close-pr-label: 'Closed - Stale'
+
+          # ── Exempt labels ────────────────────────────────────────────────────
+          # Issues carrying ANY of these labels are never marked stale.
+          # @maintainer: Adjust the list to match your project's label conventions.
+          exempt-issue-labels: 'Keep Open,Accepted,In Progress,help wanted,good first issue'
+
+          # PRs carrying ANY of these labels are never marked stale.
+          # @maintainer: Adjust as needed (e.g. add 'ready for review').
+          exempt-pr-labels: 'Keep Open,Work In Progress,WIP'
+
+          # ── Draft PR protection ──────────────────────────────────────────────
+          # Draft PRs are always excluded — they are explicitly works in progress.
+          exempt-draft-pr: true
+
+          # ── Milestone protection ─────────────────────────────────────────────
+          # @maintainer: Uncomment to prevent staling issues/PRs that belong to a milestone.
+          # exempt-all-issue-milestones: true
+          # exempt-all-pr-milestones: true
+
+          # @maintainer: Or exempt only specific milestone names (comma-separated):
+          # exempt-issue-milestones: 'v1.0,v2.0'
+          # exempt-pr-milestones: 'v1.0,v2.0'
+
+          # ── Assignee protection ──────────────────────────────────────────────
+          # @maintainer: Uncomment to prevent staling any assigned issue or PR.
+          # exempt-all-issue-assignees: true
+          # exempt-all-pr-assignees: true
+
+          # @maintainer: Or exempt specific maintainer/bot accounts (comma-separated):
+          # exempt-issue-assignees: 'maintainer1,maintainer2'
+          # exempt-pr-assignees: 'maintainer1,maintainer2'
+
+          # ── PR filtering ─────────────────────────────────────────────────────
+          # @maintainer: Uncomment to process ONLY PRs that carry a specific label
+          # (e.g. only chase PRs that are waiting on the author to respond).
+          # only-pr-labels: 'Needs Author Reply'
+
+          # @maintainer: Uncomment to process only issues/PRs that carry AT LEAST ONE
+          # of the listed labels (useful to target specific categories).
+          # any-of-labels: 'needs-more-info,awaiting-feedback'
+
+          # ── Branch cleanup ───────────────────────────────────────────────────
+          # @maintainer: Set to true to auto-delete branches of auto-closed stale PRs.
+          # Also requires 'contents: write' permission in the job block above.
+          # delete-branch: false
+
+          # ── Behaviour ────────────────────────────────────────────────────────
+          # Remove the Stale label automatically when a new comment or push arrives.
+          remove-stale-when-updated: true
+
+          # Process oldest issues/PRs first so long-standing contributions get attention.
+          ascending: true
+
+          # Cap GitHub API calls per run to stay within rate limits.
+          # @maintainer: Raise this (e.g. 100–200) if your repo has many open items.
+          operations-per-run: 30
+
+          # Print a statistics summary at the end of each run (useful for debugging).
+          enable-statistics: true
+
+          # ── Label transitions ─────────────────────────────────────────────────
+          # @maintainer: Uncomment to strip a label when an issue/PR becomes stale.
+          # labels-to-remove-when-stale: 'In Progress'
+
+          # @maintainer: Uncomment to add a label when an issue/PR becomes un-stale.
+          # labels-to-add-when-unstale: 'In Progress'
+
+          # @maintainer: Uncomment to strip a label when an issue/PR becomes un-stale.
+          # labels-to-remove-when-unstale: 'Needs Author Reply'
+
+          # ── Start date ────────────────────────────────────────────────────────
+          # @maintainer: Uncomment and set a date to skip issues/PRs created before it.
+          # Handy when adding this workflow to an existing repo with old open items.
+          # start-date: '2024-01-01T00:00:00Z'  # ISO 8601 format
+
+          # ── Issue types ───────────────────────────────────────────────────────
+          # @maintainer: Uncomment to restrict stale processing to specific issue types
+          # (GitHub Issues feature — only applies if your org uses issue types).
+          # only-issue-types: 'bug,feature'
+
+          # ── Sort order ────────────────────────────────────────────────────────
+          # @maintainer: Change sort field if needed. Options: created | updated | comments
+          # sort-by: 'created'

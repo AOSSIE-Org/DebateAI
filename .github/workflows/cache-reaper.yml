@@ -1,0 +1,98 @@
+# cache workaround : https://prosopo.io/blog/github-actions-cache-chaos/
+name: 🧹 Cache Reaper
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only)'
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+      stale_days:
+        description: 'Days before cache is stale'
+        default: '7'
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  reap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete stale & orphaned caches
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const DRY_RUN    = '${{ github.event.inputs.dry_run }}' === 'true';
+            const staleDaysRaw = '${{ github.event.inputs.stale_days }}' || '7';
+            const STALE_DAYS = Number(staleDaysRaw);
+            if (!Number.isInteger(STALE_DAYS) || STALE_DAYS < 1) {
+              throw new Error(`stale_days must be a positive integer, got "${staleDaysRaw}"`);
+            }
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - STALE_DAYS);
+
+            // Paginate all caches
+            let page = 1, all = [];
+            while (true) {
+              let data;
+              try {
+                ({ data } = await github.rest.actions.getActionsCacheList({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  per_page: 100, page,
+                }));
+              } catch (err) {
+                core.setFailed(`Failed to list caches (page ${page}): ${err.message}`);
+                return;
+              }
+              if (!data.actions_caches.length) break;
+              all = all.concat(data.actions_caches);
+              if (data.actions_caches.length < 100) break;
+              page++;
+            }
+
+            let deleted = 0, freed = 0;
+            for (const cache of all) {
+              const stale    = new Date(cache.last_accessed_at) < cutoff;
+              const zeroByte = (cache.size_in_bytes || 0) === 0;
+              let closedPR = false;
+              const prMatch = cache.ref?.match(/refs\/pull\/(\d+)\/merge/);
+              if (prMatch) {
+                try {
+                  const { data: pr } = await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: parseInt(prMatch[1]),
+                  });
+                  closedPR = pr.state === 'closed';
+                } catch (err) {
+                  // PR may have been deleted; treat as closed
+                  closedPR = true;
+                }
+              }
+
+              if (!stale && !zeroByte && !closedPR) continue;
+
+              const reason = stale ? `stale(${STALE_DAYS}d)` : zeroByte ? 'zero-byte' : 'closed-PR';
+              console.log(`${DRY_RUN ? '[DRY]' : '🗑️'} ${reason} → ${cache.key}`);
+
+              if (!DRY_RUN) {
+                try {
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    cache_id: cache.id,
+                  });
+                  deleted++;
+                  freed += cache.size_in_bytes || 0;
+                } catch (err) {
+                  console.log(`⚠️ Failed to delete ${cache.key}: ${err.message}`);
+                }
+              }
+            }
+
+            console.log(`Done: ${deleted} deleted, ${(freed/1024/1024).toFixed(1)} MB freed`);

@@ -1,0 +1,141 @@
+name: CodeQL Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "20 2 * * 1" # weekly scan
+  workflow_dispatch:
+
+jobs:
+
+# --------------------------------------------------
+# STEP 1: Detect languages automatically
+# --------------------------------------------------
+
+  create-matrix:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'AOSSIE-Org' }}
+
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+      packages: read
+
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix || '[]' }}
+
+    steps:
+
+      - name: Detect repository languages
+        id: set-matrix
+        uses: advanced-security/set-codeql-language-matrix@v1
+        with:
+          access-token: ${{ secrets.GITHUB_TOKEN }}
+          endpoint: ${{ github.event.repository.languages_url }}
+
+          # ⚠️ OPTIONAL
+          # exclude: 'java,python'
+
+          # ⚠️ OPTIONAL
+          # Force manual build for certain languages
+          # build-mode-manual-override: 'java'
+
+
+# --------------------------------------------------
+# STEP 2: Run CodeQL analysis
+# --------------------------------------------------
+
+  analyze:
+    needs: create-matrix
+
+    if: ${{ github.repository_owner == 'AOSSIE-Org' && needs.create-matrix.outputs.matrix != '[]' }}
+
+    name: Analyze (${{ matrix.language }})
+
+    # Swift requires macOS runners
+    runs-on: ${{ matrix.language == 'swift' && 'macos-latest' || 'ubuntu-latest' }}
+
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.create-matrix.outputs.matrix || '[]') }}
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+
+# --------------------------------------------------
+# LANGUAGE RUNTIME SETUPS
+# Only run if language exists
+# --------------------------------------------------
+
+      - name: Setup Node
+        if: matrix.language == 'javascript-typescript'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20  # ⚠️ MANUAL change if project requires another version
+
+
+      - name: Setup Python
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'  # ⚠️ MANUAL change if project pins version
+
+
+      - name: Setup Java
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'   # ⚠️ MANUAL change if project uses 11 or 17
+
+# --------------------------------------------------
+# Initialize CodeQL
+# IMPORTANT: must run BEFORE build
+# --------------------------------------------------
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+          # ⚠️ OPTIONAL
+          # Uncomment for deeper scans
+          # queries: security-extended
+
+# --------------------------------------------------
+# MANUAL BUILD (only for compiled languages)
+# CodeQL must observe the build process
+# --------------------------------------------------
+
+      # Gradle build
+      - name: Build Java (Gradle)
+        if: matrix.language == 'java-kotlin' && matrix.build-mode == 'manual' && hashFiles('gradlew') != ''
+        run: ./gradlew build --no-daemon -x test
+
+
+      # Maven build
+      - name: Build Java (Maven)
+        if: matrix.language == 'java-kotlin' && matrix.build-mode == 'manual' && hashFiles('pom.xml') != ''
+        run: mvn -B package --file pom.xml
+
+# --------------------------------------------------
+# Run CodeQL scan
+# --------------------------------------------------
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

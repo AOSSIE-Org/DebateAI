@@ -1,0 +1,54 @@
+# https://google.github.io/osv-scanner/github-action/#scan-on-release
+name: Go Release Process
+
+on:
+  push:
+    tags:
+      - "*" # triggers only if push new tag version, like `0.8.4` or else
+
+permissions:
+  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
+  actions: read
+  # Require writing security events to upload SARIF file to security tab
+  security-events: write
+  # to fetch code (actions/checkout)
+  contents: read
+
+jobs:
+  osv-scan:
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.1"
+    with:
+      # Recursive scan supports multiple ecosystems:
+      # Go, Node.js, Python, Rust, Java, etc.
+      scan-args: |-
+        ./
+    permissions:
+      # Require writing security events to upload SARIF file to security tab
+      security-events: write
+  tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder test step
+        run: echo "Configure project-specific tests here"
+    # Replace placeholder steps with actual project tests
+    # Examples:
+    # npm test
+    # go test ./...
+    # pytest
+    # cargo test
+  release:
+    needs: # Needs both tests and osv-scan to pass
+      - tests
+      - osv-scan
+    runs-on: ubuntu-latest
+    # Your actual release steps
+    steps:
+       - name: Placeholder release step
+         run: echo "Configure release steps here"
+    # Add actual release/build/publish steps here
+    # Examples:
+    # - Build binaries
+    # - Publish Docker image
+    # - Create GitHub Release
+    # - Upload artifacts
