@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { LoginForm, SignUpForm, OTPVerificationForm, ForgotPasswordForm, ResetPasswordForm } from './Authentication/forms.tsx';
+import {
+  LoginForm,
+  SignUpForm,
+  OTPVerificationForm,
+  ForgotPasswordForm,
+  ResetPasswordForm,
+} from './Authentication/forms.tsx';
 import { Link, useLocation } from 'react-router-dom';
 import DebateCover from '../assets/DebateCover4.svg';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -15,24 +21,36 @@ const LeftSection = () => (
         Arguehub
       </Link>
     </div>
+
     <div className="flex justify-center items-center flex-1 p-10">
-      <img src={DebateCover} alt="Debate Cover" className="max-w-full max-h-full object-contain" />
+      <img
+        src={DebateCover}
+        alt="Debate Cover"
+        className="max-w-full max-h-full object-contain"
+      />
     </div>
+
     <div>
       <blockquote className="space-y-2">
         <p className="text-lg text-black dark:text-white [.contrast_&]:text-white">
           "We cannot solve our problems with the same thinking we used when we created them."
         </p>
         <footer className="text-sm text-black dark:text-white [.contrast_&]:text-white">Albert Einstein</footer>
+        <footer className="text-sm text-black dark:text-white">
+          Albert Einstein
+        </footer>
       </blockquote>
     </div>
   </div>
 );
 
-
-
 interface RightSectionProps {
-  authMode: 'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword';
+  authMode:
+    | 'login'
+    | 'signup'
+    | 'otpVerification'
+    | 'forgotPassword'
+    | 'resetPassword';
   toggleAuthMode: () => void;
   startOtpVerification: (email: string) => void;
   handleOtpVerified: () => void;
@@ -61,6 +79,7 @@ const RightSection: React.FC<RightSectionProps> = ({
       <div className="w-32">
         <ThemeToggle />
       </div>
+
       {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
         <Button
           className="border-foreground dark:border-white"
@@ -71,51 +90,94 @@ const RightSection: React.FC<RightSectionProps> = ({
         </Button>
       )}
     </div>
+
     <div className="flex flex-col items-center justify-center w-full px-6">
       <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-xl p-8 backdrop-blur-sm">
-      {authMode === 'login' && (
-        <>
-          <h3 className="text-2xl font-medium my-4">Sign in to your account</h3>
-          <LoginForm startForgotPassword={startForgotPassword} infoMessage={infoMessage} />
-        </>
-      )}
-      {authMode === 'signup' && (
-        <>
-          <h3 className="text-2xl font-medium my-4">Create an account</h3>
-          <SignUpForm startOtpVerification={startOtpVerification} />
-        </>
-      )}
-      {authMode === 'otpVerification' && (
-        <OTPVerificationForm email={emailForOTP} handleOtpVerified={handleOtpVerified} />
-      )}
-      {authMode === 'forgotPassword' && (
-        <ForgotPasswordForm startResetPassword={startResetPassword} />
-      )}
-      {authMode === 'resetPassword' && (
-        <ResetPasswordForm
-          email={emailForPasswordReset}
-          handlePasswordReset={handlePasswordReset}
-        />
-      )}
+
+        {authMode === 'login' && (
+          <>
+            <h3 className="text-2xl font-medium my-4">
+              Sign in to your account
+            </h3>
+
+            <LoginForm
+              startForgotPassword={startForgotPassword}
+              infoMessage={infoMessage}
+            />
+          </>
+        )}
+
+        {authMode === 'signup' && (
+          <>
+            <h3 className="text-2xl font-medium my-4">
+              Create an account
+            </h3>
+
+            <SignUpForm
+              startOtpVerification={startOtpVerification}
+            />
+          </>
+        )}
+
+        {authMode === 'otpVerification' && (
+          <OTPVerificationForm
+            email={emailForOTP}
+            handleOtpVerified={handleOtpVerified}
+          />
+        )}
+
+        {authMode === 'forgotPassword' && (
+          <ForgotPasswordForm
+            startResetPassword={startResetPassword}
+          />
+        )}
+
+        {authMode === 'resetPassword' && (
+          <ResetPasswordForm
+            email={emailForPasswordReset}
+            handlePasswordReset={handlePasswordReset}
+          />
+        )}
+
       </div>
     </div>
   </div>
 );
 
-
 const Authentication = () => {
   const location = useLocation();
-  // Extend authMode to include 'resetPassword'
+
   const [authMode, setAuthMode] = useState<
-    'login' | 'signup' | 'otpVerification' | 'forgotPassword' | 'resetPassword'
-  >(location.state?.isSignUp ? 'signup' : 'login');
+    | 'login'
+    | 'signup'
+    | 'otpVerification'
+    | 'forgotPassword'
+    | 'resetPassword'
+  >(
+    location.state?.isSignUp ? 'signup' : 'login'
+  );
 
   const [emailForOTP, setEmailForOTP] = useState('');
   const [emailForPasswordReset, setEmailForPasswordReset] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
 
+  // Update browser tab title based on authentication state
+  useEffect(() => {
+    const authTitles = {
+      login: 'Sign In | DebateAI',
+      signup: 'Sign Up | DebateAI',
+      otpVerification: 'Verify | DebateAI',
+      forgotPassword: 'Reset Password | DebateAI',
+      resetPassword: 'Reset Password | DebateAI',
+    };
+
+    document.title = authTitles[authMode];
+  }, [authMode]);
+
   const toggleAuthMode = () => {
-    setAuthMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'));
+    setAuthMode((prevMode) =>
+      prevMode === 'login' ? 'signup' : 'login'
+    );
   };
 
   // Start OTP verification process
@@ -142,7 +204,10 @@ const Authentication = () => {
 
   // Handle successful password reset
   const handlePasswordReset = () => {
-    setInfoMessage('Your password was successfully reset. You can now log in.');
+    setInfoMessage(
+      'Your password was successfully reset. You can now log in.'
+    );
+
     setAuthMode('login');
   };
 
