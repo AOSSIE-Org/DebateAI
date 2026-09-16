@@ -654,11 +654,11 @@ const TeamDebateRoom: React.FC = () => {
   }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
 
   useEffect(() => {
-  currentUserIdRef.current = currentUser?.id;
-  myTeamIdRef.current = myTeamId;
-  isTeam1Ref.current = isTeam1;
-  debatePhaseRef.current = debatePhase;
-}, [currentUser?.id, myTeamId, isTeam1, debatePhase]);
+    currentUserIdRef.current = currentUser?.id ?? null;
+    myTeamIdRef.current = myTeamId;
+    isTeam1Ref.current = isTeam1;
+    debatePhaseRef.current = debatePhase;
+  }, [currentUser?.id, myTeamId, isTeam1, debatePhase]);
 
 
   // Initialize WebSocket connection - only need token and debateId
@@ -739,7 +739,6 @@ const TeamDebateRoom: React.FC = () => {
       const amTeam1 = isTeam1Ref.current;
       const currentMyTeamId = myTeamIdRef.current;
       const currentUserId = currentUserIdRef.current;
-      const currentPhase = debatePhaseRef.current;
 
       switch (data.type) {
         case "stateSync": {

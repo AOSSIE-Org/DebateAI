@@ -1,5 +1,4 @@
 // src/components/Footer.tsx
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Github, MessageCircle, Heart } from 'lucide-react';
 import debateAiLogo from '@/assets/aossie.png';

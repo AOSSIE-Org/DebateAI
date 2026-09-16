@@ -3,6 +3,7 @@ import React from 'react';
 interface SpeechTranscriptsProps {
   transcripts: { [key: string]: string };
   currentPhase: string;
+  liveTranscript?: string;
 }
 
 const SpeechTranscripts: React.FC<SpeechTranscriptsProps> = ({
