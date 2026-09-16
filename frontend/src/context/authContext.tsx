@@ -291,7 +291,7 @@ const verifyToken = useCallback(async () => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Password update failed');
+        throw new Error(data.error || data.message || 'Password update failed');
       }
     } catch (error) {
       handleError(error);
