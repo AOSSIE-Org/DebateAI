@@ -38,15 +38,6 @@ export function ThemeToggle() {
       >
         {themeOptions.find((t) => t.id === theme)?.icon} Theme:{" "}
         <span>{themeOptions.find((t) => t.id === theme)?.name}</span>
-        <svg
-          className={`ml-auto w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-        >
-          <path d="M19 9l-7 7-7-7" />
-        </svg>
       </button>
 
       {open && (
