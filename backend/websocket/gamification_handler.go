@@ -122,7 +122,7 @@ func GamificationWebSocketHandler(c *gin.Context) {
 
 		// Handle ping/pong for keepalive
 		if messageType == websocket.PingMessage {
-			if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+			if err := client.SafeWriteMessage(websocket.PongMessage, nil); err != nil {
 				log.Printf("Error writing pong: %v", err)
 				break
 			}

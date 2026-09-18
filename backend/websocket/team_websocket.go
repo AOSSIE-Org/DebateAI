@@ -229,6 +229,13 @@ func TeamWebsocketHandler(c *gin.Context) {
 		Team2Ready:   make(map[string]bool),
 	}
 
+	// Upgrade the connection
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println("Team WebSocket upgrade error:", err)
+		return
+	}
+
 	// Insert room if absent
 	teamRoomsMutex.Lock()
 	room, exists := teamRooms[roomKey]
@@ -238,14 +245,8 @@ func TeamWebsocketHandler(c *gin.Context) {
 	} else {
 		// discard prepared room; existing room will be used
 	}
+	room.Mutex.Lock()
 	teamRoomsMutex.Unlock()
-
-	// Upgrade the connection
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		log.Println("Team WebSocket upgrade error:", err)
-		return
-	}
 
 	// CRITICAL: Validate userTeamID matches one of the debate teams before creating client
 	userTeamIDHex := userTeamID.Hex()
@@ -255,6 +256,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 	if userTeamIDHex != team1IDHex && userTeamIDHex != team2IDHex {
 		log.Printf("[TeamWebsocketHandler] ❌ ERROR: UserTeamID %s doesn't match Team1ID %s or Team2ID %s", userTeamIDHex, team1IDHex, team2IDHex)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Team assignment error"})
+		room.Mutex.Unlock()
 		conn.Close()
 		return
 	}
@@ -278,7 +280,6 @@ func TeamWebsocketHandler(c *gin.Context) {
 		Tokens:       10, // Initial tokens
 	}
 
-	room.Mutex.Lock()
 	room.Clients[conn] = client
 	room.Mutex.Unlock()
 
@@ -354,13 +355,19 @@ func TeamWebsocketHandler(c *gin.Context) {
 			userID := client.UserID.Hex()
 			room.Mutex.Lock()
 			delete(room.Clients, conn)
+			clientCount := len(room.Clients)
+			room.Mutex.Unlock()
+
 			// If room is empty, delete it
-			if len(room.Clients) == 0 {
+			if clientCount == 0 {
 				teamRoomsMutex.Lock()
-				delete(teamRooms, roomKey)
+				room.Mutex.Lock()
+				if len(room.Clients) == 0 {
+					delete(teamRooms, roomKey)
+				}
+				room.Mutex.Unlock()
 				teamRoomsMutex.Unlock()
 			}
-			room.Mutex.Unlock()
 
 			// Notify remaining clients that this user has left
 			broadcastExcept(room, conn, map[string]any{
