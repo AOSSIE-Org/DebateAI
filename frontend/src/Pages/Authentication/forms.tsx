@@ -350,9 +350,13 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
       return;
     }
 
-    await confirmForgotPassword(email, code, newPassword);
-    await login(email, newPassword);
-    handlePasswordReset();
+    try {
+      await confirmForgotPassword(email, code, newPassword);
+      await login(email, newPassword);
+      handlePasswordReset();
+    } catch {
+      return;
+    }
   };
 
   return (

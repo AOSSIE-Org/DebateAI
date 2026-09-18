@@ -177,6 +177,7 @@ const verifyToken = useCallback(async () => {
       navigate('/');
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -291,10 +292,11 @@ const verifyToken = useCallback(async () => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Password update failed');
+        throw new Error(data.error || data.message || 'Password update failed');
       }
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
