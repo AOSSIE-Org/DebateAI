@@ -84,8 +84,12 @@ export const createDebate = async (data: DebateRequest): Promise<DebateResponse>
   };
 };
 
-// Function to send a message in an existing debate
-export const sendDebateMessage = async (data: DebateRequest): Promise<{ response: string }> => {
+
+// Function to send a message and stream the bot response token-by-token
+export const sendDebateMessageStream = async (
+  data: DebateRequest,
+  onChunk?: (chunk: string, accumulated: string) => void
+): Promise<{ response: string; debateId?: string }> => {
   const token = getAuthToken();
   const response = await fetch(`${baseURL}/vsbot/debate`, {
     method: "POST",
@@ -98,12 +102,86 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
   });
 
   if (!response.ok) {
-    throw new Error("Failed to send debate message");
+    throw new Error("Failed to send debate message stream");
   }
 
-  const result = await response.json();
-  return { response: result.response }; // Adjusted to return bot's response directly
+  if (!response.body) {
+    throw new Error("ReadableStream not supported on response");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulatedText = "";
+  let debateId = "";
+  let buffer = "";
+  let receivedDone = false;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() || "";
+
+    for (const block of blocks) {
+      if (!block.trim()) continue;
+      const lines = block.split("\n");
+      let eventType = "message";
+      let dataStr = "";
+
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          eventType = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          dataStr = line.slice(5).trim();
+        }
+      }
+
+      if (eventType === "error") {
+        let errorMsg = "Stream error";
+        if (dataStr) {
+          try {
+            const parsed = JSON.parse(dataStr);
+            errorMsg = parsed.error || parsed.message || dataStr;
+          } catch {
+            errorMsg = dataStr;
+          }
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (dataStr) {
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (eventType === "chunk" && parsed.text) {
+            accumulatedText += parsed.text;
+            if (onChunk) {
+              onChunk(parsed.text, accumulatedText);
+            }
+          } else if (eventType === "done") {
+            receivedDone = true;
+            if (parsed.response) {
+              accumulatedText = parsed.response;
+            }
+            if (parsed.debateId) {
+              debateId = parsed.debateId;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse SSE payload:", dataStr, e);
+        }
+      }
+    }
+  }
+
+  if (!receivedDone) {
+    throw new Error("Stream ended before receiving done event");
+  }
+
+  return { response: accumulatedText, debateId };
 };
+
 
 export const concedeDebate = async (debateId: string, history: DebateMessage[] = []): Promise<void> => {
   const token = getAuthToken();
