@@ -134,6 +134,16 @@ const TeamBuilder: React.FC = () => {
     }
   }, []);
 
+  const retryFetchAvailableTeams = () => {
+    setIsLoadingAvailableTeams(true);
+    fetchAvailableTeams();
+  };
+
+  const retryFetchUserTeams = () => {
+    setIsLoadingUserTeams(true);
+    fetchUserTeams();
+  };
+
   React.useEffect(() => {
     fetchAvailableTeams();
     fetchUserTeams();
@@ -187,7 +197,7 @@ const TeamBuilder: React.FC = () => {
   const isUserInTeam = userTeams && userTeams.length > 0;
   const canCreateOrJoin =
     !isUserInTeam && !isLoadingUserTeams && !userTeamsError;
-    
+
   const handleViewMemberProfile = async (memberId: string, team?: Team) => {
     try {
       const profile = await getTeamMemberProfile(memberId);
@@ -508,7 +518,7 @@ const TeamBuilder: React.FC = () => {
           ) : userTeamsError ? (
             <div className="text-center py-12">
               <p className="text-destructive mb-4">{userTeamsError}</p>
-              <Button variant="outline" onClick={fetchUserTeams}>
+              <Button variant="outline" onClick={retryFetchUserTeams}>
                 Retry
               </Button>
             </div>
@@ -858,7 +868,7 @@ const TeamBuilder: React.FC = () => {
           ) : availableTeamsError ? (
             <div className="text-center py-12">
               <p className="text-destructive mb-4">{availableTeamsError}</p>
-              <Button variant="outline" onClick={fetchAvailableTeams}>
+              <Button variant="outline" onClick={retryFetchAvailableTeams}>
                 Retry
               </Button>
             </div>
