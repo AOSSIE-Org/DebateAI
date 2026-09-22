@@ -170,6 +170,139 @@ const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> =
 
 const BIO_MAX_LENGTH = 300;
 
+ const FollowersFollowingSection: React.FC = () => {
+   const { user } = useUser();
+   const [followers, setFollowers] = useState<FollowUser[]>([]);
+   const [following, setFollowing] = useState<FollowUser[]>([]);
+   const [loadingFollowers, setLoadingFollowers] = useState(false);
+   const [loadingFollowing, setLoadingFollowing] = useState(false);
+   const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+
+   useEffect(() => {
+     if (user?.id) {
+       fetchFollowers();
+       fetchFollowing();
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [user?.id]);
+
+   const fetchFollowers = async () => {
+     if (!user?.id) return;
+     setLoadingFollowers(true);
+     try {
+       const token = getAuthToken();
+       const response = await fetch(`${baseURL}/users/${user.id}/followers`, {
+         headers: token ? { Authorization: `Bearer ${token}` } : {},
+       });
+       if (response.ok) {
+         const data = await response.json();
+         setFollowers(data.followers || []);
+       }
+     } catch (err) {
+       console.error("Error fetching followers:", err);
+     } finally {
+       setLoadingFollowers(false);
+     }
+   };
+
+   const fetchFollowing = async () => {
+     if (!user?.id) return;
+     setLoadingFollowing(true);
+     try {
+       const token = getAuthToken();
+       const response = await fetch(`${baseURL}/users/${user.id}/following`, {
+         headers: token ? { Authorization: `Bearer ${token}` } : {},
+       });
+       if (response.ok) {
+         const data = await response.json();
+         setFollowing(data.following || []);
+       }
+     } catch (err) {
+       console.error("Error fetching following:", err);
+     } finally {
+       setLoadingFollowing(false);
+     }
+   };
+
+   return (
+     <div className="space-y-3">
+       <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+         Connections
+       </h3>
+       <div className="space-y-1">
+         <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+           <Users className="w-3 h-3" />
+           <span>Followers ({followers.length})</span>
+         </div>
+         <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
+           {loadingFollowers ? (
+             <div className="text-center py-2 text-xs text-muted-foreground">
+               <LoadingSpinner />
+             </div>
+           ) : followers.length === 0 ? (
+             <div className="text-center py-2 text-xs text-muted-foreground">
+               No followers yet
+             </div>
+           ) : (
+             followers.map((follower: FollowUser) => (
+               <ProfileHover
+                 key={follower.id || follower._id || ""}
+                 userId={follower.id || follower._id || ""}
+               >
+                 <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
+                   <img
+                     src={follower.avatarUrl || defaultAvatar}
+                     alt={follower.displayName || "User"}
+                     className="w-5 h-5 rounded-full object-cover"
+                   />
+                   <span className="text-xs truncate">
+                     {follower.displayName || follower.email || "User"}
+                   </span>
+                 </div>
+               </ProfileHover>
+             ))
+           )}
+         </div>
+       </div>
+       <div className="space-y-1">
+         <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+           <Users className="w-3 h-3" />
+           <span>Following ({following.length})</span>
+         </div>
+         <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
+           {loadingFollowing ? (
+             <div className="text-center py-2 text-xs text-muted-foreground">
+               <LoadingSpinner size="sm" />
+             </div>
+           ) : following.length === 0 ? (
+             <div className="text-center py-2 text-xs text-muted-foreground">
+               Not following anyone yet
+             </div>
+           ) : (
+             following.map((followed: FollowUser) => (
+               <ProfileHover
+                 key={followed.id || followed._id || ""}
+                 userId={followed.id || followed._id || ""}
+               >
+                 <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
+                   <img
+                     src={followed.avatarUrl || defaultAvatar}
+                     alt={followed.displayName || "User"}
+                     className="w-5 h-5 rounded-full object-cover"
+                   />
+                   <span className="text-xs truncate">
+                     {followed.displayName || followed.email || "User"}
+                   </span>
+                 </div>
+               </ProfileHover>
+             ))
+           )}
+         </div>
+       </div>
+     </div>
+   );
+ };
+
 const Profile: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -600,111 +733,6 @@ const Profile: React.FC = () => {
   const clearCustomDateRange = () => {
     setCustomDateRange({ from: undefined, to: undefined });
     if (eloFilter === "custom") setEloFilter("all");
-  };
-
-  const FollowersFollowingSection: React.FC = () => {
-    const { user } = useUser();
-    const [followers, setFollowers] = useState<FollowUser[]>([]);
-    const [following, setFollowing] = useState<FollowUser[]>([]);
-    const [loadingFollowers, setLoadingFollowers] = useState(false);
-    const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
-
-    useEffect(() => {
-      if (user?.id) {
-        fetchFollowers();
-        fetchFollowing();
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.id]);
-
-    const fetchFollowers = async () => {
-      if (!user?.id) return;
-      setLoadingFollowers(true);
-      try {
-        const token = getAuthToken();
-        const response = await fetch(`${baseURL}/users/${user.id}/followers`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setFollowers(data.followers || []);
-        }
-      } catch (err) {
-        console.error("Error fetching followers:", err);
-      } finally {
-        setLoadingFollowers(false);
-      }
-    };
-
-    const fetchFollowing = async () => {
-      if (!user?.id) return;
-      setLoadingFollowing(true);
-      try {
-        const token = getAuthToken();
-        const response = await fetch(`${baseURL}/users/${user.id}/following`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setFollowing(data.following || []);
-        }
-      } catch (err) {
-        console.error("Error fetching following:", err);
-      } finally {
-        setLoadingFollowing(false);
-      }
-    };
-
-    return (
-      <div className="space-y-3">
-        <h3 className="text-xs sm:text-sm font-semibold text-foreground">Connections</h3>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <Users className="w-3 h-3" />
-            <span>Followers ({followers.length})</span>
-          </div>
-          <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
-            {loadingFollowers ? (
-              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner/></div>
-            ) : followers.length === 0 ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">No followers yet</div>
-            ) : (
-              followers.map((follower: FollowUser) => (
-                <ProfileHover key={follower.id || follower._id || ""} userId={follower.id || follower._id || ""}>
-                  <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
-                    <img src={follower.avatarUrl || defaultAvatar} alt={follower.displayName || "User"} className="w-5 h-5 rounded-full object-cover" />
-                    <span className="text-xs truncate">{follower.displayName || follower.email || "User"}</span>
-                  </div>
-                </ProfileHover>
-              ))
-            )}
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <Users className="w-3 h-3" />
-            <span>Following ({following.length})</span>
-          </div>
-          <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
-            {loadingFollowing ? (
-              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner size="sm" /></div>
-            ) : following.length === 0 ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Not following anyone yet</div>
-            ) : (
-              following.map((followed: FollowUser) => (
-                <ProfileHover key={followed.id || followed._id || ""} userId={followed.id || followed._id || ""}>
-                  <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
-                    <img src={followed.avatarUrl || defaultAvatar} alt={followed.displayName || "User"} className="w-5 h-5 rounded-full object-cover" />
-                    <span className="text-xs truncate">{followed.displayName || followed.email || "User"}</span>
-                  </div>
-                </ProfileHover>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
