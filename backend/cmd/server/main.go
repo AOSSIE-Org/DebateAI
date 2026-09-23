@@ -100,6 +100,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.GET("/ws/matchmaking", websocket.MatchmakingHandler)
 	router.GET("/ws/gamification", websocket.GamificationWebSocketHandler)
 
+	routes.SetupPerformanceReportRoutes(router.Group("/"))
+
 	auth := router.Group("/")
 	auth.Use(middlewares.AuthMiddleware("./config/config.prod.yml"))
 	{
