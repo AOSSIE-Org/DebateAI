@@ -347,7 +347,7 @@ function Header() {
                 onClick={toggleDrawer}
               />
               <NavItem
-                to="/support-debateai"
+                to="/support-os"
                 label="Support DebateAI"
                 icon={<Heart className="mr-3 h-4 w-4 text-red-500 transition-all duration-300 group-hover:fill-red-500 group-hover:scale-110" />}
                 onClick={toggleDrawer}

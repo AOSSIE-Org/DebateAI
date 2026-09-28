@@ -906,7 +906,7 @@ const Profile: React.FC = () => {
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">No matches yet!</p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/startDebate")} className="hover:bg-primary hover:text-primary-foreground text-xs">
                     Start Debating
                   </Button>
                 </div>
@@ -1000,7 +1000,7 @@ const Profile: React.FC = () => {
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                     {eloFilter === "custom" ? "No debates in this date range!" : "No Elo history for selected period!"}
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/startDebate")} className="hover:bg-primary hover:text-primary-foreground text-xs">
                     Join a Debate
                   </Button>
                 </div>
@@ -1080,7 +1080,7 @@ const Profile: React.FC = () => {
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">No recent debates available.</p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/startDebate")} className="hover:bg-primary hover:text-primary-foreground text-xs">
                     Join a Debate
                   </Button>
                 </div>
@@ -1193,7 +1193,7 @@ const Profile: React.FC = () => {
                 </div>
               )}
               <div className="text-center">
-                <Button variant="outline" onClick={() => (window.location.href = "/debates")}>
+                <Button variant="outline" onClick={() => (window.location.href = "/startDebate")}>
                   Start New Debate
                 </Button>
               </div>
