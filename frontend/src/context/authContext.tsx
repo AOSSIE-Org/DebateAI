@@ -125,7 +125,6 @@ const verifyToken = useCallback(async () => {
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
     }
   } catch (error) {
-    console.log('error', error);
     logout();
   }
 }, [setUser]);
@@ -340,7 +339,6 @@ const verifyToken = useCallback(async () => {
       };
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      console.log('User after Google login:', data.user);
       navigate('/');
     } catch (error) {
       handleError(error);

@@ -9,10 +9,7 @@ const LeftSection = () => (
   <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white [.contrast_&]:text-white">
     <div className="flex items-center text-lg font-medium">
       <Link to="/" className="flex items-center">
-        <svg>
-          {/* SVG Content */}
-        </svg>
-        Arguehub
+        DebateAI
       </Link>
     </div>
     <div className="flex justify-center items-center flex-1 p-10">
