@@ -2,6 +2,9 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
+/**
+ * 404 page shown for any URL that does not match a route.
+ */
 function NotFound() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center text-foreground">

@@ -122,7 +122,7 @@ function Header() {
                 <BreadcrumbItem>
                   {isLast ? (
                     <BreadcrumbPage className="capitalize">
-                      {value === "support-debateai" 
+                      {value === "support-os"
                         ? "Support DebateAI" 
                         : value === "bot-selection" 
                         ? "Bot Selection" 
@@ -131,7 +131,7 @@ function Header() {
                   ) : (
                     <BreadcrumbLink asChild>
                       <NavLink to={to} className="capitalize">
-                        {value === "support-debateai" 
+                        {value === "support-os"
                           ? "Support DebateAI" 
                           : value === "bot-selection" 
                           ? "Bot Selection" 
