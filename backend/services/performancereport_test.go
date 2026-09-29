@@ -67,8 +67,9 @@ func TestParseReportJSON(t *testing.T) {
 }
 
 func TestGenerateOrGetPerformanceReport_MockAndCache(t *testing.T) {
-	// Setup MongoDB connection if available
-	_ = db.ConnectMongoDB("mongodb://localhost:27017/debateai")
+	if err := db.ConnectMongoDB("mongodb://localhost:27017/debateai"); err != nil {
+		t.Skipf("MongoDB not available for cache test: %v", err)
+	}
 
 	llmCallCount := 0
 	mockLLM := func(ctx context.Context, prompt string) (string, error) {
@@ -156,7 +157,13 @@ func TestGenerateOrGetPerformanceReport_RetryAndFallback(t *testing.T) {
 				"clarity": 82,
 				"rebuttal_effectiveness": 74
 			},
-			"argument_breakdown": [],
+			"argument_breakdown": [
+				{
+					"statement": "UBI causes hyperinflation.",
+					"tag": "Moderate",
+					"reason": "Needs more evidence."
+				}
+			],
 			"fallacy_flags": [],
 			"improvement_tips": ["Tip 1", "Tip 2"]
 		}`, nil

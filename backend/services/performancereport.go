@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ func ResetLLMGenerator() {
 }
 
 // BuildPerformanceReportPrompt constructs the prompt for LLM report generation
-func BuildPerformanceReportPrompt(topic, stance, transcriptText string) string {
+func BuildPerformanceReportPrompt(topic, stance, transcriptText, debateType string) string {
 	if stance == "" {
 		stance = "User / Debater"
 	}
@@ -39,8 +40,13 @@ func BuildPerformanceReportPrompt(topic, stance, transcriptText string) string {
 		topic = "General Debate"
 	}
 
+	audienceNote := "Analyze the following debate transcript and generate an in-depth, personalized Post-Debate Performance Report for the debater who represented the stance"
+	if debateType == "team" {
+		audienceNote = "Analyze the following team debate transcript and generate a team-level Post-Debate Performance Report (combined arguments from all speakers on the same side, not individualized per teammate) for the side that represented the stance"
+	}
+
 	return fmt.Sprintf(`You are an expert debate adjudicator, rhetoric scholar, and speech coach.
-Analyze the following debate transcript and generate an in-depth, personalized Post-Debate Performance Report for the debater who represented the stance: "%s".
+%s: "%s".
 Debate Topic: "%s"
 
 Full Transcript:
@@ -80,7 +86,7 @@ STRICT CONSTRAINTS:
 1. Return ONLY the raw JSON object. Do NOT enclose in markdown tags or add preamble.
 2. Provide 2 to 3 high-impact improvement tips specific to the content of this transcript.
 3. If no fallacies are present in the debater's statements, provide an empty array [] for "fallacy_flags".
-4. "tag" in argument_breakdown MUST be exactly "Strong", "Moderate", or "Weak".`, stance, topic, transcriptText)
+4. "tag" in argument_breakdown MUST be exactly "Strong", "Moderate", or "Weak".`, audienceNote, stance, topic, transcriptText)
 }
 
 // FormatTranscriptFromPayload formats messages or transcripts map into string
@@ -137,6 +143,52 @@ func FormatTranscriptFromPayload(messages []models.Message, transcripts map[stri
 	return ""
 }
 
+// UserIsDebateParticipant returns true if the user took part in the debate identified by debateID.
+func UserIsDebateParticipant(ctx context.Context, debateID string, userID primitive.ObjectID, email string) bool {
+	if db.MongoDatabase == nil || debateID == "" || userID.IsZero() || email == "" {
+		return false
+	}
+
+	transcriptCount, err := db.MongoDatabase.Collection("debate_transcripts").CountDocuments(ctx, bson.M{
+		"roomId": debateID,
+		"email":  email,
+	})
+	if err == nil && transcriptCount > 0 {
+		return true
+	}
+
+	objID, err := primitive.ObjectIDFromHex(debateID)
+	if err != nil {
+		return false
+	}
+
+	var botDebate models.DebateVsBot
+	if db.MongoDatabase.Collection("debates_vs_bot").FindOne(ctx, bson.M{"_id": objID, "email": email}).Decode(&botDebate) == nil {
+		return true
+	}
+
+	var saved models.SavedDebateTranscript
+	if db.MongoDatabase.Collection("saved_debate_transcripts").FindOne(ctx, bson.M{"_id": objID, "userId": userID}).Decode(&saved) == nil {
+		return true
+	}
+
+	var teamDebate models.TeamDebate
+	if db.MongoDatabase.Collection("team_debates").FindOne(ctx, bson.M{"_id": objID}).Decode(&teamDebate) == nil {
+		for _, member := range teamDebate.Team1Members {
+			if member.UserID == userID {
+				return true
+			}
+		}
+		for _, member := range teamDebate.Team2Members {
+			if member.UserID == userID {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // GetCachedPerformanceReport checks if a report already exists in MongoDB
 func GetCachedPerformanceReport(ctx context.Context, debateID string, userID primitive.ObjectID) (*models.PerformanceReport, error) {
 	if db.MongoDatabase == nil || debateID == "" {
@@ -145,15 +197,13 @@ func GetCachedPerformanceReport(ctx context.Context, debateID string, userID pri
 
 	collection := db.MongoDatabase.Collection("performance_reports")
 	filter := bson.M{"debateId": debateID}
-	if !userID.IsZero() {
-		filter = bson.M{
-			"debateId": debateID,
-			"$or": []bson.M{
-				{"userId": userID},
-				{"userId": primitive.NilObjectID},
-				{"userId": bson.M{"$exists": false}},
-			},
+	if userID.IsZero() {
+		filter["$or"] = []bson.M{
+			{"userId": bson.M{"$exists": false}},
+			{"userId": nil},
 		}
+	} else {
+		filter["userId"] = userID
 	}
 
 	var report models.PerformanceReport
@@ -179,7 +229,12 @@ func SavePerformanceReport(ctx context.Context, report *models.PerformanceReport
 	}
 
 	filter := bson.M{"debateId": report.DebateID}
-	if !report.UserID.IsZero() {
+	if report.UserID.IsZero() {
+		filter["$or"] = []bson.M{
+			{"userId": bson.M{"$exists": false}},
+			{"userId": nil},
+		}
+	} else {
 		filter["userId"] = report.UserID
 	}
 
@@ -240,11 +295,14 @@ func ParseReportJSON(raw string) (*models.PerformanceReport, error) {
 	if parsed.FallacyFlags == nil {
 		parsed.FallacyFlags = []models.FallacyFlag{}
 	}
-	if parsed.ArgumentBreakdown == nil {
-		parsed.ArgumentBreakdown = []models.ArgumentItem{}
+	if len(parsed.ArgumentBreakdown) == 0 {
+		return nil, errors.New("missing or empty argument_breakdown")
 	}
-	if parsed.ImprovementTips == nil {
-		parsed.ImprovementTips = []string{}
+	if len(parsed.ImprovementTips) == 0 {
+		return nil, errors.New("missing or empty improvement_tips")
+	}
+	if parsed.OverallScores.Persuasion == 0 && parsed.OverallScores.Clarity == 0 && parsed.OverallScores.RebuttalEffectiveness == 0 {
+		return nil, errors.New("missing or empty overall_scores")
 	}
 
 	return &models.PerformanceReport{
@@ -301,9 +359,9 @@ func GenerateOrGetPerformanceReport(ctx context.Context, req models.PerformanceR
 		req.DebateID = primitive.NewObjectID().Hex()
 	}
 
-	// 1. Check cache first
+	// 1. Check cache first (skip cached fallback so a later request can retry the LLM)
 	cached, err := GetCachedPerformanceReport(ctx, req.DebateID, userID)
-	if err == nil && cached != nil {
+	if err == nil && cached != nil && !cached.IsFallback {
 		return cached, nil
 	}
 
@@ -354,7 +412,7 @@ func GenerateOrGetPerformanceReport(ctx context.Context, req models.PerformanceR
 	}
 
 	// 3. Build Prompt & Call LLM
-	prompt := BuildPerformanceReportPrompt(topic, stance, transcriptText)
+	prompt := BuildPerformanceReportPrompt(topic, stance, transcriptText, req.DebateType)
 
 	var report *models.PerformanceReport
 	llmOutput, err := defaultLLMGenerator(ctx, prompt)
@@ -386,7 +444,9 @@ func GenerateOrGetPerformanceReport(ctx context.Context, req models.PerformanceR
 	report.Stance = stance
 	report.GeneratedAt = time.Now()
 
-	_ = SavePerformanceReport(ctx, report)
+	if err := SavePerformanceReport(ctx, report); err != nil {
+		log.Printf("Failed to cache performance report for debate %s: %v", req.DebateID, err)
+	}
 
 	return report, nil
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PerformanceReport as PerformanceReportType,
   PerformanceReportRequest,
@@ -30,17 +30,38 @@ export const PerformanceReport: React.FC<PerformanceReportProps> = ({
   const [report, setReport] = useState<PerformanceReportType | null>(initialReport);
   const [loading, setLoading] = useState<boolean>(!initialReport);
   const [error, setError] = useState<string | null>(null);
+  const fetchGenerationRef = useRef(0);
+
+  const requestKey = useMemo(
+    () =>
+      JSON.stringify({
+        debateId: request.debateId,
+        topic: request.topic,
+        stance: request.stance,
+        debateType: request.debateType,
+        messages: request.messages,
+        transcripts: request.transcripts,
+      }),
+    [request]
+  );
 
   const fetchReport = async () => {
+    const generation = ++fetchGenerationRef.current;
     setLoading(true);
     setError(null);
     try {
       const data = await getOrGeneratePerformanceReport(request);
-      setReport(data);
+      if (generation === fetchGenerationRef.current) {
+        setReport(data);
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to generate performance report');
+      if (generation === fetchGenerationRef.current) {
+        setError(err?.message || 'Failed to generate performance report');
+      }
     } finally {
-      setLoading(false);
+      if (generation === fetchGenerationRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -48,7 +69,7 @@ export const PerformanceReport: React.FC<PerformanceReportProps> = ({
     if (!initialReport && request?.debateId) {
       fetchReport();
     }
-  }, [request?.debateId]);
+  }, [requestKey, initialReport]);
 
   if (loading) {
     return (
@@ -138,10 +159,15 @@ export const PerformanceReport: React.FC<PerformanceReportProps> = ({
               <Sparkles className="w-3.5 h-3.5" /> AI Performance Evaluation
             </div>
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Debate Performance Report
+              {request.debateType === 'team' ? 'Team Debate Performance Report' : 'Debate Performance Report'}
             </h2>
             <p className="text-orange-100 text-sm mt-1">
               Topic: <span className="font-semibold text-white">"{report.topic}"</span> • Stance: <span className="font-semibold text-white">{report.stance}</span>
+              {request.debateType === 'team' && (
+                <span className="block text-orange-200 text-xs mt-1">
+                  Team-level feedback for your side&apos;s combined arguments (not per-speaker).
+                </span>
+              )}
             </p>
           </div>
           {report.generated_at && (
@@ -248,7 +274,14 @@ export const PerformanceReport: React.FC<PerformanceReportProps> = ({
         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 text-orange-500" /> Logical Fallacy Detection
         </h3>
-        {fallacy_flags && fallacy_flags.length > 0 ? (
+        {report.is_fallback ? (
+          <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <p className="text-sm font-medium text-amber-900">
+              Fallacy analysis wasn&apos;t available for this report.
+            </p>
+          </div>
+        ) : fallacy_flags && fallacy_flags.length > 0 ? (
           <div className="space-y-3">
             {fallacy_flags.map((fallacy, idx) => (
               <div
