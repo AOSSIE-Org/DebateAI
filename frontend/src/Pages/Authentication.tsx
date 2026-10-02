@@ -77,8 +77,8 @@ const RightSection: React.FC<RightSectionProps> = ({
 }) => (
   <div className="flex items-center justify-center w-full h-full relative">
     <div className="absolute right-4 top-4 md:right-8 md:top-8 flex flex-col md:flex-row gap-2 items-center">
-      <div className="w-32">
-        <ThemeToggle />
+      <div className="w-56">
+        <ThemeToggle iconSize={20} />
       </div>
 
       {authMode !== 'otpVerification' && authMode !== 'resetPassword' && (
