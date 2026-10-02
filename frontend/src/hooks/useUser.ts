@@ -3,6 +3,7 @@ import { useAtom } from "jotai";
 import { userAtom } from "../state/userAtom";
 import { AuthContext } from "../context/authContext";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 const USER_CACHE_KEY = "userProfile";
 const DEFAULT_RATING = 1500;
@@ -43,7 +44,12 @@ export const useUser = () => {
         });
 
         if (!response.ok) {
-          throw new Error(`Fetch profile failed with status ${response.status}`);
+          throw new Error(
+            await getApiErrorMessage(
+              response,
+              `Fetch profile failed with status ${response.status}`
+            )
+          );
         }
 
         const userData = await response.json();

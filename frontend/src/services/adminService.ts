@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from '@/utils/apiError';
+
 const baseURL =
   import.meta.env.VITE_BASE_URL ??
   (import.meta.env.DEV ? "http://localhost:1313" : undefined);
@@ -107,7 +109,9 @@ export const getAnalytics = async (token: string): Promise<Analytics> => {
     },
   });
   if (!response.ok) {
-    throw new Error('Failed to fetch analytics');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to fetch analytics')
+    );
   }
   return response.json();
 };
@@ -126,7 +130,9 @@ export const getAnalyticsHistory = async (
     }
   );
   if (!response.ok) {
-    throw new Error('Failed to fetch analytics history');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to fetch analytics history')
+    );
   }
   return response.json();
 };
@@ -147,7 +153,9 @@ export const getDebates = async (
     }
   );
   if (!response.ok) {
-    throw new Error('Failed to fetch debates');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to fetch debates')
+    );
   }
   return response.json();
 };
@@ -163,7 +171,9 @@ export const deleteDebate = async (
     },
   });
   if (!response.ok) {
-    throw new Error('Failed to delete debate');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to delete debate')
+    );
   }
 };
 
@@ -180,7 +190,9 @@ export const bulkDeleteDebates = async (
     body: JSON.stringify({ ids }),
   });
   if (!response.ok) {
-    throw new Error('Failed to delete debates');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to delete debates')
+    );
   }
 };
 
@@ -200,7 +212,9 @@ export const getComments = async (
     }
   );
   if (!response.ok) {
-    throw new Error('Failed to fetch comments');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to fetch comments')
+    );
   }
   return response.json();
 };
@@ -220,7 +234,9 @@ export const deleteComment = async (
     }
   );
   if (!response.ok) {
-    throw new Error('Failed to delete comment');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to delete comment')
+    );
   }
 };
 
@@ -238,7 +254,9 @@ export const bulkDeleteComments = async (
     body: JSON.stringify({ ids, type }),
   });
   if (!response.ok) {
-    throw new Error('Failed to delete comments');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to delete comments')
+    );
   }
 };
 
@@ -258,7 +276,9 @@ export const getAdminActionLogs = async (
     }
   );
   if (!response.ok) {
-    throw new Error('Failed to fetch admin logs');
+    throw new Error(
+      await getApiErrorMessage(response, 'Failed to fetch admin logs')
+    );
   }
   return response.json();
 };

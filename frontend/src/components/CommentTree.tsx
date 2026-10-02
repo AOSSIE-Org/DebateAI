@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAtom } from 'jotai';
 import { useUser } from '../hooks/useUser';
+import { getApiErrorMessage } from '@/utils/apiError';
 import ProfileHover from './ProfileHover';
 import UserProfileModal from './UserProfileModal';
 import {
@@ -304,7 +305,9 @@ const CommentTree: React.FC<CommentTreeProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch comments');
+        throw new Error(
+          await getApiErrorMessage(response, 'Failed to fetch comments')
+        );
       }
 
       const data = await response.json();
