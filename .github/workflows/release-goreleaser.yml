@@ -1,0 +1,35 @@
+name: Release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+on:
+  push:
+    tags: ["v*.*.*"]
+jobs:
+  release:
+    name: Release with GoReleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write          # [DOCKER] Required for ghcr.io push
+      id-token: write          # [SIGNING] Required for cosign keyless signing
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0   # Full history needed for changelog
+          persist-credentials: false  # Avoid exposing token to submodules
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020        # [NODE] Remove if not a Node.js project
+        with:
+          node-version: '20'
+          cache: ''
+      # [PYTHON] Add: actions/setup-python@v5 with python-version: '3.12'
+      # [DOCKER] Add: docker/setup-buildx-action@v3 + docker/login-action@v3
+      # [GO] Add: actions/setup-go@v5 with go-version: stable
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NPM_TOKEN: ${{ secrets.NPM_TOKEN }}     # [NODE]
+          # DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}  # [DOCKER]

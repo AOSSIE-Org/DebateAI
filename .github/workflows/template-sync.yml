@@ -1,0 +1,33 @@
+name: Template Sync
+
+on:
+  # cronjob trigger - runs monthly on the 1st at midnight
+  schedule:
+  - cron: "0 0 1 * *"
+  workflow_dispatch:
+jobs:
+  repo-sync:
+    runs-on: ubuntu-latest
+    if: github.repository != 'AOSSIE-Org/Template-Repo'
+    # https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      # Check out the repository
+      - name: Checkout
+        uses: actions/checkout@v7
+        # https://github.com/actions/checkout#usage
+        # uncomment if you use submodules within the repository
+        # with:
+        #   submodules: true
+
+      - name: actions-template-sync
+        uses: AndreasAugustin/actions-template-sync@v2
+        with:
+          source_repo_path: AOSSIE-Org/Template-Repo
+          upstream_branch: main # defaults to main
+          pr_labels: template_sync,auto_pr # defaults to template_sync
+          source_gh_token: ${{ secrets.GITHUB_TOKEN }}
+          is_pr_cleanup: true # for not open multiple PRs

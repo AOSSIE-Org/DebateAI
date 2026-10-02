@@ -1,0 +1,32 @@
+name: PR Template Validation
+
+# pull_request_target is used (instead of pull_request) so that GITHUB_TOKEN
+# has write permissions even for PRs from forks, which is required for Danger
+# to post review comments. The Dangerfile is always read from the base branch
+# (checked out below), so no untrusted code from the fork is executed.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  danger:
+    if: ${{ github.repository_owner == 'AOSSIE-Org' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+
+      - name: Run Danger JS
+        run: npx --yes danger@13.0.7 ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,60 @@
+# https://goreleaser.com/customization/
+version: 2
+
+project_name: debateai
+
+env:
+  - GITHUB_TOKEN={{ .Env.GITHUB_TOKEN }}
+  # - DOCKER_USERNAME={{ .Env.DOCKER_USERNAME }}  # [DOCKER] Uncomment if pushing to Docker Hub
+
+# [DOCKER] DebateAI has Docker support — uncomment and configure when ready
+# docker_builds:
+#   - id: docker-backend
+#     goos: linux
+#     goarchs:
+#       - amd64
+#       - arm64
+#     image_templates:
+#       - "ghcr.io/aossie-org/debateai:{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+#       - "ghcr.io/aossie-org/debateai:latest"
+#     build_flag_templates:
+#       - --label=org.opencontainers.image.title=DebateAI
+#       - --label=org.opencontainers.image.version={{ .Version }}
+#       - --label=org.opencontainers.image.created={{ .Date }}
+#       - --label=org.opencontainers.image.revision={{ .FullCommit }}
+#       - --label=org.opencontainers.image.source={{ .GitURL }}
+
+archives:
+  - id: default-archive
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - README.md
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+
+sboms:
+  - artifacts: archive
+
+release:
+  github:
+    owner: AOSSIE-Org
+    name: DebateAI
+  draft: false
+  prerelease: auto
+  name_template: "{{ .ProjectName }} {{ .Version }}"
+
+snapshot:
+  version_template: "{{ .Tag }}-SNAPSHOT-{{ .ShortCommit }}"
+
+report_sizes: true
