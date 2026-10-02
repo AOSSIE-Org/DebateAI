@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 interface Participant {
   id: string;
@@ -18,6 +19,7 @@ const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
 const RoomBrowser: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const fetchRooms = async () => {
@@ -31,7 +33,7 @@ const RoomBrowser: React.FC = () => {
         },
       });
       if (!response.ok) {
-        setLoading(false);
+        setError(await getApiErrorMessage(response, 'Failed to fetch rooms'));
         return;
       }
       const data = await response.json();
@@ -47,7 +49,13 @@ const RoomBrowser: React.FC = () => {
       }));
 
       setRooms(normalizedRooms);
-    } catch (error) {
+      setError(null);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Failed to fetch rooms'
+      );
     } finally {
       setLoading(false);
     }
@@ -73,11 +81,13 @@ const RoomBrowser: React.FC = () => {
         }
       );
       if (!response.ok) {
-        alert(`Failed to join room ${roomId}.`);
+        alert(
+          await getApiErrorMessage(response, `Failed to join room ${roomId}.`)
+        );
         return;
       }
       navigate(`/debate-room/${roomId}`);
-    } catch (error) {
+    } catch {
       alert('An error occurred while joining the match.');
     }
   };
@@ -100,6 +110,8 @@ const RoomBrowser: React.FC = () => {
       </h2>
       {loading ? (
         <p className='text-center text-foreground'>Loading rooms...</p>
+      ) : error ? (
+        <p className='text-center text-destructive'>{error}</p>
       ) : rooms.length === 0 ? (
         <p className='text-center text-foreground'>
           No rooms available at the moment.

@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from "@/utils/apiError";
+
 const baseURL =
   import.meta.env.VITE_BASE_URL ??
   (import.meta.env.DEV ? "http://localhost:1313" : undefined);
@@ -10,7 +12,9 @@ export const getProfile = async (token: string) => {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error("Failed to fetch profile");
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, "Failed to fetch profile"));
+  }
   return response.json();
 };
 
@@ -49,7 +53,11 @@ export const checkDisplayNameAvailability = async (
       headers: { Authorization: `Bearer ${token}` },
     }
   );
-  if (!response.ok) throw new Error("Failed to check display name");
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to check display name")
+    );
+  }
   return response.json();
 };
 
@@ -57,6 +65,10 @@ export const getLeaderboard = async () => {
   const response = await fetch(`${baseURL}/leaderboard`, {
     method: "GET",
   });
-  if (!response.ok) throw new Error("Failed to fetch leaderboard");
+  if (!response.ok) {
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to fetch leaderboard")
+    );
+  }
   return response.json();
 };

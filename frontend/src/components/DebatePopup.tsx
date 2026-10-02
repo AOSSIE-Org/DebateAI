@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import RoomBrowser from './RoomBrowser';
 import Matchmaking from './Matchmaking';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 interface DebatePopupProps {
   onClose: () => void;
@@ -68,7 +69,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
         body: JSON.stringify({ type: 'public' }),
       });
       if (!response.ok) {
-        alert('Error creating room.');
+        alert(await getApiErrorMessage(response, 'Error creating room.'));
         return;
       }
       const room = await response.json();

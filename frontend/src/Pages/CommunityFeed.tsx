@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { MessageCircle, Trash2, UserPlus, UserCheck } from "lucide-react";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 interface Post {
   id: string;
@@ -289,7 +290,9 @@ const CommunityFeed: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch feed");
+        throw new Error(
+          await getApiErrorMessage(response, "Failed to fetch feed")
+        );
       }
 
       const data = (await response.json()) as { posts?: RawPost[] };

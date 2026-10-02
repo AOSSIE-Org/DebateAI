@@ -1,4 +1,5 @@
 import { Team } from "./teamService";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 // Team debate service for API calls
 const API_BASE_URL =
@@ -102,7 +103,7 @@ export const getTeamDebate = async (debateId: string): Promise<TeamDebate> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get debate");
+    throw new Error(await getApiErrorMessage(response, "Failed to get debate"));
   }
 
   return response.json();
@@ -120,7 +121,9 @@ export const getActiveTeamDebate = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get active debate");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get active debate")
+    );
   }
 
   return response.json();
@@ -166,7 +169,9 @@ export const getMatchmakingPool = async (): Promise<TeamMatchmakingPoolResponse>
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get matchmaking pool");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get matchmaking pool")
+    );
   }
 
   const data: MatchmakingPoolResponse = await response.json();
@@ -184,7 +189,9 @@ export const getMatchmakingStatus = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get matchmaking status");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get matchmaking status")
+    );
   }
 
   const data: MatchmakingStatusResponse = await response.json();

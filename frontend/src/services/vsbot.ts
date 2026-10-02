@@ -1,4 +1,5 @@
 import { getAuthToken } from '@/utils/auth';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 const baseURL =
   import.meta.env.VITE_BASE_URL ??
@@ -70,7 +71,9 @@ export const createDebate = async (data: DebateRequest): Promise<DebateResponse>
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create debate");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to create debate")
+    );
   }
 
   const result = await response.json();
@@ -98,7 +101,9 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
   });
 
   if (!response.ok) {
-    throw new Error("Failed to send debate message");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to send debate message")
+    );
   }
 
   const result = await response.json();
@@ -118,7 +123,9 @@ export const concedeDebate = async (debateId: string, history: DebateMessage[] =
   });
 
   if (!response.ok) {
-    throw new Error("Failed to concede debate");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to concede debate")
+    );
   }
 };
 
@@ -136,7 +143,9 @@ export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> =>
   });
 
   if (!response.ok) {
-    throw new Error("Failed to judge debate");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to judge debate")
+    );
   }
 
   return response.json();

@@ -61,14 +61,14 @@ func MatchmakingHandler(c *gin.Context) {
 	// Get token from query parameter
 	token := c.Query("token")
 	if token == "" {
-		c.String(http.StatusUnauthorized, "No token provided")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No token provided"})
 		return
 	}
 
 	// Validate token and get user information
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
 	if err != nil || !valid || email == "" {
-		c.String(http.StatusUnauthorized, "Invalid token")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		return
 	}
 
@@ -86,7 +86,7 @@ func MatchmakingHandler(c *gin.Context) {
 
 	err = userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		c.String(http.StatusNotFound, "User not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
@@ -111,18 +111,22 @@ func MatchmakingHandler(c *gin.Context) {
 		send:     make(chan []byte, 256),
 	}
 
-	// Add client to room
-	matchmakingRoom.mutex.Lock()
-	matchmakingRoom.clients[client] = true
-	matchmakingRoom.mutex.Unlock()
-
 	// Add user to matchmaking pool (but don't start matchmaking yet)
 	matchmakingService := services.GetMatchmakingService()
 	err = matchmakingService.AddToPool(user.ID.Hex(), user.DisplayName, userRating)
 	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to join matchmaking")
+		_ = conn.WriteJSON(MatchmakingMessage{
+			Type:  "error",
+			Error: "Failed to join matchmaking",
+		})
+		_ = conn.Close()
 		return
 	}
+
+	// Add client to room only after matchmaking registration succeeds.
+	matchmakingRoom.mutex.Lock()
+	matchmakingRoom.clients[client] = true
+	matchmakingRoom.mutex.Unlock()
 
 	// Send initial pool status
 	sendPoolStatus()

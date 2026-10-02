@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from "@/utils/apiError";
+
 const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
 
 export interface GamificationEvent {
@@ -48,7 +50,12 @@ export const fetchGamificationLeaderboard = async (token: string): Promise<Leade
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch leaderboard: ${response.status}`);
+    throw new Error(
+      await getApiErrorMessage(
+        response,
+        `Failed to fetch leaderboard: ${response.status}`
+      )
+    );
   }
 
   return response.json();

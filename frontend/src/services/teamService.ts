@@ -1,4 +1,5 @@
 import { getAuthToken } from "@/utils/auth";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 // Team service for API calls
 const API_BASE_URL =
@@ -68,7 +69,7 @@ export const createTeam = async (data: CreateTeamData): Promise<Team> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create team");
+    throw new Error(await getApiErrorMessage(response, "Failed to create team"));
   }
 
   return response.json();
@@ -84,7 +85,7 @@ export const getTeam = async (teamId: string): Promise<Team> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get team");
+    throw new Error(await getApiErrorMessage(response, "Failed to get team"));
   }
 
   return response.json();
@@ -101,7 +102,7 @@ export const joinTeam = async (teamId: string): Promise<void> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to join team");
+    throw new Error(await getApiErrorMessage(response, "Failed to join team"));
   }
 };
 
@@ -116,7 +117,7 @@ export const leaveTeam = async (teamId: string): Promise<void> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to leave team");
+    throw new Error(await getApiErrorMessage(response, "Failed to leave team"));
   }
 };
 
@@ -130,7 +131,9 @@ export const getUserTeams = async (): Promise<Team[]> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get user teams");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get user teams")
+    );
   }
 
   return response.json();
@@ -146,7 +149,9 @@ export const getAvailableTeams = async (): Promise<Team[]> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get available teams");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get available teams")
+    );
   }
 
   return response.json();
@@ -167,7 +172,9 @@ export const createTeamDebate = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create team debate");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to create team debate")
+    );
   }
 
   return response.json();
@@ -183,7 +190,9 @@ export const getTeamDebate = async (debateId: string): Promise<TeamDebate> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get team debate");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get team debate")
+    );
   }
 
   return response.json();
@@ -204,7 +213,9 @@ export const getTeamDebates = async (
   );
 
   if (!response.ok) {
-    throw new Error("Failed to get team debates");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get team debates")
+    );
   }
 
   return response.json();
@@ -230,7 +241,9 @@ export const addTeamMessage = async (
   );
 
   if (!response.ok) {
-    throw new Error("Failed to add team message");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to add team message")
+    );
   }
 };
 
@@ -250,7 +263,9 @@ export const addTeamChatMessage = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to add team chat message");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to add team chat message")
+    );
   }
 };
 
@@ -264,7 +279,9 @@ export const getTeamChatMessages = async (teamId: string): Promise<any[]> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get team chat messages");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get team chat messages")
+    );
   }
 
   return response.json();
@@ -312,7 +329,9 @@ export const getTeamMemberProfile = async (memberId: string): Promise<any> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get member profile");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get member profile")
+    );
   }
 
   return response.json();
@@ -346,7 +365,9 @@ export const getTeamByCode = async (code: string): Promise<Team> => {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get team by code");
+    throw new Error(
+      await getApiErrorMessage(response, "Failed to get team by code")
+    );
   }
 
   return response.json();
