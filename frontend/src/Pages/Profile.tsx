@@ -954,7 +954,7 @@ const Profile: React.FC = () => {
                     <div className="flex gap-2 items-center">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs">
+                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs [.contrast_&]:border-border">
                             <CalendarIcon className="mr-2 h-3 w-3 flex-shrink-0" />
                             <span className="truncate">
                               {customDateRange.from
