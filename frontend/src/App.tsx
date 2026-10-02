@@ -17,6 +17,7 @@ import StrengthenArgument from './Pages/StrengthenArgument';
 import SpeechTest from './Pages/SpeechTest';
 import PrivacyPolicy from './Pages/PrivacyPolicy';
 import TermsOfService from './Pages/TermsOfService';
+import NotFound from './Pages/NotFound';
 // Layout
 import Layout from './components/Layout';
 import CoachPage from './Pages/CoachPage';
@@ -106,8 +107,8 @@ function AppRoutes() {
         <Route path='/view-debate/:debateID' element={<ViewDebate />} />
         <Route path='/speech-test' element={<SpeechTest />} />
       </Route>
-      {/* Redirect unknown routes */}
-      <Route path='*' element={<Navigate to='/' replace />} />
+      {/* Show 404 page for unknown routes */}
+      <Route path='*' element={<NotFound />} />
     </Routes>
   );
 }

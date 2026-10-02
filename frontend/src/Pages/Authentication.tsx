@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   LoginForm,
@@ -10,6 +10,7 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import DebateCover from '../assets/DebateCover4.svg';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { AuthContext } from '../context/authContext';
 
 const LeftSection = () => (
   <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white [.contrast_&]:text-white">
@@ -146,7 +147,8 @@ const RightSection: React.FC<RightSectionProps> = ({
 
 const Authentication = () => {
   const location = useLocation();
-
+  const authContext = useContext(AuthContext);
+  // Extend authMode to include 'resetPassword'
   const [authMode, setAuthMode] = useState<
     | 'login'
     | 'signup'
@@ -175,39 +177,42 @@ const Authentication = () => {
   }, [authMode]);
 
   const toggleAuthMode = () => {
-    setAuthMode((prevMode) =>
-      prevMode === 'login' ? 'signup' : 'login'
-    );
+    authContext?.clearError();
+    setInfoMessage('');
+    setAuthMode((prevMode) => (prevMode === 'login' ? 'signup' : 'login'));
   };
 
   // Start OTP verification process
   const startOtpVerification = (email: string) => {
+    authContext?.clearError();
     setEmailForOTP(email);
     setAuthMode('otpVerification');
   };
 
   // Handle successful OTP verification
   const handleOtpVerified = () => {
+    authContext?.clearError();
     setAuthMode('login');
   };
 
   // Start forgot password process
   const startForgotPassword = () => {
+    authContext?.clearError();
+    setInfoMessage('');
     setAuthMode('forgotPassword');
   };
 
   // Start reset password process
   const startResetPassword = (email: string) => {
+    authContext?.clearError();
     setEmailForPasswordReset(email);
     setAuthMode('resetPassword');
   };
 
   // Handle successful password reset
   const handlePasswordReset = () => {
-    setInfoMessage(
-      'Your password was successfully reset. You can now log in.'
-    );
-
+    authContext?.clearError();
+    setInfoMessage('Your password was successfully reset. You can now log in.');
     setAuthMode('login');
   };
 
