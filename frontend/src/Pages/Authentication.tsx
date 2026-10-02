@@ -168,7 +168,7 @@ const Authentication = () => {
     const authTitles = {
       login: 'Sign In | DebateAI',
       signup: 'Sign Up | DebateAI',
-      otpVerification: 'Verify | DebateAI',
+      otpVerification: 'Verify Account| DebateAI',
       forgotPassword: 'Reset Password | DebateAI',
       resetPassword: 'Reset Password | DebateAI',
     };
