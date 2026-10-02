@@ -429,7 +429,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
             if (error) clearError();
           }}
           placeholder="Enter Code"
-          className="w-full mb-2 border dark:border-white"
+          className="w-full mb-2 border dark:border-white [.contrast_&]:border-white"
         />
         <Input
           type={passwordVisible ? "text" : "password"}
@@ -439,7 +439,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
             if (error) clearError();
           }}
           placeholder="New Password"
-          className="w-full mb-2 dark:border-white"
+          className="w-full mb-2 border dark:border-white [.contrast_&]:border-white"
         />
         <Input
           type={passwordVisible ? "text" : "password"}
@@ -449,7 +449,7 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
             if (error) clearError();
           }}
           placeholder="Confirm New Password"
-          className="w-full mb-4 dark:border-white"
+          className="w-full mb-4 border dark:border-white [.contrast_&]:border-white"
         />
         <div className='w-full flex justify-start items-center pl-1'>
           <div className='w-4'>
