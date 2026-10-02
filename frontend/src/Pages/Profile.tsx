@@ -859,7 +859,7 @@ const Profile: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {profile.badges.map((badge, index) => {
                 const badgeIcons: Record<string, React.ReactNode> = {
-                  Novice: <FaAward className="w-6 h-6 text-blue-500" />,
+                  Novice: <FaAward className="w-6 h-6 text-primary" />,
                   Streak5: <FaMedal className="w-6 h-6 text-yellow-500" />,
                   FactMaster: <FaTrophy className="w-6 h-6 text-purple-500" />,
                   FirstWin: <FaTrophy className="w-6 h-6 text-green-500" />,
@@ -877,7 +877,7 @@ const Profile: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:bg-accent transition-colors cursor-pointer group"
+                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:border-primary hover:shadow-md transition-all cursor-pointer group"
                     title={badgeDescription}
                   >
                     <div className="mb-1 group-hover:scale-110 transition-transform">{badgeIcon}</div>
@@ -954,7 +954,7 @@ const Profile: React.FC = () => {
                     <div className="flex gap-2 items-center">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs">
+                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs [.contrast_&]:border-border">
                             <CalendarIcon className="mr-2 h-3 w-3 flex-shrink-0" />
                             <span className="truncate">
                               {customDateRange.from

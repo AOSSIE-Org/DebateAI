@@ -361,10 +361,8 @@ const TeamBuilder: React.FC = () => {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Team Builder
-        </h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Team Builder</h1>
+        <p className="text-gray-600 dark:text-muted-foreground [.contrast_&]:text-foreground">
           Create or join a team to participate in team debates
         </p>
       </div>
@@ -490,7 +488,7 @@ const TeamBuilder: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-muted-foreground [.contrast_&]:text-foreground">
                 <FaSearch className="inline mr-1" />
                 Teams match only with teams of the same size!
               </p>

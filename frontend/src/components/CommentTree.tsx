@@ -488,7 +488,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                       setReplyContent('');
                     }
                   }}
-                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors [.contrast_&]:text-black [.contrast_&]:hover:text-black"
                 >
                   {replyingTo === comment.id ? 'Cancel' : 'Reply'}
                 </button>

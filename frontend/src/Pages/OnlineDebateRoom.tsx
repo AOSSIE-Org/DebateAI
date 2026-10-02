@@ -2240,11 +2240,26 @@ const OnlineDebateRoom = (): JSX.Element => {
 
       {/* Setup Popup */}
       {showSetupPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-card text-foreground p-6 rounded-lg shadow-lg max-w-md w-full">
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+          onClick={() => setShowSetupPopup(false)}
+        >
+          <div
+            className="bg-card text-foreground p-6 rounded-lg shadow-lg max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header with title and close icon */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Debate Setup</h2>
+
+              <button
+                type="button"
+                onClick={() => setShowSetupPopup(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close debate setup"
+              >
+                <span className="text-2xl leading-none">{"\u00D7"}</span>
+              </button>
             </div>
 
             {/* Room Code */}
