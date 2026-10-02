@@ -215,13 +215,11 @@ const Leaderboard: React.FC = () => {
         }
       });
     }
-    // Update ranks after sorting
-    sorted.forEach((debater, index) => {
-      debater.rank = index + 1;
-    });
-    return sorted;
+    return sorted.map((debater, index) => ({
+      ...debater,
+      rank: index + 1,
+    }));
   }, [debaters, sortCategory]);
-
   const currentUserIndex = sortedDebaters.findIndex(
     (debater) => debater.currentUser
   );
