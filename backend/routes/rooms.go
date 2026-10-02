@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -189,8 +190,25 @@ func JoinRoomHandler(c *gin.Context) {
 	// Use atomic operation to join room
 	roomCollection := db.MongoDatabase.Collection("rooms")
 	filter := bson.M{"_id": roomId}
-	update := bson.M{
-		"$addToSet": bson.M{"participants": participant},
+	update := mongo.Pipeline{
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "participants", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$in", Value: bson.A{participant.ID, "$participants.id"}}},
+				bson.D{{Key: "$map", Value: bson.D{
+					{Key: "input", Value: "$participants"},
+					{Key: "as", Value: "existingParticipant"},
+					{Key: "in", Value: bson.D{{Key: "$cond", Value: bson.A{
+						bson.D{{Key: "$eq", Value: bson.A{"$$existingParticipant.id", participant.ID}}},
+						bson.D{{Key: "$literal", Value: participant}},
+						"$$existingParticipant",
+					}}}},
+				}}},
+				bson.D{{Key: "$concatArrays", Value: bson.A{
+					"$participants",
+					bson.A{bson.D{{Key: "$literal", Value: participant}}},
+				}}},
+			}}}},
+		}}},
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 
