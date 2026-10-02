@@ -127,7 +127,7 @@ const MatchLogs: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-background h-[calc(100vh-350px)]">
+    <div className="p-6 max-w-4xl mx-auto bg-background min-h-[calc(100vh-350px)]">
       <h2 className="text-2xl font-bold text-foreground mb-6">Match Logs</h2>
       <div className="space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto scrollbar-hide">
         {[...logs].reverse().map((log, index) => {
