@@ -544,7 +544,7 @@ const TeamBuilder: React.FC = () => {
                           </div>
                         )}
                         <div className="flex items-center gap-3 mt-2 text-sm">
-                          <div className="flex items-center gap-1 text-gray-600">
+                          <div className="flex items-center gap-1 text-gray-600 dark:text-muted-foreground [.contrast_&]:text-foreground">
                             <span className="font-medium">
                               <FaCrown className="inline text-yellow-500" />{" "}
                               Captain:
