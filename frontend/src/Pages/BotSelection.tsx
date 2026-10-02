@@ -693,7 +693,7 @@ const BotSelection: React.FC = () => {
                   effectiveTopic.trim().length > MAX_TOPIC_LENGTH ||
                   phaseTimings.some((p) => p.time < 60 || p.time > 600)
                 }
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-md transition-colors shadow-md"
+                className="w-full font-semibold py-2 rounded-md transition-colors shadow-md"
               >
                 {isLoading || isCreating
                   ? "Creating Debate..."
