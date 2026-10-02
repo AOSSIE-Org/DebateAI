@@ -32,7 +32,7 @@ func generateModelText(ctx context.Context, modelName, prompt string) (string, e
 		},
 	}
 
-	resp, err := geminiClient.Models.GenerateContent(ctx, defaultGeminiModel, genai.Text(prompt), config)
+	resp, err := geminiClient.Models.GenerateContent(ctx, modelName, genai.Text(prompt), config)
 	if err != nil {
 		return "", err
 	}

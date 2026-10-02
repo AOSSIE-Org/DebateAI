@@ -17,6 +17,7 @@ import StrengthenArgument from './Pages/StrengthenArgument';
 import SpeechTest from './Pages/SpeechTest';
 import PrivacyPolicy from './Pages/PrivacyPolicy';
 import TermsOfService from './Pages/TermsOfService';
+import NotFound from './Pages/NotFound';
 // Layout
 import Layout from './components/Layout';
 import CoachPage from './Pages/CoachPage';
@@ -31,6 +32,7 @@ import AdminSignup from './Pages/Admin/AdminSignup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ViewDebate from './Pages/ViewDebate';
 import SupportOpenSource from './Pages/SupportOpenSource';
+import PageTitle from './components/PageTitle';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // Protects routes based on authentication status
@@ -105,8 +107,8 @@ function AppRoutes() {
         <Route path='/view-debate/:debateID' element={<ViewDebate />} />
         <Route path='/speech-test' element={<SpeechTest />} />
       </Route>
-      {/* Redirect unknown routes */}
-      <Route path='*' element={<Navigate to='/' replace />} />
+      {/* Show 404 page for unknown routes */}
+      <Route path='*' element={<NotFound />} />
     </Routes>
   );
 }
@@ -116,6 +118,7 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
+        <PageTitle/>
         <AppRoutes />
       </ThemeProvider>
     </AuthProvider>
