@@ -36,9 +36,6 @@ const LeftSection = () => (
           "We cannot solve our problems with the same thinking we used when we created them."
         </p>
         <footer className="text-sm text-black dark:text-white [.contrast_&]:text-white">Albert Einstein</footer>
-        <footer className="text-sm text-black dark:text-white">
-          Albert Einstein
-        </footer>
       </blockquote>
     </div>
   </div>
