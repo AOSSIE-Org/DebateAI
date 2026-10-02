@@ -53,6 +53,13 @@ func CreateRoomHandler(c *gin.Context) {
 		return
 	}
 
+	switch input.Type {
+	case "public", "private", "invite":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid room type"})
+		return
+	}
+
 	// Get user email from middleware-set context
 	email, exists := c.Get("email")
 	if !exists {
