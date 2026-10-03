@@ -252,17 +252,6 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
 	}
-	// Refresh room activity on access, throttled so an open tab polling every few
-	// seconds doesn't trigger a write on every request.
-	staleCutoff := time.Now().Add(-2 * time.Minute)
-	if _, uerr := roomCollection.UpdateOne(
-		ctx,
-		bson.M{"_id": roomId, "lastActivity": bson.M{"$lt": staleCutoff}},
-		bson.M{"$set": bson.M{"lastActivity": time.Now()}},
-	); uerr != nil {
-		log.Printf("[rooms] failed to refresh lastActivity for room %s: %v", roomId, uerr)
-	}
-
 	// Get user ID from email
 	emailStr, ok := email.(string)
 	if !ok {
@@ -291,6 +280,17 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	if !isParticipant {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this room"})
 		return
+	}
+
+	// Refresh room activity on access (participants only), throttled so an open
+	// tab polling every few seconds doesn't trigger a write on every request.
+	staleCutoff := time.Now().Add(-2 * time.Minute)
+	if _, uerr := roomCollection.UpdateOne(
+		ctx,
+		bson.M{"_id": roomId, "lastActivity": bson.M{"$lt": staleCutoff}},
+		bson.M{"$set": bson.M{"lastActivity": time.Now()}},
+	); uerr != nil {
+		log.Printf("[rooms] failed to refresh lastActivity for room %s: %v", roomId, uerr)
 	}
 
 	// Prepare email list for batch lookup

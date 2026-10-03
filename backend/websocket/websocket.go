@@ -469,6 +469,17 @@ func WebsocketHandler(c *gin.Context) {
 		}
 		room.Mutex.Unlock()
 
+		// Throttled refresh of the room's persisted activity so an active debate
+		// (WS traffic) keeps the room alive independent of REST polling.
+		roomStaleCutoff := time.Now().Add(-2 * time.Minute)
+		if _, uerr := roomCollection.UpdateOne(
+			context.Background(),
+			bson.M{"_id": roomID, "lastActivity": bson.M{"$lt": roomStaleCutoff}},
+			bson.M{"$set": bson.M{"lastActivity": time.Now()}},
+		); uerr != nil {
+			log.Printf("[ws] failed to refresh room lastActivity: room=%s err=%v", roomID, uerr)
+		}
+
 		// Handle different message types
 		switch message.Type {
 		case "join":
