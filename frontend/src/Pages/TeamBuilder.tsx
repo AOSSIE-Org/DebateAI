@@ -101,26 +101,48 @@ const TeamBuilder: React.FC = () => {
   const [searchCode, setSearchCode] = useState<string>("");
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [joinByCodeError, setJoinByCodeError] = useState<string>("");
+  const [isLoadingUserTeams, setIsLoadingUserTeams] = useState(true);
+  const [isLoadingAvailableTeams, setIsLoadingAvailableTeams] = useState(true);
+  const [userTeamsError, setUserTeamsError] = useState<string>("");
+  const [availableTeamsError, setAvailableTeamsError] = useState<string>("");
 
   // Fetch available teams
   const fetchAvailableTeams = useCallback(async () => {
+    setAvailableTeamsError("");
     try {
       const teams = await getAvailableTeams();
       setAvailableTeams(teams || []);
     } catch (error) {
-      setAvailableTeams([]);
+      setAvailableTeamsError(
+        "Could not load available teams. Please try again."
+      );
+    } finally {
+      setIsLoadingAvailableTeams(false);
     }
   }, []);
 
   // Fetch user's teams
   const fetchUserTeams = useCallback(async () => {
+    setUserTeamsError("");
     try {
       const teams = await getUserTeams();
       setUserTeams(teams || []);
     } catch (error) {
-      setUserTeams([]);
+      setUserTeamsError("Could not load your team. Please try again.");
+    } finally {
+      setIsLoadingUserTeams(false);
     }
   }, []);
+
+  const retryFetchAvailableTeams = () => {
+    setIsLoadingAvailableTeams(true);
+    fetchAvailableTeams();
+  };
+
+  const retryFetchUserTeams = () => {
+    setIsLoadingUserTeams(true);
+    fetchUserTeams();
+  };
 
   React.useEffect(() => {
     fetchAvailableTeams();
@@ -173,6 +195,8 @@ const TeamBuilder: React.FC = () => {
   };
 
   const isUserInTeam = userTeams && userTeams.length > 0;
+  const canCreateOrJoin =
+    !isUserInTeam && !isLoadingUserTeams && !userTeamsError;
 
   const handleViewMemberProfile = async (memberId: string, team?: Team) => {
     try {
@@ -354,7 +378,11 @@ const TeamBuilder: React.FC = () => {
             className={isUserInTeam ? "text-primary" : "text-muted-foreground"}
           />
           <p className="text-sm font-medium">
-            {isUserInTeam
+            {isLoadingUserTeams
+              ? "Checking your team status..."
+              : userTeamsError
+              ? "Could not check your team status"
+              : isUserInTeam
               ? "You are currently in a team"
               : "You are not in any team yet"}
           </p>
@@ -362,7 +390,7 @@ const TeamBuilder: React.FC = () => {
       </div>
 
       {/* Join by Code Section */}
-      {!isUserInTeam && (
+      {canCreateOrJoin && (
         <Card className="mb-6 border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -400,7 +428,7 @@ const TeamBuilder: React.FC = () => {
       )}
 
       {/* Create Team Section */}
-      {!isUserInTeam && (
+      {canCreateOrJoin && (
         <Card className="mb-6 border-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -481,7 +509,18 @@ const TeamBuilder: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!userTeams || userTeams.length === 0 ? (
+          {isLoadingUserTeams ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading your team...</p>
+            </div>
+          ) : userTeamsError ? (
+            <div className="text-center py-12">
+              <p className="text-destructive mb-4">{userTeamsError}</p>
+              <Button variant="outline" onClick={retryFetchUserTeams}>
+                Retry
+              </Button>
+            </div>
+          ) : !userTeams || userTeams.length === 0 ? (
             <div className="text-center py-12">
               <FaUsers className="text-6xl mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500 text-lg mb-2">No team yet!</p>
@@ -820,7 +859,18 @@ const TeamBuilder: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!availableTeams || availableTeams.length === 0 ? (
+          {isLoadingAvailableTeams ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading teams...</p>
+            </div>
+          ) : availableTeamsError ? (
+            <div className="text-center py-12">
+              <p className="text-destructive mb-4">{availableTeamsError}</p>
+              <Button variant="outline" onClick={retryFetchAvailableTeams}>
+                Retry
+              </Button>
+            </div>
+          ) : !availableTeams || availableTeams.length === 0 ? (
             <div className="text-center py-12">
               <FaSearch className="text-6xl mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500 text-lg mb-2">No teams available</p>

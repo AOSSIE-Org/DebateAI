@@ -1,8 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
-  
+
   :root {
     --background: 0 0% 100%;
     --foreground: 20 14.3% 4.1%;
@@ -15,6 +16,7 @@
     --secondary: 60 4.8% 90.9%;
     --secondary-foreground: 24 9.8% 10%;
     --muted: 60 4.8% 95.9%;
+    --illustration-neutral: 215 25% 27%;
     --muted-foreground: 25 5.3% 44.7%;
     --accent: 60 4.8% 95.9%;
     --accent-foreground: 24 9.8% 10%;
@@ -43,6 +45,7 @@
     --secondary: 12 6.5% 15.1%;
     --secondary-foreground: 60 9.1% 97.8%;
     --muted: 12 6.5% 15.1%;
+    --illustration-neutral: 0 0% 88%;
     --muted-foreground: 24 5.4% 63.9%;
     --accent: 12 6.5% 15.1%;
     --accent-foreground: 60 9.1% 97.8%;
@@ -70,6 +73,7 @@
     --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 25%;
+    --illustration-neutral: 0 0% 88%;
     --muted-foreground: 0 0% 70%;
     --accent: 60 100% 50%;
     --accent-foreground: 0 0% 0%;
@@ -90,6 +94,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -100,6 +105,7 @@
     transform: translateY(0);
     opacity: 1;
   }
+
   100% {
     transform: translateY(-150px);
     opacity: 0;
