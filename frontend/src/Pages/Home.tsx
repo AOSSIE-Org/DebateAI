@@ -42,7 +42,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4">
           <a
             href="https://aossie.org"
@@ -81,17 +81,17 @@ const Home: React.FC = () => {
         </div>
       </nav>
 
-      <div className="flex items-center justify-center">
-        <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
-          <div className="w-full md:w-2/3 p-4 md:p-16">
+      <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-col items-center justify-center w-full px-4 lg:flex-row lg:px-8">
+          <div className="w-full lg:w-2/3 p-4 lg:p-12">
             <DebateCoverIllustration
               className="w-full h-auto object-cover"
               role="img"
               aria-label="Debate Cover"
             />
           </div>
-          <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
-            <h3 className="text-xl md:text-4xl font-bold text-center">
+          <div className="flex w-full lg:w-1/3 flex-col items-center justify-center space-y-4 p-4">
+            <h3 className="text-2xl md:text-4xl font-bold text-center">
               Play Debate Online on the <span className="text-primary">#1</span> Site!
             </h3>
             <div className="flex flex-col w-full">

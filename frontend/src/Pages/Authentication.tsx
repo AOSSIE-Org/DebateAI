@@ -13,9 +13,9 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuthContext } from '../context/authContext';
 
 const LeftSection = () => (
-  <div className="hidden md:flex w-full h-full flex-col justify-between bg-muted p-10 text-black dark:text-white overflow-y-auto [.contrast_&]:text-white">
-    <div className="flex items-center text-lg font-medium">
-      <Link to="/" className="flex items-center">
+  <div className="flex flex-col justify-between bg-muted p-6 sm:p-8 xl:p-10 text-black dark:text-white w-full xl:w-1/2 xl:h-full min-h-[50vh] [.contrast_&]:text-white overflow-hidden">
+    <div className="flex w-full items-center justify-center xl:justify-start text-lg font-medium text-center mx-auto">
+      <Link to="/" className="flex flex-wrap items-center justify-center xl:justify-start gap-2 max-w-full break-words mx-auto xl:mx-0">
         <svg>
           {/* SVG Content */}
         </svg>
@@ -31,7 +31,7 @@ const LeftSection = () => (
     </div>
 
     <div>
-      <blockquote className="space-y-2">
+      <blockquote className="space-y-2 text-center xl:text-left">
         <p className="text-lg text-black dark:text-white [.contrast_&]:text-white">
           "We cannot solve our problems with the same thinking we used when we created them."
         </p>
@@ -71,9 +71,9 @@ const RightSection: React.FC<RightSectionProps> = ({
   emailForPasswordReset,
   infoMessage,
 }) => (
-  <div className="flex items-center justify-center w-full h-full relative">
-    <div className="absolute right-4 top-4 md:right-8 md:top-8 flex flex-col md:flex-row gap-2 items-center">
-      <div className="w-56">
+  <div className="flex items-center justify-center w-full xl:w-1/2 xl:h-full relative py-16 xl:py-0 min-h-[80vh] xl:min-h-0">
+    <div className="absolute right-2 top-2 sm:right-4 sm:top-4 xl:right-8 xl:top-8 flex flex-row gap-4 items-center z-10">
+      <div className="w-32">
         <ThemeToggle iconSize={20} />
       </div>
 
@@ -212,7 +212,7 @@ const Authentication = () => {
   };
 
   return (
-    <div className="flex w-screen h-screen overflow-hidden">
+    <div className="flex flex-col-reverse xl:flex-row w-full overflow-x-hidden min-h-screen xl:h-screen xl:overflow-hidden bg-background">
       <LeftSection />
 
       <RightSection

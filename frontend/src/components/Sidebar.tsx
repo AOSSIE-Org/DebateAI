@@ -16,7 +16,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 function Sidebar() {
   return (
-    <aside className='hidden md:flex flex-col w-64 border-r border-border bg-background'>
+    <aside className='hidden lg:flex flex-col w-64 border-r border-border bg-background'>
       {/* Logo / Brand */}
       <div className='flex items-center h-16 px-4 border-b border-border'>
         <div className='flex items-center gap-2'>
