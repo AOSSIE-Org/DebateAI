@@ -255,11 +255,20 @@ const Profile: React.FC = () => {
     setSelectedDebate(debate);
     setIsDebateDialogOpen(true);
     setTranscriptLoading(true);
+        setErrorMessage("");
+        setFullTranscript(null); 
+
     try {
       const transcript = await transcriptService.getTranscriptById(debate.id);
       setFullTranscript(transcript);
-    } catch {
-      // transcript fetch failed
+    } catch(error) {
+       console.error("Error fetching transcript:", error);
+       setFullTranscript(null);
+       setErrorMessage(
+         error instanceof Error
+           ? error.message
+           : "Failed to load transcript. Please try again."
+       );
     } finally {
       setTranscriptLoading(false);
     }
@@ -456,7 +465,7 @@ const Profile: React.FC = () => {
     return editingField === "bio" ? (
       <form
         onSubmit={(e) => handleSubmit(e, "bio")}
-        className="space-y-2 mb-2 w-full"
+        className="space-y-2 mb-2 w-full min-w-0 max-w-full"
       >
         <Label htmlFor="bio" className="text-sm">Bio</Label>
         <Textarea
@@ -469,8 +478,12 @@ const Profile: React.FC = () => {
               profile: { ...dashboard!.profile, bio: e.target.value },
             })
           }
+          onInput={(e) => {
+            e.currentTarget.style.height = "auto";
+            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+          }}
           placeholder="Share your story"
-          className="text-sm w-full resize-none h-20"
+          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
         />
         <p className={`text-xs text-right ${(dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
           ? "text-red-500"
@@ -494,17 +507,10 @@ const Profile: React.FC = () => {
         </div>
       </form>
     ) : (
-      <div className="flex items-start justify-between mb-2 w-full min-w-0">
-        <span className="text-sm text-foreground whitespace-pre-wrap overflow-hidden break-words min-w-0">
+      <div className="mb-2 w-full min-w-0">
+        <span className="block w-full text-sm text-foreground whitespace-pre-wrap overflow-hidden min-w-0 [overflow-wrap:anywhere]">
           {dashboard?.profile.bio || "Add your bio"}
         </span>
-        <button
-          onClick={() => setEditingField("bio")}
-          className="p-1 hover:bg-muted rounded-full transition-colors flex-shrink-0"
-          title="Edit Bio"
-        >
-          <Pen className="w-3 h-3 text-muted-foreground" />
-        </button>
       </div>
     );
   };
@@ -709,7 +715,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="w-full flex flex-col lg:flex-row gap-4 p-2 sm:p-4 bg-background">
-      <div className="w-full lg:w-1/3 bg-card p-4 sm:p-6 border border-border rounded-md shadow lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
+      <div className="w-full min-w-0 lg:w-1/3 bg-card p-4 sm:p-6 border border-border rounded-md shadow lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
         {successMessage && (
           <div className="mb-2 p-2 rounded bg-green-100 text-green-700 text-xs animate-in fade-in duration-300">
             {successMessage}
@@ -845,8 +851,19 @@ const Profile: React.FC = () => {
 
         <Separator className="my-2" />
 
-        <div className="space-y-2 mb-4">
-          <h3 className="text-xs sm:text-sm font-semibold text-foreground">Bio</h3>
+        <div className="space-y-2 mb-4 min-w-0">
+          <div className="flex items-center justify-between w-full">
+            <h3 className="text-xs sm:text-sm font-semibold text-foreground">Bio</h3>
+            {editingField !== "bio" && (
+              <button
+                onClick={() => setEditingField("bio")}
+                className="p-1 hover:bg-muted rounded-full transition-colors"
+                title="Edit Bio"
+              >
+                <Pen className="w-3 h-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
           {renderBioField()}
         </div>
 
@@ -859,7 +876,7 @@ const Profile: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {profile.badges.map((badge, index) => {
                 const badgeIcons: Record<string, React.ReactNode> = {
-                  Novice: <FaAward className="w-6 h-6 text-blue-500" />,
+                  Novice: <FaAward className="w-6 h-6 text-primary" />,
                   Streak5: <FaMedal className="w-6 h-6 text-yellow-500" />,
                   FactMaster: <FaTrophy className="w-6 h-6 text-purple-500" />,
                   FirstWin: <FaTrophy className="w-6 h-6 text-green-500" />,
@@ -877,7 +894,7 @@ const Profile: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:bg-accent transition-colors cursor-pointer group"
+                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:border-primary hover:shadow-md transition-all cursor-pointer group"
                     title={badgeDescription}
                   >
                     <div className="mb-1 group-hover:scale-110 transition-transform">{badgeIcon}</div>
@@ -954,7 +971,7 @@ const Profile: React.FC = () => {
                     <div className="flex gap-2 items-center">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs">
+                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs [.contrast_&]:border-border">
                             <CalendarIcon className="mr-2 h-3 w-3 flex-shrink-0" />
                             <span className="truncate">
                               {customDateRange.from
@@ -1193,7 +1210,11 @@ const Profile: React.FC = () => {
                 </div>
               )}
               <div className="text-center">
-                <Button variant="outline" onClick={() => (window.location.href = "/debates")}>
+                <Button
+                  variant="outline"
+                  onClick={() => (window.location.href = "/debates")}
+                  className="[.contrast_&]:border-white"
+                >
                   Start New Debate
                 </Button>
               </div>

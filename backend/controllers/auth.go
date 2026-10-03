@@ -441,7 +441,7 @@ func ForgotPassword(ctx *gin.Context) {
 	now := time.Now()
 	update := bson.M{
 		"$set": bson.M{
-			"resetPasswordCode":       resetCode,
+			"resetPasswordCode":       hashResetCode(resetCode, cfg.JWT.Secret),
 			"resetPasswordCodeExpiry": now.Add(15 * time.Minute),
 			"updatedAt":               now,
 		},
@@ -477,7 +477,8 @@ func VerifyForgotPassword(ctx *gin.Context) {
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
-	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email, "resetPasswordCode": request.Code}).Decode(&user)
+	hashedCode := hashResetCode(request.Code, cfg.JWT.Secret)
+	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email, "resetPasswordCode": hashedCode}).Decode(&user)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": "Invalid email or reset code"})
 		return
@@ -507,7 +508,7 @@ func VerifyForgotPassword(ctx *gin.Context) {
 		dbCtx,
 		bson.M{
 			"email":                   request.Email,
-			"resetPasswordCode":       request.Code,
+			"resetPasswordCode":       hashedCode,
 			"resetPasswordCodeExpiry": bson.M{"$gt": now},
 		},
 		update,
