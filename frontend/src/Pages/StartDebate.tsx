@@ -33,7 +33,7 @@ const StartDebate = () => {
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-center flex-1">
-        <div className="flex flex-col items-center justify-center w-full px-4 lg:flex-row lg:px-8">
+        <div className="flex flex-col-reverse items-center justify-center w-full px-4 lg:flex-row lg:px-8">
           <div className="w-full lg:w-2/3 p-4 lg:p-12">
             <DebateCoverIllustration
               className="w-full h-auto object-cover"

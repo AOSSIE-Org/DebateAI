@@ -123,7 +123,7 @@ function Header() {
                 <BreadcrumbItem>
                   {isLast ? (
                     <BreadcrumbPage className="capitalize">
-                      {value === "support-debateai" 
+                      {value === "support-debateai" || value === "support-os"
                         ? "Support DebateAI" 
                         : value === "bot-selection" 
                         ? "Bot Selection" 
@@ -132,7 +132,7 @@ function Header() {
                   ) : (
                     <BreadcrumbLink asChild>
                       <NavLink to={to} className="capitalize">
-                        {value === "support-debateai" 
+                        {value === "support-debateai" || value === "support-os"
                           ? "Support DebateAI" 
                           : value === "bot-selection" 
                           ? "Bot Selection" 
@@ -371,10 +371,10 @@ function Header() {
                 icon={<Heart className="mr-3 h-4 w-4 text-red-500 transition-all duration-300 group-hover:fill-red-500 group-hover:scale-110" />}
                 onClick={toggleDrawer}
               />
-              <div className="pt-2">
-                <ThemeToggle />
-              </div>
             </nav>
+            <div className="p-4 border-t border-border mt-auto">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       )}
