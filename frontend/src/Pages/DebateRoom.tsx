@@ -8,6 +8,7 @@ import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -220,12 +221,51 @@ const extractJSON = (response: string): string => {
 const DebateRoom: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const debateData = location.state as DebateProps;
-  const phases = debateData.phaseTimings;
-  const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
+  const { toast } = useToast();
+
+  // Rehydrate debateData from location.state or sessionStorage
+  const [debateData] = useState<DebateProps | null>(() => {
+    if (location.state) {
+      try {
+        sessionStorage.setItem(
+          `debateData_${location.pathname}`,
+          JSON.stringify(location.state)
+        );
+      } catch (err) {
+        console.error("Failed to cache debate data in sessionStorage:", err);
+      }
+      return location.state as DebateProps;
+    }
+    const cached = sessionStorage.getItem(`debateData_${location.pathname}`);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as DebateProps;
+      } catch (err) {
+        console.error("Failed to parse cached debate data from sessionStorage:", err);
+      }
+    }
+    return null;
+  });
+
+  const phases = debateData?.phaseTimings || [];
+  const debateKey = debateData
+    ? `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`
+    : "";
   const [user] = useAtom(userAtom);
 
   const [state, setState] = useState<DebateState>(() => {
+    if (!debateKey) {
+      return {
+        messages: [],
+        currentPhase: 0,
+        phaseStep: 0,
+        isBotTurn: false,
+        userStance: "",
+        botStance: "",
+        timer: 60,
+        isDebateEnded: false,
+      };
+    }
     const savedState = localStorage.getItem(debateKey);
     return savedState
       ? JSON.parse(savedState)
@@ -236,7 +276,7 @@ const DebateRoom: React.FC = () => {
           isBotTurn: false,
           userStance: "",
           botStance: "",
-          timer: phases[0].time,
+          timer: phases[0]?.time ?? 60,
           isDebateEnded: false,
         };
   });
@@ -255,14 +295,28 @@ const DebateRoom: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const bot = allBots.find((b) => b.name === debateData.botName) || allBots[0];
+  const bot = debateData
+    ? allBots.find((b) => b.name === debateData.botName) || allBots[0]
+    : allBots[0];
   const userAvatar =
     user?.avatarUrl || DEFAULT_AVATAR_URL;
+
+  // Redirect to start-debate if no debate data is present
+  useEffect(() => {
+    if (!debateData) {
+      toast({
+        variant: "destructive",
+        title: "Debate Session Not Found",
+        description: "No active debate session found. Redirecting to debate setup.",
+      });
+      navigate("/start-debate", { replace: true });
+    }
+  }, [debateData, navigate, toast]);
 
   const handleConcede = async () => {
     if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
       try {
-        if (debateData.debateId) {
+        if (debateData?.debateId) {
             await concedeDebate(debateData.debateId, state.messages);
         }
         
@@ -347,17 +401,21 @@ const DebateRoom: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!debateKey) return;
     localStorage.setItem(debateKey, JSON.stringify(state));
   }, [state, debateKey]);
 
   useEffect(() => {
     return () => {
-      localStorage.removeItem(debateKey);
+      if (debateKey) {
+        localStorage.removeItem(debateKey);
+      }
     };
   }, [debateKey]);
 
   useEffect(() => {
-    if (!state.userStance) {
+    if (!debateData || !state.userStance) {
+      if (!debateData) return;
       const stanceNormalized =
         debateData.stance.toLowerCase() === "for" ||
         debateData.stance.toLowerCase() === "against"
@@ -372,7 +430,7 @@ const DebateRoom: React.FC = () => {
         isBotTurn: stanceNormalized === "Against",
       }));
     }
-  }, [state.userStance, debateData.stance]);
+  }, [state.userStance, debateData?.stance]);
 
   useEffect(() => {
     if (state.timer > 0 && !state.isDebateEnded) {
@@ -692,7 +750,7 @@ setPopup({ show: false, message: "" });
         judgment={judgmentData}
         userAvatar={userAvatar}
         botAvatar={bot.avatar}
-        botName={debateData.botName}
+        botName={debateData?.botName || "Bot"}
         userStance={state.userStance}
         botStance={state.botStance}
         botDesc={bot.desc}
@@ -704,6 +762,14 @@ setPopup({ show: false, message: "" });
     </div>
   );
 }
+
+  if (!debateData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground text-sm">Redirecting to debate setup...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 transition-colors duration-300">
