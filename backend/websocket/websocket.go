@@ -107,6 +107,24 @@ type TypingIndicator struct {
 var rooms = make(map[string]*Room)
 var roomsMutex sync.Mutex
 
+var (
+	roomActivityRefresh   = make(map[string]time.Time)
+	roomActivityRefreshMu sync.Mutex
+)
+
+// shouldRefreshRoomActivity reports whether enough time has passed to persist a
+// room activity refresh, updating the in-memory marker when it returns true.
+// This throttles MongoDB requests (not just writes) under chatty WS traffic.
+func shouldRefreshRoomActivity(roomID string) bool {
+	roomActivityRefreshMu.Lock()
+	defer roomActivityRefreshMu.Unlock()
+	if last, ok := roomActivityRefresh[roomID]; ok && time.Since(last) < 2*time.Minute {
+		return false
+	}
+	roomActivityRefresh[roomID] = time.Now()
+	return true
+}
+
 // snapshotRecipients returns a slice of clients to send messages to, excluding the specified connection
 func snapshotRecipients(room *Room, exclude *websocket.Conn) []*Client {
 	room.Mutex.Lock()
@@ -470,14 +488,18 @@ func WebsocketHandler(c *gin.Context) {
 		room.Mutex.Unlock()
 
 		// Throttled refresh of the room's persisted activity so an active debate
-		// (WS traffic) keeps the room alive independent of REST polling.
-		roomStaleCutoff := time.Now().Add(-2 * time.Minute)
-		if _, uerr := roomCollection.UpdateOne(
-			context.Background(),
-			bson.M{"_id": roomID, "lastActivity": bson.M{"$lt": roomStaleCutoff}},
-			bson.M{"$set": bson.M{"lastActivity": time.Now()}},
-		); uerr != nil {
-			log.Printf("[ws] failed to refresh room lastActivity: room=%s err=%v", roomID, uerr)
+		// (WS traffic) keeps the room alive independent of REST polling. Throttled
+		// in-memory to avoid a MongoDB request on every message.
+		if shouldRefreshRoomActivity(roomID) {
+			refreshCtx, refreshCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if _, uerr := roomCollection.UpdateOne(
+				refreshCtx,
+				bson.M{"_id": roomID},
+				bson.M{"$set": bson.M{"lastActivity": time.Now()}},
+			); uerr != nil {
+				log.Printf("[ws] failed to refresh room lastActivity: room=%s err=%v", roomID, uerr)
+			}
+			refreshCancel()
 		}
 
 		// Handle different message types
