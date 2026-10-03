@@ -82,10 +82,10 @@ function Footer() {
       role="contentinfo"
       className="border-t border-border bg-background px-4 py-6 md:px-8"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row md:items-start md:justify-between">
+      <div className="w-full flex flex-col items-center sm:items-start gap-8 sm:flex-row sm:flex-wrap sm:justify-between">
         {/* BRAND */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-2 w-full sm:w-auto">
+          <div className="flex items-center justify-center sm:justify-start gap-2">
             <span className="text-lg font-bold">DebateAI by</span>
 
             <a
@@ -103,15 +103,17 @@ function Footer() {
             </a>
           </div>
 
-          <p className="max-w-xs text-sm leading-5 text-muted-foreground">
+          <p className="max-w-xs text-sm leading-5 text-muted-foreground mx-auto sm:mx-0">
             AI-powered debate practice platform, built by AOSSIE to help
             sharpen communication, argumentation, and critical thinking skills.
           </p>
         </div>
 
-        {/* EXPLORE */}
-        <div className="flex flex-col gap-3">
-          <h4 className="text-sm font-semibold text-foreground">Explore</h4>
+        {/* LINKS ROW */}
+        <div className="flex flex-row justify-center w-full sm:w-auto gap-16 sm:gap-8">
+          {/* EXPLORE */}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold text-foreground text-left">Explore</h4>
 
           <div className="flex flex-col gap-2">
             {footerLinks.map((item) => (
@@ -126,9 +128,9 @@ function Footer() {
           </div>
         </div>
 
-        {/* LEGAL */}
-        <div className="flex flex-col gap-3">
-          <h4 className="text-sm font-semibold text-foreground">Legal</h4>
+          {/* LEGAL */}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold text-foreground text-left">Legal</h4>
 
           <div className="flex flex-col gap-2">
             {legalLinks.map((item) => (
@@ -142,9 +144,10 @@ function Footer() {
             ))}
           </div>
         </div>
+        </div>
 
         {/* COMMUNITY */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-3 w-full sm:w-auto">
           <h4 className="text-sm font-semibold text-foreground">
             Community
           </h4>
@@ -170,7 +173,7 @@ function Footer() {
             })}
           </div>
 
-          <p className="max-w-[220px] text-xs leading-5 text-muted-foreground">
+          <p className="max-w-[220px] text-xs leading-5 text-muted-foreground mx-auto sm:mx-0">
             Join the AOSSIE community and help us build open-source software
             together.
           </p>
@@ -178,7 +181,7 @@ function Footer() {
       </div>
 
       {/* BOTTOM */}
-      <div className="mx-auto mt-8 flex max-w-7xl flex-col items-center gap-2 border-t border-border pt-4 text-center md:flex-row md:justify-between">
+      <div className="w-full mt-6 flex flex-col items-center gap-2 border-t border-border pt-4 text-center sm:flex-row sm:justify-between">
         <p className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} DebateAI · AOSSIE. All rights reserved.
         </p>
