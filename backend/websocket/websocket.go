@@ -366,27 +366,28 @@ func WebsocketHandler(c *gin.Context) {
 	client.SafeWriteJSON(participantsMsg)
 
 	// Send existing participants' detailed info to the new client
-	for connRef, existing := range room.Clients {
-		payload := map[string]interface{}{
-			"id":          existing.UserID,
-			"username":    existing.Username,
-			"displayName": existing.Username,
-			"email":       existing.Email,
-			"avatarUrl":   existing.AvatarURL,
-			"elo":         existing.Elo,
-		}
-		detailMessage := map[string]interface{}{
-			"type":        "userDetails",
-			"userDetails": payload,
-		}
+	// Snapshot existing participants' detail payloads under the lock,
+	// then write outside the lock to avoid a data race on room.Clients
+	// and to avoid holding the mutex during network I/O.
+	room.Mutex.Lock()
+	detailMessages := make([]map[string]interface{}, 0, len(room.Clients))
+	for _, existing := range room.Clients {
+		detailMessages = append(detailMessages, map[string]interface{}{
+			"type": "userDetails",
+			"userDetails": map[string]interface{}{
+				"id":          existing.UserID,
+				"username":    existing.Username,
+				"displayName": existing.Username,
+				"email":       existing.Email,
+				"avatarUrl":   existing.AvatarURL,
+				"elo":         existing.Elo,
+			},
+		})
+	}
+	room.Mutex.Unlock()
 
-		if connRef == conn {
-			// Already sent this client's participant data; ensure they have their own detail payload too
-			client.SafeWriteJSON(detailMessage)
-		} else {
-			// Send existing participant info to the new client
-			client.SafeWriteJSON(detailMessage)
-		}
+	for _, detailMessage := range detailMessages {
+		client.SafeWriteJSON(detailMessage)
 	}
 
 	// Prepare detailed payload for the new client to broadcast to others
