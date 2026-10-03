@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -24,6 +25,7 @@ type Room struct {
 	Type         string        `json:"type" bson:"type"`
 	OwnerID      string        `json:"ownerId" bson:"ownerId"`
 	Participants []Participant `json:"participants" bson:"participants"`
+	LastActivity time.Time     `json:"lastActivity" bson:"lastActivity"`
 }
 
 // Participant represents a user in a room.
@@ -108,6 +110,7 @@ func CreateRoomHandler(c *gin.Context) {
 		Type:         input.Type,
 		OwnerID:      creatorParticipant.ID,
 		Participants: []Participant{creatorParticipant},
+		LastActivity: time.Now(),
 	}
 
 	roomCollection := db.MongoDatabase.Collection("rooms")
@@ -208,6 +211,7 @@ func JoinRoomHandler(c *gin.Context) {
 					bson.A{bson.D{{Key: "$literal", Value: participant}}},
 				}}},
 			}}}},
+			{Key: "lastActivity", Value: time.Now()},
 		}}},
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
@@ -247,6 +251,16 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
+	}
+	// Refresh room activity on access, throttled so an open tab polling every few
+	// seconds doesn't trigger a write on every request.
+	staleCutoff := time.Now().Add(-2 * time.Minute)
+	if _, uerr := roomCollection.UpdateOne(
+		ctx,
+		bson.M{"_id": roomId, "lastActivity": bson.M{"$lt": staleCutoff}},
+		bson.M{"$set": bson.M{"lastActivity": time.Now()}},
+	); uerr != nil {
+		log.Printf("[rooms] failed to refresh lastActivity for room %s: %v", roomId, uerr)
 	}
 
 	// Get user ID from email
