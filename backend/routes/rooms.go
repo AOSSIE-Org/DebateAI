@@ -160,7 +160,7 @@ func JoinRoomHandler(c *gin.Context) {
 
 	emailStr, ok := email.(string)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error: email context value is not a string"})
 		return
 	}
 
@@ -252,7 +252,7 @@ func GetRoomParticipantsHandler(c *gin.Context) {
 	// Get user ID from email
 	emailStr, ok := email.(string)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error: email context value is not a string"})
 		return
 	}
 
