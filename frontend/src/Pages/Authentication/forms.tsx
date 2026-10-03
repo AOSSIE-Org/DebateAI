@@ -8,9 +8,10 @@ import { useCallback } from "react";
 interface LoginFormProps {
   startForgotPassword: () => void;
   infoMessage?: string;
+  startOtpVerification: (email: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoMessage, startOtpVerification }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -39,8 +40,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     setLocalError(null);
     try {
       await login(email, password);
-    } catch {
-      // Handled by authContext error state
+    } catch (err) {
+      const code = (err as Error & { code?: string }).code;
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        startOtpVerification(email);
+      }
     }
   };
 
@@ -271,17 +275,26 @@ interface OTPVerificationFormProps {
 
 export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email, handleOtpVerified }) => {
   const [otp, setOtp] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const authContext = useContext(AuthContext);
 
   if (!authContext) {
     throw new Error('OTPVerificationForm must be used within an AuthProvider');
   }
-
-  const { verifyEmail, error, loading, clearError } = authContext;
+  const { verifyEmail, resendVerification, error, loading, clearError } = authContext;
 
   useEffect(() => {
     clearError();
   }, []);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,8 +307,22 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
     }
   };
 
+  const handleResend = async () => {
+    setResendMessage(null);
+    try {
+      const message = await resendVerification(email);
+      setResendMessage(message);
+      setResendCooldown(120);
+    } catch (err) {
+      const retryAfter = (err as Error & { retryAfterSeconds?: number }).retryAfterSeconds;
+      if (typeof retryAfter === 'number') {
+        setResendCooldown(retryAfter);
+      }
+    }
+  };
+
   return (
-    <div className="w-full flex flex-col items-center">
+        <div className="w-full flex flex-col items-center">
       <h3 className="text-2xl font-medium my-4">Verify Your Email</h3>
       <p className="mb-4">Enter the OTP sent to your email to complete the sign-up process.</p>
       <form onSubmit={handleSubmit} className="w-full">
@@ -310,10 +337,19 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
           className="w-full mb-4 dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+        {resendMessage && <p className="text-sm text-green-500 mb-2">{resendMessage}</p>}
         <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
           {loading ? 'Verifying...' : 'Verify OTP'}
         </Button>
       </form>
+      <button
+        type="button"
+        onClick={handleResend}
+        disabled={resendCooldown > 0 || loading}
+        className="text-sm text-muted-foreground dark:text-white underline mt-4 disabled:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+      </button>
     </div>
   );
 };

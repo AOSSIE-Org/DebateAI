@@ -32,6 +32,7 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<void>;
   googleLogin: (idToken: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<string>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -153,7 +154,14 @@ const verifyToken = useCallback(async () => {
       });
 
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || data.message || 'Login failed');
+        if (!response.ok) {
+          const message = data.error || data.message || 'Login failed';
+          const err = new Error(message) as Error & { code?: string };
+          if (data.code === 'EMAIL_NOT_VERIFIED') {
+            err.code = 'EMAIL_NOT_VERIFIED';
+          }
+          throw err;
+        }
 
       setToken(data.accessToken);
       localStorage.setItem('token', data.accessToken);
@@ -290,6 +298,34 @@ const verifyToken = useCallback(async () => {
     }
   };
 
+  const resendVerification = async (email: string): Promise<string> => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${baseURL}/resendVerification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        const message = data.error || data.message || 'Failed to resend code';
+        const err = new Error(message) as Error & { retryAfterSeconds?: number };
+        if (typeof data.retryAfterSeconds === 'number') {
+          err.retryAfterSeconds = data.retryAfterSeconds;
+        }
+        throw err;
+      }
+      setError(null);
+      return data.message || 'A new code has been sent to your email.';
+    } catch (error) {
+      handleError(error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmForgotPassword = async (
     email: string,
     code: string,
@@ -389,6 +425,7 @@ const verifyToken = useCallback(async () => {
         logout,
         signup,
         verifyEmail,
+        resendVerification,
         forgotPassword,
         confirmForgotPassword,
         googleLogin,

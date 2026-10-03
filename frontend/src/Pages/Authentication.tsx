@@ -90,7 +90,6 @@ const RightSection: React.FC<RightSectionProps> = ({
 
     <div className="flex flex-col items-center justify-center w-full px-6">
       <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-xl p-8 backdrop-blur-sm">
-
         {authMode === 'login' && (
           <>
             <h3 className="text-2xl font-medium my-4">
@@ -100,6 +99,7 @@ const RightSection: React.FC<RightSectionProps> = ({
             <LoginForm
               startForgotPassword={startForgotPassword}
               infoMessage={infoMessage}
+              startOtpVerification={startOtpVerification}
             />
           </>
         )}
