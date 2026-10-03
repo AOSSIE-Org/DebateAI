@@ -1,5 +1,5 @@
 "use client";
-
+import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Card,
@@ -162,15 +162,17 @@ interface FollowUser {
   avatarUrl?: string;
 }
 
-const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> = {
-  twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
-  instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
-  linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
-};
+const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> =
+  {
+    twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
+    instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
+    linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
+  };
 
 const BIO_MAX_LENGTH = 300;
 
 const Profile: React.FC = () => {
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
@@ -255,20 +257,20 @@ const Profile: React.FC = () => {
     setSelectedDebate(debate);
     setIsDebateDialogOpen(true);
     setTranscriptLoading(true);
-        setErrorMessage("");
-        setFullTranscript(null); 
+    setErrorMessage("");
+    setFullTranscript(null);
 
     try {
       const transcript = await transcriptService.getTranscriptById(debate.id);
       setFullTranscript(transcript);
-    } catch(error) {
-       console.error("Error fetching transcript:", error);
-       setFullTranscript(null);
-       setErrorMessage(
-         error instanceof Error
-           ? error.message
-           : "Failed to load transcript. Please try again."
-       );
+    } catch (error) {
+      console.error("Error fetching transcript:", error);
+      setFullTranscript(null);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load transcript. Please try again."
+      );
     } finally {
       setTranscriptLoading(false);
     }
@@ -313,7 +315,9 @@ const Profile: React.FC = () => {
         dashboard.profile.avatarUrl
       );
       setSuccessMessage(
-        `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully!`
+        `${
+          field.charAt(0).toUpperCase() + field.slice(1)
+        } updated successfully!`
       );
       setErrorMessage("");
       setEditingField(null);
@@ -325,9 +329,7 @@ const Profile: React.FC = () => {
         setRecentDebates(updatedData.stats.recentDebates);
       }
     } catch (err) {
-      setErrorMessage(
-        (err as Error).message || `Failed to update ${field}.`
-      );
+      setErrorMessage((err as Error).message || `Failed to update ${field}.`);
     }
   };
 
@@ -339,7 +341,10 @@ const Profile: React.FC = () => {
       return;
     }
     try {
-      setDashboard({ ...dashboard, profile: { ...dashboard.profile, avatarUrl } });
+      setDashboard({
+        ...dashboard,
+        profile: { ...dashboard.profile, avatarUrl },
+      });
       await updateProfile(
         token,
         dashboard.profile.displayName,
@@ -355,7 +360,10 @@ const Profile: React.FC = () => {
       setErrorMessage("Failed to update avatar.");
       setDashboard({
         ...dashboard,
-        profile: { ...dashboard.profile, avatarUrl: dashboard.profile.avatarUrl },
+        profile: {
+          ...dashboard.profile,
+          avatarUrl: dashboard.profile.avatarUrl,
+        },
       });
     }
   };
@@ -398,7 +406,9 @@ const Profile: React.FC = () => {
               const rules = socialValidation[field as string];
               let val = e.target.value;
               if (field === "linkedin") val = val.toLowerCase();
-              val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
+              val = rules
+                ? val.replace(rules.pattern, "").slice(0, rules.maxLength)
+                : val;
               setDashboard({
                 ...dashboard!,
                 profile: { ...dashboard!.profile, [field]: val },
@@ -430,8 +440,8 @@ const Profile: React.FC = () => {
               field === "twitter"
                 ? `https://twitter.com/${dashboard.profile[field]}`
                 : field === "instagram"
-                  ? `https://instagram.com/${dashboard.profile[field]}`
-                  : `https://linkedin.com/in/${dashboard.profile[field]}`
+                ? `https://instagram.com/${dashboard.profile[field]}`
+                : `https://linkedin.com/in/${dashboard.profile[field]}`
             }
             target="_blank"
             rel="noopener noreferrer"
@@ -467,7 +477,9 @@ const Profile: React.FC = () => {
         onSubmit={(e) => handleSubmit(e, "bio")}
         className="space-y-2 mb-2 w-full min-w-0 max-w-full"
       >
-        <Label htmlFor="bio" className="text-sm">Bio</Label>
+        <Label htmlFor="bio" className="text-sm">
+          Bio
+        </Label>
         <Textarea
           maxLength={BIO_MAX_LENGTH}
           id="bio"
@@ -485,12 +497,15 @@ const Profile: React.FC = () => {
           placeholder="Share your story"
           className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
         />
-        <p className={`text-xs text-right ${(dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
-          ? "text-red-500"
-          : (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH - 60
-            ? "text-orange-500"
-            : "text-muted-foreground"
-          }`}>
+        <p
+          className={`text-xs text-right ${
+            (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
+              ? "text-red-500"
+              : (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH - 60
+              ? "text-orange-500"
+              : "text-muted-foreground"
+          }`}
+        >
           {dashboard?.profile.bio?.length || 0} / {BIO_MAX_LENGTH}
         </p>
         <div className="flex gap-2">
@@ -503,7 +518,14 @@ const Profile: React.FC = () => {
           >
             Save
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => setEditingField(null)} className="flex-1">Cancel</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setEditingField(null)}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
         </div>
       </form>
     ) : (
@@ -522,7 +544,10 @@ const Profile: React.FC = () => {
     { label: "Wins", value: stats.wins, fill: "hsl(var(--chart-2))" },
     { label: "Draws", value: stats.draws, fill: "hsl(var(--chart-3))" },
   ];
-  const totalMatches = donutChartData.reduce((acc, curr) => acc + curr.value, 0);
+  const totalMatches = donutChartData.reduce(
+    (acc, curr) => acc + curr.value,
+    0
+  );
 
   const donutChartConfig: ChartConfig = {
     value: { label: "Matches" },
@@ -550,15 +575,23 @@ const Profile: React.FC = () => {
       filteredHistory = filteredHistory.filter(
         (entry) => new Date(entry.date || now) >= thirtyDaysAgo
       );
-    } else if (eloFilter === "custom" && customDateRange.from && customDateRange.to) {
+    } else if (
+      eloFilter === "custom" &&
+      customDateRange.from &&
+      customDateRange.to
+    ) {
       filteredHistory = filteredHistory.filter((entry) => {
         const entryDate = new Date(entry.date || now);
-        return entryDate >= customDateRange.from! && entryDate <= customDateRange.to!;
+        return (
+          entryDate >= customDateRange.from! && entryDate <= customDateRange.to!
+        );
       });
     }
 
     if (filteredHistory.length === 0 && eloFilter !== "custom") {
-      filteredHistory = [{ elo: profile.rating, date: new Date().toISOString() }];
+      filteredHistory = [
+        { elo: profile.rating, date: new Date().toISOString() },
+      ];
     }
 
     return filteredHistory.map((entry) => ({
@@ -571,8 +604,14 @@ const Profile: React.FC = () => {
 
   const filteredEloHistory = filterEloHistory();
   const eloValues = filteredEloHistory.map((entry) => entry.elo);
-  const minElo = eloValues.length > 0 ? Math.min(...eloValues, profile.rating) : profile.rating;
-  const maxElo = eloValues.length > 0 ? Math.max(...eloValues, profile.rating) : profile.rating;
+  const minElo =
+    eloValues.length > 0
+      ? Math.min(...eloValues, profile.rating)
+      : profile.rating;
+  const maxElo =
+    eloValues.length > 0
+      ? Math.max(...eloValues, profile.rating)
+      : profile.rating;
   const padding = Math.round((maxElo - minElo) * 0.1) || 50;
   const yDomain = [minElo - padding, maxElo + padding];
 
@@ -582,15 +621,25 @@ const Profile: React.FC = () => {
     label?: string;
   }
 
-  const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+  const CustomTooltip: React.FC<CustomTooltipProps> = ({
+    active,
+    payload,
+    label,
+  }) => {
     if (active && payload && payload.length) {
       const currentElo = payload[0].value;
-      const index = filteredEloHistory.findIndex((e) => e.formattedDate === label);
+      const index = filteredEloHistory.findIndex(
+        (e) => e.formattedDate === label
+      );
       let changeText = "No change";
       if (index > 0) {
         const change = currentElo - filteredEloHistory[index - 1].elo;
         changeText =
-          change > 0 ? `Increased by ${change}` : change < 0 ? `Decreased by ${-change}` : "No change";
+          change > 0
+            ? `Increased by ${change}`
+            : change < 0
+            ? `Decreased by ${-change}`
+            : "No change";
       }
       return (
         <div className="bg-background border border-border p-2 rounded shadow text-xs">
@@ -664,7 +713,9 @@ const Profile: React.FC = () => {
 
     return (
       <div className="space-y-3">
-        <h3 className="text-xs sm:text-sm font-semibold text-foreground">Connections</h3>
+        <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+          Connections
+        </h3>
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-medium text-foreground">
             <Users className="w-3 h-3" />
@@ -672,15 +723,28 @@ const Profile: React.FC = () => {
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowers ? (
-              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner/></div>
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                <LoadingSpinner />
+              </div>
             ) : followers.length === 0 ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">No followers yet</div>
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                No followers yet
+              </div>
             ) : (
               followers.map((follower: FollowUser) => (
-                <ProfileHover key={follower.id || follower._id || ""} userId={follower.id || follower._id || ""}>
+                <ProfileHover
+                  key={follower.id || follower._id || ""}
+                  userId={follower.id || follower._id || ""}
+                >
                   <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
-                    <img src={follower.avatarUrl || defaultAvatar} alt={follower.displayName || "User"} className="w-5 h-5 rounded-full object-cover" />
-                    <span className="text-xs truncate">{follower.displayName || follower.email || "User"}</span>
+                    <img
+                      src={follower.avatarUrl || defaultAvatar}
+                      alt={follower.displayName || "User"}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                    <span className="text-xs truncate">
+                      {follower.displayName || follower.email || "User"}
+                    </span>
                   </div>
                 </ProfileHover>
               ))
@@ -694,15 +758,28 @@ const Profile: React.FC = () => {
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowing ? (
-              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner size="sm" /></div>
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                <LoadingSpinner size="sm" />
+              </div>
             ) : following.length === 0 ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Not following anyone yet</div>
+              <div className="text-center py-2 text-xs text-muted-foreground">
+                Not following anyone yet
+              </div>
             ) : (
               following.map((followed: FollowUser) => (
-                <ProfileHover key={followed.id || followed._id || ""} userId={followed.id || followed._id || ""}>
+                <ProfileHover
+                  key={followed.id || followed._id || ""}
+                  userId={followed.id || followed._id || ""}
+                >
                   <div className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors">
-                    <img src={followed.avatarUrl || defaultAvatar} alt={followed.displayName || "User"} className="w-5 h-5 rounded-full object-cover" />
-                    <span className="text-xs truncate">{followed.displayName || followed.email || "User"}</span>
+                    <img
+                      src={followed.avatarUrl || defaultAvatar}
+                      alt={followed.displayName || "User"}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                    <span className="text-xs truncate">
+                      {followed.displayName || followed.email || "User"}
+                    </span>
                   </div>
                 </ProfileHover>
               ))
@@ -728,7 +805,11 @@ const Profile: React.FC = () => {
         )}
         <div className="flex flex-col items-center mb-4">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md group">
-            <img src={profile.avatarUrl || defaultAvatar} alt="Avatar" className="object-cover w-full h-full" />
+            <img
+              src={profile.avatarUrl || defaultAvatar}
+              alt="Avatar"
+              className="object-cover w-full h-full"
+            />
             <button
               onClick={() => setIsAvatarModalOpen(true)}
               className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -755,18 +836,25 @@ const Profile: React.FC = () => {
                 value={profile.displayName || ""}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setDashboard({ ...dashboard, profile: { ...profile, displayName: val } });
+                  setDashboard({
+                    ...dashboard,
+                    profile: { ...profile, displayName: val },
+                  });
                   if (!val.trim()) {
                     setUsernameStatus("idle");
                     return;
                   }
-                  if (debounceTimer.current) clearTimeout(debounceTimer.current);
+                  if (debounceTimer.current)
+                    clearTimeout(debounceTimer.current);
                   setUsernameStatus("checking");
                   debounceTimer.current = setTimeout(async () => {
                     try {
                       const token = getAuthToken();
                       if (!token) return;
-                      const res = await checkDisplayNameAvailability(token, val.trim());
+                      const res = await checkDisplayNameAvailability(
+                        token,
+                        val.trim()
+                      );
                       setUsernameStatus(res.available ? "available" : "taken");
                     } catch {
                       setUsernameStatus("idle");
@@ -781,10 +869,14 @@ const Profile: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Checking...</p>
               )}
               {usernameStatus === "taken" && (
-                <p className="text-xs text-red-500">Display name already taken</p>
+                <p className="text-xs text-red-500">
+                  Display name already taken
+                </p>
               )}
               {usernameStatus === "available" && (
-                <p className="text-xs text-green-500">Display name available ✓</p>
+                <p className="text-xs text-green-500">
+                  Display name available ✓
+                </p>
               )}
               <div className="flex gap-2 w-full max-w-xs">
                 <Button
@@ -792,14 +884,19 @@ const Profile: React.FC = () => {
                   size="sm"
                   variant="default"
                   className="flex-1 text-xs"
-                  disabled={usernameStatus === "taken" || usernameStatus === "checking"}
+                  disabled={
+                    usernameStatus === "taken" || usernameStatus === "checking"
+                  }
                 >
                   Save
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => { setEditingField(null); setUsernameStatus("idle"); }}
+                  onClick={() => {
+                    setEditingField(null);
+                    setUsernameStatus("idle");
+                  }}
                   className="flex-1 text-xs"
                 >
                   Cancel
@@ -816,7 +913,13 @@ const Profile: React.FC = () => {
                 className="p-1 hover:bg-muted rounded-full"
                 title="Edit Display Name"
               >
-                <Pen className={`w-4 h-4 ${profile.displayName ? "text-primary" : "text-muted-foreground"}`} />
+                <Pen
+                  className={`w-4 h-4 ${
+                    profile.displayName
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  }`}
+                />
               </button>
             </div>
           )}
@@ -843,17 +946,36 @@ const Profile: React.FC = () => {
         </p>
 
         <div className="space-y-2 mb-4">
-          <h3 className="text-xs sm:text-sm font-semibold text-foreground">Socials</h3>
-          {renderEditableSocialField("twitter", "X / Twitter", Twitter, "Your Twitter handle (without @)")}
-          {renderEditableSocialField("instagram", "Instagram", Instagram, "Your Instagram handle (without @)")}
-          {renderEditableSocialField("linkedin", "LinkedIn", Linkedin, "Your LinkedIn profile (username or ID)")}
+          <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+            Socials
+          </h3>
+          {renderEditableSocialField(
+            "twitter",
+            "X / Twitter",
+            Twitter,
+            "Your Twitter handle (without @)"
+          )}
+          {renderEditableSocialField(
+            "instagram",
+            "Instagram",
+            Instagram,
+            "Your Instagram handle (without @)"
+          )}
+          {renderEditableSocialField(
+            "linkedin",
+            "LinkedIn",
+            Linkedin,
+            "Your LinkedIn profile (username or ID)"
+          )}
         </div>
 
         <Separator className="my-2" />
 
         <div className="space-y-2 mb-4 min-w-0">
           <div className="flex items-center justify-between w-full">
-            <h3 className="text-xs sm:text-sm font-semibold text-foreground">Bio</h3>
+            <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+              Bio
+            </h3>
             {editingField !== "bio" && (
               <button
                 onClick={() => setEditingField("bio")}
@@ -871,7 +993,9 @@ const Profile: React.FC = () => {
         <FollowersFollowingSection />
 
         <div className="space-y-2">
-          <h3 className="text-xs sm:text-sm font-semibold text-foreground">Badges</h3>
+          <h3 className="text-xs sm:text-sm font-semibold text-foreground">
+            Badges
+          </h3>
           {profile.badges && profile.badges.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {profile.badges.map((badge, index) => {
@@ -889,16 +1013,23 @@ const Profile: React.FC = () => {
                   FirstWin: "First victory earned",
                   Debater10: "10 debates completed",
                 };
-                const badgeIcon = badgeIcons[badge] || <FaAward className="w-6 h-6 text-primary" />;
-                const badgeDescription = badgeDescriptions[badge] || "Achievement unlocked";
+                const badgeIcon = badgeIcons[badge] || (
+                  <FaAward className="w-6 h-6 text-primary" />
+                );
+                const badgeDescription =
+                  badgeDescriptions[badge] || "Achievement unlocked";
                 return (
                   <div
                     key={index}
                     className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:border-primary hover:shadow-md transition-all cursor-pointer group"
                     title={badgeDescription}
                   >
-                    <div className="mb-1 group-hover:scale-110 transition-transform">{badgeIcon}</div>
-                    <span className="text-xs font-medium text-foreground text-center">{badge}</span>
+                    <div className="mb-1 group-hover:scale-110 transition-transform">
+                      {badgeIcon}
+                    </div>
+                    <span className="text-xs font-medium text-foreground text-center">
+                      {badge}
+                    </span>
                   </div>
                 );
               })}
@@ -922,23 +1053,59 @@ const Profile: React.FC = () => {
               {totalMatches === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">No matches yet!</p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                    No matches yet!
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/startDebate")}
+                    className="hover:bg-primary hover:text-primary-foreground text-xs"
+                  >
                     Start Debating
                   </Button>
                 </div>
               ) : (
-                <ChartContainer config={donutChartConfig} className="mx-auto h-full min-h-0 w-full min-w-0">
+                <ChartContainer
+                  config={donutChartConfig}
+                  className="mx-auto h-full min-h-0 w-full min-w-0"
+                >
                   <PieChart>
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                    <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                    />
+                    <Pie
+                      data={donutChartData}
+                      dataKey="value"
+                      nameKey="label"
+                      innerRadius="40%"
+                      strokeWidth={3}
+                    >
                       <LabelList
                         content={({ viewBox }) => {
                           if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                             return (
-                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                                <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
-                                <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
+                              <text
+                                x={viewBox.cx}
+                                y={viewBox.cy}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                              >
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={viewBox.cy}
+                                  className="fill-foreground text-sm sm:text-base font-bold"
+                                >
+                                  {totalMatches}
+                                </tspan>
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) + 16}
+                                  className="fill-muted-foreground text-xs"
+                                >
+                                  Matches
+                                </tspan>
                               </text>
                             );
                           }
@@ -954,9 +1121,16 @@ const Profile: React.FC = () => {
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardHeader className="p-3 pb-1 flex-shrink-0">
               <div className="flex flex-wrap justify-between items-center gap-2">
-                <CardTitle className="text-foreground text-base sm:text-lg">Ratings</CardTitle>
+                <CardTitle className="text-foreground text-base sm:text-lg">
+                  Ratings
+                </CardTitle>
                 <div className="flex flex-wrap gap-2 items-center">
-                  <Select value={eloFilter} onValueChange={(value: "7days" | "30days" | "all" | "custom") => setEloFilter(value)}>
+                  <Select
+                    value={eloFilter}
+                    onValueChange={(
+                      value: "7days" | "30days" | "all" | "custom"
+                    ) => setEloFilter(value)}
+                  >
                     <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs [.contrast_&]:border-border">
                       <SelectValue placeholder="Select filter" />
                     </SelectTrigger>
@@ -971,12 +1145,22 @@ const Profile: React.FC = () => {
                     <div className="flex gap-2 items-center">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs [.contrast_&]:border-border">
+                          <Button
+                            variant="outline"
+                            className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs [.contrast_&]:border-border"
+                          >
                             <CalendarIcon className="mr-2 h-3 w-3 flex-shrink-0" />
                             <span className="truncate">
                               {customDateRange.from
-                                ? customDateRange.to && !isSameDay(customDateRange.from, customDateRange.to)
-                                  ? `${format(customDateRange.from, "MMM d")} - ${format(customDateRange.to, "MMM d")}`
+                                ? customDateRange.to &&
+                                  !isSameDay(
+                                    customDateRange.from,
+                                    customDateRange.to
+                                  )
+                                  ? `${format(
+                                      customDateRange.from,
+                                      "MMM d"
+                                    )} - ${format(customDateRange.to, "MMM d")}`
                                   : format(customDateRange.from, "MMM d")
                                 : "Pick a date range"}
                             </span>
@@ -986,13 +1170,23 @@ const Profile: React.FC = () => {
                           <Calendar
                             mode="range"
                             selected={customDateRange}
-                            onSelect={(range) => setCustomDateRange(range ?? { from: undefined, to: undefined })}
+                            onSelect={(range) =>
+                              setCustomDateRange(
+                                range ?? { from: undefined, to: undefined }
+                              )
+                            }
                             initialFocus
                             required={false}
                           />
                         </PopoverContent>
                       </Popover>
-                      <Button variant="ghost" size="icon" onClick={clearCustomDateRange} className="h-8 w-8" title="Clear date range">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={clearCustomDateRange}
+                        className="h-8 w-8"
+                        title="Clear date range"
+                      >
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -1001,23 +1195,66 @@ const Profile: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="p-2 flex-1 min-h-0 min-w-0">
-              {filteredEloHistory.length > 0 && !(eloFilter === "custom" && filteredEloHistory.length === 1 && filteredEloHistory[0].elo === profile.rating) ? (
-                <ChartContainer config={eloChartConfig} className="h-full min-h-0 w-full min-w-0">
-                  <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
-                    <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
-                    <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
+              {filteredEloHistory.length > 0 &&
+              !(
+                eloFilter === "custom" &&
+                filteredEloHistory.length === 1 &&
+                filteredEloHistory[0].elo === profile.rating
+              ) ? (
+                <ChartContainer
+                  config={eloChartConfig}
+                  className="h-full min-h-0 w-full min-w-0"
+                >
+                  <LineChart
+                    data={filteredEloHistory}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 30 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <XAxis
+                      dataKey="formattedDate"
+                      tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }}
+                      tickLine={false}
+                      axisLine={{ stroke: "hsl(var(--muted-foreground))" }}
+                      angle={filteredEloHistory.length > 5 ? -45 : 0}
+                      textAnchor="end"
+                      height={40}
+                      interval={Math.floor(filteredEloHistory.length / 5)}
+                    />
+                    <YAxis
+                      domain={yDomain}
+                      tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }}
+                      tickLine={false}
+                      axisLine={{ stroke: "hsl(var(--muted-foreground))" }}
+                      width={30}
+                    />
                     <ChartTooltip content={<CustomTooltip />} />
-                    <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
+                    <Line
+                      dataKey="elo"
+                      type="monotone"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))", r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
                   </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <TrendingUp className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                    {eloFilter === "custom" ? "No debates in this date range!" : "No Elo history for selected period!"}
+                    {eloFilter === "custom"
+                      ? "No debates in this date range!"
+                      : "No Elo history for selected period!"}
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/startDebate")}
+                    className="hover:bg-primary hover:text-primary-foreground text-xs"
+                  >
                     Join a Debate
                   </Button>
                 </div>
@@ -1029,32 +1266,55 @@ const Profile: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="shadow min-h-[250px] sm:min-h-[300px] flex flex-col">
             <CardHeader className="p-2 flex-shrink-0">
-              <CardTitle className="text-foreground text-base sm:text-lg">Top 5 Debaters</CardTitle>
-              <CardDescription className="text-muted-foreground text-xs">See who's leading</CardDescription>
+              <CardTitle className="text-foreground text-base sm:text-lg">
+                Top 5 Debaters
+              </CardTitle>
+              <CardDescription className="text-muted-foreground text-xs">
+                See who's leading
+              </CardDescription>
             </CardHeader>
             <Separator />
             <CardContent className="p-2 flex-1 overflow-y-auto">
               {leaderboard && leaderboard.length > 0 ? (
                 <ul className="space-y-1">
                   {leaderboard.slice(0, 5).map((leader, index) => (
-                    <li key={index} className="flex items-center justify-between border-b border-muted py-1 last:border-none text-xs sm:text-sm hover:bg-muted/50 transition-colors">
+                    <li
+                      key={index}
+                      className="flex items-center justify-between border-b border-muted py-1 last:border-none text-xs sm:text-sm hover:bg-muted/50 transition-colors"
+                    >
                       <span className="font-medium flex items-center space-x-2 truncate">
                         <span>{leader.rank}</span>
-                        {leader.rank === 1 && <Medal className="w-3 h-3 text-yellow-500" />}
-                        {leader.rank === 2 && <Medal className="w-3 h-3 text-gray-400" />}
-                        {leader.rank === 3 && <Medal className="w-3 h-3 text-amber-600" />}
-                        <img src={leader.avatarUrl} alt={leader.name} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
+                        {leader.rank === 1 && (
+                          <Medal className="w-3 h-3 text-yellow-500" />
+                        )}
+                        {leader.rank === 2 && (
+                          <Medal className="w-3 h-3 text-gray-400" />
+                        )}
+                        {leader.rank === 3 && (
+                          <Medal className="w-3 h-3 text-amber-600" />
+                        )}
+                        <img
+                          src={leader.avatarUrl}
+                          alt={leader.name}
+                          className="w-5 h-5 sm:w-6 sm:h-6 rounded-full"
+                        />
                         <span className="truncate">{leader.name}</span>
                       </span>
-                      <span className="text-muted-foreground text-xs">{leader.score}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {leader.score}
+                      </span>
                     </li>
                   ))}
                 </ul>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Users className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">Leaderboard is empty!</p>
-                  <p className="text-xs text-muted-foreground">Check back later to see top debaters.</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                    Leaderboard is empty!
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Check back later to see top debaters.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -1062,31 +1322,59 @@ const Profile: React.FC = () => {
 
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardHeader className="p-2 flex-shrink-0">
-              <CardTitle className="text-foreground text-base sm:text-lg">Recent Debates</CardTitle>
-              <CardDescription className="text-muted-foreground text-xs">Win/Loss record & Elo changes</CardDescription>
+              <CardTitle className="text-foreground text-base sm:text-lg">
+                Recent Debates
+              </CardTitle>
+              <CardDescription className="text-muted-foreground text-xs">
+                Win/Loss record & Elo changes
+              </CardDescription>
             </CardHeader>
             <Separator />
             <CardContent className="p-2 flex-1 overflow-y-auto">
               {debateStatsLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Loading debate history...</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Loading debate history...
+                  </p>
                 </div>
               ) : recentDebates && recentDebates.length > 0 ? (
                 <ul className="space-y-1">
                   {recentDebates.map((debate, idx) => {
-                    const IconComponent = debate.result === "win" ? CheckCircle : debate.result === "loss" ? XCircle : MinusCircle;
-                    const iconColor = debate.result === "win" ? "text-green-600" : debate.result === "loss" ? "text-red-600" : "text-gray-600";
+                    const IconComponent =
+                      debate.result === "win"
+                        ? CheckCircle
+                        : debate.result === "loss"
+                        ? XCircle
+                        : MinusCircle;
+                    const iconColor =
+                      debate.result === "win"
+                        ? "text-green-600"
+                        : debate.result === "loss"
+                        ? "text-red-600"
+                        : "text-gray-600";
                     return (
-                      <li key={idx} className="flex items-center justify-between border-b border-muted py-1 last:border-none text-xs sm:text-sm hover:bg-muted/50 transition-colors cursor-pointer group" onClick={() => handleDebateClick(debate)}>
+                      <li
+                        key={idx}
+                        className="flex items-center justify-between border-b border-muted py-1 last:border-none text-xs sm:text-sm hover:bg-muted/50 transition-colors cursor-pointer group"
+                        onClick={() => handleDebateClick(debate)}
+                      >
                         <span className="font-medium flex items-center truncate">
-                          <IconComponent className={`w-3 h-3 mr-1 ${iconColor}`} />
+                          <IconComponent
+                            className={`w-3 h-3 mr-1 ${iconColor}`}
+                          />
                           <span className="truncate">{debate.topic}</span>
                         </span>
-                        <span className={`${iconColor} font-semibold text-xs flex items-center gap-1`}>
+                        <span
+                          className={`${iconColor} font-semibold text-xs flex items-center gap-1`}
+                        >
                           {debate.result.toUpperCase()}{" "}
-                          {debate.eloChange && debate.eloChange > 0 && `(+${debate.eloChange})`}
-                          {debate.eloChange && debate.eloChange < 0 && `(${debate.eloChange})`}
+                          {debate.eloChange &&
+                            debate.eloChange > 0 &&
+                            `(+${debate.eloChange})`}
+                          {debate.eloChange &&
+                            debate.eloChange < 0 &&
+                            `(${debate.eloChange})`}
                           <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </span>
                       </li>
@@ -1096,8 +1384,15 @@ const Profile: React.FC = () => {
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">No recent debates available.</p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                    No recent debates available.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/startDebate")}
+                    className="hover:bg-primary hover:text-primary-foreground text-xs"
+                  >
                     Join a Debate
                   </Button>
                 </div>
@@ -1124,45 +1419,72 @@ const Profile: React.FC = () => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-semibold">Topic:</span>
-                  <p className="text-muted-foreground">{selectedDebate.topic}</p>
+                  <p className="text-muted-foreground">
+                    {selectedDebate.topic}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold">Opponent:</span>
                   <p className="text-muted-foreground">
                     {selectedDebate.opponent}
                     {selectedDebate.debateType === "user_vs_bot" && (
-                      <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">Bot</span>
+                      <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                        Bot
+                      </span>
                     )}
                   </p>
                 </div>
                 <div>
                   <span className="font-semibold">Type:</span>
-                  <p className="text-muted-foreground capitalize">{selectedDebate.debateType.replace("_", " ")}</p>
+                  <p className="text-muted-foreground capitalize">
+                    {selectedDebate.debateType.replace("_", " ")}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold">Result:</span>
                   <div className="flex items-center gap-1">
-                    {selectedDebate.result === "win" ? <CheckCircle className="w-4 h-4 text-green-600" /> : selectedDebate.result === "loss" ? <XCircle className="w-4 h-4 text-red-600" /> : <MinusCircle className="w-4 h-4 text-gray-600" />}
-                    <span className="text-muted-foreground capitalize">{selectedDebate.result}</span>
+                    {selectedDebate.result === "win" ? (
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    ) : selectedDebate.result === "loss" ? (
+                      <XCircle className="w-4 h-4 text-red-600" />
+                    ) : (
+                      <MinusCircle className="w-4 h-4 text-gray-600" />
+                    )}
+                    <span className="text-muted-foreground capitalize">
+                      {selectedDebate.result}
+                    </span>
                   </div>
                 </div>
                 <div>
                   <span className="font-semibold">Date:</span>
-                  <p className="text-muted-foreground">{format(new Date(selectedDebate.date), "PPP")}</p>
+                  <p className="text-muted-foreground">
+                    {format(new Date(selectedDebate.date), "PPP")}
+                  </p>
                 </div>
                 <div>
                   <span className="font-semibold">Elo Change:</span>
-                  <p className="text-muted-foreground">{selectedDebate.eloChange || 0}</p>
+                  <p className="text-muted-foreground">
+                    {selectedDebate.eloChange || 0}
+                  </p>
                 </div>
               </div>
               <Separator />
               <div>
                 <h4 className="font-semibold mb-3">Debate Summary</h4>
                 <p className="text-sm text-muted-foreground">
-                  This debate was a {selectedDebate.debateType.replace("_", " ")} debate about "{selectedDebate.topic}" against {selectedDebate.opponent}. The result was a {selectedDebate.result}.
-                  {selectedDebate.eloChange && selectedDebate.eloChange !== 0 && (
-                    <span> Your Elo rating changed by {selectedDebate.eloChange > 0 ? "+" : ""}{selectedDebate.eloChange}.</span>
-                  )}
+                  This debate was a{" "}
+                  {selectedDebate.debateType.replace("_", " ")} debate about "
+                  {selectedDebate.topic}" against {selectedDebate.opponent}. The
+                  result was a {selectedDebate.result}.
+                  {selectedDebate.eloChange &&
+                    selectedDebate.eloChange !== 0 && (
+                      <span>
+                        {" "}
+                        Your Elo rating changed by{" "}
+                        {selectedDebate.eloChange > 0 ? "+" : ""}
+                        {selectedDebate.eloChange}.
+                      </span>
+                    )}
                 </p>
               </div>
               <Separator />
@@ -1170,19 +1492,29 @@ const Profile: React.FC = () => {
                 <h4 className="font-semibold mb-3">Your Performance</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{dashboard?.stats?.totalDebates || 0}</div>
-                    <div className="text-xs text-muted-foreground">Total Debates</div>
+                    <div className="text-2xl font-bold text-primary">
+                      {dashboard?.stats?.totalDebates || 0}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Total Debates
+                    </div>
                   </div>
                   <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{dashboard?.stats?.winRate?.toFixed(1) || 0}%</div>
-                    <div className="text-xs text-muted-foreground">Win Rate</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {dashboard?.stats?.winRate?.toFixed(1) || 0}%
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Win Rate
+                    </div>
                   </div>
                 </div>
               </div>
               {transcriptLoading ? (
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                  <p className="text-sm text-muted-foreground">Loading transcript...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loading transcript...
+                  </p>
                 </div>
               ) : fullTranscript ? (
                 <div className="space-y-4">
@@ -1191,13 +1523,34 @@ const Profile: React.FC = () => {
                     <h4 className="font-semibold mb-3">Full Conversation</h4>
                     <div className="border rounded-lg p-3 space-y-3">
                       {fullTranscript.messages.map((message, index: number) => (
-                        <div key={index} className={`flex gap-3 ${message.sender === "User" ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-lg p-3 ${message.sender === "User" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                        <div
+                          key={index}
+                          className={`flex gap-3 ${
+                            message.sender === "User"
+                              ? "justify-end"
+                              : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[80%] rounded-lg p-3 ${
+                              message.sender === "User"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted"
+                            }`}
+                          >
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium">{message.sender}</span>
-                              {message.phase && <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">{message.phase}</span>}
+                              <span className="text-xs font-medium">
+                                {message.sender}
+                              </span>
+                              {message.phase && (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                                  {message.phase}
+                                </span>
+                              )}
                             </div>
-                            <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                            <p className="text-sm whitespace-pre-wrap">
+                              {message.text}
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -1206,13 +1559,15 @@ const Profile: React.FC = () => {
                 </div>
               ) : (
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-2">Full transcript not available</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Full transcript not available
+                  </p>
                 </div>
               )}
               <div className="text-center">
                 <Button
                   variant="outline"
-                  onClick={() => (window.location.href = "/debates")}
+                  onClick={() => navigate("/startDebate")}
                   className="[.contrast_&]:border-white"
                 >
                   Start New Debate
