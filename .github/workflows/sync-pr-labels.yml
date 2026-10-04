@@ -1,0 +1,456 @@
+name: Sync PR Labels
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync-labels:
+    if: ${{ github.repository_owner == 'AOSSIE-Org' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR details
+        id: pr-details
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const details = {
+              number: pr.number,
+              body: pr.body || '',
+              base: pr.base.ref,
+              head: pr.head.ref
+            };
+            core.info(`PR Details:\n${JSON.stringify(details, null, 2)}`);
+            return details;
+
+      # STEP 1: Issue-based labels
+      - name: Extract linked issue number
+        id: extract-issue
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            
+            // Match patterns: Fixes #123, Closes #123, Resolves #123, etc.
+            const issuePatterns = [
+              /(?:fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+#(\d+)/gi,
+              /#(\d+)/g
+            ];
+            
+            let issueNumber = null;
+            for (const pattern of issuePatterns) {
+              const match = prBody.match(pattern);
+              if (match) {
+                const numbers = match.map(m => m.match(/\d+/)[0]);
+                issueNumber = numbers[0];
+                break;
+              }
+            }
+            
+            core.setOutput('issue_number', issueNumber || '');
+            return issueNumber;
+
+      - name: Apply issue-based labels
+        if: steps.extract-issue.outputs.issue_number != ''
+        uses: actions/github-script@v9
+        env:
+          ISSUE_NUMBER: ${{ steps.extract-issue.outputs.issue_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = process.env.ISSUE_NUMBER;
+            const prNumber = context.payload.pull_request.number;
+            
+            try {
+              // Fetch issue labels
+              const issue = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(issueNumber)
+              });
+              
+              const issueLabels = issue.data.labels.map(label => 
+                typeof label === 'string' ? label : label.name
+              );
+              
+              if (issueLabels.length > 0) {
+                console.log(`Applying issue-based labels: ${issueLabels.join(', ')}`);
+                
+                // Add labels from issue
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: issueLabels
+                });
+              }
+              
+              // Remove "no-issue-linked" label if present
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: 'no-issue-linked'
+                });
+                console.log('Removed "no-issue-linked" label');
+              } catch (error) {
+                if (error.status !== 404) {
+                  console.error(`Error removing no-issue-linked label: ${error.message}`);
+                  throw error;
+                }
+              }
+            } catch (error) {
+              console.log(`Error fetching issue #${issueNumber}: ${error.message}`);
+            }
+
+      - name: Mark no issue linked
+        if: steps.extract-issue.outputs.issue_number == ''
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            console.log('No issue linked to this PR');
+            
+            // Add "no-issue-linked" label
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['no-issue-linked']
+              });
+            } catch (error) {
+              console.error(`Error adding no-issue-linked label to PR #${prNumber}: ${error.message}`);
+            }
+
+      # STEP 2: File-based labels
+      - name: Get changed files
+        id: changed-files
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            // Get list of files changed in the PR
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            const changedFiles = files.map(file => file.filename);
+            core.setOutput('files', JSON.stringify(changedFiles));
+            
+            return changedFiles;
+
+      - name: Apply file-based labels
+        uses: actions/github-script@v9
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.files }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const changedFiles = JSON.parse(process.env.CHANGED_FILES);
+            
+            const fileLabels = [];
+            
+            // Define file-based label mappings
+            const labelMappings = {
+              'documentation': ['.md', 'README', 'CONTRIBUTING', 'LICENSE', '.txt'],
+              'frontend': ['.html', '.css', '.scss', '.jsx', '.tsx', '.vue'],
+              'backend': ['.py', '.java', '.go', '.rb', '.php', '.rs'],
+              'javascript': ['.js', '.ts', '.jsx', '.tsx'],
+              'python': ['.py'],
+              'configuration': ['.yml', '.yaml', '.json', '.toml', '.ini', '.env', '.config'],
+              'github-actions': ['.github/workflows/'],
+              'dependencies': ['package.json', 'requirements.txt', 'Gemfile', 'Cargo.toml', 'go.mod', 'pom.xml'],
+              'tests': ['test/', '__tests__/', '.test.', '.spec.', '_test.'],
+              'docker': ['Dockerfile', 'docker-compose', '.dockerignore'],
+              'ci-cd': ['.github/', '.gitlab-ci', 'Jenkinsfile', '.circleci']
+            };
+            
+            // Check each file against label mappings
+            for (const file of changedFiles) {
+              for (const [label, patterns] of Object.entries(labelMappings)) {
+                for (const pattern of patterns) {
+                  if (file.includes(pattern) || file.endsWith(pattern)) {
+                    if (!fileLabels.includes(label)) {
+                      fileLabels.push(label);
+                    }
+                  }
+                }
+              }
+            }
+            
+            // Get current labels
+            const currentLabels = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+            
+            const existingLabels = currentLabels.data.map(label => label.name);
+            const managedLabels = Object.keys(labelMappings);
+            
+            // Find managed labels that are currently on the PR but shouldn't be
+            const labelsToRemove = existingLabels.filter(label => 
+              managedLabels.includes(label) && !fileLabels.includes(label)
+            );
+            
+            // Remove stale labels
+            if (labelsToRemove.length > 0) {
+              console.log(`Removing stale file-based labels: ${labelsToRemove.join(', ')}`);
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    name: label
+                  });
+                } catch (error) {
+                  console.log(`Error removing label ${label}: ${error.message}`);
+                }
+              }
+            }
+            
+            // Determine which new labels need to be added
+            const labelsToAdd = fileLabels.filter(label => !existingLabels.includes(label));
+            
+            if (labelsToAdd.length > 0) {
+              console.log(`Applying file-based labels: ${labelsToAdd.join(', ')}`);
+              
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: labelsToAdd
+                });
+              } catch (error) {
+                console.error(`Error adding file-based labels [${labelsToAdd.join(', ')}] to PR #${prNumber}: ${error.message}`);
+              }
+            } else {
+              if (fileLabels.length > 0) console.log('All matched file-based labels are already present');
+              else console.log('No file-based labels matched');
+            }
+
+      # STEP 3: PR size labels
+      - name: Apply PR size label
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            // Get PR details to calculate size
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            const additions = pr.data.additions;
+            const deletions = pr.data.deletions;
+            const totalChanges = additions + deletions;
+            
+            console.log(`PR has ${additions} additions and ${deletions} deletions (${totalChanges} total changes)`);
+            
+            // Determine size label based on total changes
+            let sizeLabel = '';
+            if (totalChanges <= 10) {
+              sizeLabel = 'size/XS';
+            } else if (totalChanges <= 50) {
+              sizeLabel = 'size/S';
+            } else if (totalChanges <= 200) {
+              sizeLabel = 'size/M';
+            } else if (totalChanges <= 500) {
+              sizeLabel = 'size/L';
+            } else {
+              sizeLabel = 'size/XL';
+            }
+            
+            console.log(`Calculated size label: ${sizeLabel}`);
+            
+            // Get current labels on the PR
+            const currentLabels = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+            
+            const existingSizeLabels = currentLabels.data
+              .map(label => label.name)
+              .filter(name => name.startsWith('size/'));
+            
+            // Check if the size label needs to be changed
+            if (existingSizeLabels.length === 1 && existingSizeLabels[0] === sizeLabel) {
+              console.log(`Size label ${sizeLabel} is already correct, no changes needed`);
+              return;
+            }
+            
+            // Remove outdated size labels only if they differ
+            if (existingSizeLabels.length > 0) {
+              console.log(`Removing outdated size labels: ${existingSizeLabels.join(', ')}`);
+              for (const label of existingSizeLabels) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    name: label
+                  });
+                } catch (error) {
+                  console.log(`Error removing size label ${label}: ${error.message}`);
+                }
+              }
+            }
+            
+            // Apply the new size label
+            console.log(`Applying new size label: ${sizeLabel}`);
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: [sizeLabel]
+              });
+            } catch (error) {
+              console.error(`Error adding size label ${sizeLabel} to PR #${prNumber}: ${error.message}`);
+            }
+
+      # STEP 4: Contributor-based labels(in this later we can add logic of team p as discussed on discord)
+      - name: Apply contributor-based labels
+        uses: actions/github-script@v9
+        env:
+          LABELLER_TOKEN: ${{ secrets.EXTERNAL_LABELLER_TOKEN || secrets.GITHUB_TOKEN }}
+        with:
+          github-token: ${{ env.LABELLER_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const prAuthor = context.payload.pull_request.user.login;
+            
+            try {
+              // Check if user is a first-time contributor
+              const commits = await github.rest.repos.listCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                author: prAuthor
+              });
+              
+              const contributorLabels = [];
+              
+              // First check if maintainer
+              let isMaintainer = false;
+              try {
+                const permissionLevel = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: prAuthor
+                });
+                
+                if (['admin', 'maintain'].includes(permissionLevel.data.permission)) {
+                  contributorLabels.push('org-Member');
+                  isMaintainer = true;
+                }
+              } catch (error) {
+                console.log('Could not check collaborator status');
+              }
+              
+              // If not maintainer, check contributor type
+              if (!isMaintainer) {
+                if (commits.data.length === 0) {
+                  contributorLabels.push('first-time-contributor');
+                } else {
+                  contributorLabels.push('repeat-contributor');
+                }
+              }
+              
+              const managedContributorLabels = ['org-Member', 'first-time-contributor', 'repeat-contributor'];
+              const labelsToRemove = managedContributorLabels.filter(label => !contributorLabels.includes(label));
+              
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    name: label
+                  });
+                } catch (error) {
+                  if (error.status !== 404) {
+                    console.error(`Error removing stale contributor label ${label}: ${error.message}`);
+                  }
+                }
+              }
+              
+              if (contributorLabels.length > 0) {
+                console.log(`Applying contributor-based labels: ${contributorLabels.join(', ')}`);
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: contributorLabels
+                });
+              }
+            } catch (error) {
+              console.log(`Error applying contributor labels: ${error.message}`);
+            }
+
+      # STEP 5: Review status
+      - name: Add needs review label
+        if: github.event.action != 'edited'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            console.log('Adding needs-review label');
+            
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['needs-review']
+              });
+            } catch (error) {
+              core.warning(`Error adding needs-review label to PR #${prNumber}: ${error.message}`);
+            }
+
+      # Summary step
+      - name: Label sync summary
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            // Get current labels on PR
+            const pr = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+            
+            const currentLabels = pr.data.labels.map(label => label.name);
+            console.log('='.repeat(50));
+            console.log('PR Label Sync Complete');
+            console.log('='.repeat(50));
+            console.log(`Current labels on PR #${prNumber}:`);
+            console.log(currentLabels.join(', ') || 'No labels');
+            console.log('='.repeat(50));

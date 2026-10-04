@@ -1,0 +1,19 @@
+{
+  "recommendations": [
+    "DavidAnson.vscode-markdownlint",  // Markdown linting
+    "eamodio.gitlens",  // Git integration and visualization
+    "esbenp.prettier-vscode",  // Code formatter
+    "github.vscode-github-actions",  // GitHub Actions support
+    "github.vscode-pull-request-github",  // GitHub Pull Requests and Issues integration
+    "hediet.vscode-drawio",  // Draw.io editor integration (useful for /drawio)
+    "humao.rest-client",  // REST Client for testing HTTP endpoints
+    "mhutchie.git-graph",  // Git graph visualizer
+    "ms-azuretools.vscode-docker",  // Dockerfile / container tooling
+    "editorconfig.editorconfig",  // EditorConfig support for consistent coding styles
+    "dbaeumer.vscode-eslint",  // Linting for JavaScript and TypeScript
+    "redhat.vscode-yaml",  // YAML support and validation
+    "streetsidesoftware.code-spell-checker",  // Spell checking for code and comments
+    "usernamehw.errorlens",  // Highlighting errors and warnings in the code
+    "yzhang.markdown-all-in-one"  // Markdown productivity features
+  ]
+}

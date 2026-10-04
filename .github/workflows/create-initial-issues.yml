@@ -1,0 +1,95 @@
+name: Create Initial Issues
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-issues:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: create-initial-issues-${{ github.ref }}
+      cancel-in-progress: false
+    if: ${{ github.repository != 'AOSSIE-Org/Template-Repo' }}
+    permissions:
+      contents: write
+      issues: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Check if issues file exists
+        id: check_file
+        run: |
+          if [ -f ".github/initial-issues.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Issues file not found. Skipping..."
+          fi
+
+      - name: Create issues from JSON
+        if: steps.check_file.outputs.exists == 'true'
+        id: create_issues
+        uses: actions/github-script@v9
+        #js-yaml is NOT bundled with actions/github-script@v9 hecne we use JSON for the issues file
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read and parse the issues JSON file
+            const issuesData = JSON.parse(fs.readFileSync('.github/initial-issues.json', 'utf8'));
+            
+            // Validate structure
+            if (!issuesData || !issuesData.issues || !Array.isArray(issuesData.issues)) {
+              throw new Error('Invalid issues data structure. Expected { issues: [...] }');
+            }
+            
+            console.log(`Creating ${issuesData.issues.length} issues...`);
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            // Create each issue
+            for (const issue of issuesData.issues) {
+              try {
+                const response = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issue.title,
+                  body: issue.body,
+                  labels: issue.labels || []
+                });
+                console.log(`✓ Created issue #${response.data.number}: ${issue.title}`);
+                successCount++;
+              } catch (error) {
+                console.error(`✗ Failed to create issue "${issue.title}":`, error.message);
+                failCount++;
+              }
+            }
+            
+            console.log(`\nSummary: ${successCount} succeeded, ${failCount} failed`);
+            
+            // Fail the step if any issues failed to create
+            if (failCount > 0) {
+              throw new Error(`Failed to create ${failCount} issue(s)`);
+            }
+
+      - name: Delete issues file and workflow
+        if: steps.create_issues.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Delete the files
+          git rm .github/initial-issues.json
+          git rm .github/workflows/create-initial-issues.yml
+          
+          # Commit the changes
+          git commit -m "chore: cleanup initial issues automation files"
+          
+          # Pull latest changes to avoid conflicts
+          git pull --rebase origin ${{ github.ref_name }}
+          
+          # Push the changes
+          git push

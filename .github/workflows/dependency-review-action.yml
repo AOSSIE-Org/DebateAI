@@ -1,0 +1,153 @@
+# Automatically scans every PR for newly added dependencies
+# Blocks merges if a dependency license is NOT in the allow-list
+# Flags CVEs with moderate+ severity
+# Docs: https://github.com/actions/dependency-review-action
+
+
+name: Dependency Review
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    # Only re-run when dependency manifests actually change
+    paths:
+      # JavaScript / TypeScript / Node
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/yarn.lock"
+      - "**/pnpm-lock.yaml"
+      # Python
+      - "**/requirements*.txt"
+      - "**/Pipfile.lock"
+      - "**/pyproject.toml"
+      - "**/poetry.lock"
+      # Rust
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      # Go
+      - "**/go.mod"
+      - "**/go.sum"
+      # Java / Kotlin / Android
+      - "**/pom.xml"
+      - "**/build.gradle"
+      - "**/build.gradle.kts"
+      - "**/*.gradle"
+      # Ruby
+      - "**/Gemfile.lock"
+      # Docker / Infrastructure
+      - "**/Dockerfile"
+      - "**/docker-compose*.yml"
+      - "**/docker-compose*.yaml"
+      # GitHub Actions themselves
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
+
+permissions:
+  contents: read          # Required to read the repo content
+# pull-requests: write    # Required to post review comments on the PR
+
+jobs:
+  dependency-review:
+    name: Dependency & License Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run Dependency Review
+        uses: actions/dependency-review-action@v5
+        with:
+          # ── VULNERABILITY SETTINGS ──────────────────────────
+          # Fail if any newly added dependency has a CVE at this
+          # severity level or above. Options: low | moderate | high | critical
+          fail-on-severity: moderate
+
+          # Which dependency scopes to check for vulnerabilities
+          # Options: runtime | development | unknown (comma-separated)
+          fail-on-scopes: runtime
+
+          # ── LICENSE ENFORCEMENT ─────────────────────────────
+          # ALLOW: Only these licenses are permitted in new dependencies.
+          # PRs introducing any other license will fail automatically.
+          # Full SPDX list: https://spdx.org/licenses/
+          allow-licenses: >-
+            MIT,
+            Apache-2.0,
+            BSD-2-Clause,
+            BSD-3-Clause,
+            ISC,
+            CC0-1.0,
+            Unlicense,
+            GPL-2.0-only,
+            GPL-2.0-or-later,
+            GPL-3.0-only,
+            GPL-3.0-or-later,
+            LGPL-2.0-only,
+            LGPL-2.0-or-later,
+            LGPL-2.1-only,
+            LGPL-2.1-or-later,
+            LGPL-3.0-only,
+            LGPL-3.0-or-later,
+            AGPL-3.0-only,
+            AGPL-3.0-or-later,
+            MPL-2.0,
+            EUPL-1.2,
+            Python-2.0,
+            PSF-2.0
+
+          # PER-PACKAGE EXCEPTIONS: Packages excluded from license checks entirely.
+          # Use for packages with unrecognized/non-standard license declarations.
+          # Format: "pkg:npm/name, pkg:pypi/name, pkg:githubactions/owner/repo@version"
+          # ── Edit this list when adding approved exceptions ──
+          # allow-dependencies-licenses: >-
+          #   pkg:npm/example-package,
+          #   pkg:pypi/example-package
+
+          # ── SCOPE FILTERING ─────────────────────────────────
+          # Skip dev-only dependencies (test frameworks, linters, etc.)
+          # They are not shipped to production so risk is lower.
+          # Set to "all" to also scan devDependencies.
+          # Options: runtime | development | all
+          # Using "runtime" keeps noise low in template repos
+          # where dev deps vary wildly by project type.
+          # Uncomment the line below to enforce on devDeps too:
+          # fail-on-scopes: runtime, development
+          allow-ghsas: ""   # Leave empty to block all known GHSAs
+
+          # ── OUTPUT & COMMENTS ────────────────────────────────
+          # Post a detailed summary comment directly on the PR
+          # comment-summary-in-pr: always
+
+          # Fail (don't just warn) on license violations.
+          # Change to "true" to only warn without failing.
+          warn-only: false
+
+          # ── VULNERABILITY DATABASE ───────────────────────────
+          # Use the GitHub Advisory Database (GHSA) as the source.
+          # This is the default; listed explicitly for clarity.
+          # vulnerability-check: true   # default
+          # Add explicitly so teams know it's active
+          show-openssf-scorecard: true
+          warn-on-openssf-scorecard-level: 3
+
+  #  Post a status summary badge to PR 
+  # summarize:
+  #   name: Post Review Summary
+  #   runs-on: ubuntu-latest
+  #   needs: dependency-review
+  #   if: always()
+
+  #   steps:
+  #     - name: 📋 Summarize Result
+  #       run: |
+  #         if [ "${{ needs.dependency-review.result }}" == "success" ]; then
+  #           echo "✅ Dependency review passed — no license violations or CVEs found."
+  #         else
+  #           echo "❌ Dependency review failed — check the PR comment for details."
+  #           echo ""
+  #           echo "Common fixes:"
+  #           echo "  • Replace dependencies using licenses not in allow-licenses"
+  #           echo "  • Upgrade vulnerable packages to patched versions"
+  #           echo "  • Add an explicit exception to allow-dependencies-licenses if intentional"
+  #         fi

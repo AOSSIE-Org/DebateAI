@@ -1,0 +1,81 @@
+name: Bug Report
+description: Report a bug or issue
+title: "[BUG]: "
+labels: ["bug", "triage-needed"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below to help us fix it.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this bug?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs-screenshots
+    attributes:
+      label: Logs and Screenshots
+      description: Add error logs, console output, or screenshots
+      placeholder: |
+        Paste logs here or drag and drop screenshots
+        ```
+        Error logs here
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment-details
+    attributes:
+      label: Environment Details
+      description: Provide environment, version, and any additional context
+      placeholder: |
+        - OS: Windows 11 / macOS / Linux
+        - Browser: Chrome 120 / Firefox / Safari
+        - Node.js / Python version (if applicable)
+        - Any other relevant information
+    validations:
+      required: false
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: How severe is this bug?
+      options:
+        - Critical - Application is unusable
+        - High - Major feature is broken
+        - Medium - Feature works but has issues
+        - Low - Minor inconvenience
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct and join our Discord
+      options:
+        - label: I have joined the [Discord server](https://discord.gg/hjUhu33uAn) and will post updates there
+          required: true
+        - label: I have searched existing issues to avoid duplicates
+          required: true

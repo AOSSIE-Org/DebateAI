@@ -1,0 +1,123 @@
+name: Version Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ github.repository_owner == 'AOSSIE-Org' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Read VERSION file
+        id: get_version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version detected: $VERSION"
+
+      - name: Validate VERSION format
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: VERSION must follow semantic versioning (e.g., 1.0.0)"
+            exit 1
+          fi
+          echo "✓ Version format is valid: $VERSION"
+
+      - name: Check if tag already exists
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if git show-ref --tags --verify --quiet "refs/tags/v$VERSION"; then
+            echo "Error: Tag v$VERSION already exists"
+            exit 1
+          fi
+          echo "✓ Tag v$VERSION does not exist yet"
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release version $VERSION"
+          git push origin "v$VERSION"
+          echo "✓ Created and pushed tag v$VERSION"
+
+      - name: Find and Publish Draft Release
+        id: publish_release
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = 'v${{ steps.get_version.outputs.version }}';
+            
+            // Get all releases
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            // Find the draft release
+            const draftRelease = releases.find(release => release.draft === true);
+            
+            if (draftRelease) {
+              console.log(`Found draft release: ${draftRelease.name}`);
+              
+              // Update and publish the draft release
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: draftRelease.id,
+                tag_name: version,
+                name: version,
+                draft: false,
+              });
+              
+              console.log(`✓ Published draft release as ${version}`);
+              core.setOutput('released', 'true');
+            } else {
+              console.log('⚠️ No draft release found. Please ensure release-drafter has created a draft release first.');
+              core.setOutput('released', 'false');
+              core.setFailed('No draft release found to publish');
+              
+              //Uncomment below to auto-create release if no draft exists but also check release-drafter config first(why not working)
+              // await github.rest.repos.createRelease({
+              //   owner: context.repo.owner,
+              //   repo: context.repo.repo,
+              //   tag_name: version,
+              //   name: version,
+              //   body: `## Release ${version}\n\nThis release was automatically created when the VERSION file was updated.`,
+              //   draft: false,
+              //   prerelease: false,
+              // });
+            }
+
+      - name: Release Summary
+        run: |
+          echo "### Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** v${{ steps.get_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag Created:** ✓" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.publish_release.outputs.released }}" = "true" ]; then
+            echo "- **GitHub Release:** ✓" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **GitHub Release:** ✗ (no draft found)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.publish_release.outputs.released }}" = "true" ]; then
+            echo "Release completed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Release failed - no draft release was found to publish" >> $GITHUB_STEP_SUMMARY
+          fi

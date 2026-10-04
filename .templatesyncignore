@@ -1,0 +1,23 @@
+# read this before editing in this file: https://github.com/AndreasAugustin/actions-template-sync?tab=readme-ov-file#ignore-files
+# .templatesyncignore
+# Files and folders to exclude from template sync
+# Uses glob pattern syntax similar to .gitignore
+# Note: This file itself cannot be synced - any template changes will be restored automatically
+
+# Repository-specific files that should not be synced
+README.md
+LICENSE
+
+# GitHub workflows are not synced by default due to GitHub policy
+.github/workflows/**
+
+# Add more patterns to exclude specific files or directories
+# Examples:
+# docs/
+# *.log
+# config/local.yml
+
+# Use :! prefix for exceptions (pathspec syntax)
+# Example - ignore all files except specific ones:
+# :!newfile-1.txt
+# *
