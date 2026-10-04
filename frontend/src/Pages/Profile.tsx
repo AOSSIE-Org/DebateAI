@@ -217,14 +217,20 @@ const Profile: React.FC = () => {
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const availabilityCheckId = useRef(0);
+  const editSessionRef = useRef(0);
 
   const handleStartEdit = (field: string, initialValue: string = "") => {
+    editSessionRef.current += 1;
+    availabilityCheckId.current += 1;
     setEditingField(field);
     setDraftValue(initialValue);
     setErrorMessage("");
   };
 
   const handleCancelEdit = () => {
+    editSessionRef.current += 1;
+    availabilityCheckId.current += 1;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     setEditingField(null);
     setDraftValue("");
@@ -318,6 +324,8 @@ const Profile: React.FC = () => {
       return;
     }
 
+    const sessionAtSubmit = editSessionRef.current;
+
     try {
       await updateProfile(
         token,
@@ -332,7 +340,9 @@ const Profile: React.FC = () => {
         `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully!`
       );
       setErrorMessage("");
-      handleCancelEdit();
+      if (editSessionRef.current === sessionAtSubmit) {
+        handleCancelEdit();
+      }
       // Refetch to sync updated displayName across the page
       const updatedData = await getProfile(token);
       setDashboard(updatedData);
@@ -425,6 +435,7 @@ const Profile: React.FC = () => {
             Save
           </Button>
           <Button
+            type="button"
             variant="secondary"
             size="sm"
             onClick={handleCancelEdit}
@@ -510,7 +521,7 @@ const Profile: React.FC = () => {
           >
             Save
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleCancelEdit} className="flex-1">Cancel</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={handleCancelEdit} className="flex-1">Cancel</Button>
         </div>
       </form>
     ) : (
@@ -763,19 +774,23 @@ const Profile: React.FC = () => {
                 onChange={(e) => {
                   const val = e.target.value;
                   setDraftValue(val);
+                  if (debounceTimer.current) clearTimeout(debounceTimer.current);
                   if (!val.trim()) {
+                    availabilityCheckId.current += 1;
                     setUsernameStatus("idle");
                     return;
                   }
-                  if (debounceTimer.current) clearTimeout(debounceTimer.current);
+                  const checkId = ++availabilityCheckId.current;
                   setUsernameStatus("checking");
                   debounceTimer.current = setTimeout(async () => {
                     try {
                       const token = getAuthToken();
                       if (!token) return;
                       const res = await checkDisplayNameAvailability(token, val.trim());
+                      if (availabilityCheckId.current !== checkId) return;
                       setUsernameStatus(res.available ? "available" : "taken");
                     } catch {
+                      if (availabilityCheckId.current !== checkId) return;
                       setUsernameStatus("idle");
                     }
                   }, 300);
@@ -804,6 +819,7 @@ const Profile: React.FC = () => {
                   Save
                 </Button>
                 <Button
+                  type="button"
                   variant="secondary"
                   size="sm"
                   onClick={handleCancelEdit}
