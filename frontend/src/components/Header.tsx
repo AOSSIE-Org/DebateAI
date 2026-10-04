@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Menu, X, Home, BarChart, User, Info, LogOut, Heart, Trophy, Users, MessageCircle, MessageSquare, GraduationCap } from "lucide-react";
+import { Bell, Menu, X, BarChart, User, Info, LogOut, Heart, Trophy, Users, MessageCircle, MessageSquare } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { AuthContext } from "@/context/authContext";
@@ -373,7 +373,7 @@ function Header() {
               />
             </nav>
             <div className="p-4 border-t border-border mt-auto">
-              <ThemeToggle />
+              <ThemeToggle direction="up" />
             </div>
           </div>
         </div>

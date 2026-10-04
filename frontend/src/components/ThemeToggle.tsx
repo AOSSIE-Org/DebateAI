@@ -4,9 +4,10 @@ import { Moon, Sun, Contrast } from "lucide-react";
 
 interface ThemeToggleProps {
   iconSize?: number;
+  direction?: "up" | "down";
 }
 
-export function ThemeToggle({ iconSize = 16 }: ThemeToggleProps) {
+export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeToggleProps) {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -43,7 +44,15 @@ export function ThemeToggle({ iconSize = 16 }: ThemeToggleProps) {
         {themeOptions.find((t) => t.id === theme)?.icon} Theme:{" "}
         <span>{themeOptions.find((t) => t.id === theme)?.name}</span>
         <svg
-          className={`ml-auto w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-auto w-3 h-3 shrink-0 transition-transform ${
+            open
+              ? direction === "up"
+                ? "rotate-0"
+                : "rotate-180"
+              : direction === "up"
+              ? "rotate-180"
+              : ""
+          }`}
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
@@ -54,7 +63,11 @@ export function ThemeToggle({ iconSize = 16 }: ThemeToggleProps) {
       </button>
 
       {open && (
-        <div className="absolute left-2 right-2 mt-1 bg-popover border border-border rounded-md shadow z-10">
+        <div
+          className={`absolute left-2 right-2 bg-popover border border-border rounded-md shadow z-10 ${
+            direction === "up" ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
+        >
           {themeOptions.map((option) => (
             <div
               key={option.id}
