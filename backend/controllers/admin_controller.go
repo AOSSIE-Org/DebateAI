@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -92,7 +93,7 @@ func AdminSignup(ctx *gin.Context) {
 	newAdmin.ID = result.InsertedID.(primitive.ObjectID)
 
 	// Generate JWT
-	token, err := generateJWT(newAdmin.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+		token, err := generateAdminJWT(newAdmin.ID, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
@@ -146,7 +147,7 @@ func AdminLogin(ctx *gin.Context) {
 	}
 
 	// Generate JWT
-	token, err := generateJWT(admin.Email, cfg.JWT.Secret, cfg.JWT.Expiry)
+		token, err := generateAdminJWT(admin.ID, cfg.JWT.Secret, cfg.JWT.Expiry)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "message": err.Error()})
 		return
@@ -512,4 +513,17 @@ func BulkDeleteComments(ctx *gin.Context) {
 		"message":      "Comments deleted successfully",
 		"deletedCount": result.DeletedCount,
 	})
+}
+
+// generateAdminJWT creates a token that is only valid on admin routes.
+func generateAdminJWT(adminID primitive.ObjectID, secret string, expiryMinutes int) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub": adminID.Hex(),
+		"aud": middlewares.AdminJWTAudience,
+		"exp": now.Add(time.Minute * time.Duration(expiryMinutes)).Unix(),
+		"iat": now.Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }

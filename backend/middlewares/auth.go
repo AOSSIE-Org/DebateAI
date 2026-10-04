@@ -137,6 +137,13 @@ func validateJWT(tokenString, secret string) (jwt.MapClaims, error) {
 	if !token.Valid {
 		return nil, fmt.Errorf("token is invalid")
 	}
+	if aud, audErr := claims.GetAudience(); audErr == nil {
+		for _, a := range aud {
+			if a == AdminJWTAudience {
+				return nil, fmt.Errorf("admin token cannot be used on user routes")
+			}
+		}
+	}
 	
 	// Log successful validation for debugging
 	log.Printf("JWT validation successful - Email: %v, Exp: %v", claims["sub"], claims["exp"])
