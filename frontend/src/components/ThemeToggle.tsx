@@ -69,14 +69,15 @@ export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeTogglePr
           }`}
         >
           {themeOptions.map((option) => (
-            <div
+            <button
+              type="button"
               key={option.id}
               onClick={() => setTheme(option.id)}
-              className="flex items-center gap-2 p-2 text-sm hover:bg-muted cursor-pointer rounded-md"
+              className="w-full flex items-center gap-2 p-2 text-sm hover:bg-muted cursor-pointer rounded-md text-left transition"
             >
               {option.icon}
               <span>{option.name}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
