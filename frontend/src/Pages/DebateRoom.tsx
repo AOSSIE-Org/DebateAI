@@ -199,20 +199,20 @@ const turnTypes = [
 
 const extractJSON = (response: string): string => {
   if (!response) return "{}";
-  
+
   // Try to extract JSON from markdown code fences
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
   const match = fenceRegex.exec(response);
   if (match && match[1]) {
     return match[1].trim();
   }
-  
+
   // Try to find JSON object in the response
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     return jsonMatch[0];
   }
-  
+
   // If no JSON found, return empty object
   console.warn("No JSON found in response:", response);
   return "{}";
@@ -236,10 +236,38 @@ const DebateRoom: React.FC = () => {
       }
       return location.state as DebateProps;
     }
-    const cached = sessionStorage.getItem(`debateData_${location.pathname}`);
+    let cached: string | null = null;
+    try {
+      cached = sessionStorage.getItem(`debateData_${location.pathname}`);
+    } catch (err) {
+      console.error("Failed to access sessionStorage:", err);
+      return null;
+    }
     if (cached) {
       try {
-        return JSON.parse(cached) as DebateProps;
+        const parsed = JSON.parse(cached);
+        // Validate required DebateProps fields before trusting cached data
+        if (
+          parsed &&
+          typeof parsed.userId === "string" &&
+          typeof parsed.botName === "string" &&
+          typeof parsed.botLevel === "string" &&
+          typeof parsed.topic === "string" &&
+          typeof parsed.stance === "string" &&
+          typeof parsed.debateId === "string" &&
+          Array.isArray(parsed.phaseTimings) &&
+          parsed.phaseTimings.length > 0 &&
+          parsed.phaseTimings.every(
+            (pt: unknown) =>
+              pt !== null &&
+              typeof pt === "object" &&
+              typeof (pt as { name: unknown }).name === "string" &&
+              typeof (pt as { time: unknown }).time === "number"
+          )
+        ) {
+          return parsed as DebateProps;
+        }
+        console.error("Cached debate data failed validation:", parsed);
       } catch (err) {
         console.error("Failed to parse cached debate data from sessionStorage:", err);
       }
@@ -270,15 +298,15 @@ const DebateRoom: React.FC = () => {
     return savedState
       ? JSON.parse(savedState)
       : {
-          messages: [],
-          currentPhase: 0,
-          phaseStep: 0,
-          isBotTurn: false,
-          userStance: "",
-          botStance: "",
-          timer: phases[0]?.time ?? 60,
-          isDebateEnded: false,
-        };
+        messages: [],
+        currentPhase: 0,
+        phaseStep: 0,
+        isBotTurn: false,
+        userStance: "",
+        botStance: "",
+        timer: phases[0]?.time ?? 60,
+        isDebateEnded: false,
+      };
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
@@ -290,7 +318,7 @@ const DebateRoom: React.FC = () => {
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -317,18 +345,18 @@ const DebateRoom: React.FC = () => {
     if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
       try {
         if (debateData?.debateId) {
-            await concedeDebate(debateData.debateId, state.messages);
+          await concedeDebate(debateData.debateId, state.messages);
         }
-        
+
         setState(prev => ({ ...prev, isDebateEnded: true }));
         setPopup({
-            show: true,
-            message: "You have conceded the debate.",
-            isJudging: false
+          show: true,
+          message: "You have conceded the debate.",
+          isJudging: false
         });
-        
+
         setTimeout(() => {
-            navigate("/game");
+          navigate("/game");
         }, 2000);
 
       } catch (error) {
@@ -418,7 +446,7 @@ const DebateRoom: React.FC = () => {
       if (!debateData) return;
       const stanceNormalized =
         debateData.stance.toLowerCase() === "for" ||
-        debateData.stance.toLowerCase() === "against"
+          debateData.stance.toLowerCase() === "against"
           ? debateData.stance.toLowerCase() === "for"
             ? "For"
             : "Against"
@@ -509,9 +537,8 @@ const DebateRoom: React.FC = () => {
       const newPhase = currentState.currentPhase + 1;
       setPopup({
         show: true,
-        message: `${phases[currentState.currentPhase].name} completed. Next: ${
-          phases[newPhase].name
-        } - ${getPhaseInstructions(newPhase)}`,
+        message: `${phases[currentState.currentPhase].name} completed. Next: ${phases[newPhase].name
+          } - ${getPhaseInstructions(newPhase)}`,
       });
       setTimeout(() => {
         setPopup({ show: false, message: "" });
@@ -570,6 +597,11 @@ const DebateRoom: React.FC = () => {
   };
 
   const handleBotTurn = async () => {
+    if (!debateData) {
+      console.error("Cannot handle bot turn without debate data.");
+      return;
+    }
+
     try {
       const turnType = turnTypes[state.currentPhase][state.phaseStep];
       let context = "";
@@ -633,6 +665,11 @@ const DebateRoom: React.FC = () => {
   };
 
   const judgeDebateResult = async (messages: Message[]) => {
+    if (!debateData) {
+      console.error("Cannot judge debate without debate data.");
+      return;
+    }
+
     try {
       console.log("Starting judgment with messages:", messages);
       const { result } = await judgeDebate({
@@ -644,25 +681,25 @@ const DebateRoom: React.FC = () => {
 
       let judgment: JudgmentData;
 
-if (typeof result === "string") {
-  const jsonString = extractJSON(result);
-  console.log("Extracted JSON:", jsonString);
-  judgment = JSON.parse(jsonString);
-} else {
- const res: any = result;
+      if (typeof result === "string") {
+        const jsonString = extractJSON(result);
+        console.log("Extracted JSON:", jsonString);
+        judgment = JSON.parse(jsonString);
+      } else {
+        const res: any = result;
 
-if (res?.opening_statement && res?.verdict) {
-  judgment = res as JudgmentData;
-} else {
-  console.error("Invalid judgment structure:", result);
-  return;
-}
-}
+        if (res?.opening_statement && res?.verdict) {
+          judgment = res as JudgmentData;
+        } else {
+          console.error("Invalid judgment structure:", result);
+          return;
+        }
+      }
 
-console.log("FINAL PARSED:", judgment);
-setJudgmentData(judgment);
-setPopup({ show: false, message: "" });
-      
+      console.log("FINAL PARSED:", judgment);
+      setJudgmentData(judgment);
+      setPopup({ show: false, message: "" });
+
     } catch (error) {
       console.error("Judging error:", error);
       // Show error to user
@@ -671,7 +708,7 @@ setPopup({ show: false, message: "" });
         message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
         isJudging: false,
       });
-      
+
       // Set default judgment data
       setJudgmentData({
         opening_statement: {
@@ -699,8 +736,8 @@ setPopup({ show: false, message: "" });
         },
       });
       setTimeout(() => {
-  setPopup({ show: false, message: "" });
-}, 3000);
+        setPopup({ show: false, message: "" });
+      }, 3000);
     }
   };
 
@@ -710,9 +747,8 @@ setPopup({ show: false, message: "" });
       .padStart(2, "0")}`;
     return (
       <span
-        className={`font-mono ${
-          seconds <= 5 ? "text-destructive animate-pulse" : "text-muted-foreground"
-        }`}
+        className={`font-mono ${seconds <= 5 ? "text-destructive animate-pulse" : "text-muted-foreground"
+          }`}
       >
         {timeStr}
       </span>
@@ -745,23 +781,23 @@ setPopup({ show: false, message: "" });
 
   if (judgmentData) {
     return (
-    <div className="fixed inset-0 z-[9999] bg-black">
-      <JudgmentPopup
-        judgment={judgmentData}
-        userAvatar={userAvatar}
-        botAvatar={bot.avatar}
-        botName={debateData?.botName || "Bot"}
-        userStance={state.userStance}
-        botStance={state.botStance}
-        botDesc={bot.desc}
-        onClose={() => {
-          setJudgmentData(null);
-          navigate("/game");
-        }}
-      />
-    </div>
-  );
-}
+      <div className="fixed inset-0 z-[9999] bg-black">
+        <JudgmentPopup
+          judgment={judgmentData}
+          userAvatar={userAvatar}
+          botAvatar={bot.avatar}
+          botName={debateData?.botName || "Bot"}
+          userStance={state.userStance}
+          botStance={state.botStance}
+          botDesc={bot.desc}
+          onClose={() => {
+            setJudgmentData(null);
+            navigate("/game");
+          }}
+        />
+      </div>
+    );
+  }
 
   if (!debateData) {
     return (
@@ -789,8 +825,8 @@ setPopup({ show: false, message: "" });
               {currentTurnType === "statement"
                 ? "make a statement"
                 : currentTurnType === "question"
-                ? "ask a question"
-                : "answer"}
+                  ? "ask a question"
+                  : "answer"}
             </span>
           </p>
         </div>
@@ -823,9 +859,8 @@ setPopup({ show: false, message: "" });
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            state.isBotTurn ? "animate-glow" : ""
-          } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""
+            } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -871,9 +906,8 @@ setPopup({ show: false, message: "" });
 
         {/* User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            !state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
-          } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${!state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
+            } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -943,8 +977,8 @@ setPopup({ show: false, message: "" });
                     currentTurnType === "statement"
                       ? "Make your statement"
                       : currentTurnType === "question"
-                      ? "Ask your question"
-                      : "Provide your answer"
+                        ? "Ask your question"
+                        : "Provide your answer"
                   }
                   className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary"
                 />
