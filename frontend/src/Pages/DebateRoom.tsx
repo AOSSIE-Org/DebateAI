@@ -160,6 +160,35 @@ type DebateState = {
   isDebateEnded: boolean;
 };
 
+const isDebateState = (value: unknown): value is DebateState => {
+  if (!value || typeof value !== "object") return false;
+
+  const state = value as Partial<DebateState>;
+  return (
+    Array.isArray(state.messages) &&
+    state.messages.every(
+      (message) =>
+        message &&
+        typeof message === "object" &&
+        (message.sender === "User" ||
+          message.sender === "Bot" ||
+          message.sender === "Judge") &&
+        typeof message.text === "string" &&
+        typeof message.phase === "string"
+    ) &&
+    typeof state.currentPhase === "number" &&
+    Number.isFinite(state.currentPhase) &&
+    typeof state.phaseStep === "number" &&
+    Number.isFinite(state.phaseStep) &&
+    typeof state.isBotTurn === "boolean" &&
+    typeof state.userStance === "string" &&
+    typeof state.botStance === "string" &&
+    typeof state.timer === "number" &&
+    Number.isFinite(state.timer) &&
+    typeof state.isDebateEnded === "boolean"
+  );
+};
+
 type JudgmentData = {
   opening_statement: {
     user: { score: number; reason: string };
@@ -282,31 +311,32 @@ const DebateRoom: React.FC = () => {
   const [user] = useAtom(userAtom);
 
   const [state, setState] = useState<DebateState>(() => {
-    if (!debateKey) {
-      return {
-        messages: [],
-        currentPhase: 0,
-        phaseStep: 0,
-        isBotTurn: false,
-        userStance: "",
-        botStance: "",
-        timer: 60,
-        isDebateEnded: false,
-      };
+    const defaultState: DebateState = {
+      messages: [],
+      currentPhase: 0,
+      phaseStep: 0,
+      isBotTurn: false,
+      userStance: "",
+      botStance: "",
+      timer: debateKey ? phases[0]?.time ?? 60 : 60,
+      isDebateEnded: false,
+    };
+
+    if (!debateKey) return defaultState;
+
+    try {
+      const savedState = localStorage.getItem(debateKey);
+      if (!savedState) return defaultState;
+
+      const parsed: unknown = JSON.parse(savedState);
+      if (isDebateState(parsed)) return parsed;
+
+      console.error("Cached debate state failed validation:", parsed);
+    } catch (err) {
+      console.error("Failed to restore cached debate state:", err);
     }
-    const savedState = localStorage.getItem(debateKey);
-    return savedState
-      ? JSON.parse(savedState)
-      : {
-        messages: [],
-        currentPhase: 0,
-        phaseStep: 0,
-        isBotTurn: false,
-        userStance: "",
-        botStance: "",
-        timer: phases[0]?.time ?? 60,
-        isDebateEnded: false,
-      };
+
+    return defaultState;
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
@@ -432,14 +462,6 @@ const DebateRoom: React.FC = () => {
     if (!debateKey) return;
     localStorage.setItem(debateKey, JSON.stringify(state));
   }, [state, debateKey]);
-
-  useEffect(() => {
-    return () => {
-      if (debateKey) {
-        localStorage.removeItem(debateKey);
-      }
-    };
-  }, [debateKey]);
 
   useEffect(() => {
     if (!debateData || !state.userStance) {
