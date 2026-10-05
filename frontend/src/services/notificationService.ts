@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from '@/utils/apiError';
+
 const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
 
 export interface Notification {
@@ -19,7 +21,11 @@ export const getNotifications = async (): Promise<Notification[]> => {
     const response = await fetch(`${API_URL}/notifications`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    if (!response.ok) throw new Error('Failed to fetch notifications');
+    if (!response.ok) {
+      throw new Error(
+        await getApiErrorMessage(response, 'Failed to fetch notifications')
+      );
+    }
     return await response.json();
   } catch (error) {
     console.error('Error fetching notifications:', error);

@@ -294,7 +294,7 @@ func Login(ctx *gin.Context) {
 
 	var request structs.LoginRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "message": "Check email and password format"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input format", "message": "Check email and password format"})
 		return
 	}
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))

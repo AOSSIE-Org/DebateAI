@@ -12,6 +12,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { useUser } from "@/hooks/useUser";
 import { getAuthToken } from "@/utils/auth";
+import { getApiErrorMessage } from "@/utils/apiError";
 import ReconnectingWebSocket from "reconnecting-websocket";
 import { useAtom } from "jotai";
 import {
@@ -548,13 +549,18 @@ const OnlineDebateRoom = (): JSX.Element => {
           });
 
           if (!pollResponse.ok) {
-            if (pollResponse.status === 401) {
-              setPopup({
-                show: true,
-                message: "Session expired. Please sign in again.",
-                isJudging: false,
-              });
-            }
+            const errorMessage = await getApiErrorMessage(
+              pollResponse,
+              `Failed to check judgment status: ${pollResponse.status} ${pollResponse.statusText}`
+            );
+            setPopup({
+              show: true,
+              message:
+                pollResponse.status === 401
+                  ? "Session expired. Please sign in again."
+                  : errorMessage,
+              isJudging: false,
+            });
             if (judgePollRef.current) {
               clearInterval(judgePollRef.current);
               judgePollRef.current = null;
@@ -640,6 +646,10 @@ const OnlineDebateRoom = (): JSX.Element => {
         });
 
         if (!response.ok) {
+          const errorMessage = await getApiErrorMessage(
+            response,
+            `Failed to send transcripts: ${response.status} ${response.statusText}`
+          );
           if (response.status === 401) {
             setPopup({
               show: true,
@@ -647,9 +657,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               isJudging: false,
             });
           }
-          throw new Error(
-            `Failed to send transcripts: ${response.status} ${response.statusText}`
-          );
+          throw new Error(errorMessage);
         }
 
         const result = await response.json();

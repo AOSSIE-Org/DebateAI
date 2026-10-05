@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from "@/utils/apiError";
+
 const baseURL =
   import.meta.env.VITE_BASE_URL ??
   (import.meta.env.DEV ? "http://localhost:1313" : undefined);
@@ -15,7 +17,12 @@ export const fetchLeaderboardData = async (token: string) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch leaderboard: ${response.status}`);
+    throw new Error(
+      await getApiErrorMessage(
+        response,
+        `Failed to fetch leaderboard: ${response.status}`
+      )
+    );
   }
 
   return response.json();
