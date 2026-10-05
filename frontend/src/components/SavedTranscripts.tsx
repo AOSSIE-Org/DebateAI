@@ -292,11 +292,11 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder='Search topic or opponent...'
                     aria-label='Search transcripts by topic or opponent'
-                    className='pl-9'
+                    className='pl-9 [.contrast_&]:border-border'
                   />
                 </div>
                 <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
-                  <SelectTrigger className='sm:w-[160px]'>
+                  <SelectTrigger className='sm:w-[160px] [.contrast_&]:border-border'>
                     <SelectValue placeholder='All Outcomes' />
                   </SelectTrigger>
                   <SelectContent>
@@ -308,7 +308,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                   </SelectContent>
                 </Select>
                 <Select value={modeFilter} onValueChange={setModeFilter}>
-                  <SelectTrigger className='sm:w-[160px]'>
+                  <SelectTrigger className='sm:w-[160px] [.contrast_&]:border-border'>
                     <SelectValue placeholder='All Modes' />
                   </SelectTrigger>
                   <SelectContent>

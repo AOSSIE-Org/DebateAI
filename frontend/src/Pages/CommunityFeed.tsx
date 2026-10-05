@@ -459,7 +459,7 @@ const CommunityFeed: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Community Feed</h1>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           See what the community is debating about
         </p>
       </div>

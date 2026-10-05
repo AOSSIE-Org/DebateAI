@@ -386,7 +386,7 @@ const DebateRoom: React.FC = () => {
         });
 
         setTimeout(() => {
-          navigate("/game");
+          navigate("/startDebate");
         }, 2000);
 
       } catch (error) {
@@ -814,7 +814,7 @@ const DebateRoom: React.FC = () => {
           botDesc={bot.desc}
           onClose={() => {
             setJudgmentData(null);
-            navigate("/game");
+            navigate("/startDebate");
           }}
         />
       </div>

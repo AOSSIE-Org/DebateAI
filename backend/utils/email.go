@@ -70,7 +70,8 @@ func SendPasswordResetEmail(email, code string) error {
 			"MIME-Version: 1.0\r\n"+
 			"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
 			"\r\n"+
-			"<p>Your password reset code is: <strong>%s</strong></p>\r\n",
+			"<p>Your password reset code is: <strong>%s</strong></p>\r\n"+
+			"<p>This code will expire in 15 minutes.</p>\r\n",
 		email, cfg.SMTP.SenderName, cfg.SMTP.SenderEmail, code))
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTP.Host, cfg.SMTP.Port)

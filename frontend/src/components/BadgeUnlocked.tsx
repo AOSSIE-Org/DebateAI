@@ -11,7 +11,7 @@ interface BadgeUnlockedProps {
 }
 
 const badgeIcons: Record<string, React.ReactNode> = {
-  Novice: <FaAward className="w-16 h-16 text-blue-500" />,
+  Novice: <FaAward className="w-16 h-16 text-primary" />,
   Streak5: <FaMedal className="w-16 h-16 text-yellow-500" />,
   FactMaster: <FaTrophy className="w-16 h-16 text-purple-500" />,
   FirstWin: <FaTrophy className="w-16 h-16 text-green-500" />,
