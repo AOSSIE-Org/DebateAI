@@ -1212,7 +1212,7 @@ const Profile: React.FC = () => {
               <div className="text-center">
                 <Button
                   variant="outline"
-                  onClick={() => (window.location.href = "/debates")}
+                  onClick={() => (window.location.href = "/startDebate")}
                   className="[.contrast_&]:border-white"
                 >
                   Start New Debate
