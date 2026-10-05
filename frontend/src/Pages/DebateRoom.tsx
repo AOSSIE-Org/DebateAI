@@ -160,10 +160,42 @@ type DebateState = {
   isDebateEnded: boolean;
 };
 
-const isDebateState = (value: unknown): value is DebateState => {
+const isDebateData = (value: unknown): value is DebateProps => {
+  if (!value || typeof value !== "object") return false;
+
+  const data = value as Partial<DebateProps>;
+  return (
+    typeof data.userId === "string" &&
+    typeof data.botName === "string" &&
+    typeof data.botLevel === "string" &&
+    typeof data.topic === "string" &&
+    typeof data.stance === "string" &&
+    typeof data.debateId === "string" &&
+    Array.isArray(data.phaseTimings) &&
+    data.phaseTimings.length > 0 &&
+    data.phaseTimings.every(
+      (phase) =>
+        phase !== null &&
+        typeof phase === "object" &&
+        typeof phase.name === "string" &&
+        typeof phase.time === "number" &&
+        Number.isFinite(phase.time) &&
+        phase.time > 0
+    )
+  );
+};
+
+const isDebateState = (
+  value: unknown,
+  phaseTimings: DebateProps["phaseTimings"]
+): value is DebateState => {
   if (!value || typeof value !== "object") return false;
 
   const state = value as Partial<DebateState>;
+  const phaseSequence =
+    typeof state.currentPhase === "number"
+      ? phaseSequences[state.currentPhase]
+      : undefined;
   return (
     Array.isArray(state.messages) &&
     state.messages.every(
@@ -177,9 +209,18 @@ const isDebateState = (value: unknown): value is DebateState => {
         typeof message.phase === "string"
     ) &&
     typeof state.currentPhase === "number" &&
-    Number.isFinite(state.currentPhase) &&
+    Number.isInteger(state.currentPhase) &&
+    state.currentPhase >= 0 &&
+    state.currentPhase < phaseSequences.length &&
+    Array.isArray(phaseSequence) &&
+    phaseSequence.length > 0 &&
+    phaseSequence.every((stance) => stance === "For" || stance === "Against") &&
+    phaseTimings[state.currentPhase] !== undefined &&
     typeof state.phaseStep === "number" &&
-    Number.isFinite(state.phaseStep) &&
+    Number.isInteger(state.phaseStep) &&
+    state.phaseStep >= 0 &&
+    state.phaseStep < phaseSequence.length &&
+    phaseSequence[state.phaseStep] !== undefined &&
     typeof state.isBotTurn === "boolean" &&
     typeof state.userStance === "string" &&
     typeof state.botStance === "string" &&
@@ -254,7 +295,7 @@ const DebateRoom: React.FC = () => {
 
   // Rehydrate debateData from location.state or sessionStorage
   const [debateData] = useState<DebateProps | null>(() => {
-    if (location.state) {
+    if (location.state && isDebateData(location.state)) {
       try {
         sessionStorage.setItem(
           `debateData_${location.pathname}`,
@@ -264,6 +305,9 @@ const DebateRoom: React.FC = () => {
         console.error("Failed to cache debate data in sessionStorage:", err);
       }
       return location.state as DebateProps;
+    }
+    if (location.state) {
+      console.error("Router debate data failed validation:", location.state);
     }
     let cached: string | null = null;
     try {
@@ -275,25 +319,7 @@ const DebateRoom: React.FC = () => {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        // Validate required DebateProps fields before trusting cached data
-        if (
-          parsed &&
-          typeof parsed.userId === "string" &&
-          typeof parsed.botName === "string" &&
-          typeof parsed.botLevel === "string" &&
-          typeof parsed.topic === "string" &&
-          typeof parsed.stance === "string" &&
-          typeof parsed.debateId === "string" &&
-          Array.isArray(parsed.phaseTimings) &&
-          parsed.phaseTimings.length > 0 &&
-          parsed.phaseTimings.every(
-            (pt: unknown) =>
-              pt !== null &&
-              typeof pt === "object" &&
-              typeof (pt as { name: unknown }).name === "string" &&
-              typeof (pt as { time: unknown }).time === "number"
-          )
-        ) {
+        if (isDebateData(parsed)) {
           return parsed as DebateProps;
         }
         console.error("Cached debate data failed validation:", parsed);
@@ -329,7 +355,16 @@ const DebateRoom: React.FC = () => {
       if (!savedState) return defaultState;
 
       const parsed: unknown = JSON.parse(savedState);
-      if (isDebateState(parsed)) return parsed;
+      if (isDebateState(parsed, phases) && !parsed.isDebateEnded) return parsed;
+
+      if (isDebateState(parsed, phases) && parsed.isDebateEnded) {
+        try {
+          localStorage.removeItem(debateKey);
+        } catch (err) {
+          console.error("Failed to clear completed debate state:", err);
+        }
+        return defaultState;
+      }
 
       console.error("Cached debate state failed validation:", parsed);
     } catch (err) {
@@ -460,7 +495,15 @@ const DebateRoom: React.FC = () => {
 
   useEffect(() => {
     if (!debateKey) return;
-    localStorage.setItem(debateKey, JSON.stringify(state));
+    try {
+      if (state.isDebateEnded) {
+        localStorage.removeItem(debateKey);
+        return;
+      }
+      localStorage.setItem(debateKey, JSON.stringify(state));
+    } catch (err) {
+      console.error("Failed to persist debate state:", err);
+    }
   }, [state, debateKey]);
 
   useEffect(() => {
