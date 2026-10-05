@@ -169,7 +169,7 @@ export const getMatchmakingPool = async (): Promise<TeamMatchmakingPoolResponse>
     throw new Error("Failed to get matchmaking pool");
   }
 
-  const data: MatchmakingPoolResponse = await response.json();
+  const data: TeamMatchmakingPoolResponse = await response.json();
   return data;
 };
 

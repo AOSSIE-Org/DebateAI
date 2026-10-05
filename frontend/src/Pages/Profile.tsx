@@ -728,7 +728,12 @@ const Profile: React.FC = () => {
         )}
         <div className="flex flex-col items-center mb-4">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md group">
-            <img src={profile.avatarUrl || defaultAvatar} alt="Avatar" className="object-cover w-full h-full" />
+            <img
+              src={profile.avatarUrl || defaultAvatar}
+              alt="Avatar"
+              className="object-cover w-full h-full"
+              onError={handleProfileAvatarLoadError}
+            />
             <button
               onClick={() => setIsAvatarModalOpen(true)}
               className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
