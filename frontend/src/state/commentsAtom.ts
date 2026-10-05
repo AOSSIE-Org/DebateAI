@@ -18,9 +18,12 @@ export interface Comment {
 // Atom for comments by transcript ID
 export const commentsByTranscriptAtom = atom<Record<string, Comment[]>>({});
 
+// Keep uncached reads stable when another transcript's comments change.
+const emptyComments: Comment[] = [];
+
 // Helper atom to get comments for a specific transcript
 export const getCommentsForTranscriptAtom = (transcriptId: string) =>
-  atom((get) => get(commentsByTranscriptAtom)[transcriptId] || []);
+  atom((get) => get(commentsByTranscriptAtom)[transcriptId] || emptyComments);
 
 // Helper atom to set comments for a specific transcript
 export const setCommentsForTranscriptAtom = (transcriptId: string) =>
