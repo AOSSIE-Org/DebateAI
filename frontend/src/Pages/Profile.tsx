@@ -501,7 +501,7 @@ const Profile: React.FC = () => {
             e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
           }}
           placeholder="Share your story"
-          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
+          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words border [.contrast_&]:border-border"
         />
         <p className={`text-xs text-right ${draftValue.length >= BIO_MAX_LENGTH
           ? "text-red-500"
