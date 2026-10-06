@@ -25,7 +25,7 @@ func leaderboardRequest(query string) (*gin.Context, *httptest.ResponseRecorder)
 }
 
 func TestLeaderboardRejectsInvalidPagination(t *testing.T) {
-	for _, query := range []string{"?page=0", "?page=-1", "?page=abc", "?page=1.5", "?page=9223372036854775808", "?page=9223372036854775807&limit=100", "?limit=0", "?limit=-1", "?limit=101", "?limit=abc"} {
+	for _, query := range []string{"?page=0", "?page=-1", "?page=abc", "?page=1.5", "?page=9223372036854775808", "?page=9223372036854775807&limit=100", "?limit=0", "?limit=-1", "?limit=101", "?limit=abc", "?sort=name", "?includeCurrentUser=invalid"} {
 		t.Run(query, func(t *testing.T) {
 			c, w := leaderboardRequest(query)
 			GetLeaderboard(c)
@@ -185,4 +185,98 @@ func TestLeaderboardStatsSurviveExpiredPageDeadline(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestLeaderboardCurrentUserMetadata(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, tc := range []struct {
+		name                                        string
+		onPage, missing, lookupFailure, rankFailure bool
+	}{
+		{name: "out of page"}, {name: "already on page", onPage: true},
+		{name: "deleted account", missing: true},
+		{name: "lookup failure", lookupFailure: true}, {name: "rank failure", rankFailure: true},
+	} {
+		mt.Run(tc.name, func(mt *mtest.T) {
+			previous := db.MongoDatabase
+			db.MongoDatabase = mt.DB
+			defer func() { db.MongoDatabase = previous }()
+			ns := mt.DB.Name() + ".users"
+			id := primitive.NewObjectID()
+			user := bson.D{{Key: "_id", Value: id}, {Key: "email", Value: "current@example.test"}, {Key: "score", Value: 12}}
+			pageUser := bson.D{{Key: "_id", Value: primitive.NewObjectID()}, {Key: "email", Value: "other@example.test"}, {Key: "score", Value: 50}}
+			if tc.onPage {
+				pageUser = user
+			}
+			mt.AddMockResponses(
+				mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "n", Value: int64(5000)}}),
+				mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, pageUser),
+			)
+			if !tc.onPage {
+				if tc.lookupFailure {
+					mt.AddMockResponses(mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 2, Message: "lookup failed"}))
+				} else if tc.missing {
+					mt.AddMockResponses(mtest.CreateCursorResponse(0, ns, mtest.FirstBatch))
+				} else {
+					mt.AddMockResponses(mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, user))
+					if tc.rankFailure {
+						mt.AddMockResponses(mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 2, Message: "rank failed"}))
+					} else {
+						mt.AddMockResponses(mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "n", Value: int64(4500)}}))
+					}
+				}
+			}
+			for i := 0; i < 7; i++ {
+				mt.AddMockResponses(mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "n", Value: int64(0)}}))
+			}
+			c, w := leaderboardRequest("?sort=score&includeCurrentUser=true&limit=1")
+			GetLeaderboard(c)
+			if tc.lookupFailure || tc.rankFailure {
+				if w.Code != http.StatusInternalServerError {
+					mt.Fatalf("expected explicit failure: %s", w.Body.String())
+				}
+				return
+			}
+			var response LeaderboardData
+			if w.Code != http.StatusOK {
+				mt.Fatalf("status %d: %s", w.Code, w.Body.String())
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				mt.Fatal(err)
+			}
+			if len(response.Debaters) != 1 || response.Pagination.Total != 5000 {
+				mt.Fatalf("page enlarged or total lost: %+v", response)
+			}
+			if tc.missing {
+				if response.CurrentUser != nil {
+					mt.Fatal("missing user should omit metadata")
+				}
+			} else {
+				wantRank := 4501
+				if tc.onPage {
+					wantRank = 1
+				}
+				if response.CurrentUser == nil || response.CurrentUser.ID != id.Hex() || response.CurrentUser.Rank != wantRank || !response.CurrentUser.CurrentUser {
+					mt.Fatalf("incorrect current user: %+v", response.CurrentUser)
+				}
+			}
+			finds := 0
+			for _, e := range mt.GetAllStartedEvents() {
+				if e.CommandName != "find" {
+					continue
+				}
+				finds++
+				if finds == 1 && e.Command.Lookup("sort").Document().Lookup("score").Int32() != -1 {
+					mt.Fatal("score sort not sent to database")
+				}
+			}
+			wantFinds := 2
+			if tc.onPage {
+				wantFinds = 1
+			}
+			if finds != wantFinds {
+				mt.Fatalf("find queries: got %d, want %d", finds, wantFinds)
+			}
+		})
+	}
 }

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -15,14 +16,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // LeaderboardData defines the response structure for the frontend
 type LeaderboardData struct {
-	Debaters   []Debater             `json:"debaters"`
-	Stats      []Stat                `json:"stats"`
-	Pagination LeaderboardPagination `json:"pagination"`
+	Debaters    []Debater             `json:"debaters"`
+	Stats       []Stat                `json:"stats"`
+	Pagination  LeaderboardPagination `json:"pagination"`
+	CurrentUser *Debater              `json:"currentUser,omitempty"`
 }
 
 type LeaderboardPagination struct {
@@ -72,6 +75,19 @@ type Stat struct {
 	Label string `json:"label"`
 }
 
+func leaderboardDebater(user models.User, rank int, currentemail interface{}) Debater {
+	name := user.DisplayName
+	if name == "" {
+		name = utils.ExtractNameFromEmail(user.Email)
+	}
+	avatarURL := user.AvatarURL
+	if avatarURL == "" {
+		avatarURL = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + name
+	}
+	return Debater{ID: user.ID.Hex(), Rank: rank, Name: name, Score: user.Score,
+		Rating: int(user.Rating), AvatarURL: avatarURL, CurrentUser: user.Email == currentemail}
+}
+
 // GetLeaderboard fetches and returns leaderboard data
 func GetLeaderboard(c *gin.Context) {
 	// Check for authenticated user
@@ -81,11 +97,24 @@ func GetLeaderboard(c *gin.Context) {
 		return
 	}
 
-	// Query users sorted by Rating (descending)
+	// Validate pagination and ordering before querying users.
 	page, limit, skip, err := leaderboardPage(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	sortField := c.DefaultQuery("sort", "rating")
+	if sortField != "rating" && sortField != "score" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sort must be rating or score"})
+		return
+	}
+	includeCurrentUser := false
+	if value, present := c.GetQuery("includeCurrentUser"); present {
+		includeCurrentUser, err = strconv.ParseBool(value)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "includeCurrentUser must be a boolean"})
+			return
+		}
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
@@ -96,10 +125,11 @@ func GetLeaderboard(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count leaderboard users"})
 		return
 	}
+	projection := bson.M{"_id": 1, "email": 1, "displayName": 1, "rating": 1, "score": 1, "avatarUrl": 1}
 	findOptions := options.Find().
-		SetSort(bson.D{{"rating", -1}, {"_id", 1}}).
+		SetSort(bson.D{{sortField, -1}, {"_id", 1}}).
 		SetLimit(limit).SetSkip(skip).
-		SetProjection(bson.M{"_id": 1, "email": 1, "displayName": 1, "rating": 1, "score": 1, "avatarUrl": 1})
+		SetProjection(projection)
 	cursor, err := collection.Find(ctx, bson.M{}, findOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard data"})
@@ -116,27 +146,51 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Build debaters list
 	debaters := make([]Debater, 0, len(users))
+	var currentUser *Debater
 	for i, user := range users {
-		name := user.DisplayName
-		if name == "" {
-			name = utils.ExtractNameFromEmail(user.Email)
+		debater := leaderboardDebater(user, int(skip)+i+1, currentemail)
+		debaters = append(debaters, debater)
+		if includeCurrentUser && debater.CurrentUser {
+			currentUser = &debater
 		}
-
-		avatarURL := user.AvatarURL
-		if avatarURL == "" {
-			avatarURL = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + name
+	}
+	// Keep an out-of-page user's row separate so it cannot enlarge or reorder the page.
+	if includeCurrentUser && currentUser == nil {
+		raw, lookupErr := collection.FindOne(ctx, bson.M{"email": currentemail},
+			options.FindOne().SetProjection(projection)).Raw()
+		if lookupErr != nil && !errors.Is(lookupErr, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch current leaderboard user"})
+			return
 		}
-
-		isCurrentUser := user.Email == currentemail
-		debaters = append(debaters, Debater{
-			ID:          user.ID.Hex(),
-			Rank:        int(skip) + i + 1,
-			Name:        name,
-			Score:       user.Score,
-			Rating:      int(user.Rating),
-			AvatarURL:   avatarURL,
-			CurrentUser: isCurrentUser,
-		})
+		if lookupErr == nil {
+			var user models.User
+			var sortValue interface{}
+			if err := bson.Unmarshal(raw, &user); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode current leaderboard user"})
+				return
+			}
+			if value := raw.Lookup(sortField); value.Type != 0 {
+				if err := value.Unmarshal(&sortValue); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode current leaderboard rank"})
+					return
+				}
+			}
+			// Aggregation comparisons follow BSON sort order, including missing/null fields.
+			fieldValue := bson.M{"$ifNull": bson.A{"$" + sortField, nil}}
+			ahead, err := collection.CountDocuments(ctx, bson.M{"$expr": bson.M{"$or": bson.A{
+				bson.M{"$gt": bson.A{fieldValue, sortValue}},
+				bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{fieldValue, sortValue}},
+					bson.M{"$lt": bson.A{"$_id", user.ID}},
+				}},
+			}}})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count current leaderboard rank"})
+				return
+			}
+			debater := leaderboardDebater(user, int(ahead)+1, currentemail)
+			currentUser = &debater
+		}
 	}
 
 	// Generate stats
@@ -246,9 +300,10 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Send response
 	response := LeaderboardData{
-		Debaters:   debaters,
-		Stats:      stats,
-		Pagination: LeaderboardPagination{Page: page, Limit: limit, Total: totalUsers, TotalPages: totalUsers / limit},
+		Debaters:    debaters,
+		CurrentUser: currentUser,
+		Stats:       stats,
+		Pagination:  LeaderboardPagination{Page: page, Limit: limit, Total: totalUsers, TotalPages: totalUsers / limit},
 	}
 	if totalUsers%limit != 0 {
 		response.Pagination.TotalPages++

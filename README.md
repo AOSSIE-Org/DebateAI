@@ -12,6 +12,20 @@
 
 **DebateAI** is an AI-enhanced, real-time debating platform designed to sharpen communication skills. Whether competing against human opponents or LLM-powered AI challengers, users can participate in structured debates that mimic formal competitions.
 
+### Leaderboard API
+
+Authenticated `GET /leaderboard` accepts `page` (default 1), `limit` (default
+100, maximum 100), and `sort` (`rating` by default, or `score`). Both orders are
+descending with `_id` ascending to break ties. The response contains `debaters`,
+global `stats`, and `pagination` with `page`, `limit`, `total`, and `totalPages`.
+Ranks include the page offset. Invalid pagination or sort values return 400.
+
+Use `includeCurrentUser=true` to request a separate `currentUser` row with its
+global rank when the authenticated user is outside the requested page. This
+does not enlarge the `debaters` array. Statistics-only callers can use `limit=1`
+without requesting this additional lookup. The frontend fallback loads later
+pages on demand through Show More and requests a new first page when sorting.
+
 ### Key Features
 
 - **User vs. User Debates**
