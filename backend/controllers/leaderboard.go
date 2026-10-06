@@ -51,7 +51,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Query users sorted by Rating (descending)
 	collection := db.MongoDatabase.Collection("users")
-	findOptions := options.Find().SetSort(bson.D{{"rating", -1}})
+	findOptions := options.Find().SetSort(bson.D{{"rating", -1}}).SetLimit(100)
 	cursor, err := collection.Find(c, bson.M{}, findOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard data"})
@@ -92,8 +92,15 @@ func GetLeaderboard(c *gin.Context) {
 	}
 
 	// Generate stats
-	totalUsers := len(users)
 	ctx := context.Background()
+
+	// Total registered users (counted separately, since the leaderboard query is now limited)
+	totalUsersCount, err := collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		log.Printf("Error counting total users: %v", err)
+		totalUsersCount = 0
+	}
+	totalUsers := int(totalUsersCount)
 
 	// Calculate DEBATES TODAY - count all debates created today
 	todayStart := time.Now().Truncate(24 * time.Hour)
