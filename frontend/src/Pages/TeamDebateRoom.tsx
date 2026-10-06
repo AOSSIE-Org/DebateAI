@@ -623,6 +623,7 @@ const TeamDebateRoom: React.FC = () => {
     } else {
       setTimer(0);
     }
+    setCurrentTranscript("");
   }, [debatePhase]);
 
   // Timer countdown and phase transition
@@ -1048,6 +1049,7 @@ const TeamDebateRoom: React.FC = () => {
 
             // Ensure we accept the phase change
             setDebatePhase(newPhase);
+            setCurrentTranscript("");
 
             // Close setup popup and clear countdown when debate starts (ALWAYS if not setup)
             if (newPhase !== DebatePhase.Setup) {
@@ -1071,6 +1073,7 @@ const TeamDebateRoom: React.FC = () => {
               [targetPhase]:
                 (prev[targetPhase] || "") + " " + data.speechText,
             }));
+            setCurrentTranscript("");
           }
           break;
         }
@@ -1080,7 +1083,9 @@ const TeamDebateRoom: React.FC = () => {
             data.liveTranscript &&
             data.userId !== currentUserId
           ) {
-            setCurrentTranscript(data.liveTranscript);
+            if (!data.phase || data.phase === debatePhaseRef.current) {
+              setCurrentTranscript(data.liveTranscript);
+            }
           }
           break;
         }
@@ -1268,6 +1273,7 @@ const TeamDebateRoom: React.FC = () => {
           }
 
           if (finalTranscript.trim()) {
+            setCurrentTranscript("");
             setSpeechTranscripts((prev) => ({
               ...prev,
               [debatePhase]: (

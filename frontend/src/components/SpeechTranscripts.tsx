@@ -75,13 +75,28 @@ const SpeechTranscripts: React.FC<SpeechTranscriptsProps> = ({
                 )}
               </div>
 
-              {transcript ? (
+              {isCurrentPhase ? (
+                transcript || liveTranscript ? (
+                  <div className='space-y-2'>
+                    {transcript && (
+                      <div className='text-sm text-gray-800 bg-white p-2 rounded border'>
+                        {transcript}
+                      </div>
+                    )}
+                    {liveTranscript && (
+                      <div className='text-sm text-gray-700 bg-white p-2 rounded border italic'>
+                        {liveTranscript}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className='text-sm text-gray-500 italic'>
+                    No transcript available yet
+                  </div>
+                )
+              ) : transcript ? (
                 <div className='text-sm text-gray-800 bg-white p-2 rounded border'>
                   {transcript}
-                </div>
-              ) : isCurrentPhase && liveTranscript ? (
-                <div className='text-sm text-gray-700 bg-white p-2 rounded border italic'>
-                  {liveTranscript}
                 </div>
               ) : (
                 <div className='text-sm text-gray-500 italic'>
