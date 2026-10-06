@@ -295,7 +295,7 @@ export default function TournamentPage() {
                   onChange={(e) => setDate(e.target.value)}
                   required
                   min={new Date().toISOString().split("T")[0]}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
+                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [color-scheme:light] dark:[color-scheme:dark] [.contrast_&]:[color-scheme:dark] [.contrast_&]:border-border"
                 />
               </div>
               <div>
