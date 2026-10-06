@@ -216,6 +216,10 @@ const TeamDebateRoom: React.FC = () => {
   // Speech recognition state
   const [isListening, setIsListening] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState("");
+  const liveTranscriptMetaRef = useRef<{ userId: string; phase: string }>({
+    userId: "",
+    phase: "",
+  });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [speechTranscripts, setSpeechTranscripts] = useState<{
@@ -624,6 +628,7 @@ const TeamDebateRoom: React.FC = () => {
       setTimer(0);
     }
     setCurrentTranscript("");
+    liveTranscriptMetaRef.current = { userId: "", phase: "" };
   }, [debatePhase]);
 
   // Timer countdown and phase transition
@@ -1050,6 +1055,7 @@ const TeamDebateRoom: React.FC = () => {
             // Ensure we accept the phase change
             setDebatePhase(newPhase);
             setCurrentTranscript("");
+            liveTranscriptMetaRef.current = { userId: "", phase: "" };
 
             // Close setup popup and clear countdown when debate starts (ALWAYS if not setup)
             if (newPhase !== DebatePhase.Setup) {
@@ -1073,7 +1079,13 @@ const TeamDebateRoom: React.FC = () => {
               [targetPhase]:
                 (prev[targetPhase] || "") + " " + data.speechText,
             }));
-            setCurrentTranscript("");
+            if (
+              liveTranscriptMetaRef.current.userId === data.userId &&
+              liveTranscriptMetaRef.current.phase === targetPhase
+            ) {
+              setCurrentTranscript("");
+              liveTranscriptMetaRef.current = { userId: "", phase: "" };
+            }
           }
           break;
         }
@@ -1083,7 +1095,9 @@ const TeamDebateRoom: React.FC = () => {
             data.liveTranscript &&
             data.userId !== currentUserId
           ) {
+            const phase = data.phase || debatePhaseRef.current;
             if (!data.phase || data.phase === debatePhaseRef.current) {
+              liveTranscriptMetaRef.current = { userId: data.userId, phase };
               setCurrentTranscript(data.liveTranscript);
             }
           }
@@ -1273,7 +1287,6 @@ const TeamDebateRoom: React.FC = () => {
           }
 
           if (finalTranscript.trim()) {
-            setCurrentTranscript("");
             setSpeechTranscripts((prev) => ({
               ...prev,
               [debatePhase]: (
