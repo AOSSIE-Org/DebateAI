@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 // AnalyzeDebateTranscript sends the full debate transcript to Gemini and requests
@@ -136,7 +137,7 @@ Required JSON Output Format:
 
 IMPORTANT RULES:
 1. Return ONLY valid JSON, no markdown, no code fences, no additional text.
-2. Be specific — always reference actual quotes and moments from the transcript.
+2. Be specific - always reference actual quotes and moments from the transcript.
 3. Identify ALL logical fallacies, even subtle ones. If none exist, return an empty array.
 4. Coaching tips should be personalized and actionable, not generic advice.
 5. Scores should be fair and evidence-based, not inflated.
@@ -145,10 +146,13 @@ IMPORTANT RULES:
 8. Provide exactly 3-5 coaching tips, prioritized by impact.`,
 		userStance, botName, botStance, topic, transcript)
 
-	ctx := context.Background()
+	// Use a 60-second timeout to prevent Gemini calls from hanging indefinitely
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	text, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
-		log.Printf("❌ Gemini error in AnalyzeDebateTranscript: %v", err)
+		log.Printf("Gemini error in AnalyzeDebateTranscript: %v", err)
 		return "", fmt.Errorf("failed to analyze debate: %w", err)
 	}
 
