@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
+import DebateAnalyticsReport from "@/components/DebateAnalyticsReport";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
@@ -248,6 +249,7 @@ const DebateRoom: React.FC = () => {
     isJudging?: boolean;
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -701,6 +703,54 @@ setPopup({ show: false, message: "" });
           navigate("/startDebate");
         }}
       />
+      {!showAnalytics && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 10000,
+        }}>
+          <button
+            onClick={() => setShowAnalytics(true)}
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              color: '#fff',
+              border: 'none',
+              padding: '14px 28px',
+              borderRadius: 16,
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 8px 32px rgba(59,130,246,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 12px 40px rgba(59,130,246,0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(59,130,246,0.4)';
+            }}
+          >
+            📊 View Full Analytics
+          </button>
+        </div>
+      )}
+      {showAnalytics && (
+        <DebateAnalyticsReport
+          history={state.messages}
+          topic={debateData.topic}
+          userStance={state.userStance}
+          botName={debateData.botName}
+          userAvatar={userAvatar}
+          botAvatar={bot.avatar}
+          onClose={() => setShowAnalytics(false)}
+        />
+      )}
     </div>
   );
 }

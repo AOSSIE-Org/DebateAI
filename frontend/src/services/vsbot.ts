@@ -141,3 +141,35 @@ export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> =>
 
   return response.json();
 };
+
+// Types for debate analytics
+export type AnalyzeDebateRequest = {
+  history: DebateMessage[];
+  topic: string;
+  userStance: string;
+  botName: string;
+};
+
+export type AnalyzeDebateResponse = {
+  analytics: string;
+};
+
+// Function to get AI-powered debate analytics
+export const analyzeDebate = async (data: AnalyzeDebateRequest): Promise<AnalyzeDebateResponse> => {
+  const token = getAuthToken();
+  const response = await fetch(`${baseURL}/vsbot/analyze`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to analyze debate");
+  }
+
+  return response.json();
+};
