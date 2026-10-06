@@ -28,6 +28,10 @@ const result = await build({
   define: { 'import.meta.env.VITE_BASE_URL': '"http://comments.test"' },
   plugins: [{
     name: 'profile-stubs',
+    /**
+     * Stubs authentication and profile UI while bundling the real comment component.
+     * @param {import('esbuild').PluginBuild} builder - Build hooks for this test bundle.
+     */
     setup(builder) {
       const stubs = {
         '../hooks/useUser': 'export const useUser = () => ({ user: null });',
@@ -53,6 +57,14 @@ const {
   removeCommentFromTranscriptAtom,
 } = compiled.exports;
 
+/**
+ * Creates a flat comment fixture with predictable content and timestamps.
+ * @param {string} id - Comment ID, also used as the rendered content.
+ * @param {string} transcriptId - Transcript containing this comment.
+ * @param {string|null} parentId - Parent comment ID, or null for a root comment.
+ * @param {string} createdAt - ISO timestamp used to verify comment ordering.
+ * @returns {object} A comment fixture suitable for the cache and mocked API.
+ */
 function comment(id, transcriptId, parentId = null, createdAt = '2026-01-01T00:00:00Z') {
   return {
     id, transcriptId, parentId, path: [], content: id,
@@ -61,12 +73,23 @@ function comment(id, transcriptId, parentId = null, createdAt = '2026-01-01T00:0
   };
 }
 
+/**
+ * Creates an externally resolvable promise for controlling a delayed API response.
+ * @returns {object} The pending promise and its resolve function.
+ */
 function deferred() {
   let resolve;
   const promise = new Promise((done) => { resolve = done; });
   return { promise, resolve };
 }
 
+/**
+ * Mounts CommentTree in an isolated Jotai store with mocked networking and cleanup.
+ * A profiler guard stops infinite render loops before they can hang the test runner.
+ * @param {import('node:test').TestContext} t - Test context owning mocks and cleanup.
+ * @param {object} options - Transcript ID, initial cache, and optional API response factory.
+ * @returns {Promise<object>} Renderer, store, request log, and render-settling helpers.
+ */
 async function mount(t, { transcriptId = 'a', cached = {}, fetchComments } = {}) {
   const store = createStore();
   store.set(commentsByTranscriptAtom, cached);
@@ -88,6 +111,11 @@ async function mount(t, { transcriptId = 'a', cached = {}, fetchComments } = {})
   });
   let commits = 0;
   let tree;
+  /**
+   * Builds the profiled comments view while keeping the test's store unchanged.
+   * @param {string} id - Transcript to render or switch to.
+   * @returns {React.ReactElement} The comments component inside its test providers.
+   */
   const render = (id) => React.createElement(React.StrictMode, {},
     React.createElement(Provider, { store },
       React.createElement(React.Profiler, {
@@ -109,6 +137,10 @@ async function mount(t, { transcriptId = 'a', cached = {}, fetchComments } = {})
     store, requests, tree,
     text: () => JSON.stringify(tree.toJSON()),
     update: async (id) => act(async () => tree.update(render(id))),
+    /**
+     * Verifies that idle event-loop turns produce no commits or render-loop warnings.
+     * @returns {Promise<void>} Resolves when the idle-render assertions pass.
+     */
     async assertSettled() {
       const previousCommits = commits;
       for (let i = 0; i < 3; i++) await act(async () => { await setImmediate(); });
@@ -150,6 +182,7 @@ test('populated comments keep tree order and react to additions and removals', a
     comment('early-reply', 'a', 'old-root', '2026-01-02T00:00:00Z'),
   ];
   const view = await mount(t, { fetchComments: () => ({ comments }) });
+  /** @returns {string[]} Comment text in the tree's rendered order. */
   const contents = () => view.tree.root.findAllByType('p').map((node) => node.children.join(''));
   assert.deepEqual(contents(), ['new-root', 'old-root', 'early-reply', 'late-reply']);
   await act(async () => view.store.set(addCommentToTranscriptAtom('a'), comment('added', 'a')));

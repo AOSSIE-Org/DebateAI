@@ -219,6 +219,13 @@ interface CommentTreeProps {
   className?: string;
 }
 
+/**
+ * Renders a transcript's threaded comments and its posting, reply, and delete controls.
+ * Transcript-specific atoms remain stable across renders and change when the ID changes.
+ *
+ * @param props - Transcript ID, optional post-success callback, and CSS classes.
+ * @returns The loading, error, or comments view for the selected transcript.
+ */
 const CommentTree: React.FC<CommentTreeProps> = ({
   transcriptId,
   onCommentAdded,
