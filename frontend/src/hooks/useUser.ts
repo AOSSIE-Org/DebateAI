@@ -16,6 +16,15 @@ export const useUser = () => {
 
   // Hydrate from localStorage if available
   useEffect(() => {
+    const token = authContext?.token || localStorage.getItem("token");
+    if (!token) {
+      localStorage.removeItem(USER_CACHE_KEY);
+      if (user) {
+        setUser(null);
+      }
+      return;
+    }
+
     if (!user) {
       const cachedUser = localStorage.getItem(USER_CACHE_KEY);
       if (cachedUser) {
@@ -28,7 +37,7 @@ export const useUser = () => {
         }
       }
     }
-  }, [user, setUser]);
+  }, [user, setUser, authContext?.token]);
 
   useEffect(() => {
     const fetchUserData = async () => {

@@ -63,82 +63,92 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(message);
   }, []);
 
-let currentRequest = 0;
-const verifyToken = useCallback(async () => {
-  const requestId = ++currentRequest;
+  const logout = useCallback(() => {
+    setError(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem(USER_CACHE_KEY);
+    setUser(null); // Clear userAtom on logout
+    navigate('/auth');
+  }, [navigate, setUser]);
 
-  const storedToken = localStorage.getItem('token');
-  if (!storedToken) return;
+  let currentRequest = 0;
+  const verifyToken = useCallback(async () => {
+    const requestId = ++currentRequest;
 
-  try {
-    const response = await fetch(`${baseURL}/verifyToken`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${storedToken}` },
-    });
-
-    // ignore if outdated
-    if (requestId !== currentRequest) return;
-
-    if (!response.ok) {
-      localStorage.removeItem('token');
-      setToken(null);
+    const storedToken = localStorage.getItem('token');
+    if (!storedToken) {
+      localStorage.removeItem(USER_CACHE_KEY);
       setUser(null);
-      navigate('/login');
       return;
     }
 
-    setToken(storedToken);
-
-    const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${storedToken}` },
-    });
-
-    // ignore if outdated
-    if (requestId !== currentRequest) return;
-
-    if (userResponse.ok) {
-      const responseData = await userResponse.json();
+    try {
+      const response = await fetch(`${baseURL}/verifyToken`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
 
       // ignore if outdated
       if (requestId !== currentRequest) return;
 
-      const userData = responseData.profile;
+      if (!response.ok) {
+        logout();
+        return;
+      }
 
-      const normalizedUser: User = {
-        id: userData.id || userData._id,
-        email: userData.email,
-        displayName: userData.displayName || 'User',
-        bio: userData.bio || '',
-        rating: userData.rating || 1500,
-        rd: userData.rd || 350,
-        volatility: userData.volatility || 0.06,
-        lastRatingUpdate:
-          userData.lastRatingUpdate || new Date().toISOString(),
-        avatarUrl: userData.avatarUrl || DEFAULT_AVATAR_URL,
-        twitter: userData.twitter,
-        instagram: userData.instagram,
-        linkedin: userData.linkedin,
-        password: '',
-        nickname: userData.nickname || 'User',
-        isVerified: userData.isVerified || false,
-        verificationCode: userData.verificationCode,
-        resetPasswordCode: userData.resetPasswordCode,
-        createdAt: userData.createdAt || new Date().toISOString(),
-        updatedAt: userData.updatedAt || new Date().toISOString(),
-      };
+      setToken(storedToken);
 
-      // final safety check
+      const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
+
+      // ignore if outdated
       if (requestId !== currentRequest) return;
 
-      setUser(normalizedUser);
-      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+      if (userResponse.ok) {
+        const responseData = await userResponse.json();
+
+        // ignore if outdated
+        if (requestId !== currentRequest) return;
+
+        const userData = responseData.profile;
+
+        const normalizedUser: User = {
+          id: userData.id || userData._id,
+          email: userData.email,
+          displayName: userData.displayName || 'User',
+          bio: userData.bio || '',
+          rating: userData.rating || 1500,
+          rd: userData.rd || 350,
+          volatility: userData.volatility || 0.06,
+          lastRatingUpdate:
+            userData.lastRatingUpdate || new Date().toISOString(),
+          avatarUrl: userData.avatarUrl || DEFAULT_AVATAR_URL,
+          twitter: userData.twitter,
+          instagram: userData.instagram,
+          linkedin: userData.linkedin,
+          password: '',
+          nickname: userData.nickname || 'User',
+          isVerified: userData.isVerified || false,
+          verificationCode: userData.verificationCode,
+          resetPasswordCode: userData.resetPasswordCode,
+          createdAt: userData.createdAt || new Date().toISOString(),
+          updatedAt: userData.updatedAt || new Date().toISOString(),
+        };
+
+        // final safety check
+        if (requestId !== currentRequest) return;
+
+        setUser(normalizedUser);
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
+      }
+    } catch (error) {
+      console.log('error', error);
+      logout();
     }
-  } catch (error) {
-    console.log('error', error);
-    logout();
-  }
-}, [setUser]);
+  }, [setUser, logout]);
   
   useEffect(() => {
     verifyToken();
@@ -402,15 +412,6 @@ const verifyToken = useCallback(async () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    setError(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem(USER_CACHE_KEY);
-    setUser(null); // Clear userAtom on logout
-    navigate('/auth');
   };
 
   return (
