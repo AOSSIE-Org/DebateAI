@@ -446,11 +446,10 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, han
 
     try {
       await confirmForgotPassword(email, code, newPassword);
-      clearError();
       await login(email, newPassword);
       handlePasswordReset();
     } catch {
-      // Handled by authContext error state
+      return;
     }
   };
 
