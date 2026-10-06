@@ -918,7 +918,7 @@ const Profile: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:border-primary hover:shadow-md transition-all cursor-pointer group"
+                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:bg-accent [.contrast_&]:hover:bg-muted transition-colors cursor-pointer group"
                     title={badgeDescription}
                   >
                     <div className="mb-1 group-hover:scale-110 transition-transform">{badgeIcon}</div>
