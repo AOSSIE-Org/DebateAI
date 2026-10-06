@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func leaderboardRequest(query string) (*gin.Context, *httptest.ResponseRecorder) {
@@ -122,6 +125,64 @@ func TestLeaderboardCountFailureDoesNotReturnMisleadingStats(t *testing.T) {
 		GetLeaderboard(c)
 		if w.Code != http.StatusInternalServerError {
 			mt.Fatalf("got status %d", w.Code)
+		}
+	})
+}
+
+func TestLeaderboardStatsSurviveExpiredPageDeadline(t *testing.T) {
+	pageContextExpired := false
+	monitor := &event.CommandMonitor{
+		Succeeded: func(ctx context.Context, event *event.CommandSucceededEvent) {
+			if event.CommandName == "find" {
+				// Simulate the page fetch consuming its entire timeout after the
+				// final batch arrives, before the statistics queries start.
+				<-ctx.Done()
+				pageContextExpired = ctx.Err() == context.DeadlineExceeded
+			}
+		},
+	}
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock).
+		ClientOptions(options.Client().SetMonitor(monitor)))
+	mt.Run("fresh statistics timeout", func(mt *mtest.T) {
+		previous := db.MongoDatabase
+		db.MongoDatabase = mt.DB
+		defer func() { db.MongoDatabase = previous }()
+		ns := mt.DB.Name() + ".users"
+		mt.AddMockResponses(
+			mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "n", Value: int64(23)}}),
+			mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{
+				{Key: "_id", Value: primitive.NewObjectID()},
+				{Key: "email", Value: "current@example.test"},
+			}),
+		)
+		for _, stat := range []struct {
+			collection string
+			count      int64
+		}{
+			{"saved_debate_transcripts", 2}, {"debates_vs_bot", 3},
+			{"team_debates", 4}, {"debates", 5},
+			{"team_debates", 6}, {"saved_debate_transcripts", 7}, {"users", 8},
+		} {
+			mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+stat.collection,
+				mtest.FirstBatch, bson.D{{Key: "n", Value: stat.count}}))
+		}
+		c, w := leaderboardRequest("?page=2&limit=10")
+		GetLeaderboard(c)
+		if !pageContextExpired || w.Code != http.StatusOK {
+			mt.Fatalf("page deadline expired: %v; status %d, body %s", pageContextExpired, w.Code, w.Body.String())
+		}
+		var response LeaderboardData
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+			mt.Fatal(err)
+		}
+		if response.Pagination.Total != 23 || response.Pagination.Limit != 10 ||
+			len(response.Debaters) != 1 || response.Debaters[0].Rank != 11 {
+			mt.Fatalf("user count or page changed: %+v", response)
+		}
+		for i, want := range []string{"23", "14", "13", "8"} {
+			if response.Stats[i].Value != want {
+				mt.Fatalf("stat %s: got %s, want %s", response.Stats[i].Label, response.Stats[i].Value, want)
+			}
 		}
 	})
 }

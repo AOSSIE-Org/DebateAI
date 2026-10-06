@@ -140,6 +140,9 @@ func GetLeaderboard(c *gin.Context) {
 	}
 
 	// Generate stats
+	// Give statistics their own budget after the user count and page fetch.
+	statsCtx, cancelStats := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancelStats()
 
 	// Calculate DEBATES TODAY - count all debates created today
 	todayStart := time.Now().Truncate(24 * time.Hour)
@@ -149,7 +152,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from saved_debate_transcripts
 	transcriptCollection := db.MongoDatabase.Collection("saved_debate_transcripts")
-	transcriptCount, err := transcriptCollection.CountDocuments(ctx, bson.M{
+	transcriptCount, err := transcriptCollection.CountDocuments(statsCtx, bson.M{
 		"createdAt": bson.M{
 			"$gte": todayStart,
 			"$lt":  todayEnd,
@@ -161,7 +164,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from debates_vs_bot (createdAt is int64 timestamp)
 	botDebateCollection := db.MongoDatabase.Collection("debates_vs_bot")
-	botDebateCount, err := botDebateCollection.CountDocuments(ctx, bson.M{
+	botDebateCount, err := botDebateCollection.CountDocuments(statsCtx, bson.M{
 		"createdAt": bson.M{
 			"$gte": todayStart.Unix(),
 			"$lt":  todayEnd.Unix(),
@@ -173,7 +176,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from team_debates
 	teamDebateCollection := db.MongoDatabase.Collection("team_debates")
-	teamDebateCount, err := teamDebateCollection.CountDocuments(ctx, bson.M{
+	teamDebateCount, err := teamDebateCollection.CountDocuments(statsCtx, bson.M{
 		"createdAt": bson.M{
 			"$gte": todayStart,
 			"$lt":  todayEnd,
@@ -185,7 +188,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from debates collection (uses date field)
 	debateCollection := db.MongoDatabase.Collection("debates")
-	debateCount, err := debateCollection.CountDocuments(ctx, bson.M{
+	debateCount, err := debateCollection.CountDocuments(statsCtx, bson.M{
 		"date": bson.M{
 			"$gte": todayStart,
 			"$lt":  todayEnd,
@@ -199,7 +202,7 @@ func GetLeaderboard(c *gin.Context) {
 	debatingNow := 0
 
 	// Count active team debates
-	activeTeamDebates, err := teamDebateCollection.CountDocuments(ctx, bson.M{
+	activeTeamDebates, err := teamDebateCollection.CountDocuments(statsCtx, bson.M{
 		"status": "active",
 	})
 	if err == nil {
@@ -207,7 +210,7 @@ func GetLeaderboard(c *gin.Context) {
 	}
 
 	// Count debates with pending status (might be in progress)
-	pendingDebates, err := transcriptCollection.CountDocuments(ctx, bson.M{
+	pendingDebates, err := transcriptCollection.CountDocuments(statsCtx, bson.M{
 		"result": "pending",
 		"updatedAt": bson.M{
 			"$gte": time.Now().Add(-2 * time.Hour), // Active within last 2 hours
@@ -222,7 +225,7 @@ func GetLeaderboard(c *gin.Context) {
 	expertThreshold := 1500.0
 	activeThreshold := time.Now().Add(-30 * time.Minute)
 
-	expertsOnline, err := collection.CountDocuments(ctx, bson.M{
+	expertsOnline, err := collection.CountDocuments(statsCtx, bson.M{
 		"rating": bson.M{"$gte": expertThreshold},
 		"$or": []bson.M{
 			{"lastActivityDate": bson.M{"$gte": activeThreshold}},
