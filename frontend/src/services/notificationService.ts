@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+import config from "../config/config";
+const API_URL = config.baseUrl || 'http://localhost:1313';
 
 export interface Notification {
   id: string;

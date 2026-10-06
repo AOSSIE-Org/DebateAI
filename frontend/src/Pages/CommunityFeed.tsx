@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect, useCallback } from "react";
 import { useUser } from "../hooks/useUser";
 import CommentTree from "../components/CommentTree";
@@ -188,7 +189,7 @@ const CommunityFeed: React.FC = () => {
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<
     string | null
   >(null);
-  const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+  const baseURL = config.baseUrl || "http://localhost:1313";
   const normalizeObjectId = useCallback(
     (value: ObjectIdLike | undefined): string => {
       if (!value) {

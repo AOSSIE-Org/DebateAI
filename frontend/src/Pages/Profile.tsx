@@ -1,3 +1,4 @@
+import config from "../config/config";
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -632,7 +633,7 @@ const Profile: React.FC = () => {
     const [following, setFollowing] = useState<FollowUser[]>([]);
     const [loadingFollowers, setLoadingFollowers] = useState(false);
     const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+    const baseURL = config.baseUrl || "http://localhost:1313";
 
     useEffect(() => {
       if (user?.id) {

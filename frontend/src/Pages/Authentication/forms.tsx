@@ -1,3 +1,4 @@
+import config from "../../config/config";
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -364,7 +365,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
 
-  const baseURL = import.meta.env.VITE_BASE_URL;
+  const baseURL = config.baseUrl;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
