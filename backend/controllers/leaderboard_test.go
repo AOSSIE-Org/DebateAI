@@ -1,0 +1,127 @@
+package controllers
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"arguehub/db"
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+)
+
+func leaderboardRequest(query string) (*gin.Context, *httptest.ResponseRecorder) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/leaderboard"+query, nil)
+	c.Set("email", "current@example.test")
+	return c, w
+}
+
+func TestLeaderboardRejectsInvalidPagination(t *testing.T) {
+	for _, query := range []string{"?page=0", "?page=-1", "?page=abc", "?page=1.5", "?page=9223372036854775808", "?page=9223372036854775807&limit=100", "?limit=0", "?limit=-1", "?limit=101", "?limit=abc"} {
+		t.Run(query, func(t *testing.T) {
+			c, w := leaderboardRequest(query)
+			GetLeaderboard(c)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("got status %d, body %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestLeaderboardBoundsQueryAndKeepsGlobalCount(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, tc := range []struct {
+		name, query        string
+		limit, skip, total int64
+		empty              bool
+	}{
+		{"default", "", 100, 0, 5000, false},
+		{"second page", "?page=2&limit=10", 10, 10, 5000, false},
+		{"stats request", "?limit=1", 1, 0, 5000, false},
+		{"past end", "?page=501&limit=10", 10, 5000, 5000, true},
+		{"empty collection", "", 100, 0, 0, true},
+	} {
+		mt.Run(tc.name, func(mt *mtest.T) {
+			previous := db.MongoDatabase
+			db.MongoDatabase = mt.DB
+			defer func() { db.MongoDatabase = previous }()
+			ns := mt.DB.Name() + ".users"
+			count := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "n", Value: tc.total}})
+			users := []bson.D{}
+			if !tc.empty {
+				users = append(users, bson.D{{Key: "_id", Value: primitive.NewObjectID()}, {Key: "email", Value: "current@example.test"}, {Key: "displayName", Value: "Current User"}, {Key: "rating", Value: 1500.0}})
+			}
+			mt.AddMockResponses(count, mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, users...))
+			// Other dashboard statistics each perform an independent count.
+			for i := 0; i < 7; i++ {
+				mt.AddMockResponses(mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "n", Value: int64(0)}}))
+			}
+			c, w := leaderboardRequest(tc.query)
+			GetLeaderboard(c)
+			if w.Code != http.StatusOK {
+				mt.Fatalf("got status %d, body %s", w.Code, w.Body.String())
+			}
+			var response LeaderboardData
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				mt.Fatal(err)
+			}
+			if response.Pagination.Total != tc.total || response.Pagination.Limit != tc.limit {
+				mt.Fatalf("incorrect pagination: %+v", response.Pagination)
+			}
+			if tc.empty {
+				if response.Debaters == nil || len(response.Debaters) != 0 {
+					mt.Fatalf("empty page should be an empty array: %s", w.Body.String())
+				}
+			} else if response.Debaters[0].Rank != int(tc.skip)+1 || !response.Debaters[0].CurrentUser {
+				mt.Fatalf("incorrect rank/current user: %+v", response.Debaters[0])
+			}
+			if response.Stats[0].Value != "5000" && tc.total == 5000 {
+				mt.Fatalf("global user count lost: %+v", response.Stats)
+			}
+			var found bool
+			for _, event := range mt.GetAllStartedEvents() {
+				if event.CommandName != "find" {
+					continue
+				}
+				found = true
+				if event.Command.Lookup("limit").Int64() != tc.limit {
+					mt.Fatalf("unbounded or wrong limit: %s", event.Command)
+				}
+				skipValue := event.Command.Lookup("skip")
+				if tc.skip > 0 && skipValue.Int64() != tc.skip {
+					mt.Fatalf("incorrect page offset: %s", event.Command)
+				}
+				if event.Command.Lookup("sort").Document().Lookup("_id").Int32() != 1 {
+					mt.Fatalf("missing deterministic tie break: %s", event.Command)
+				}
+				projection := event.Command.Lookup("projection").Document()
+				if projection.Lookup("rating").Int32() != 1 || projection.Lookup("password").Type != 0 {
+					mt.Fatalf("incorrect projection: %s", projection)
+				}
+			}
+			if !found {
+				mt.Fatal("no users query issued")
+			}
+		})
+	}
+}
+
+func TestLeaderboardCountFailureDoesNotReturnMisleadingStats(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("count failure", func(mt *mtest.T) {
+		previous := db.MongoDatabase
+		db.MongoDatabase = mt.DB
+		defer func() { db.MongoDatabase = previous }()
+		mt.AddMockResponses(mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 2, Message: "count failed"}))
+		c, w := leaderboardRequest("")
+		GetLeaderboard(c)
+		if w.Code != http.StatusInternalServerError {
+			mt.Fatalf("got status %d", w.Code)
+		}
+	})
+}

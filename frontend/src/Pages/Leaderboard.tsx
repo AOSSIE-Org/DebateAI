@@ -101,7 +101,7 @@ const Leaderboard: React.FC = () => {
           const data = await fetchGamificationLeaderboard(token);
           setDebaters(data.debaters);
           // Keep stats from old endpoint for now
-          const oldData: LeaderboardData = await fetchLeaderboardData(token);
+          const oldData: LeaderboardData = await fetchLeaderboardData(token, 1);
           setStats(oldData.stats);
         } catch {
           // Fallback to old endpoint
