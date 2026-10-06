@@ -1945,6 +1945,11 @@ const TeamDebateRoom: React.FC = () => {
           judgment={judgmentData}
           forRole={localRole === "for" ? "Your Team" : "Opponent Team"}
           againstRole={localRole === "against" ? "Your Team" : "Opponent Team"}
+          localRole={localRole}
+          debateId={debateId}
+          topic={topic}
+          transcripts={speechTranscripts}
+          debateType="team"
           onClose={() => setShowJudgment(false)}
         />
       )}

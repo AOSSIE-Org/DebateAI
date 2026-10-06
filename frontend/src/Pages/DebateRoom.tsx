@@ -696,6 +696,10 @@ setPopup({ show: false, message: "" });
         userStance={state.userStance}
         botStance={state.botStance}
         botDesc={bot.desc}
+        debateId={debateData.debateId}
+        topic={debateData.topic}
+        messages={state.messages}
+        debateType="user_vs_bot"
         onClose={() => {
           setJudgmentData(null);
           navigate("/startDebate");
