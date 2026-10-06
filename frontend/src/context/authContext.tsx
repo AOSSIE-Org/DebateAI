@@ -1,3 +1,4 @@
+import config from "../config/config";
 import {
   createContext,
   useState,
@@ -11,7 +12,7 @@ import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
 import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
 
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = config.baseUrl;
 const USER_CACHE_KEY = 'userProfile';
 
 interface AuthContextType {
@@ -19,7 +20,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
-  handleError: (error: string) => void;
+  handleError: (error: unknown) => void;
+  clearError: () => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   signup: (email: string, password: string) => Promise<void>;
@@ -31,6 +33,7 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<void>;
   googleLogin: (idToken: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<string>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -46,12 +49,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const setUser = useSetAtom(userAtom);
 
-  const handleError = (error: unknown) => {
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const handleError = useCallback((error: unknown) => {
     const message =
-      error instanceof Error ? error.message : 'An unexpected error occurred';
+      typeof error === 'string'
+        ? error
+        : error instanceof Error
+        ? error.message
+        : 'An unexpected error occurred';
     setError(message);
-    throw error;
-  };
+  }, []);
 
 let currentRequest = 0;
 const verifyToken = useCallback(async () => {
@@ -136,6 +146,7 @@ const verifyToken = useCallback(async () => {
 
   const login = async (email: string, password: string) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${baseURL}/login`, {
         method: 'POST',
@@ -143,8 +154,15 @@ const verifyToken = useCallback(async () => {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Login failed');
+      const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = data.error || data.message || 'Login failed';
+          const err = new Error(message) as Error & { code?: string };
+          if (data.code === 'EMAIL_NOT_VERIFIED') {
+            err.code = 'EMAIL_NOT_VERIFIED';
+          }
+          throw err;
+        }
 
       setToken(data.accessToken);
       localStorage.setItem('token', data.accessToken);
@@ -177,6 +195,7 @@ const verifyToken = useCallback(async () => {
       navigate('/');
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -184,6 +203,7 @@ const verifyToken = useCallback(async () => {
 
   const signup = async (email: string, password: string) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${baseURL}/signup`, {
         method: 'POST',
@@ -192,11 +212,12 @@ const verifyToken = useCallback(async () => {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Signup failed');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Signup failed');
       }
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -204,6 +225,7 @@ const verifyToken = useCallback(async () => {
 
   const verifyEmail = async (email: string, code: string) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${baseURL}/verifyEmail`, {
         method: 'POST',
@@ -211,12 +233,10 @@ const verifyToken = useCallback(async () => {
         body: JSON.stringify({ email, confirmationCode: code }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Verification failed');
+        throw new Error(data.error || data.message || 'Verification failed');
       }
-
-      const data = await response.json();
 
       // User is now verified and logged in
       if (data.accessToken) {
@@ -251,6 +271,7 @@ const verifyToken = useCallback(async () => {
       }
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -258,6 +279,7 @@ const verifyToken = useCallback(async () => {
 
   const forgotPassword = async (email: string) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${baseURL}/forgotPassword`, {
         method: 'POST',
@@ -266,11 +288,40 @@ const verifyToken = useCallback(async () => {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Password reset failed');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Password reset failed');
       }
     } catch (error) {
       handleError(error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendVerification = async (email: string): Promise<string> => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${baseURL}/resendVerification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        const message = data.error || data.message || 'Failed to resend code';
+        const err = new Error(message) as Error & { retryAfterSeconds?: number };
+        if (typeof data.retryAfterSeconds === 'number') {
+          err.retryAfterSeconds = data.retryAfterSeconds;
+        }
+        throw err;
+      }
+      setError(null);
+      return data.message || 'A new code has been sent to your email.';
+    } catch (error) {
+      handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -282,6 +333,7 @@ const verifyToken = useCallback(async () => {
     newPassword: string
   ) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${baseURL}/confirmForgotPassword`, {
         method: 'POST',
@@ -290,11 +342,12 @@ const verifyToken = useCallback(async () => {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Password update failed');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Password update failed');
       }
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -302,6 +355,7 @@ const verifyToken = useCallback(async () => {
 
   const googleLogin = async (idToken: string) => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${baseURL}/googleLogin`, {
         method: 'POST',
@@ -309,8 +363,8 @@ const verifyToken = useCallback(async () => {
         body: JSON.stringify({ idToken }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Google login failed');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || data.message || 'Google login failed');
 
       setToken(data.accessToken);
       localStorage.setItem('token', data.accessToken);
@@ -344,12 +398,14 @@ const verifyToken = useCallback(async () => {
       navigate('/');
     } catch (error) {
       handleError(error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const logout = () => {
+    setError(null);
     setToken(null);
     localStorage.removeItem('token');
     localStorage.removeItem(USER_CACHE_KEY);
@@ -365,10 +421,12 @@ const verifyToken = useCallback(async () => {
         loading,
         error,
         handleError,
+        clearError,
         login,
         logout,
         signup,
         verifyEmail,
+        resendVerification,
         forgotPassword,
         confirmForgotPassword,
         googleLogin,

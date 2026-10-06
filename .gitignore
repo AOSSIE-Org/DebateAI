@@ -3,3 +3,4 @@
 *.env
 config.prod.yml
 vite.config.ts.timestamp-*.mjs
+.vscode/

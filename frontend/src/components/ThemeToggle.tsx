@@ -2,15 +2,19 @@ import { useContext, useState, useRef, useEffect } from "react";
 import { ThemeContext, ThemeOptions } from "../context/theme-provider";
 import { Moon, Sun, Contrast } from "lucide-react";
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  iconSize?: number;
+}
+
+export function ThemeToggle({ iconSize = 16 }: ThemeToggleProps) {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const themeOptions = [
-    { id: ThemeOptions.Light, name: "Light", icon: <Sun size={16} /> },
-    { id: ThemeOptions.Dark, name: "Dark", icon: <Moon size={16} /> },
-    { id: ThemeOptions.Contrast, name: "High Contrast", icon: <Contrast size={16} /> },
+    { id: ThemeOptions.Light, name: "Light", icon: <Sun size={iconSize} className="shrink-0" /> },
+    { id: ThemeOptions.Dark, name: "Dark", icon: <Moon size={iconSize} className="shrink-0" /> },
+    { id: ThemeOptions.Contrast, name: "High Contrast", icon: <Contrast size={iconSize} className="shrink-0" /> },
   ];
 
   const setTheme = (targetId: number) => {
@@ -34,12 +38,12 @@ export function ThemeToggle() {
     <div className="relative w-full" ref={dropdownRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full flex items-center gap-2 p-2 text-sm font-medium rounded-md hover:bg-muted/70 transition"
+        className="w-full flex items-center gap-2 p-2 text-sm font-medium text-foreground rounded-md hover:bg-muted/70 transition"
       >
         {themeOptions.find((t) => t.id === theme)?.icon} Theme:{" "}
         <span>{themeOptions.find((t) => t.id === theme)?.name}</span>
         <svg
-          className={`ml-auto w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-auto w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           strokeWidth="2"

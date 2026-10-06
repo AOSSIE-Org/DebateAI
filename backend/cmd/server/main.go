@@ -34,8 +34,8 @@ func main() {
 	log.Println("Connected to MongoDB")
 
 	if err := db.EnsureIndexes(); err != nil {
-    log.Fatalf("Failed to ensure indexes: %v", err)
-    }
+		log.Fatalf("Failed to ensure indexes: %v", err)
+	}
 
 	if err := middlewares.InitCasbin("./config/config.prod.yml"); err != nil {
 		log.Fatalf("Failed to initialize Casbin: %v", err)
@@ -94,6 +94,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	router.POST("/forgotPassword", routes.ForgotPasswordRouteHandler)
 	router.POST("/confirmForgotPassword", routes.VerifyForgotPasswordRouteHandler)
 	router.POST("/verifyToken", routes.VerifyTokenRouteHandler)
+	router.POST("/resendVerification", routes.ResendVerificationRouteHandler)
 
 	router.GET("/debug/matchmaking-pool", routes.GetMatchmakingPoolStatusHandler)
 
@@ -105,7 +106,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	{
 		auth.GET("/user/fetchprofile", routes.GetProfileRouteHandler)
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
-        auth.GET("/user/check-displayname", routes.CheckDisplayNameRouteHandler)		
+		auth.GET("/user/check-displayname", routes.CheckDisplayNameRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
 		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 
