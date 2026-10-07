@@ -1,3 +1,4 @@
+
 import config from "../config/config";
 import {
   createContext,
@@ -11,6 +12,7 @@ import { useSetAtom } from 'jotai';
 import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
 import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
+import { useRef } from "react";
 
 const baseURL = config.baseUrl;
 const USER_CACHE_KEY = 'userProfile';
@@ -63,9 +65,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(message);
   }, []);
 
-let currentRequest = 0;
+const currentRequest = useRef(-1);
 const verifyToken = useCallback(async () => {
-  const requestId = ++currentRequest;
+  const requestId = ++currentRequest.current;
 
   const storedToken = localStorage.getItem('token');
   if (!storedToken) return;
@@ -77,7 +79,7 @@ const verifyToken = useCallback(async () => {
     });
 
     // ignore if outdated
-    if (requestId !== currentRequest) return;
+    if (requestId !== currentRequest.current) return;
 
     if (!response.ok) {
       localStorage.removeItem('token');
@@ -95,13 +97,13 @@ const verifyToken = useCallback(async () => {
     });
 
     // ignore if outdated
-    if (requestId !== currentRequest) return;
+    if (requestId !== currentRequest.current) return;
 
     if (userResponse.ok) {
       const responseData = await userResponse.json();
 
       // ignore if outdated
-      if (requestId !== currentRequest) return;
+      if (requestId !== currentRequest.current) return;
 
       const userData = responseData.profile;
 
@@ -129,13 +131,14 @@ const verifyToken = useCallback(async () => {
       };
 
       // final safety check
-      if (requestId !== currentRequest) return;
+      if (requestId !== currentRequest.current) return;
 
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
     }
   } catch (error) {
     console.log('error', error);
+    if (requestId !== currentRequest.current) return; 
     logout();
   }
 }, [setUser]);
@@ -405,6 +408,7 @@ const verifyToken = useCallback(async () => {
   };
 
   const logout = () => {
+    currentRequest.current = -1;
     setError(null);
     setToken(null);
     localStorage.removeItem('token');
