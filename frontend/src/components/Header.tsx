@@ -114,8 +114,11 @@ function Header() {
             </BreadcrumbLink>
           </BreadcrumbItem>
           {pathnames.map((value, index) => {
-            const to = `/${pathnames.slice(0, index + 1).join("/")}`;
-            const isLast = index === pathnames.length - 1;
+            let to = `/${pathnames.slice(0, index + 1).join("/")}`;
+            if (value === "tournament"){
+              to = "/tournaments";
+            }
+              const isLast = index === pathnames.length - 1;
             return (
               <React.Fragment key={to}>
                 <BreadcrumbSeparator />

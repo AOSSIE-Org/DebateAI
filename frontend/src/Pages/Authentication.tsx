@@ -119,6 +119,7 @@ const RightSection: React.FC<RightSectionProps> = ({
         <LoginForm
           startForgotPassword={startForgotPassword}
           infoMessage={infoMessage}
+          startOtpVerification={startOtpVerification}
         />
       )}
 

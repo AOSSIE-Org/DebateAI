@@ -24,6 +24,8 @@ type User struct {
 	Nickname                string             `bson:"nickname"`
 	IsVerified              bool               `bson:"isVerified"`
 	VerificationCode        string             `bson:"verificationCode,omitempty"`
+	VerificationCodeExpiry  time.Time          `bson:"verificationCodeExpiry,omitempty"`
+	VerificationCodeSentAt  time.Time          `bson:"verificationCodeSentAt,omitempty"`
 	ResetPasswordCode       string             `bson:"resetPasswordCode,omitempty"`
 	ResetPasswordCodeExpiry time.Time          `bson:"resetPasswordCodeExpiry,omitempty"`
 	CreatedAt               time.Time          `bson:"createdAt"`
