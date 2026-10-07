@@ -262,7 +262,7 @@ const Authentication = () => {
   };
 
   return (
-    <div className="flex flex-col xl:flex-row w-full overflow-x-hidden min-h-screen xl:h-screen xl:overflow-hidden bg-background">
+    <div className="flex flex-col xl:flex-row w-full overflow-x-hidden min-h-screen bg-background">
       <LeftSection />
 
       <RightSection
