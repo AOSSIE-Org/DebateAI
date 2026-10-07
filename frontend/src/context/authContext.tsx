@@ -230,7 +230,7 @@ const verifyToken = useCallback(async () => {
       const response = await fetch(`${baseURL}/verifyEmail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, confirmationCode: code }),
+        body: JSON.stringify({ email, confirmationCode: code.trim() }),
       });
 
       const data = await response.json().catch(() => ({}));

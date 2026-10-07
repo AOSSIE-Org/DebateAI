@@ -144,6 +144,32 @@ func SignUp(ctx *gin.Context) {
 	var existingUser models.User
 	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&existingUser)
 	if err == nil {
+		// If the user exists but is not verified, resend a fresh code
+		// instead of blocking them with "User already exists".
+		if !existingUser.IsVerified {
+			newCode := utils.GenerateRandomCode(6)
+			now := time.Now()
+			_, updErr := db.MongoDatabase.Collection("users").UpdateOne(
+				dbCtx,
+				bson.M{"email": request.Email},
+				bson.M{"$set": bson.M{
+					"verificationCode":       newCode,
+					"verificationCodeExpiry": now.Add(24 * time.Hour),
+					"verificationCodeSentAt": now,
+					"updatedAt":              now,
+				}},
+			)
+			if updErr != nil {
+				ctx.JSON(500, gin.H{"error": "Failed to resend verification code", "message": updErr.Error()})
+				return
+			}
+			if mailErr := utils.SendVerificationEmail(request.Email, newCode); mailErr != nil {
+				ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": mailErr.Error()})
+				return
+			}
+			ctx.JSON(200, gin.H{"message": "Sign-up successful. Please verify your email."})
+			return
+		}
 		ctx.JSON(400, gin.H{"error": "User already exists"})
 		return
 	}
@@ -151,7 +177,6 @@ func SignUp(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
 		return
 	}
-
 	// Check if displayName is already taken
 	defaultDisplayName := utils.ExtractNameFromEmail(request.Email)
 	var existingDisplayName models.User
@@ -207,6 +232,12 @@ func SignUp(ctx *gin.Context) {
 
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
 	if err != nil {
+		// Rollback: remove the orphan user so signup can be retried.
+		if _, delErr := db.MongoDatabase.Collection("users").DeleteOne(
+			dbCtx, bson.M{"email": request.Email},
+		); delErr != nil {
+			log.Printf("failed to rollback user %s after email failure: %v", request.Email, delErr)
+		}
 		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
 		return
 	}
@@ -228,7 +259,7 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
-
+	request.ConfirmationCode = strings.TrimSpace(request.ConfirmationCode)
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -298,7 +329,6 @@ func Login(ctx *gin.Context) {
 		return
 	}
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
-
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -315,6 +345,15 @@ func Login(ctx *gin.Context) {
 
 	if !user.IsVerified {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified", "code": "EMAIL_NOT_VERIFIED"})
+		return
+	}
+
+	// Google-created accounts have no password set.
+	if user.Password == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "This account was created with Google. Please sign in with Google.",
+			"code":  "USE_GOOGLE_LOGIN",
+		})
 		return
 	}
 
