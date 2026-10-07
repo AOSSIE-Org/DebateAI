@@ -83,7 +83,7 @@ const verifyToken = useCallback(async () => {
       localStorage.removeItem('token');
       setToken(null);
       setUser(null);
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 
