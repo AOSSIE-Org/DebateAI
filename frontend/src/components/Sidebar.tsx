@@ -21,9 +21,9 @@ function Sidebar() {
       <div className='flex items-center h-16 px-4 border-b border-border'>
         <div className='flex items-center gap-2'>
           <span className='text-xl font-bold'>DebateAI by</span>
-          <a 
-            href="https://aossie.org" 
-            target="_blank" 
+          <a
+            href="https://aossie.org"
+            target="_blank"
             rel="noopener noreferrer"
             className="hover:opacity-80 transition-opacity"
           >

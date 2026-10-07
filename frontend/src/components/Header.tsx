@@ -23,7 +23,6 @@ import debateAiLogo from "@/assets/aossie.png";
 import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) => {
   const image = event.currentTarget;
@@ -372,9 +371,6 @@ function Header() {
                 onClick={toggleDrawer}
               />
             </nav>
-            <div className="p-4 border-t border-border mt-auto">
-              <ThemeToggle direction="up" />
-            </div>
           </div>
         </div>
       )}
