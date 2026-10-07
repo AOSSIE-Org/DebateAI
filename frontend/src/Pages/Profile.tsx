@@ -490,7 +490,7 @@ const Profile: React.FC = () => {
         onSubmit={(e) => handleSubmit(e, "bio")}
         className="space-y-2 mb-2 w-full min-w-0 max-w-full"
       >
-        <Label htmlFor="bio" className="text-sm">Bio</Label>
+        <Label htmlFor="bio" className="sr-only">Bio</Label>
         <Textarea
           maxLength={BIO_MAX_LENGTH}
           id="bio"
