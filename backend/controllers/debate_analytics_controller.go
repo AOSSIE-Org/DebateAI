@@ -73,7 +73,7 @@ func AnalyzeDebate(c *gin.Context) {
 	}
 	totalLen := 0
 	for _, msg := range req.History {
-		totalLen += len(msg.Content)
+		totalLen += len(msg.Text)
 	}
 	if totalLen > maxTotalTextLength {
 		c.JSON(400, gin.H{"error": "Debate transcript exceeds the maximum allowed text length"})

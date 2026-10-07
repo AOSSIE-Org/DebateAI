@@ -271,6 +271,85 @@ const AnimatedScore: React.FC<{ target: number | string; color: string; label: s
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+function isValidAnalyticsData(data: unknown): data is AnalyticsData {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Record<string, unknown>;
+
+  if (
+    !d.overall_summary ||
+    typeof d.overall_summary !== "object" ||
+    typeof (d.overall_summary as Record<string, unknown>).user_overall_score !== "number" ||
+    typeof (d.overall_summary as Record<string, unknown>).bot_overall_score !== "number" ||
+    typeof (d.overall_summary as Record<string, unknown>).debate_quality !== "string"
+  ) {
+    return false;
+  }
+
+  if (
+    !d.pillar_scores ||
+    typeof d.pillar_scores !== "object" ||
+    !(d.pillar_scores as Record<string, unknown>).user ||
+    !(d.pillar_scores as Record<string, unknown>).bot
+  ) {
+    return false;
+  }
+
+  const userPillars = (d.pillar_scores as Record<string, Record<string, unknown>>).user;
+  const botPillars = (d.pillar_scores as Record<string, Record<string, unknown>>).bot;
+  const pillars = ["argument_strength", "rebuttal_effectiveness", "evidence_support", "rhetorical_style"] as const;
+  for (const p of pillars) {
+    const u = userPillars?.[p] as Record<string, unknown> | undefined;
+    const b = botPillars?.[p] as Record<string, unknown> | undefined;
+    if (!u || typeof u.score !== "number" || !b || typeof b.score !== "number") {
+      return false;
+    }
+  }
+
+  if (!Array.isArray(d.fallacies)) return false;
+  for (const f of d.fallacies) {
+    if (!f || typeof f !== "object") return false;
+    const fObj = f as Record<string, unknown>;
+    if (typeof fObj.type !== "string" || typeof fObj.sender !== "string") {
+      return false;
+    }
+  }
+
+  if (!Array.isArray(d.coaching_tips)) return false;
+  for (const c of d.coaching_tips) {
+    if (!c || typeof c !== "object") return false;
+    const cObj = c as Record<string, unknown>;
+    if (typeof cObj.title !== "string" || typeof cObj.tip !== "string") {
+      return false;
+    }
+  }
+
+  if (!d.argument_matrix || typeof d.argument_matrix !== "object") return false;
+
+  return true;
+}
+
+const keyframesStyle = (
+  <style>{`
+    @keyframes analytics-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes analytics-pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+    @keyframes analytics-shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    @keyframes analytics-fill {
+      0% { width: 0%; }
+      50% { width: 70%; }
+      100% { width: 95%; }
+    }
+  `}</style>
+);
+
 const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
   history,
   topic,
@@ -315,6 +394,9 @@ const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
         parsed = raw as unknown as AnalyticsData;
       }
 
+      if (!isValidAnalyticsData(parsed)) {
+        throw new Error("Invalid analytics data schema received from AI");
+      }
       setAnalytics(parsed);
     } catch (err) {
       console.error("Analytics fetch error:", err);
@@ -333,6 +415,7 @@ const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
   if (loading) {
     return (
       <div style={styles.overlay}>
+        {keyframesStyle}
         <div style={styles.loadingContainer}>
           <div style={styles.loadingPulse}>
             <div style={styles.spinnerRing} />
@@ -539,11 +622,24 @@ const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
                       style={{
                         ...styles.fallacyCard,
                         borderLeftColor: severityColors[f.severity] || "#f59e0b",
-                        cursor: "pointer",
                       }}
-                      onClick={() => setExpandedFallacy(expandedFallacy === i ? null : i)}
                     >
-                      <div style={styles.fallacyTop}>
+                      <button
+                        type="button"
+                        aria-expanded={expandedFallacy === i}
+                        onClick={() => setExpandedFallacy(expandedFallacy === i ? null : i)}
+                        style={{
+                          width: "100%",
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          textAlign: "left" as const,
+                          cursor: "pointer",
+                          color: "inherit",
+                          font: "inherit",
+                        }}
+                      >
+                        <div style={styles.fallacyTop}>
                         <div style={styles.fallacyLeft}>
                           <span style={{ fontSize: 20 }}>{fallacyIcons[f.type] || "🚩"}</span>
                           <div>
@@ -561,6 +657,7 @@ const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
                           <span style={{ fontSize: 14, color: "#64748b" }}>{expandedFallacy === i ? "▲" : "▼"}</span>
                         </div>
                       </div>
+                      </button>
                       {expandedFallacy === i && (
                         <div style={styles.fallacyDetails}>
                           <div style={styles.quoteBlock}>
@@ -671,10 +768,24 @@ const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
                 {coaching_tips?.map((tip, i) => (
                   <div
                     key={i}
-                    style={{ ...styles.coachingCard, cursor: "pointer" }}
-                    onClick={() => setExpandedTip(expandedTip === i ? null : i)}
+                    style={styles.coachingCard}
                   >
-                    <div style={styles.coachingTop}>
+                    <button
+                      type="button"
+                      aria-expanded={expandedTip === i}
+                      onClick={() => setExpandedTip(expandedTip === i ? null : i)}
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        textAlign: "left" as const,
+                        cursor: "pointer",
+                        color: "inherit",
+                        font: "inherit",
+                      }}
+                    >
+                      <div style={styles.coachingTop}>
                       <div style={styles.coachingLeft}>
                         <span style={{ fontSize: 24 }}>{categoryIcons[tip.category] || "💡"}</span>
                         <div>
@@ -689,6 +800,7 @@ const DebateAnalyticsReport: React.FC<DebateAnalyticsReportProps> = ({
                         <span style={{ fontSize: 14, color: "#64748b" }}>{expandedTip === i ? "▲" : "▼"}</span>
                       </div>
                     </div>
+                    </button>
                     {expandedTip === i && (
                       <div style={styles.coachingDetails}>
                         <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.7 }}>{tip.tip}</p>
