@@ -183,7 +183,7 @@ func GetFollowersHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"followers": users})
+	c.JSON(http.StatusOK, gin.H{"followers": sanitizeUsersForFollowList(users)})
 }
 
 // GetFollowingHandler gets users that a user is following
@@ -232,5 +232,38 @@ func GetFollowingHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"following": users})
+	c.JSON(http.StatusOK, gin.H{"following": sanitizeUsersForFollowList(users)})
+}
+
+// FollowUserResponse represents safe public user profile data for follower/following lists
+type FollowUserResponse struct {
+	ID            primitive.ObjectID `json:"id"`
+	DisplayName   string             `json:"displayName"`
+	AvatarURL     string             `json:"avatarUrl,omitempty"`
+	Bio           string             `json:"bio,omitempty"`
+	Rating        float64            `json:"rating"`
+	Score         int                `json:"score"`
+	CurrentStreak int                `json:"currentStreak"`
+	Badges        []string           `json:"badges,omitempty"`
+}
+
+func sanitizeUsersForFollowList(users []models.User) []FollowUserResponse {
+	sanitized := make([]FollowUserResponse, 0, len(users))
+	for _, u := range users {
+		name := u.DisplayName
+		if name == "" {
+			name = utils.ExtractNameFromEmail(u.Email)
+		}
+		sanitized = append(sanitized, FollowUserResponse{
+			ID:            u.ID,
+			DisplayName:   name,
+			AvatarURL:     u.AvatarURL,
+			Bio:           u.Bio,
+			Rating:        u.Rating,
+			Score:         u.Score,
+			CurrentStreak: u.CurrentStreak,
+			Badges:        u.Badges,
+		})
+	}
+	return sanitized
 }
