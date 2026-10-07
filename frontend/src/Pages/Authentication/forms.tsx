@@ -364,11 +364,14 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const baseURL = config.baseUrl;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    setLoading(true);
     setError('');
 
     try {
@@ -387,6 +390,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
       startResetPassword(email);
     } catch {
       setError('An unexpected error occurred. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -406,8 +411,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           className="w-full mb-4 border-border dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-        <Button type="submit" className="w-full border dark:border-white">
-          Send Reset Code
+        <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
+          {loading ? 'Sending...' : 'Send Reset Code'}
         </Button>
       </form>
     </div>
