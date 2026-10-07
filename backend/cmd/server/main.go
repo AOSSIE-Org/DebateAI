@@ -51,6 +51,7 @@ func main() {
 			log.Printf("⚠️ Warning: Failed to initialize Redis: %v", err)
 			log.Printf("⚠️ Some realtime features will be unavailable until Redis is reachable")
 		} else {
+			db.RedisClient = debate.GetRedisClient()
 			log.Println("Connected to Redis")
 		}
 	} else {
