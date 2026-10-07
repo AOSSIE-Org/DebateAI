@@ -10,7 +10,7 @@ function Layout() {
       <Sidebar />
       <div className='flex-1 flex flex-col h-full'>
         <Header />
-        <main className='flex-1 overflow-y-auto flex flex-col'>
+        <main className='flex-1 overflow-y-auto overflow-x-hidden flex flex-col'>
           <div className='flex-1 p-4 md:p-6'>
             <Outlet />
           </div>

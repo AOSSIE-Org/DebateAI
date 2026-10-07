@@ -9,6 +9,7 @@ import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -160,6 +161,76 @@ type DebateState = {
   isDebateEnded: boolean;
 };
 
+const isDebateData = (value: unknown): value is DebateProps => {
+  if (!value || typeof value !== "object") return false;
+
+  const data = value as Partial<DebateProps>;
+  return (
+    typeof data.userId === "string" &&
+    typeof data.botName === "string" &&
+    typeof data.botLevel === "string" &&
+    typeof data.topic === "string" &&
+    typeof data.stance === "string" &&
+    typeof data.debateId === "string" &&
+    Array.isArray(data.phaseTimings) &&
+    data.phaseTimings.length > 0 &&
+    data.phaseTimings.every(
+      (phase) =>
+        phase !== null &&
+        typeof phase === "object" &&
+        typeof phase.name === "string" &&
+        typeof phase.time === "number" &&
+        Number.isFinite(phase.time) &&
+        phase.time > 0
+    )
+  );
+};
+
+const isDebateState = (
+  value: unknown,
+  phaseTimings: DebateProps["phaseTimings"]
+): value is DebateState => {
+  if (!value || typeof value !== "object") return false;
+
+  const state = value as Partial<DebateState>;
+  const phaseSequence =
+    typeof state.currentPhase === "number"
+      ? phaseSequences[state.currentPhase]
+      : undefined;
+  return (
+    Array.isArray(state.messages) &&
+    state.messages.every(
+      (message) =>
+        message &&
+        typeof message === "object" &&
+        (message.sender === "User" ||
+          message.sender === "Bot" ||
+          message.sender === "Judge") &&
+        typeof message.text === "string" &&
+        typeof message.phase === "string"
+    ) &&
+    typeof state.currentPhase === "number" &&
+    Number.isInteger(state.currentPhase) &&
+    state.currentPhase >= 0 &&
+    state.currentPhase < phaseSequences.length &&
+    Array.isArray(phaseSequence) &&
+    phaseSequence.length > 0 &&
+    phaseSequence.every((stance) => stance === "For" || stance === "Against") &&
+    phaseTimings[state.currentPhase] !== undefined &&
+    typeof state.phaseStep === "number" &&
+    Number.isInteger(state.phaseStep) &&
+    state.phaseStep >= 0 &&
+    state.phaseStep < phaseSequence.length &&
+    phaseSequence[state.phaseStep] !== undefined &&
+    typeof state.isBotTurn === "boolean" &&
+    typeof state.userStance === "string" &&
+    typeof state.botStance === "string" &&
+    typeof state.timer === "number" &&
+    Number.isFinite(state.timer) &&
+    typeof state.isDebateEnded === "boolean"
+  );
+};
+
 type JudgmentData = {
   opening_statement: {
     user: { score: number; reason: string };
@@ -199,20 +270,20 @@ const turnTypes = [
 
 const extractJSON = (response: string): string => {
   if (!response) return "{}";
-  
+
   // Try to extract JSON from markdown code fences
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
   const match = fenceRegex.exec(response);
   if (match && match[1]) {
     return match[1].trim();
   }
-  
+
   // Try to find JSON object in the response
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     return jsonMatch[0];
   }
-  
+
   // If no JSON found, return empty object
   console.warn("No JSON found in response:", response);
   return "{}";
@@ -221,25 +292,87 @@ const extractJSON = (response: string): string => {
 const DebateRoom: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const debateData = location.state as DebateProps;
-  const phases = debateData.phaseTimings;
-  const debateKey = `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`;
+  const { toast } = useToast();
+
+  // Rehydrate debateData from location.state or sessionStorage
+  const [debateData] = useState<DebateProps | null>(() => {
+    if (location.state && isDebateData(location.state)) {
+      try {
+        sessionStorage.setItem(
+          `debateData_${location.pathname}`,
+          JSON.stringify(location.state)
+        );
+      } catch (err) {
+        console.error("Failed to cache debate data in sessionStorage:", err);
+      }
+      return location.state as DebateProps;
+    }
+    if (location.state) {
+      console.error("Router debate data failed validation:", location.state);
+    }
+    let cached: string | null = null;
+    try {
+      cached = sessionStorage.getItem(`debateData_${location.pathname}`);
+    } catch (err) {
+      console.error("Failed to access sessionStorage:", err);
+      return null;
+    }
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (isDebateData(parsed)) {
+          return parsed as DebateProps;
+        }
+        console.error("Cached debate data failed validation:", parsed);
+      } catch (err) {
+        console.error("Failed to parse cached debate data from sessionStorage:", err);
+      }
+    }
+    return null;
+  });
+
+  const phases = debateData?.phaseTimings || [];
+  const debateKey = debateData
+    ? `debate_${debateData.userId}_${debateData.topic}_${debateData.debateId}`
+    : "";
   const [user] = useAtom(userAtom);
 
   const [state, setState] = useState<DebateState>(() => {
-    const savedState = localStorage.getItem(debateKey);
-    return savedState
-      ? JSON.parse(savedState)
-      : {
-          messages: [],
-          currentPhase: 0,
-          phaseStep: 0,
-          isBotTurn: false,
-          userStance: "",
-          botStance: "",
-          timer: phases[0].time,
-          isDebateEnded: false,
-        };
+    const defaultState: DebateState = {
+      messages: [],
+      currentPhase: 0,
+      phaseStep: 0,
+      isBotTurn: false,
+      userStance: "",
+      botStance: "",
+      timer: debateKey ? phases[0]?.time ?? 60 : 60,
+      isDebateEnded: false,
+    };
+
+    if (!debateKey) return defaultState;
+
+    try {
+      const savedState = localStorage.getItem(debateKey);
+      if (!savedState) return defaultState;
+
+      const parsed: unknown = JSON.parse(savedState);
+      if (isDebateState(parsed, phases) && !parsed.isDebateEnded) return parsed;
+
+      if (isDebateState(parsed, phases) && parsed.isDebateEnded) {
+        try {
+          localStorage.removeItem(debateKey);
+        } catch (err) {
+          console.error("Failed to clear completed debate state:", err);
+        }
+        return defaultState;
+      }
+
+      console.error("Cached debate state failed validation:", parsed);
+    } catch (err) {
+      console.error("Failed to restore cached debate state:", err);
+    }
+
+    return defaultState;
   });
   const [finalInput, setFinalInput] = useState("");
   const [interimInput, setInterimInput] = useState("");
@@ -252,31 +385,45 @@ const DebateRoom: React.FC = () => {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const bot = allBots.find((b) => b.name === debateData.botName) || allBots[0];
+  const bot = debateData
+    ? allBots.find((b) => b.name === debateData.botName) || allBots[0]
+    : allBots[0];
   const userAvatar =
     user?.avatarUrl || DEFAULT_AVATAR_URL;
+
+  // Redirect to start-debate if no debate data is present
+  useEffect(() => {
+    if (!debateData) {
+      toast({
+        variant: "destructive",
+        title: "Debate Session Not Found",
+        description: "No active debate session found. Redirecting to debate setup.",
+      });
+      navigate("/start-debate", { replace: true });
+    }
+  }, [debateData, navigate, toast]);
 
   const handleConcede = async () => {
     if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
       try {
-        if (debateData.debateId) {
-            await concedeDebate(debateData.debateId, state.messages);
+        if (debateData?.debateId) {
+          await concedeDebate(debateData.debateId, state.messages);
         }
-        
+
         setState(prev => ({ ...prev, isDebateEnded: true }));
         setPopup({
-            show: true,
-            message: "You have conceded the debate.",
-            isJudging: false
+          show: true,
+          message: "You have conceded the debate.",
+          isJudging: false
         });
-        
+
         setTimeout(() => {
-            navigate("/startDebate");
+          navigate("/startDebate");
         }, 2000);
 
       } catch (error) {
@@ -349,20 +496,24 @@ const DebateRoom: React.FC = () => {
   };
 
   useEffect(() => {
-    localStorage.setItem(debateKey, JSON.stringify(state));
+    if (!debateKey) return;
+    try {
+      if (state.isDebateEnded) {
+        localStorage.removeItem(debateKey);
+        return;
+      }
+      localStorage.setItem(debateKey, JSON.stringify(state));
+    } catch (err) {
+      console.error("Failed to persist debate state:", err);
+    }
   }, [state, debateKey]);
 
   useEffect(() => {
-    return () => {
-      localStorage.removeItem(debateKey);
-    };
-  }, [debateKey]);
-
-  useEffect(() => {
-    if (!state.userStance) {
+    if (!debateData || !state.userStance) {
+      if (!debateData) return;
       const stanceNormalized =
         debateData.stance.toLowerCase() === "for" ||
-        debateData.stance.toLowerCase() === "against"
+          debateData.stance.toLowerCase() === "against"
           ? debateData.stance.toLowerCase() === "for"
             ? "For"
             : "Against"
@@ -374,7 +525,7 @@ const DebateRoom: React.FC = () => {
         isBotTurn: stanceNormalized === "Against",
       }));
     }
-  }, [state.userStance, debateData.stance]);
+  }, [state.userStance, debateData?.stance]);
 
   useEffect(() => {
     if (state.timer > 0 && !state.isDebateEnded) {
@@ -453,9 +604,8 @@ const DebateRoom: React.FC = () => {
       const newPhase = currentState.currentPhase + 1;
       setPopup({
         show: true,
-        message: `${phases[currentState.currentPhase].name} completed. Next: ${
-          phases[newPhase].name
-        } - ${getPhaseInstructions(newPhase)}`,
+        message: `${phases[currentState.currentPhase].name} completed. Next: ${phases[newPhase].name
+          } - ${getPhaseInstructions(newPhase)}`,
       });
       setTimeout(() => {
         setPopup({ show: false, message: "" });
@@ -514,6 +664,11 @@ const DebateRoom: React.FC = () => {
   };
 
   const handleBotTurn = async () => {
+    if (!debateData) {
+      console.error("Cannot handle bot turn without debate data.");
+      return;
+    }
+
     try {
       const turnType = turnTypes[state.currentPhase][state.phaseStep];
       let context = "";
@@ -577,6 +732,11 @@ const DebateRoom: React.FC = () => {
   };
 
   const judgeDebateResult = async (messages: Message[]) => {
+    if (!debateData) {
+      console.error("Cannot judge debate without debate data.");
+      return;
+    }
+
     try {
       console.log("Starting judgment with messages:", messages);
       const { result } = await judgeDebate({
@@ -588,25 +748,25 @@ const DebateRoom: React.FC = () => {
 
       let judgment: JudgmentData;
 
-if (typeof result === "string") {
-  const jsonString = extractJSON(result);
-  console.log("Extracted JSON:", jsonString);
-  judgment = JSON.parse(jsonString);
-} else {
- const res: any = result;
+      if (typeof result === "string") {
+        const jsonString = extractJSON(result);
+        console.log("Extracted JSON:", jsonString);
+        judgment = JSON.parse(jsonString);
+      } else {
+        const res: any = result;
 
-if (res?.opening_statement && res?.verdict) {
-  judgment = res as JudgmentData;
-} else {
-  console.error("Invalid judgment structure:", result);
-  return;
-}
-}
+        if (res?.opening_statement && res?.verdict) {
+          judgment = res as JudgmentData;
+        } else {
+          console.error("Invalid judgment structure:", result);
+          return;
+        }
+      }
 
-console.log("FINAL PARSED:", judgment);
-setJudgmentData(judgment);
-setPopup({ show: false, message: "" });
-      
+      console.log("FINAL PARSED:", judgment);
+      setJudgmentData(judgment);
+      setPopup({ show: false, message: "" });
+
     } catch (error) {
       console.error("Judging error:", error);
       // Show error to user
@@ -615,7 +775,7 @@ setPopup({ show: false, message: "" });
         message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
         isJudging: false,
       });
-      
+
       // Set default judgment data
       setJudgmentData({
         opening_statement: {
@@ -643,8 +803,8 @@ setPopup({ show: false, message: "" });
         },
       });
       setTimeout(() => {
-  setPopup({ show: false, message: "" });
-}, 3000);
+        setPopup({ show: false, message: "" });
+      }, 3000);
     }
   };
 
@@ -654,9 +814,8 @@ setPopup({ show: false, message: "" });
       .padStart(2, "0")}`;
     return (
       <span
-        className={`font-mono ${
-          seconds <= 5 ? "text-destructive animate-pulse" : "text-muted-foreground"
-        }`}
+        className={`font-mono ${seconds <= 5 ? "text-destructive animate-pulse" : "text-muted-foreground"
+          }`}
       >
         {timeStr}
       </span>
@@ -694,7 +853,7 @@ setPopup({ show: false, message: "" });
         judgment={judgmentData}
         userAvatar={userAvatar}
         botAvatar={bot.avatar}
-        botName={debateData.botName}
+        botName={debateData?.botName || "Bot"}
         userStance={state.userStance}
         botStance={state.botStance}
         botDesc={bot.desc}
@@ -743,14 +902,22 @@ setPopup({ show: false, message: "" });
       {showAnalytics && (
         <DebateAnalyticsReport
           history={state.messages}
-          topic={debateData.topic}
+          topic={debateData?.topic || "Debate"}
           userStance={state.userStance}
-          botName={debateData.botName}
+          botName={debateData?.botName || "Bot"}
           userAvatar={userAvatar}
           botAvatar={bot.avatar}
           onClose={() => setShowAnalytics(false)}
         />
       )}
+    </div>
+  );
+}
+
+if (!debateData) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground text-sm">Redirecting to debate setup...</p>
     </div>
   );
 }
@@ -773,8 +940,8 @@ setPopup({ show: false, message: "" });
               {currentTurnType === "statement"
                 ? "make a statement"
                 : currentTurnType === "question"
-                ? "ask a question"
-                : "answer"}
+                  ? "ask a question"
+                  : "answer"}
             </span>
           </p>
         </div>
@@ -807,9 +974,8 @@ setPopup({ show: false, message: "" });
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            state.isBotTurn ? "animate-glow" : ""
-          } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""
+            } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -855,9 +1021,8 @@ setPopup({ show: false, message: "" });
 
         {/* User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${
-            !state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
-          } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 ${!state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
+            } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -927,8 +1092,8 @@ setPopup({ show: false, message: "" });
                     currentTurnType === "statement"
                       ? "Make your statement"
                       : currentTurnType === "question"
-                      ? "Ask your question"
-                      : "Provide your answer"
+                        ? "Ask your question"
+                        : "Provide your answer"
                   }
                   className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary"
                 />

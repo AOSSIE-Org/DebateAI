@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
-  const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+  const baseURL = config.baseUrl || 'http://localhost:1313';
 
   useEffect(() => {
     console.log('=== UserProfileModal useEffect ===');

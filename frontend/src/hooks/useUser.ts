@@ -1,3 +1,4 @@
+import config from "../config/config";
 import { useEffect, useContext } from "react";
 import { useAtom } from "jotai";
 import { userAtom } from "../state/userAtom";
@@ -36,7 +37,7 @@ export const useUser = () => {
       if (user?.email) return;
 
       try {
-        const baseUrl = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+        const baseUrl = config.baseUrl || "http://localhost:1313";
         const response = await fetch(`${baseUrl}/user/fetchprofile`, {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },

@@ -1,3 +1,4 @@
+import config from "../config/config";
 import {
   createContext,
   useState,
@@ -11,7 +12,7 @@ import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
 import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
 
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = config.baseUrl;
 const USER_CACHE_KEY = 'userProfile';
 
 interface AuthContextType {

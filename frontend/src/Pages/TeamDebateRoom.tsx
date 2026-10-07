@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAtom } from "jotai";
@@ -128,7 +129,7 @@ const phaseDurations: { [key in DebatePhase]?: number } = {
 };
 
 const BASE_URL =
-  (import.meta.env.VITE_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
+  (config.baseUrl as string | undefined)?.replace(/\/$/, "") ??
   window.location.origin;
 
 // Function to extract JSON from response
