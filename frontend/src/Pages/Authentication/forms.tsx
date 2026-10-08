@@ -301,7 +301,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
     e.preventDefault();
     clearError();
     try {
-      await verifyEmail(email, otp);
+      await verifyEmail(email, otp.trim());
       handleOtpVerified();
     } catch {
       // Handled by authContext error state
