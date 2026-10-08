@@ -24,6 +24,11 @@ func main() {
 		panic("Failed to load config: " + err.Error())
 	}
 
+	// ADD THIS CHECK
+if cfg.JWT.Secret == "" {
+    panic("JWT_SECRET is required but not set. Please set the JWT_SECRET environment variable.")
+}
+
 	services.InitDebateVsBotService(cfg)
 	services.InitCoachService()
 	services.InitRatingService(cfg)
