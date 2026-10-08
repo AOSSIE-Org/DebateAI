@@ -359,14 +359,18 @@ func WebsocketHandler(c *gin.Context) {
 	// Send current participants to the new client
 	room.Mutex.Lock()
 	room.Clients[conn] = client
+	clientsSnapshot := make([]*Client, 0, len(room.Clients))
+	for _, cl := range room.Clients {
+		clientsSnapshot = append(clientsSnapshot, cl)
+	}
 	room.Mutex.Unlock()
 
 	// Send participants list to newly connected client
 	participantsMsg := buildParticipantsMessage(room)
 	client.SafeWriteJSON(participantsMsg)
 
-	// Send existing participants' detailed info to the new client
-	for connRef, existing := range room.Clients {
+	// Send existing participants' detailed info to the new client safely using snapshot
+	for _, existing := range clientsSnapshot {
 		payload := map[string]interface{}{
 			"id":          existing.UserID,
 			"username":    existing.Username,
@@ -380,13 +384,7 @@ func WebsocketHandler(c *gin.Context) {
 			"userDetails": payload,
 		}
 
-		if connRef == conn {
-			// Already sent this client's participant data; ensure they have their own detail payload too
-			client.SafeWriteJSON(detailMessage)
-		} else {
-			// Send existing participant info to the new client
-			client.SafeWriteJSON(detailMessage)
-		}
+		client.SafeWriteJSON(detailMessage)
 	}
 
 	// Prepare detailed payload for the new client to broadcast to others
