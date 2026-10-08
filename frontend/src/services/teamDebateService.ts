@@ -1,8 +1,9 @@
+import config from "../config/config";
 import { Team } from "./teamService";
 
 // Team debate service for API calls
 const API_BASE_URL =
-  (import.meta.env.VITE_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
+  (config.baseUrl as string | undefined)?.replace(/\/$/, "") ??
   window.location.origin;
 
 function getAuthToken(): string {

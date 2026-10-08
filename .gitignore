@@ -3,6 +3,7 @@
 *.env
 config.prod.yml
 vite.config.ts.timestamp-*.mjs
+
 .DS_Store
 
 # Temporary previews and captures
@@ -13,3 +14,5 @@ vite.config.ts.timestamp-*.mjs
 server
 main
 *.exe
+.vscode/
+

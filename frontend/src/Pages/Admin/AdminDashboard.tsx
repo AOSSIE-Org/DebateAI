@@ -40,6 +40,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, Users, MessageSquare, Activity } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type SnapshotLike = AnalyticsSnapshot &
   Partial<Record<"DebatesToday" | "CommentsToday" | "NewUsersToday", number>>;
@@ -474,9 +475,13 @@ export default function AdminDashboard() {
     setSelectedComments(newSelected);
   };
 
-  if (loading) {
-    return <div className="p-8">Loading...</div>;
-  }
+ if (loading) {
+   return (
+     <div className="flex items-center justify-center min-h-screen">
+       <LoadingSpinner fullScreen />
+     </div>
+   );
+ }
 
   if (error) {
     return (

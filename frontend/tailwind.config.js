@@ -10,6 +10,9 @@ export default {
       fontFamily: {
         sans: ["Outfit", "sans-serif"],
       },
+      screens: {
+        xs: '390px',
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',

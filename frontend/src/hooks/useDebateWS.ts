@@ -1,3 +1,4 @@
+import config from "../config/config";
 import { useEffect, useRef } from 'react';
 import { useAtom } from 'jotai';
 import {
@@ -65,7 +66,7 @@ export const useDebateWS = (debateId: string | null) => {
 
     // Get WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const apiUrl = import.meta.env.VITE_API_URL;
+    const apiUrl = config.baseUrl;
     let host = window.location.host;
     if (apiUrl) {
       try {

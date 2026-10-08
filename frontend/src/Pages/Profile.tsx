@@ -1,3 +1,4 @@
+import config from "../config/config";
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -57,7 +58,6 @@ import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import {
   PieChart,
   Pie,
-  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
@@ -77,6 +77,7 @@ import {
   checkDisplayNameAvailability,
 } from "@/services/profileService";
 import { getAuthToken } from "@/utils/auth";
+import { useNavigate } from "react-router-dom";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
@@ -86,6 +87,7 @@ import {
   transcriptService,
   SavedDebateTranscript,
 } from "@/services/transcriptService";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const handleProfileAvatarLoadError = (
   event: React.SyntheticEvent<HTMLImageElement>
@@ -171,8 +173,10 @@ const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> =
 const BIO_MAX_LENGTH = 300;
 
 const Profile: React.FC = () => {
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [draftValue, setDraftValue] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -214,6 +218,25 @@ const Profile: React.FC = () => {
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const availabilityCheckId = useRef(0);
+  const editSessionRef = useRef(0);
+
+  const handleStartEdit = (field: string, initialValue: string = "") => {
+    editSessionRef.current += 1;
+    availabilityCheckId.current += 1;
+    setEditingField(field);
+    setDraftValue(initialValue);
+    setErrorMessage("");
+  };
+
+  const handleCancelEdit = () => {
+    editSessionRef.current += 1;
+    availabilityCheckId.current += 1;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    setEditingField(null);
+    setDraftValue("");
+    setUsernameStatus("idle");
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -255,11 +278,20 @@ const Profile: React.FC = () => {
     setSelectedDebate(debate);
     setIsDebateDialogOpen(true);
     setTranscriptLoading(true);
+        setErrorMessage("");
+        setFullTranscript(null); 
+
     try {
       const transcript = await transcriptService.getTranscriptById(debate.id);
       setFullTranscript(transcript);
-    } catch {
-      // transcript fetch failed
+    } catch(error) {
+       console.error("Error fetching transcript:", error);
+       setFullTranscript(null);
+       setErrorMessage(
+         error instanceof Error
+           ? error.message
+           : "Failed to load transcript. Please try again."
+       );
     } finally {
       setTranscriptLoading(false);
     }
@@ -293,22 +325,25 @@ const Profile: React.FC = () => {
       return;
     }
 
+    const sessionAtSubmit = editSessionRef.current;
+
     try {
       await updateProfile(
         token,
-        dashboard.profile.displayName,
-        dashboard.profile.bio,
-        dashboard.profile.twitter,
-        dashboard.profile.instagram,
-        dashboard.profile.linkedin,
+        field === "displayName" ? draftValue.trim() : dashboard.profile.displayName,
+        field === "bio" ? draftValue : dashboard.profile.bio,
+        field === "twitter" ? draftValue : dashboard.profile.twitter,
+        field === "instagram" ? draftValue : dashboard.profile.instagram,
+        field === "linkedin" ? draftValue : dashboard.profile.linkedin,
         dashboard.profile.avatarUrl
       );
       setSuccessMessage(
         `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully!`
       );
       setErrorMessage("");
-      setEditingField(null);
-      setUsernameStatus("idle");
+      if (editSessionRef.current === sessionAtSubmit) {
+        handleCancelEdit();
+      }
       // Refetch to sync updated displayName across the page
       const updatedData = await getProfile(token);
       setDashboard(updatedData);
@@ -384,19 +419,16 @@ const Profile: React.FC = () => {
           <Input
             id={field}
             type="text"
-            value={(dashboard?.profile[field] as string) || ""}
+            value={draftValue}
             onChange={(e) => {
               const rules = socialValidation[field as string];
               let val = e.target.value;
               if (field === "linkedin") val = val.toLowerCase();
               val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
-              setDashboard({
-                ...dashboard!,
-                profile: { ...dashboard!.profile, [field]: val },
-              });
+              setDraftValue(val);
             }}
             placeholder={placeholder}
-            className="text-sm w-full"
+            className="text-sm w-full [.contrast_&]:border-border"
           />
         </div>
         <div className="flex gap-2">
@@ -404,9 +436,10 @@ const Profile: React.FC = () => {
             Save
           </Button>
           <Button
+            type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setEditingField(null)}
+            onClick={handleCancelEdit}
             className="flex-1"
           >
             Cancel
@@ -442,7 +475,7 @@ const Profile: React.FC = () => {
           </span>
         )}
         <button
-          onClick={() => setEditingField(field as string)}
+          onClick={() => handleStartEdit(field as string, (dashboard?.profile[field] as string) || "")}
           className="p-1 hover:bg-muted rounded-full transition-colors flex-shrink-0"
           title={`Edit ${label}`}
         >
@@ -456,29 +489,28 @@ const Profile: React.FC = () => {
     return editingField === "bio" ? (
       <form
         onSubmit={(e) => handleSubmit(e, "bio")}
-        className="space-y-2 mb-2 w-full"
+        className="space-y-2 mb-2 w-full min-w-0 max-w-full"
       >
         <Label htmlFor="bio" className="text-sm">Bio</Label>
         <Textarea
           maxLength={BIO_MAX_LENGTH}
           id="bio"
-          value={dashboard?.profile.bio || ""}
-          onChange={(e) =>
-            setDashboard({
-              ...dashboard!,
-              profile: { ...dashboard!.profile, bio: e.target.value },
-            })
-          }
+          value={draftValue}
+          onChange={(e) => setDraftValue(e.target.value)}
+          onInput={(e) => {
+            e.currentTarget.style.height = "auto";
+            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+          }}
           placeholder="Share your story"
-          className="text-sm w-full resize-none h-20"
+          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
         />
-        <p className={`text-xs text-right ${(dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
+        <p className={`text-xs text-right ${draftValue.length >= BIO_MAX_LENGTH
           ? "text-red-500"
-          : (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH - 60
+          : draftValue.length >= BIO_MAX_LENGTH - 60
             ? "text-orange-500"
             : "text-muted-foreground"
           }`}>
-          {dashboard?.profile.bio?.length || 0} / {BIO_MAX_LENGTH}
+          {draftValue.length} / {BIO_MAX_LENGTH}
         </p>
         <div className="flex gap-2">
           <Button
@@ -486,25 +518,18 @@ const Profile: React.FC = () => {
             size="sm"
             variant="default"
             className="flex-1"
-            disabled={(dashboard?.profile.bio?.length || 0) > BIO_MAX_LENGTH}
+            disabled={draftValue.length > BIO_MAX_LENGTH}
           >
             Save
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => setEditingField(null)} className="flex-1">Cancel</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={handleCancelEdit} className="flex-1">Cancel</Button>
         </div>
       </form>
     ) : (
-      <div className="flex items-start justify-between mb-2 w-full min-w-0">
-        <span className="text-sm text-foreground whitespace-pre-wrap overflow-hidden break-words min-w-0">
+      <div className="mb-2 w-full min-w-0">
+        <span className="block w-full text-sm text-foreground whitespace-pre-wrap overflow-hidden min-w-0 [overflow-wrap:anywhere]">
           {dashboard?.profile.bio || "Add your bio"}
         </span>
-        <button
-          onClick={() => setEditingField("bio")}
-          className="p-1 hover:bg-muted rounded-full transition-colors flex-shrink-0"
-          title="Edit Bio"
-        >
-          <Pen className="w-3 h-3 text-muted-foreground" />
-        </button>
       </div>
     );
   };
@@ -608,7 +633,7 @@ const Profile: React.FC = () => {
     const [following, setFollowing] = useState<FollowUser[]>([]);
     const [loadingFollowers, setLoadingFollowers] = useState(false);
     const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+    const baseURL = config.baseUrl || "http://localhost:1313";
 
     useEffect(() => {
       if (user?.id) {
@@ -666,7 +691,7 @@ const Profile: React.FC = () => {
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowers ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner/></div>
             ) : followers.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">No followers yet</div>
             ) : (
@@ -688,7 +713,7 @@ const Profile: React.FC = () => {
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowing ? (
-              <div className="text-center py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner size="sm" /></div>
             ) : following.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">Not following anyone yet</div>
             ) : (
@@ -709,7 +734,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="w-full flex flex-col lg:flex-row gap-4 p-2 sm:p-4 bg-background">
-      <div className="w-full lg:w-1/3 bg-card p-4 sm:p-6 border border-border rounded-md shadow lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
+      <div className="w-full min-w-0 lg:w-1/3 bg-card p-4 sm:p-6 border border-border rounded-md shadow lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
         {successMessage && (
           <div className="mb-2 p-2 rounded bg-green-100 text-green-700 text-xs animate-in fade-in duration-300">
             {successMessage}
@@ -746,29 +771,33 @@ const Profile: React.FC = () => {
               <Input
                 id="displayName"
                 type="text"
-                value={profile.displayName || ""}
+                value={draftValue}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setDashboard({ ...dashboard, profile: { ...profile, displayName: val } });
+                  setDraftValue(val);
+                  if (debounceTimer.current) clearTimeout(debounceTimer.current);
                   if (!val.trim()) {
+                    availabilityCheckId.current += 1;
                     setUsernameStatus("idle");
                     return;
                   }
-                  if (debounceTimer.current) clearTimeout(debounceTimer.current);
+                  const checkId = ++availabilityCheckId.current;
                   setUsernameStatus("checking");
                   debounceTimer.current = setTimeout(async () => {
                     try {
                       const token = getAuthToken();
                       if (!token) return;
                       const res = await checkDisplayNameAvailability(token, val.trim());
+                      if (availabilityCheckId.current !== checkId) return;
                       setUsernameStatus(res.available ? "available" : "taken");
                     } catch {
+                      if (availabilityCheckId.current !== checkId) return;
                       setUsernameStatus("idle");
                     }
                   }, 300);
                 }}
                 ref={inputRef}
-                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs"
+                className="text-lg sm:text-xl font-bold h-9 w-full max-w-xs [.contrast_&]:border-border"
                 placeholder="Enter display name"
               />
               {usernameStatus === "checking" && (
@@ -791,9 +820,10 @@ const Profile: React.FC = () => {
                   Save
                 </Button>
                 <Button
+                  type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => { setEditingField(null); setUsernameStatus("idle"); }}
+                  onClick={handleCancelEdit}
                   className="flex-1 text-xs"
                 >
                   Cancel
@@ -806,7 +836,7 @@ const Profile: React.FC = () => {
                 {profile.displayName || "Set your name"}
               </h2>
               <button
-                onClick={() => setEditingField("displayName")}
+                onClick={() => handleStartEdit("displayName", profile.displayName || "")}
                 className="p-1 hover:bg-muted rounded-full"
                 title="Edit Display Name"
               >
@@ -845,8 +875,19 @@ const Profile: React.FC = () => {
 
         <Separator className="my-2" />
 
-        <div className="space-y-2 mb-4">
-          <h3 className="text-xs sm:text-sm font-semibold text-foreground">Bio</h3>
+        <div className="space-y-2 mb-4 min-w-0">
+          <div className="flex items-center justify-between w-full">
+            <h3 className="text-xs sm:text-sm font-semibold text-foreground">Bio</h3>
+            {editingField !== "bio" && (
+              <button
+                onClick={() => handleStartEdit("bio", dashboard?.profile.bio || "")}
+                className="p-1 hover:bg-muted rounded-full transition-colors"
+                title="Edit Bio"
+              >
+                <Pen className="w-3 h-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
           {renderBioField()}
         </div>
 
@@ -859,7 +900,7 @@ const Profile: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {profile.badges.map((badge, index) => {
                 const badgeIcons: Record<string, React.ReactNode> = {
-                  Novice: <FaAward className="w-6 h-6 text-blue-500" />,
+                  Novice: <FaAward className="w-6 h-6 text-primary" />,
                   Streak5: <FaMedal className="w-6 h-6 text-yellow-500" />,
                   FactMaster: <FaTrophy className="w-6 h-6 text-purple-500" />,
                   FirstWin: <FaTrophy className="w-6 h-6 text-green-500" />,
@@ -877,7 +918,7 @@ const Profile: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:bg-accent transition-colors cursor-pointer group"
+                    className="flex flex-col items-center justify-center p-3 bg-muted rounded-lg border border-border hover:border-primary hover:shadow-md transition-all cursor-pointer group"
                     title={badgeDescription}
                   >
                     <div className="mb-1 group-hover:scale-110 transition-transform">{badgeIcon}</div>
@@ -899,37 +940,36 @@ const Profile: React.FC = () => {
 
       <div className="flex-1 flex flex-col space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Keep chart canvases constrained to their cards so Recharts responds to every container resize. */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
-            <CardContent className="flex-1 p-4">
+            <CardContent className="flex-1 min-h-0 min-w-0 p-4">
               {totalMatches === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">No matches yet!</p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button variant="outline" size="sm" onClick={() => navigate("/startDebate")} className="hover:bg-primary hover:text-primary-foreground text-xs">
                     Start Debating
                   </Button>
                 </div>
               ) : (
-                <ChartContainer config={donutChartConfig} className="mx-auto w-full h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                      <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
-                        <LabelList
-                          content={({ viewBox }) => {
-                            if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                              return (
-                                <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                                  <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
-                                  <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
-                                </text>
-                              );
-                            }
-                          }}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={donutChartConfig} className="mx-auto h-full min-h-0 w-full min-w-0">
+                  <PieChart>
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                    <Pie data={donutChartData} dataKey="value" nameKey="label" innerRadius="40%" strokeWidth={3}>
+                      <LabelList
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                              <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                                <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-sm sm:text-base font-bold">{totalMatches}</tspan>
+                                <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 16} className="fill-muted-foreground text-xs">Matches</tspan>
+                              </text>
+                            );
+                          }
+                        }}
+                      />
+                    </Pie>
+                  </PieChart>
                 </ChartContainer>
               )}
             </CardContent>
@@ -941,7 +981,7 @@ const Profile: React.FC = () => {
                 <CardTitle className="text-foreground text-base sm:text-lg">Ratings</CardTitle>
                 <div className="flex flex-wrap gap-2 items-center">
                   <Select value={eloFilter} onValueChange={(value: "7days" | "30days" | "all" | "custom") => setEloFilter(value)}>
-                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs">
+                    <SelectTrigger className="min-w-[100px] sm:min-w-[120px] text-xs [.contrast_&]:border-border">
                       <SelectValue placeholder="Select filter" />
                     </SelectTrigger>
                     <SelectContent>
@@ -955,7 +995,7 @@ const Profile: React.FC = () => {
                     <div className="flex gap-2 items-center">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs">
+                          <Button variant="outline" className="w-[160px] sm:w-[180px] justify-start text-left font-normal truncate text-xs [.contrast_&]:border-border">
                             <CalendarIcon className="mr-2 h-3 w-3 flex-shrink-0" />
                             <span className="truncate">
                               {customDateRange.from
@@ -984,18 +1024,16 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-2 flex-1">
+            <CardContent className="p-2 flex-1 min-h-0 min-w-0">
               {filteredEloHistory.length > 0 && !(eloFilter === "custom" && filteredEloHistory.length === 1 && filteredEloHistory[0].elo === profile.rating) ? (
-                <ChartContainer config={eloChartConfig} className="w-full h-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
-                      <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
-                      <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
-                      <ChartTooltip content={<CustomTooltip />} />
-                      <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={eloChartConfig} className="h-full min-h-0 w-full min-w-0">
+                  <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
+                    <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
+                    <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
+                    <ChartTooltip content={<CustomTooltip />} />
+                    <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
+                  </LineChart>
                 </ChartContainer>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center">
@@ -1003,7 +1041,7 @@ const Profile: React.FC = () => {
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                     {eloFilter === "custom" ? "No debates in this date range!" : "No Elo history for selected period!"}
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button variant="outline" size="sm" onClick={() => navigate("/startDebate")} className="hover:bg-primary hover:text-primary-foreground text-xs">
                     Join a Debate
                   </Button>
                 </div>
@@ -1083,7 +1121,7 @@ const Profile: React.FC = () => {
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Award className="w-10 h-10 text-muted-foreground mb-2 animate-pulse" />
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">No recent debates available.</p>
-                  <Button variant="outline" size="sm" onClick={() => (window.location.href = "/debates")} className="hover:bg-primary hover:text-primary-foreground text-xs">
+                  <Button variant="outline" size="sm" onClick={() => navigate("/startDebate")} className="hover:bg-primary hover:text-primary-foreground text-xs">
                     Join a Debate
                   </Button>
                 </div>
@@ -1196,7 +1234,11 @@ const Profile: React.FC = () => {
                 </div>
               )}
               <div className="text-center">
-                <Button variant="outline" onClick={() => (window.location.href = "/debates")}>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/startDebate")}
+                  className="[.contrast_&]:border-white"
+                >
                   Start New Debate
                 </Button>
               </div>

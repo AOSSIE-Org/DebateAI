@@ -1,3 +1,4 @@
+import config from "../config/config";
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import clsx from 'clsx';
@@ -18,7 +19,7 @@ interface FloatingEmoji {
 type VoteOption = 'FOR' | 'AGAINST';
 
 const wsBaseURL = (
-  import.meta.env.VITE_BASE_URL || 'http://localhost:1313'
+  config.baseUrl || 'http://localhost:1313'
 ).replace(/^http/, 'ws');
 
 const ChatRoom = () => {

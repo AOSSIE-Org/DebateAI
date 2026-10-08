@@ -1,4 +1,10 @@
-const baseURL = import.meta.env.VITE_BASE_URL;
+import config from "../config/config";
+const baseURL =
+  config.baseUrl ??
+  (import.meta.env.DEV ? "http://localhost:1313" : undefined);
+if (!baseURL) {
+  throw new Error("VITE_BASE_URL is not set. Define it in your frontend .env file.");
+}
 
 export interface Admin {
   id: string;

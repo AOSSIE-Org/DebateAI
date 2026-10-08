@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -159,7 +160,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
         return;
       }
 
-      const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+      const baseURL = config.baseUrl || 'http://localhost:1313';
       const response = await fetch(`${baseURL}/posts`, {
         method: 'POST',
         headers: {
@@ -305,11 +306,11 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder='Search topic or opponent...'
                     aria-label='Search transcripts by topic or opponent'
-                    className='pl-9'
+                    className='pl-9 [.contrast_&]:border-border'
                   />
                 </div>
                 <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
-                  <SelectTrigger className='sm:w-[160px]'>
+                  <SelectTrigger className='sm:w-[160px] [.contrast_&]:border-border'>
                     <SelectValue placeholder='All Outcomes' />
                   </SelectTrigger>
                   <SelectContent>
@@ -321,7 +322,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                   </SelectContent>
                 </Select>
                 <Select value={modeFilter} onValueChange={setModeFilter}>
-                  <SelectTrigger className='sm:w-[160px]'>
+                  <SelectTrigger className='sm:w-[160px] [.contrast_&]:border-border'>
                     <SelectValue placeholder='All Modes' />
                   </SelectTrigger>
                   <SelectContent>
