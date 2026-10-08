@@ -24,6 +24,12 @@ COPY --from=builder /app/server .
 # Explicitly copy the config folder
 COPY --from=builder /app/config/config.prod.yml ./config/config.prod.yml
 
+# Create a non-root user and give ownership of /app
+RUN addgroup -S app && adduser -S app -G app && chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
 EXPOSE 1313
 
 CMD ["./server"]
