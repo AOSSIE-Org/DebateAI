@@ -81,6 +81,12 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 		return
 	}
 
+	// Persist calculated Elo rating changes onto the saved debate transcripts
+	_ = services.UpdateTranscriptEloChange(context.Background(), request.UserID, request.Topic, debate.RatingChange)
+	if opponentDebate != nil {
+		_ = services.UpdateTranscriptEloChange(context.Background(), request.OpponentID, request.Topic, opponentDebate.RatingChange)
+	}
+
 	opponentSummary := gin.H{}
 	if opponentDebate != nil {
 		opponentSummary = gin.H{

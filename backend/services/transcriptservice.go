@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -224,6 +225,10 @@ func SubmitTranscripts(
 					records := []interface{}{debateRecord, opponentRecord}
 					if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
 					}
+
+					// Persist calculated Elo rating changes onto the saved debate transcripts
+					_ = UpdateTranscriptEloChange(ctx, forUser.ID, topic, debateRecord.RatingChange)
+					_ = UpdateTranscriptEloChange(ctx, againstUser.ID, topic, opponentRecord.RatingChange)
 
 					ratingSummary = map[string]interface{}{
 						"for": map[string]float64{
@@ -655,6 +660,11 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 
 // SaveDebateTranscript saves a debate transcript for later viewing
 func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+	return SaveDebateTranscriptWithElo(userID, email, debateType, topic, opponent, result, 0, messages, transcripts)
+}
+
+// SaveDebateTranscriptWithElo saves a debate transcript along with Elo rating change
+func SaveDebateTranscriptWithElo(userID primitive.ObjectID, email, debateType, topic, opponent, result string, eloChange float64, messages []models.Message, transcripts map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -674,17 +684,18 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 	err := collection.FindOne(ctx, filter).Decode(&existingTranscript)
 	if err == nil {
 		// Transcript already exists, check if we need to update it
-
-		// If the result has changed or is "pending", update the transcript
-		if existingTranscript.Result != result || existingTranscript.Result == "pending" {
-			update := bson.M{
-				"$set": bson.M{
-					"result":      result,
-					"messages":    messages,
-					"transcripts": transcripts,
-					"updatedAt":   time.Now(),
-				},
+		// If the result has changed, is "pending", or eloChange is updated
+		if existingTranscript.Result != result || existingTranscript.Result == "pending" || (eloChange != 0 && existingTranscript.EloChange == 0) {
+			updateSet := bson.M{
+				"result":      result,
+				"messages":    messages,
+				"transcripts": transcripts,
+				"updatedAt":   time.Now(),
 			}
+			if eloChange != 0 {
+				updateSet["eloChange"] = eloChange
+			}
+			update := bson.M{"$set": updateSet}
 
 			_, err = collection.UpdateOne(ctx, bson.M{"_id": existingTranscript.ID}, update)
 			if err != nil {
@@ -706,6 +717,7 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		Topic:       topic,
 		Opponent:    opponent,
 		Result:      result,
+		EloChange:   eloChange,
 		Messages:    messages,
 		Transcripts: transcripts,
 		CreatedAt:   time.Now(),
@@ -718,6 +730,24 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 	}
 
 	return nil
+}
+
+// UpdateTranscriptEloChange updates the eloChange on the most recent saved transcript for a user and topic
+func UpdateTranscriptEloChange(ctx context.Context, userID primitive.ObjectID, topic string, eloChange float64) error {
+	collection := db.MongoDatabase.Collection("saved_debate_transcripts")
+	filter := bson.M{
+		"userId":    userID,
+		"topic":     topic,
+		"createdAt": bson.M{"$gte": time.Now().Add(-15 * time.Minute)},
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"eloChange": eloChange,
+			"updatedAt": time.Now(),
+		},
+	}
+	_, err := collection.UpdateOne(ctx, filter, update)
+	return err
 }
 
 // UpdatePendingTranscripts updates any existing transcripts with "pending" results
@@ -963,7 +993,7 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 			"opponent":   transcript.Opponent,
 			"debateType": transcript.DebateType,
 			"date":       transcript.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			"eloChange":  0, // TODO: Add actual Elo change tracking
+			"eloChange":  math.Round(transcript.EloChange*10) / 10,
 		})
 	}
 
