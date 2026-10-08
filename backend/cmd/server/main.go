@@ -58,6 +58,8 @@ func main() {
 	}
 
 	go websocket.WatchForNewRooms()
+	routes.StartRoomCleanup()
+	websocket.StartRoomActivityHeartbeat()
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
 	utils.SeedDebateData()
