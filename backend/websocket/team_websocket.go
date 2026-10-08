@@ -122,7 +122,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 	// Validate token
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
-		configPath = "./config/config.yml"
+		configPath = "./config/config.prod.yml"
 	}
 	valid, email, err := utils.ValidateTokenAndFetchEmail(configPath, token, c)
 	if err != nil || !valid || email == "" {
