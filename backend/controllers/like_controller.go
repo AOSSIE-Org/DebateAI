@@ -64,7 +64,7 @@ func ToggleLikeHandler(c *gin.Context) {
 			db.RedisClient.ZIncrBy(ctx, key, -1, postID)
 
 			// Update MongoDB like count (decrement)
-			postCollection.UpdateOne(ctx, bson.M{"_id": postObjectID}, bson.M{"$inc": bson.M{"likeCount": -1}})
+			postCollection.UpdateOne(ctx, bson.M{"_id": postObjectID, "likeCount": bson.M{"$gt": 0}}, bson.M{"$inc": bson.M{"likeCount": -1}})
 		}
 
 		// Get updated count
