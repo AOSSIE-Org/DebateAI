@@ -8,8 +8,8 @@ import (
 	"google.golang.org/genai"
 )
 
-const defaultGeminiModel = "gemini-2.0-flash"
-const fallbackGeminiModel = "gemini-1.5-flash"
+const defaultGeminiModel = "gemini-2.5-flash"
+const fallbackGeminiModel = "gemini-2.0-flash"
 
 func initGemini(apiKey string) (*genai.Client, error) {
 	config := &genai.ClientConfig{}
@@ -82,10 +82,23 @@ func StreamModelText(ctx context.Context, modelName, prompt string, onChunk func
 	return cleanModelOutput(fullBuilder.String()), nil
 }
 
-// StreamDefaultModelText streams using default model with automatic fallback to secondary model.
+// StreamDefaultModelText streams using default model with automatic fallback to secondary model
+// only if no chunk was delivered to the client before the error.
 func StreamDefaultModelText(ctx context.Context, prompt string, onChunk func(chunk string) error) (string, error) {
-	text, err := StreamModelText(ctx, defaultGeminiModel, prompt, onChunk)
+	chunksDelivered := 0
+	wrappedChunk := func(chunk string) error {
+		chunksDelivered++
+		if onChunk != nil {
+			return onChunk(chunk)
+		}
+		return nil
+	}
+
+	text, err := StreamModelText(ctx, defaultGeminiModel, prompt, wrappedChunk)
 	if err != nil {
+		if chunksDelivered > 0 {
+			return text, err
+		}
 		return StreamModelText(ctx, fallbackGeminiModel, prompt, onChunk)
 	}
 	return text, nil

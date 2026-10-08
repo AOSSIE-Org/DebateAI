@@ -506,7 +506,9 @@ func StreamBotResponse(
 	if geminiClient == nil {
 		fallback := personalityErrorResponse(botName, "My systems are offline, it seems.")
 		if onChunk != nil {
-			_ = onChunk(fallback)
+			if err := onChunk(fallback); err != nil {
+				return "", err
+			}
 		}
 		return fallback, nil
 	}
@@ -514,12 +516,26 @@ func StreamBotResponse(
 	bot := GetBotPersonality(botName)
 	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
-	fullResponse, err := StreamDefaultModelText(ctx, prompt, onChunk)
+	chunksDelivered := 0
+	wrappedChunk := func(chunk string) error {
+		chunksDelivered++
+		if onChunk != nil {
+			return onChunk(chunk)
+		}
+		return nil
+	}
+
+	fullResponse, err := StreamDefaultModelText(ctx, prompt, wrappedChunk)
 	if err != nil {
 		log.Printf("❌ Gemini streaming error in StreamBotResponse: %v", err)
+		if chunksDelivered > 0 {
+			return fullResponse, err
+		}
 		fallback := personalityErrorResponse(botName, "A glitch in my logic, there is.")
 		if onChunk != nil {
-			_ = onChunk(fallback)
+			if chunkErr := onChunk(fallback); chunkErr != nil {
+				return "", chunkErr
+			}
 		}
 		return fallback, nil
 	}
@@ -527,7 +543,9 @@ func StreamBotResponse(
 	if fullResponse == "" {
 		fallback := personalityErrorResponse(botName, "Lost in translation, my thoughts are.")
 		if onChunk != nil {
-			_ = onChunk(fallback)
+			if chunkErr := onChunk(fallback); chunkErr != nil {
+				return "", chunkErr
+			}
 		}
 		return fallback, nil
 	}

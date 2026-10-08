@@ -617,9 +617,6 @@ func ConcedeDebate(c *gin.Context) {
 func StreamDebateMessage(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
-		token = c.Query("token")
-	}
-	if token == "" {
 		c.JSON(401, gin.H{"error": "Authorization token required"})
 		return
 	}
@@ -645,12 +642,15 @@ func StreamDebateMessage(c *gin.Context) {
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	c.Writer.Flush()
 
-	sendSSEEvent(c, "start", gin.H{
+	if err := sendSSEEvent(c, "start", gin.H{
 		"botName":  req.BotName,
 		"botLevel": req.BotLevel,
 		"topic":    req.Topic,
 		"stance":   req.Stance,
-	})
+	}); err != nil {
+		return
+	}
+	c.Writer.Flush()
 
 	ctx := c.Request.Context()
 	fullText, streamErr := services.StreamBotResponse(
@@ -663,14 +663,17 @@ func StreamDebateMessage(c *gin.Context) {
 		req.Context,
 		150,
 		func(chunk string) error {
-			sendSSEEvent(c, "chunk", gin.H{"token": chunk})
+			if err := sendSSEEvent(c, "chunk", gin.H{"token": chunk}); err != nil {
+				return err
+			}
 			c.Writer.Flush()
 			return nil
 		},
 	)
 
 	if streamErr != nil {
-		sendSSEEvent(c, "error", gin.H{"error": streamErr.Error()})
+		_ = sendSSEEvent(c, "error", gin.H{"error": streamErr.Error()})
+		c.Writer.Flush()
 		return
 	}
 
@@ -692,9 +695,12 @@ func StreamDebateMessage(c *gin.Context) {
 
 	if err := db.SaveDebateVsBot(debate); err != nil {
 		log.Printf("Failed to save streamed debate: %v", err)
+		_ = sendSSEEvent(c, "error", gin.H{"error": "Failed to save debate session"})
+		c.Writer.Flush()
+		return
 	}
 
-	sendSSEEvent(c, "done", gin.H{
+	_ = sendSSEEvent(c, "done", gin.H{
 		"debateId": debate.ID.Hex(),
 		"botName":  req.BotName,
 		"botLevel": req.BotLevel,
@@ -705,10 +711,11 @@ func StreamDebateMessage(c *gin.Context) {
 	c.Writer.Flush()
 }
 
-func sendSSEEvent(c *gin.Context, event string, data any) {
+func sendSSEEvent(c *gin.Context, event string, data any) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return
+		return err
 	}
-	_, _ = c.Writer.Write([]byte("event: " + event + "\ndata: " + string(jsonData) + "\n\n"))
+	_, err = c.Writer.Write([]byte("event: " + event + "\ndata: " + string(jsonData) + "\n\n"))
+	return err
 }
