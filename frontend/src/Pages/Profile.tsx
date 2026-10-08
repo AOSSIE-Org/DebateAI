@@ -1,3 +1,4 @@
+import config from "../config/config";
 "use client";
 import { useNavigate } from "react-router-dom";
 import React, { useState, useEffect, useRef } from "react";
@@ -175,6 +176,7 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [draftValue, setDraftValue] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -216,6 +218,25 @@ const Profile: React.FC = () => {
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const availabilityCheckId = useRef(0);
+  const editSessionRef = useRef(0);
+
+  const handleStartEdit = (field: string, initialValue: string = "") => {
+    editSessionRef.current += 1;
+    availabilityCheckId.current += 1;
+    setEditingField(field);
+    setDraftValue(initialValue);
+    setErrorMessage("");
+  };
+
+  const handleCancelEdit = () => {
+    editSessionRef.current += 1;
+    availabilityCheckId.current += 1;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    setEditingField(null);
+    setDraftValue("");
+    setUsernameStatus("idle");
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -304,14 +325,16 @@ const Profile: React.FC = () => {
       return;
     }
 
+    const sessionAtSubmit = editSessionRef.current;
+
     try {
       await updateProfile(
         token,
-        dashboard.profile.displayName,
-        dashboard.profile.bio,
-        dashboard.profile.twitter,
-        dashboard.profile.instagram,
-        dashboard.profile.linkedin,
+        field === "displayName" ? draftValue.trim() : dashboard.profile.displayName,
+        field === "bio" ? draftValue : dashboard.profile.bio,
+        field === "twitter" ? draftValue : dashboard.profile.twitter,
+        field === "instagram" ? draftValue : dashboard.profile.instagram,
+        field === "linkedin" ? draftValue : dashboard.profile.linkedin,
         dashboard.profile.avatarUrl
       );
       setSuccessMessage(
@@ -320,8 +343,9 @@ const Profile: React.FC = () => {
         } updated successfully!`
       );
       setErrorMessage("");
-      setEditingField(null);
-      setUsernameStatus("idle");
+      if (editSessionRef.current === sessionAtSubmit) {
+        handleCancelEdit();
+      }
       // Refetch to sync updated displayName across the page
       const updatedData = await getProfile(token);
       setDashboard(updatedData);
@@ -401,7 +425,7 @@ const Profile: React.FC = () => {
           <Input
             id={field}
             type="text"
-            value={(dashboard?.profile[field] as string) || ""}
+            value={draftValue}
             onChange={(e) => {
               const rules = socialValidation[field as string];
               let val = e.target.value;
@@ -413,6 +437,8 @@ const Profile: React.FC = () => {
                 ...dashboard!,
                 profile: { ...dashboard!.profile, [field]: val },
               });
+              val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
+              setDraftValue(val);
             }}
             placeholder={placeholder}
             className="text-sm w-full [.contrast_&]:border-border"
@@ -423,9 +449,10 @@ const Profile: React.FC = () => {
             Save
           </Button>
           <Button
+            type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setEditingField(null)}
+            onClick={handleCancelEdit}
             className="flex-1"
           >
             Cancel
@@ -461,7 +488,7 @@ const Profile: React.FC = () => {
           </span>
         )}
         <button
-          onClick={() => setEditingField(field as string)}
+          onClick={() => handleStartEdit(field as string, (dashboard?.profile[field] as string) || "")}
           className="p-1 hover:bg-muted rounded-full transition-colors flex-shrink-0"
           title={`Edit ${label}`}
         >
@@ -483,13 +510,8 @@ const Profile: React.FC = () => {
         <Textarea
           maxLength={BIO_MAX_LENGTH}
           id="bio"
-          value={dashboard?.profile.bio || ""}
-          onChange={(e) =>
-            setDashboard({
-              ...dashboard!,
-              profile: { ...dashboard!.profile, bio: e.target.value },
-            })
-          }
+          value={draftValue}
+          onChange={(e) => setDraftValue(e.target.value)}
           onInput={(e) => {
             e.currentTarget.style.height = "auto";
             e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
@@ -499,14 +521,14 @@ const Profile: React.FC = () => {
         />
         <p
           className={`text-xs text-right ${
-            (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH
+            draftValue.length >= BIO_MAX_LENGTH
               ? "text-red-500"
-              : (dashboard?.profile.bio?.length || 0) >= BIO_MAX_LENGTH - 60
+              : draftValue.length >= BIO_MAX_LENGTH - 60
               ? "text-orange-500"
               : "text-muted-foreground"
           }`}
         >
-          {dashboard?.profile.bio?.length || 0} / {BIO_MAX_LENGTH}
+          {draftValue.length} / {BIO_MAX_LENGTH}
         </p>
         <div className="flex gap-2">
           <Button
@@ -514,14 +536,15 @@ const Profile: React.FC = () => {
             size="sm"
             variant="default"
             className="flex-1"
-            disabled={(dashboard?.profile.bio?.length || 0) > BIO_MAX_LENGTH}
+            disabled={draftValue.length > BIO_MAX_LENGTH}
           >
             Save
           </Button>
           <Button
+            type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setEditingField(null)}
+            onClick={handleCancelEdit}
             className="flex-1"
           >
             Cancel
@@ -663,7 +686,7 @@ const Profile: React.FC = () => {
     const [following, setFollowing] = useState<FollowUser[]>([]);
     const [loadingFollowers, setLoadingFollowers] = useState(false);
     const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+    const baseURL = config.baseUrl || "http://localhost:1313";
 
     useEffect(() => {
       if (user?.id) {
@@ -833,19 +856,23 @@ const Profile: React.FC = () => {
               <Input
                 id="displayName"
                 type="text"
-                value={profile.displayName || ""}
+                value={draftValue}
                 onChange={(e) => {
                   const val = e.target.value;
                   setDashboard({
                     ...dashboard,
                     profile: { ...profile, displayName: val },
                   });
+                  setDraftValue(val);
+                  if (debounceTimer.current) clearTimeout(debounceTimer.current);
                   if (!val.trim()) {
+                    availabilityCheckId.current += 1;
                     setUsernameStatus("idle");
                     return;
                   }
                   if (debounceTimer.current)
                     clearTimeout(debounceTimer.current);
+                  const checkId = ++availabilityCheckId.current;
                   setUsernameStatus("checking");
                   debounceTimer.current = setTimeout(async () => {
                     try {
@@ -855,8 +882,10 @@ const Profile: React.FC = () => {
                         token,
                         val.trim()
                       );
+                      if (availabilityCheckId.current !== checkId) return;
                       setUsernameStatus(res.available ? "available" : "taken");
                     } catch {
+                      if (availabilityCheckId.current !== checkId) return;
                       setUsernameStatus("idle");
                     }
                   }, 300);
@@ -891,12 +920,10 @@ const Profile: React.FC = () => {
                   Save
                 </Button>
                 <Button
+                  type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => {
-                    setEditingField(null);
-                    setUsernameStatus("idle");
-                  }}
+                  onClick={handleCancelEdit}
                   className="flex-1 text-xs"
                 >
                   Cancel
@@ -909,7 +936,7 @@ const Profile: React.FC = () => {
                 {profile.displayName || "Set your name"}
               </h2>
               <button
-                onClick={() => setEditingField("displayName")}
+                onClick={() => handleStartEdit("displayName", profile.displayName || "")}
                 className="p-1 hover:bg-muted rounded-full"
                 title="Edit Display Name"
               >
@@ -978,7 +1005,7 @@ const Profile: React.FC = () => {
             </h3>
             {editingField !== "bio" && (
               <button
-                onClick={() => setEditingField("bio")}
+                onClick={() => handleStartEdit("bio", dashboard?.profile.bio || "")}
                 className="p-1 hover:bg-muted rounded-full transition-colors"
                 title="Edit Bio"
               >
