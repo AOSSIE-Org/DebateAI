@@ -88,19 +88,6 @@ import {
 } from "@/services/transcriptService";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-const handleProfileAvatarLoadError = (
-  event: React.SyntheticEvent<HTMLImageElement>
-) => {
-  const image = event.currentTarget;
-
-  if (image.src !== DEFAULT_AVATAR_URL) {
-    image.src = DEFAULT_AVATAR_URL;
-    return;
-  }
-
-  image.onerror = null;
-  image.src = defaultAvatar;
-};
 
 interface ProfileData {
   displayName: string;
@@ -164,11 +151,11 @@ interface FollowUser {
 }
 
 const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> =
-  {
-    twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
-    instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
-    linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
-  };
+{
+  twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
+  instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
+  linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
+};
 
 const BIO_MAX_LENGTH = 300;
 
@@ -338,8 +325,7 @@ const Profile: React.FC = () => {
         dashboard.profile.avatarUrl
       );
       setSuccessMessage(
-        `${
-          field.charAt(0).toUpperCase() + field.slice(1)
+        `${field.charAt(0).toUpperCase() + field.slice(1)
         } updated successfully!`
       );
       setErrorMessage("");
@@ -433,11 +419,6 @@ const Profile: React.FC = () => {
               val = rules
                 ? val.replace(rules.pattern, "").slice(0, rules.maxLength)
                 : val;
-              setDashboard({
-                ...dashboard!,
-                profile: { ...dashboard!.profile, [field]: val },
-              });
-              val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
               setDraftValue(val);
             }}
             placeholder={placeholder}
@@ -467,8 +448,8 @@ const Profile: React.FC = () => {
               field === "twitter"
                 ? `https://twitter.com/${dashboard.profile[field]}`
                 : field === "instagram"
-                ? `https://instagram.com/${dashboard.profile[field]}`
-                : `https://linkedin.com/in/${dashboard.profile[field]}`
+                  ? `https://instagram.com/${dashboard.profile[field]}`
+                  : `https://linkedin.com/in/${dashboard.profile[field]}`
             }
             target="_blank"
             rel="noopener noreferrer"
@@ -520,13 +501,12 @@ const Profile: React.FC = () => {
           className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
         />
         <p
-          className={`text-xs text-right ${
-            draftValue.length >= BIO_MAX_LENGTH
-              ? "text-red-500"
-              : draftValue.length >= BIO_MAX_LENGTH - 60
+          className={`text-xs text-right ${draftValue.length >= BIO_MAX_LENGTH
+            ? "text-red-500"
+            : draftValue.length >= BIO_MAX_LENGTH - 60
               ? "text-orange-500"
               : "text-muted-foreground"
-          }`}
+            }`}
         >
           {draftValue.length} / {BIO_MAX_LENGTH}
         </p>
@@ -661,8 +641,8 @@ const Profile: React.FC = () => {
           change > 0
             ? `Increased by ${change}`
             : change < 0
-            ? `Decreased by ${-change}`
-            : "No change";
+              ? `Decreased by ${-change}`
+              : "No change";
       }
       return (
         <div className="bg-background border border-border p-2 rounded shadow text-xs">
@@ -859,10 +839,6 @@ const Profile: React.FC = () => {
                 value={draftValue}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setDashboard({
-                    ...dashboard,
-                    profile: { ...profile, displayName: val },
-                  });
                   setDraftValue(val);
                   if (debounceTimer.current) clearTimeout(debounceTimer.current);
                   if (!val.trim()) {
@@ -941,11 +917,10 @@ const Profile: React.FC = () => {
                 title="Edit Display Name"
               >
                 <Pen
-                  className={`w-4 h-4 ${
-                    profile.displayName
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
+                  className={`w-4 h-4 ${profile.displayName
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                    }`}
                 />
               </button>
             </div>
@@ -1185,9 +1160,9 @@ const Profile: React.FC = () => {
                                     customDateRange.to
                                   )
                                   ? `${format(
-                                      customDateRange.from,
-                                      "MMM d"
-                                    )} - ${format(customDateRange.to, "MMM d")}`
+                                    customDateRange.from,
+                                    "MMM d"
+                                  )} - ${format(customDateRange.to, "MMM d")}`
                                   : format(customDateRange.from, "MMM d")
                                 : "Pick a date range"}
                             </span>
@@ -1223,11 +1198,11 @@ const Profile: React.FC = () => {
             </CardHeader>
             <CardContent className="p-2 flex-1 min-h-0 min-w-0">
               {filteredEloHistory.length > 0 &&
-              !(
-                eloFilter === "custom" &&
-                filteredEloHistory.length === 1 &&
-                filteredEloHistory[0].elo === profile.rating
-              ) ? (
+                !(
+                  eloFilter === "custom" &&
+                  filteredEloHistory.length === 1 &&
+                  filteredEloHistory[0].elo === profile.rating
+                ) ? (
                 <ChartContainer
                   config={eloChartConfig}
                   className="h-full min-h-0 w-full min-w-0"
@@ -1372,14 +1347,14 @@ const Profile: React.FC = () => {
                       debate.result === "win"
                         ? CheckCircle
                         : debate.result === "loss"
-                        ? XCircle
-                        : MinusCircle;
+                          ? XCircle
+                          : MinusCircle;
                     const iconColor =
                       debate.result === "win"
                         ? "text-green-600"
                         : debate.result === "loss"
-                        ? "text-red-600"
-                        : "text-gray-600";
+                          ? "text-red-600"
+                          : "text-gray-600";
                     return (
                       <li
                         key={idx}
@@ -1552,18 +1527,16 @@ const Profile: React.FC = () => {
                       {fullTranscript.messages.map((message, index: number) => (
                         <div
                           key={index}
-                          className={`flex gap-3 ${
-                            message.sender === "User"
-                              ? "justify-end"
-                              : "justify-start"
-                          }`}
+                          className={`flex gap-3 ${message.sender === "User"
+                            ? "justify-end"
+                            : "justify-start"
+                            }`}
                         >
                           <div
-                            className={`max-w-[80%] rounded-lg p-3 ${
-                              message.sender === "User"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
+                            className={`max-w-[80%] rounded-lg p-3 ${message.sender === "User"
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted"
+                              }`}
                           >
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-medium">
