@@ -5,7 +5,6 @@ import { useUser } from '../hooks/useUser';
 import ProfileHover from './ProfileHover';
 import UserProfileModal from './UserProfileModal';
 import {
-  commentsByTranscriptAtom,
   getCommentsForTranscriptAtom,
   setCommentsForTranscriptAtom,
   addCommentToTranscriptAtom,
@@ -394,6 +393,9 @@ const CommentTree: React.FC<CommentTreeProps> = ({
 
       const result = await response.json();
       const newComment: Comment = result.comment;
+      if (newComment) {
+        addCommentAtom(newComment);
+      }
       
       // Fetch updated comments (including the new one) and update atom
       await fetchComments();
