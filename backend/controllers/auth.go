@@ -147,14 +147,40 @@ func SignUp(ctx *gin.Context) {
 		// If the user exists but is not verified, resend a fresh code
 		// instead of blocking them with "User already exists".
 		if !existingUser.IsVerified {
-			newCode := utils.GenerateRandomCode(6)
+			const resendCooldown = 2 * time.Minute
 			now := time.Now()
+
+			// Cooldown check: if a code was sent within the last 2 minutes,
+			// don't send another one.
+			if !existingUser.VerificationCodeSentAt.IsZero() &&
+				now.Sub(existingUser.VerificationCodeSentAt) < resendCooldown {
+				ctx.JSON(429, gin.H{
+					"error": "Please wait before requesting another code",
+					"retryAfterSeconds": int(
+						(resendCooldown - now.Sub(existingUser.VerificationCodeSentAt)).Seconds(),
+					),
+				})
+				return
+			}
+
+			// Reuse a still-valid code; only generate a fresh one when the
+			// existing code is expired or absent. This way a delivery failure
+			// can't invalidate a code the user already received.
+			codeToSend := existingUser.VerificationCode
+			expiry := existingUser.VerificationCodeExpiry
+			if codeToSend == "" || expiry.IsZero() || now.After(expiry) {
+				codeToSend = utils.GenerateRandomCode(6)
+				expiry = now.Add(24 * time.Hour)
+			}
+
+			// Persist first, then send, so a delivery failure can't leave
+			// the DB with a code the user never received.
 			_, updErr := db.MongoDatabase.Collection("users").UpdateOne(
 				dbCtx,
 				bson.M{"email": request.Email},
 				bson.M{"$set": bson.M{
-					"verificationCode":       newCode,
-					"verificationCodeExpiry": now.Add(24 * time.Hour),
+					"verificationCode":       codeToSend,
+					"verificationCodeExpiry": expiry,
 					"verificationCodeSentAt": now,
 					"updatedAt":              now,
 				}},
@@ -163,7 +189,7 @@ func SignUp(ctx *gin.Context) {
 				ctx.JSON(500, gin.H{"error": "Failed to resend verification code", "message": updErr.Error()})
 				return
 			}
-			if mailErr := utils.SendVerificationEmail(request.Email, newCode); mailErr != nil {
+			if mailErr := utils.SendVerificationEmail(request.Email, codeToSend); mailErr != nil {
 				ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": mailErr.Error()})
 				return
 			}
@@ -233,8 +259,15 @@ func SignUp(ctx *gin.Context) {
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
 	if err != nil {
 		// Rollback: remove the orphan user so signup can be retried.
+		// Use a fresh context (SendVerificationEmail may have consumed
+		// dbCtx's 5s budget) and match by _id (not email) so a duplicate
+		// email edge case can't delete a different account.
+		rollbackCtx, rollbackCancel := context.WithTimeout(
+			context.Background(), 5*time.Second,
+		)
+		defer rollbackCancel()
 		if _, delErr := db.MongoDatabase.Collection("users").DeleteOne(
-			dbCtx, bson.M{"email": request.Email},
+			rollbackCtx, bson.M{"_id": newUser.ID},
 		); delErr != nil {
 			log.Printf("failed to rollback user %s after email failure: %v", request.Email, delErr)
 		}
