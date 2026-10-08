@@ -12,6 +12,7 @@ func SetupDebateVsBotRoutes(router *gin.RouterGroup) {
 	{
 		vsbot.POST("/create", controllers.CreateDebate)
 		vsbot.POST("/debate", controllers.SendDebateMessage)
+		vsbot.POST("/debate/stream", controllers.StreamDebateMessage)
 		vsbot.POST("/judge", controllers.JudgeDebate)
 		vsbot.POST("/concede", controllers.ConcedeDebate)
 	}
