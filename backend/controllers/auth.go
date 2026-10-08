@@ -189,10 +189,21 @@ func SignUp(ctx *gin.Context) {
 				ctx.JSON(500, gin.H{"error": "Failed to resend verification code", "message": updErr.Error()})
 				return
 			}
+
 			if mailErr := utils.SendVerificationEmail(request.Email, codeToSend); mailErr != nil {
+				// Release the cooldown reservation so the user can retry
+				// immediately after a delivery failure. Only clear if the
+				// timestamp still matches THIS request's value, so we don't
+				// wipe out a newer request's state.
+				_, _ = db.MongoDatabase.Collection("users").UpdateOne(
+					dbCtx,
+					bson.M{"email": request.Email, "verificationCodeSentAt": now},
+					bson.M{"$set": bson.M{"verificationCodeSentAt": existingUser.VerificationCodeSentAt}},
+				)
 				ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": mailErr.Error()})
 				return
 			}
+
 			ctx.JSON(200, gin.H{"message": "Sign-up successful. Please verify your email."})
 			return
 		}
