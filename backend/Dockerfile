@@ -18,8 +18,11 @@ FROM alpine:latest
 
 WORKDIR /app
 
-# Copy only the compiled binary from builder
+# Copy the compiled binary from builder
 COPY --from=builder /app/server .
+
+# Explicitly copy the config folder
+COPY --from=builder /app/config/config.prod.yml ./config/config.prod.yml
 
 EXPOSE 1313
 
