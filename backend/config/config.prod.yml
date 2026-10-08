@@ -1,0 +1,35 @@
+server:
+  port: 1313 # The port number your backend server will run on
+
+database:
+  uri: ""
+  # Replace with your MongoDB Atlas connection string
+  # Get this from your MongoDB Atlas dashboard after creating a cluster and database
+
+gemini:
+  apiKey: ""
+  # API key for OpenAI / Gemini model access
+  # Obtain from your OpenRouter.ai or OpenAI account dashboard
+
+jwt:
+  secret: ""
+  # A secret string used to sign JWT tokens
+  # Generate a strong random string (e.g. use `openssl rand -hex 32`)
+
+  expiry: 1440
+  # Token expiry time in minutes (e.g. 1440 = 24 hours)
+
+
+smtp:
+  host: "smtp.gmail.com"
+  # SMTP server host for sending emails (example is Gmail SMTP)
+
+  port: 587
+  # SMTP server port (587 for TLS)
+
+  senderName: "DebateAI Team"
+
+googleOAuth:
+  clientID: ""
+   # Google OAuth Client ID for OAuth login
+  # Obtain from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs)
