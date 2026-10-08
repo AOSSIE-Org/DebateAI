@@ -2,7 +2,10 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,24 +16,56 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // LeaderboardData defines the response structure for the frontend
 type LeaderboardData struct {
-	Debaters []Debater `json:"debaters"`
-	Stats    []Stat    `json:"stats"`
+	Debaters    []Debater             `json:"debaters"`
+	Stats       []Stat                `json:"stats"`
+	Pagination  LeaderboardPagination `json:"pagination"`
+	CurrentUser *Debater              `json:"currentUser,omitempty"`
+}
+
+type LeaderboardPagination struct {
+	Page       int64 `json:"page"`
+	Limit      int64 `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int64 `json:"totalPages"`
+}
+
+const maxLeaderboardLimit int64 = 100
+
+func leaderboardPage(c *gin.Context) (page, limit, skip int64, err error) {
+	page, limit = 1, maxLeaderboardLimit
+	if value := c.Query("page"); value != "" {
+		page, err = strconv.ParseInt(value, 10, 64)
+		if err != nil || page < 1 {
+			return 0, 0, 0, fmt.Errorf("page must be a positive integer")
+		}
+	}
+	if value := c.Query("limit"); value != "" {
+		limit, err = strconv.ParseInt(value, 10, 64)
+		if err != nil || limit < 1 || limit > maxLeaderboardLimit {
+			return 0, 0, 0, fmt.Errorf("limit must be an integer between 1 and %d", maxLeaderboardLimit)
+		}
+	}
+	if page-1 > math.MaxInt64/limit {
+		return 0, 0, 0, fmt.Errorf("page is too large")
+	}
+	return page, limit, (page - 1) * limit, nil
 }
 
 // Debater represents a leaderboard entry
 type Debater struct {
-	ID          string  `json:"id"`
-	Rank        int     `json:"rank"`
-	Name        string  `json:"name"`
-	Score       int     `json:"score"`
-	Rating      int     `json:"rating"`
-	AvatarURL   string  `json:"avatarUrl"`
-	CurrentUser bool    `json:"currentUser"`
+	ID          string `json:"id"`
+	Rank        int    `json:"rank"`
+	Name        string `json:"name"`
+	Score       int    `json:"score"`
+	Rating      int    `json:"rating"`
+	AvatarURL   string `json:"avatarUrl"`
+	CurrentUser bool   `json:"currentUser"`
 }
 
 // Stat represents a single statistic
@@ -38,6 +73,19 @@ type Stat struct {
 	Icon  string `json:"icon"`
 	Value string `json:"value"`
 	Label string `json:"label"`
+}
+
+func leaderboardDebater(user models.User, rank int, currentemail interface{}) Debater {
+	name := user.DisplayName
+	if name == "" {
+		name = utils.ExtractNameFromEmail(user.Email)
+	}
+	avatarURL := user.AvatarURL
+	if avatarURL == "" {
+		avatarURL = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + name
+	}
+	return Debater{ID: user.ID.Hex(), Rank: rank, Name: name, Score: user.Score,
+		Rating: int(user.Rating), AvatarURL: avatarURL, CurrentUser: user.Email == currentemail}
 }
 
 // GetLeaderboard fetches and returns leaderboard data
@@ -49,51 +97,106 @@ func GetLeaderboard(c *gin.Context) {
 		return
 	}
 
-	// Query users sorted by Rating (descending)
+	// Validate pagination and ordering before querying users.
+	page, limit, skip, err := leaderboardPage(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	sortField := c.DefaultQuery("sort", "rating")
+	if sortField != "rating" && sortField != "score" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sort must be rating or score"})
+		return
+	}
+	includeCurrentUser := false
+	if value, present := c.GetQuery("includeCurrentUser"); present {
+		includeCurrentUser, err = strconv.ParseBool(value)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "includeCurrentUser must be a boolean"})
+			return
+		}
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
 	collection := db.MongoDatabase.Collection("users")
-	findOptions := options.Find().SetSort(bson.D{{"rating", -1}})
-	cursor, err := collection.Find(c, bson.M{}, findOptions)
+	// Count independently so global statistics do not shrink to the page size.
+	totalUsers, err := collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count leaderboard users"})
+		return
+	}
+	projection := bson.M{"_id": 1, "email": 1, "displayName": 1, "rating": 1, "score": 1, "avatarUrl": 1}
+	findOptions := options.Find().
+		SetSort(bson.D{{sortField, -1}, {"_id", 1}}).
+		SetLimit(limit).SetSkip(skip).
+		SetProjection(projection)
+	cursor, err := collection.Find(ctx, bson.M{}, findOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard data"})
 		return
 	}
-	defer cursor.Close(c)
+	defer cursor.Close(ctx)
 
 	// Decode users into slice
 	var users []models.User
-	if err := cursor.All(c, &users); err != nil {
+	if err := cursor.All(ctx, &users); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode leaderboard data"})
 		return
 	}
 
 	// Build debaters list
-	var debaters []Debater
+	debaters := make([]Debater, 0, len(users))
+	var currentUser *Debater
 	for i, user := range users {
-		name := user.DisplayName
-		if name == "" {
-			name = utils.ExtractNameFromEmail(user.Email)
+		debater := leaderboardDebater(user, int(skip)+i+1, currentemail)
+		debaters = append(debaters, debater)
+		if includeCurrentUser && debater.CurrentUser {
+			currentUser = &debater
 		}
-
-		avatarURL := user.AvatarURL
-		if avatarURL == "" {
-			avatarURL = "https://api.dicebear.com/9.x/adventurer/svg?seed=" + name
+	}
+	// Keep an out-of-page user's row separate so it cannot enlarge or reorder the page.
+	if includeCurrentUser && currentUser == nil {
+		raw, lookupErr := collection.FindOne(ctx, bson.M{"email": currentemail},
+			options.FindOne().SetProjection(projection)).Raw()
+		if lookupErr != nil && !errors.Is(lookupErr, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch current leaderboard user"})
+			return
 		}
-
-		isCurrentUser := user.Email == currentemail
-		debaters = append(debaters, Debater{
-			ID:          user.ID.Hex(),
-			Rank:        i + 1,
-			Name:        name,
-			Score:       user.Score,
-			Rating:      int(user.Rating),
-			AvatarURL:   avatarURL,
-			CurrentUser: isCurrentUser,
-		})
+		if lookupErr == nil {
+			var user models.User
+			var sortValue interface{}
+			if err := bson.Unmarshal(raw, &user); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode current leaderboard user"})
+				return
+			}
+			if value := raw.Lookup(sortField); value.Type != 0 {
+				if err := value.Unmarshal(&sortValue); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode current leaderboard rank"})
+					return
+				}
+			}
+			// Aggregation comparisons follow BSON sort order, including missing/null fields.
+			fieldValue := bson.M{"$ifNull": bson.A{"$" + sortField, nil}}
+			ahead, err := collection.CountDocuments(ctx, bson.M{"$expr": bson.M{"$or": bson.A{
+				bson.M{"$gt": bson.A{fieldValue, sortValue}},
+				bson.M{"$and": bson.A{
+					bson.M{"$eq": bson.A{fieldValue, sortValue}},
+					bson.M{"$lt": bson.A{"$_id", user.ID}},
+				}},
+			}}})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count current leaderboard rank"})
+				return
+			}
+			debater := leaderboardDebater(user, int(ahead)+1, currentemail)
+			currentUser = &debater
+		}
 	}
 
 	// Generate stats
-	totalUsers := len(users)
-	ctx := context.Background()
+	// Give statistics their own budget after the user count and page fetch.
+	statsCtx, cancelStats := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancelStats()
 
 	// Calculate DEBATES TODAY - count all debates created today
 	todayStart := time.Now().Truncate(24 * time.Hour)
@@ -103,7 +206,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from saved_debate_transcripts
 	transcriptCollection := db.MongoDatabase.Collection("saved_debate_transcripts")
-	transcriptCount, err := transcriptCollection.CountDocuments(ctx, bson.M{
+	transcriptCount, err := transcriptCollection.CountDocuments(statsCtx, bson.M{
 		"createdAt": bson.M{
 			"$gte": todayStart,
 			"$lt":  todayEnd,
@@ -115,7 +218,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from debates_vs_bot (createdAt is int64 timestamp)
 	botDebateCollection := db.MongoDatabase.Collection("debates_vs_bot")
-	botDebateCount, err := botDebateCollection.CountDocuments(ctx, bson.M{
+	botDebateCount, err := botDebateCollection.CountDocuments(statsCtx, bson.M{
 		"createdAt": bson.M{
 			"$gte": todayStart.Unix(),
 			"$lt":  todayEnd.Unix(),
@@ -127,7 +230,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from team_debates
 	teamDebateCollection := db.MongoDatabase.Collection("team_debates")
-	teamDebateCount, err := teamDebateCollection.CountDocuments(ctx, bson.M{
+	teamDebateCount, err := teamDebateCollection.CountDocuments(statsCtx, bson.M{
 		"createdAt": bson.M{
 			"$gte": todayStart,
 			"$lt":  todayEnd,
@@ -139,7 +242,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Count from debates collection (uses date field)
 	debateCollection := db.MongoDatabase.Collection("debates")
-	debateCount, err := debateCollection.CountDocuments(ctx, bson.M{
+	debateCount, err := debateCollection.CountDocuments(statsCtx, bson.M{
 		"date": bson.M{
 			"$gte": todayStart,
 			"$lt":  todayEnd,
@@ -153,7 +256,7 @@ func GetLeaderboard(c *gin.Context) {
 	debatingNow := 0
 
 	// Count active team debates
-	activeTeamDebates, err := teamDebateCollection.CountDocuments(ctx, bson.M{
+	activeTeamDebates, err := teamDebateCollection.CountDocuments(statsCtx, bson.M{
 		"status": "active",
 	})
 	if err == nil {
@@ -161,7 +264,7 @@ func GetLeaderboard(c *gin.Context) {
 	}
 
 	// Count debates with pending status (might be in progress)
-	pendingDebates, err := transcriptCollection.CountDocuments(ctx, bson.M{
+	pendingDebates, err := transcriptCollection.CountDocuments(statsCtx, bson.M{
 		"result": "pending",
 		"updatedAt": bson.M{
 			"$gte": time.Now().Add(-2 * time.Hour), // Active within last 2 hours
@@ -176,7 +279,7 @@ func GetLeaderboard(c *gin.Context) {
 	expertThreshold := 1500.0
 	activeThreshold := time.Now().Add(-30 * time.Minute)
 
-	expertsOnline, err := collection.CountDocuments(ctx, bson.M{
+	expertsOnline, err := collection.CountDocuments(statsCtx, bson.M{
 		"rating": bson.M{"$gte": expertThreshold},
 		"$or": []bson.M{
 			{"lastActivityDate": bson.M{"$gte": activeThreshold}},
@@ -189,7 +292,7 @@ func GetLeaderboard(c *gin.Context) {
 	}
 
 	stats := []Stat{
-		{Icon: "crown", Value: strconv.Itoa(totalUsers), Label: "REGISTERED DEBATERS"},
+		{Icon: "crown", Value: strconv.FormatInt(totalUsers, 10), Label: "REGISTERED DEBATERS"},
 		{Icon: "chessQueen", Value: strconv.Itoa(debatesToday), Label: "DEBATES TODAY"},
 		{Icon: "medal", Value: strconv.Itoa(debatingNow), Label: "DEBATING NOW"},
 		{Icon: "crown", Value: strconv.Itoa(int(expertsOnline)), Label: "EXPERTS ONLINE"},
@@ -197,8 +300,13 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Send response
 	response := LeaderboardData{
-		Debaters: debaters,
-		Stats:    stats,
+		Debaters:    debaters,
+		CurrentUser: currentUser,
+		Stats:       stats,
+		Pagination:  LeaderboardPagination{Page: page, Limit: limit, Total: totalUsers, TotalPages: totalUsers / limit},
+	}
+	if totalUsers%limit != 0 {
+		response.Pagination.TotalPages++
 	}
 	c.JSON(http.StatusOK, response)
 }

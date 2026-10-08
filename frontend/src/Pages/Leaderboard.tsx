@@ -19,7 +19,10 @@ import {
   FaTrophy,
 } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
-import { fetchLeaderboardData } from "@/services/leaderboardService";
+import {
+  fetchLeaderboardData,
+  type LeaderboardPagination,
+} from "@/services/leaderboardService";
 import {
   fetchGamificationLeaderboard,
   createGamificationWebSocket,
@@ -47,6 +50,8 @@ interface Stat {
 interface LeaderboardData {
   debaters: Debater[];
   stats: Stat[];
+  pagination?: LeaderboardPagination;
+  currentUser?: Debater;
 }
 
 const getRankClasses = (rank: number) => {
@@ -71,12 +76,28 @@ const mapIcon = (icon: string) => {
 
 type SortCategory = "score" | "rating" | null;
 
+const fetchFallbackPage = (
+  token: string,
+  page: number,
+  sort: SortCategory,
+  includeCurrentUser = false
+): Promise<LeaderboardData> =>
+  fetchLeaderboardData(token, 100, { page, sort: sort ?? "rating", includeCurrentUser });
+
 const Leaderboard: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(5);
   const [debaters, setDebaters] = useState<Debater[]>([]);
   const [stats, setStats] = useState<Stat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<LeaderboardPagination | null>(null);
+  const [pinnedUser, setPinnedUser] = useState<Debater | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const pageRequest = useRef(0);
+  const pageBusy = useRef(false);
+  const fallbackMode = useRef(false);
+  const fallbackSort = useRef<SortCategory>("score");
   const [badgeUnlocked, setBadgeUnlocked] = useState<{
     badgeName: string;
     isOpen: boolean;
@@ -90,6 +111,7 @@ const Leaderboard: React.FC = () => {
 
   // Load initial leaderboard data
   useEffect(() => {
+    const request = ++pageRequest.current;
     const loadData = async () => {
       try {
         setLoading(true);
@@ -99,30 +121,38 @@ const Leaderboard: React.FC = () => {
         // Try to fetch from gamification endpoint first, fallback to old endpoint
         try {
           const data = await fetchGamificationLeaderboard(token);
+          if (request !== pageRequest.current) return;
           setDebaters(data.debaters);
           // Keep stats from old endpoint for now
-          const oldData: LeaderboardData = await fetchLeaderboardData(token);
+          const oldData: LeaderboardData = await fetchLeaderboardData(token, 1);
+          if (request !== pageRequest.current) return;
           setStats(oldData.stats);
         } catch {
           // Fallback to old endpoint
-          const data: LeaderboardData = await fetchLeaderboardData(token);
+          const data = await fetchFallbackPage(token, 1, "score", true);
+          if (request !== pageRequest.current) return;
           setDebaters(data.debaters);
           setStats(data.stats);
+          setPagination(data.pagination ?? null);
+          setPinnedUser(data.currentUser ?? null);
+          fallbackMode.current = Boolean(data.pagination);
         }
       } catch {
-        setError("Failed to load leaderboard data. Please try again later.");
+        if (request === pageRequest.current) setError("Failed to load leaderboard data. Please try again later.");
       } finally {
-        setLoading(false);
+        if (request === pageRequest.current) setLoading(false);
       }
     };
 
     loadData();
+    return () => { pageRequest.current++; };
   }, []);
 
   // Set up WebSocket connection for live updates
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token || !user) return;
+    let reloadTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Clean up existing connection
     if (wsRef.current) {
@@ -155,7 +185,7 @@ const Leaderboard: React.FC = () => {
 
         if (event.type === "score_updated") {
           // Update the leaderboard when scores change
-          setDebaters((prevDebaters) => {
+          if (!fallbackMode.current) setDebaters((prevDebaters) => {
             const updated = [...prevDebaters];
             const index = updated.findIndex((d) => d.id === event.userId);
 
@@ -170,19 +200,46 @@ const Leaderboard: React.FC = () => {
           });
 
           // Reload full leaderboard periodically to ensure accuracy
-          const reloadTimer = setTimeout(async () => {
+          clearTimeout(reloadTimer);
+          const reloadLeaderboard = async () => {
+            let refreshRequest: number | undefined;
             try {
               const token = localStorage.getItem("token");
               if (token) {
+                const request = pageRequest.current;
+                if (fallbackMode.current) {
+                  // Let an explicit page or sort operation finish before refreshing.
+                  if (pageBusy.current) {
+                    reloadTimer = setTimeout(reloadLeaderboard, 2000);
+                    return;
+                  }
+                  refreshRequest = ++pageRequest.current;
+                  pageBusy.current = true;
+                  setLoadingMore(true);
+                  setPageError(null);
+                  const data = await fetchFallbackPage(token, 1, fallbackSort.current, true);
+                  if (refreshRequest !== pageRequest.current) return;
+                  setDebaters(data.debaters);
+                  setPinnedUser(data.currentUser ?? null);
+                  setPagination(data.pagination ?? null);
+                  setStats(data.stats);
+                  setVisibleCount(5);
+                  return;
+                }
                 const data = await fetchGamificationLeaderboard(token);
+                if (request !== pageRequest.current) return;
                 setDebaters(data.debaters);
               }
             } catch (err) {
               console.error("Error reloading leaderboard:", err);
+            } finally {
+              if (refreshRequest === pageRequest.current) {
+                pageBusy.current = false;
+                setLoadingMore(false);
+              }
             }
-          }, 2000);
-
-          return () => clearTimeout(reloadTimer);
+          };
+          reloadTimer = setTimeout(reloadLeaderboard, 2000);
         }
       },
       (error) => {
@@ -196,6 +253,7 @@ const Leaderboard: React.FC = () => {
     wsRef.current = ws;
 
     return () => {
+      clearTimeout(reloadTimer);
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -205,7 +263,9 @@ const Leaderboard: React.FC = () => {
 
   // Sort debaters based on selected category
   const sortedDebaters = React.useMemo(() => {
-    const sorted = [...debaters];
+    // Paginated fallback rows already have the selected global order and ranks.
+    if (pagination) return debaters;
+    const sorted = debaters.map((debater) => ({ ...debater }));
     if (sortCategory) {
       sorted.sort((a, b) => {
         if (sortCategory === "score") {
@@ -220,7 +280,7 @@ const Leaderboard: React.FC = () => {
       debater.rank = index + 1;
     });
     return sorted;
-  }, [debaters, sortCategory]);
+  }, [debaters, sortCategory, pagination]);
 
   const currentUserIndex = sortedDebaters.findIndex(
     (debater) => debater.currentUser
@@ -231,23 +291,83 @@ const Leaderboard: React.FC = () => {
     const initialList = sortedDebaters
       .filter((debater, index) => !debater.currentUser || index < visibleCount)
       .slice(0, visibleCount);
-    if (currentUserIndex !== -1 && currentUserIndex >= visibleCount) {
-      return [...initialList.slice(0, -1), sortedDebaters[currentUserIndex]];
+    const current = pinnedUser ?? sortedDebaters[currentUserIndex];
+    if (current && !initialList.some((debater) => debater.id === current.id)) {
+      return [...initialList.slice(0, -1), current];
     }
     return initialList;
   };
 
-  const handleSortCategory = (category: SortCategory) => {
-    // If clicking the same category, toggle to null (no sort) or keep it
-    if (sortCategory === category) {
-      setSortCategory(null);
-    } else {
-      setSortCategory(category);
+  const handleSortCategory = async (category: SortCategory) => {
+    const nextSort = !pagination && sortCategory === category ? null : category;
+    if (!pagination) {
+      setSortCategory(nextSort);
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const request = ++pageRequest.current;
+    pageBusy.current = true;
+    setLoadingMore(true);
+    setPageError(null);
+    try {
+      const data = await fetchFallbackPage(token, 1, nextSort, true);
+      if (request !== pageRequest.current) return;
+      setSortCategory(nextSort);
+      fallbackSort.current = nextSort;
+      setDebaters(data.debaters);
+      setPinnedUser(data.currentUser ?? null);
+      setPagination(data.pagination ?? null);
+      setStats(data.stats);
+      setVisibleCount(5);
+    } catch {
+      if (request === pageRequest.current) {
+        setPageError("Could not change the leaderboard order. Try again.");
+      }
+    } finally {
+      if (request === pageRequest.current) {
+        pageBusy.current = false;
+        setLoadingMore(false);
+      }
     }
   };
 
-  const showMore = () =>
-    setVisibleCount((prev) => Math.min(prev + 5, sortedDebaters.length));
+  const showMore = async () => {
+    if (pageBusy.current) return;
+    const nextCount = visibleCount + 5;
+    if (
+      nextCount <= debaters.length ||
+      !pagination ||
+      pagination.page >= pagination.totalPages
+    ) {
+      setVisibleCount(Math.min(nextCount, debaters.length));
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const request = ++pageRequest.current;
+    pageBusy.current = true;
+    setLoadingMore(true);
+    setPageError(null);
+    try {
+      const data = await fetchFallbackPage(token, pagination.page + 1, sortCategory);
+      if (request !== pageRequest.current) return;
+      const seen = new Set(debaters.map((debater) => debater.id));
+      const additions = data.debaters.filter((debater) => !seen.has(debater.id));
+      setDebaters([...debaters, ...additions]);
+      setPagination(data.pagination ?? null);
+      setVisibleCount(Math.min(nextCount, debaters.length + additions.length));
+    } catch {
+      if (request === pageRequest.current) {
+        setPageError("Could not load more debaters. Try again.");
+      }
+    } finally {
+      if (request === pageRequest.current) {
+        pageBusy.current = false;
+        setLoadingMore(false);
+      }
+    }
+  };
 
   const visibleDebaters = getVisibleDebaters();
 
@@ -379,13 +499,18 @@ const Leaderboard: React.FC = () => {
               </Table>
             </Card>
 
-            {visibleCount < sortedDebaters.length && (
+            {pageError && (
+              <p role="alert" className="mt-4 text-red-500">{pageError}</p>
+            )}
+            {(visibleCount < sortedDebaters.length ||
+              (pagination && pagination.page < pagination.totalPages)) && (
               <div className="mt-6 flex justify-center">
                 <Button
                   onClick={showMore}
+                  disabled={loadingMore}
                   className="rounded-lg px-6 py-4 text-base font-semibold"
                 >
-                  Show More
+                  {loadingMore ? "Loading..." : "Show More"}
                 </Button>
               </div>
             )}

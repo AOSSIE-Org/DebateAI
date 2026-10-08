@@ -71,6 +71,21 @@ func EnsureIndexes() error {
 		return fmt.Errorf("failed to create displayName index: %w", err)
 	}
 	log.Println("DisplayName unique index ensured")
+	// Serve bounded rating pages in index order, including tied ratings.
+	_, err = usersCol.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "rating", Value: -1}, {Key: "_id", Value: 1}},
+		Options: options.Index().SetName("leaderboard_rating"),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create leaderboard rating index: %w", err)
+	}
+	_, err = usersCol.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "score", Value: -1}, {Key: "_id", Value: 1}},
+		Options: options.Index().SetName("leaderboard_score"),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create leaderboard score index: %w", err)
+	}
 	return nil
 }
 
