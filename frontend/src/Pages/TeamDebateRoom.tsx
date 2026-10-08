@@ -10,6 +10,7 @@ import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { getAuthToken } from "@/utils/auth";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { getIceServers } from "@/utils/iceServers";
 
 // Define debate phases as an enum (same as OnlineDebateRoom)
 enum DebatePhase {
@@ -361,7 +362,7 @@ const TeamDebateRoom: React.FC = () => {
       }
 
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+       iceServers: getIceServers(),
       });
 
       pcRefs.current.set(remoteUserId, pc);

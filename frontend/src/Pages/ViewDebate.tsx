@@ -15,6 +15,7 @@ import {
 } from "../atoms/debateAtoms";
 import { Button } from "../components/ui/button";
 import { getAuthToken } from "../utils/auth";
+import { getIceServers } from "@/utils/iceServers";
 
 type DebateParticipant = {
   id: string;
@@ -178,7 +179,7 @@ export const ViewDebate: React.FC = () => {
       userId: string
     ): RTCPeerConnection => {
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        iceServers: getIceServers(),
       });
       const baseConnectionId = connectionId.includes(":")
         ? connectionId.split(":")[0]
