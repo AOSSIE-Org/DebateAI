@@ -115,6 +115,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.GET("/api/leaderboard", routes.GetGamificationLeaderboardRouteHandler)
 
 		routes.SetupDebateVsBotRoutes(auth)
+		routes.SetupFactCheckRoutes(auth)
 
 		router.GET("/ws", websocket.WebsocketHandler)
 
