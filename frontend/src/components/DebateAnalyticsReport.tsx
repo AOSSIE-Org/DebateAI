@@ -324,6 +324,41 @@ function isValidAnalyticsData(data: unknown): data is AnalyticsData {
   }
 
   if (!d.argument_matrix || typeof d.argument_matrix !== "object") return false;
+  const matrix = d.argument_matrix as Record<string, unknown>;
+
+  if (!Array.isArray(matrix.user_strongest_points)) return false;
+  for (const p of matrix.user_strongest_points) {
+    if (!p || typeof p !== "object") return false;
+    const pObj = p as Record<string, unknown>;
+    if (typeof pObj.point !== "string") return false;
+  }
+
+  if (!Array.isArray(matrix.bot_strongest_points)) return false;
+  for (const p of matrix.bot_strongest_points) {
+    if (!p || typeof p !== "object") return false;
+    const pObj = p as Record<string, unknown>;
+    if (typeof pObj.point !== "string") return false;
+  }
+
+  if (!Array.isArray(matrix.user_unanswered_arguments)) return false;
+  for (const a of matrix.user_unanswered_arguments) {
+    if (!a || typeof a !== "object") return false;
+    const aObj = a as Record<string, unknown>;
+    if (typeof aObj.argument !== "string") return false;
+  }
+
+  if (!Array.isArray(matrix.bot_unanswered_arguments)) return false;
+  for (const a of matrix.bot_unanswered_arguments) {
+    if (!a || typeof a !== "object") return false;
+    const aObj = a as Record<string, unknown>;
+    if (typeof aObj.argument !== "string") return false;
+  }
+
+  if (matrix.decisive_argument) {
+    if (typeof matrix.decisive_argument !== "object") return false;
+    const dec = matrix.decisive_argument as Record<string, unknown>;
+    if (typeof dec.summary !== "string") return false;
+  }
 
   return true;
 }
