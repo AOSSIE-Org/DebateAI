@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -203,6 +204,82 @@ func GetTranscriptByIDHandler(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"transcript": transcript})
+}
+
+// ExportTranscriptPDFHandler handles exporting a transcript as a downloadable PDF.
+// Endpoint: GET /transcript/:id/export?format=pdf
+func ExportTranscriptPDFHandler(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		c.JSON(401, gin.H{"error": "Authorization token required"})
+		return
+	}
+
+	token = strings.TrimPrefix(token, "Bearer ")
+	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	if err != nil || !valid {
+		c.JSON(401, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+
+	// Get user ID from database using email
+	userID, err := utils.GetUserIDFromEmail(email)
+	if err != nil {
+		c.JSON(401, gin.H{"error": "Failed to get user ID"})
+		return
+	}
+
+	// Validate format query parameter
+	format := c.DefaultQuery("format", "pdf")
+	if format != "pdf" {
+		c.JSON(400, gin.H{"error": "Unsupported export format. Supported formats: pdf"})
+		return
+	}
+
+	// Get transcript ID from URL parameter
+	transcriptID := c.Param("id")
+	if transcriptID == "" {
+		c.JSON(400, gin.H{"error": "Transcript ID required"})
+		return
+	}
+
+	// Convert transcript ID to ObjectID
+	transcriptObjectID, err := primitive.ObjectIDFromHex(transcriptID)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid transcript ID format", "details": err.Error(), "received_id": transcriptID})
+		return
+	}
+
+	transcript, err := services.GetDebateTranscriptByID(transcriptObjectID, userID)
+	if err != nil {
+		if err.Error() == "transcript not found" {
+			c.JSON(404, gin.H{"error": "Transcript not found"})
+			return
+		}
+		c.JSON(500, gin.H{"error": "Failed to retrieve transcript"})
+		return
+	}
+
+	// Reject pending transcripts — PDF export is only valid for completed debates
+	if transcript.Result == "pending" {
+		c.JSON(400, gin.H{"error": "Cannot export a transcript with a pending result. Please wait for the debate to be completed."})
+		return
+	}
+
+	// Generate PDF
+	pdfBytes, err := services.GenerateTranscriptPDF(transcript)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to generate PDF"})
+		return
+	}
+
+	// Set response headers for file download
+	filename := "debate-transcript-" + transcriptID + ".pdf"
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	c.Header("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
+	c.Header("Cache-Control", "no-store")
+	c.Data(200, "application/pdf", pdfBytes)
 }
 
 // DeleteTranscriptHandler deletes a saved transcript
