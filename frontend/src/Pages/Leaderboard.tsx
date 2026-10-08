@@ -299,7 +299,7 @@ const Leaderboard: React.FC = () => {
   };
 
   const handleSortCategory = async (category: SortCategory) => {
-    const nextSort = sortCategory === category ? null : category;
+    const nextSort = !pagination && sortCategory === category ? null : category;
     if (!pagination) {
       setSortCategory(nextSort);
       return;
