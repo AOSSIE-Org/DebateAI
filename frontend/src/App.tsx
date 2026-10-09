@@ -35,6 +35,7 @@ import SupportOpenSource from "./Pages/SupportOpenSource";
 import PageTitle from "./components/PageTitle";
 import LoadingSpinner from "./components/LoadingSpinner";
 import TournamentBracket from "./Pages/TournamentBracketPage";
+import CreateTournament from "./Pages/CreateTournament";
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -95,6 +96,7 @@ function AppRoutes() {
           <Route path="game/:userId" element={<DebateApp />} />
           <Route path="bot-selection" element={<BotSelection />} />
           <Route path="/tournaments" element={<TournamentHub />} />
+          <Route path="/tournament/create" element={<CreateTournament/>} />
           <Route path="/tournament/:id" element={<TournamentDetails />} />
           <Route
             path="/tournament/:id/bracket"
