@@ -344,31 +344,38 @@ export const CreateTournamentForm = () => {
         {/* Schedule */}
         {form.startType === "scheduled" && (
           <div>
-            <label className="block mb-1 font-medium">Schedule Date *</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="w-full p-2 border border-border rounded bg-background text-left flex items-center justify-between"
-                >
-                  {scheduleDate ? (
-                    format(scheduleDate, "PPP")
-                  ) : (
-                    <span className="text-muted-foreground">Pick a date</span>
-                  )}
-                  <CalendarIcon className="h-4 w-4 opacity-50" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={scheduleDate}
-                  onSelect={setScheduleDate}
-                  disabled={(date) => date < new Date()}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="relative">
+              <input
+                type="text"
+                value={scheduleDate ? format(scheduleDate, "PPP") : ""}
+                placeholder="dd-mm-yyyy"
+                readOnly
+                className="w-full p-2 pr-10 border border-border rounded bg-background cursor-pointer"
+                onClick={() =>
+                  document.getElementById("schedule-popover-trigger")?.click()
+                }
+              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    id="schedule-popover-trigger"
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
+                  >
+                    <CalendarIcon className="h-4 w-4 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={scheduleDate}
+                    onSelect={setScheduleDate}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         )}
       </div>
