@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Avatar from 'react-avatar';
@@ -25,7 +26,7 @@ interface MatchmakingMessage {
 }
 
 const wsBaseURL = (
-  import.meta.env.VITE_BASE_URL || 'http://localhost:1313'
+  config.baseUrl || 'http://localhost:1313'
 ).replace(/^http/, 'ws');
 
 const Matchmaking: React.FC = () => {

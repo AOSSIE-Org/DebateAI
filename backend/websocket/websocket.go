@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var upgrader = websocket.Upgrader{
@@ -31,6 +32,7 @@ var upgrader = websocket.Upgrader{
 // Room represents a debate room with connected clients.
 type Room struct {
 	Clients map[*websocket.Conn]*Client
+	OwnerID string
 	Mutex   sync.Mutex
 }
 
@@ -270,9 +272,28 @@ func WebsocketHandler(c *gin.Context) {
 	}
 
 	// Create the room if it doesn't exist.
+	roomCollection := db.MongoDatabase.Collection("rooms")
+	var persistedRoom struct {
+		OwnerID string `bson:"ownerId"`
+	}
+	lookupContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := roomCollection.FindOne(lookupContext, bson.M{"_id": roomID}).Decode(&persistedRoom); err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		} else {
+			log.Printf("[ws] failed to load room owner: room=%s err=%v", roomID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load room"})
+		}
+		return
+	}
+
 	roomsMutex.Lock()
 	if _, exists := rooms[roomID]; !exists {
-		rooms[roomID] = &Room{Clients: make(map[*websocket.Conn]*Client)}
+		rooms[roomID] = &Room{
+			Clients: make(map[*websocket.Conn]*Client),
+			OwnerID: persistedRoom.OwnerID,
+		}
 	}
 	room := rooms[roomID]
 	roomsMutex.Unlock()
@@ -657,6 +678,15 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 
 // handleTopicChange handles topic changes
 func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID string) {
+	room.Mutex.Lock()
+	client, exists := room.Clients[conn]
+	isOwner := exists && !client.IsSpectator && client.UserID == room.OwnerID
+	room.Mutex.Unlock()
+
+	if !isOwner {
+		return
+	}
+
 	// Broadcast topic change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
 		if err := r.SafeWriteJSON(message); err != nil {
