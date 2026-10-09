@@ -138,9 +138,6 @@ export const CreateTournamentForm = () => {
       <div className="max-w-md mx-auto p-6 bg-card rounded-lg text-center">
         <h2 className="text-2xl font-bold mb-4">Tournament Created! 🎉</h2>
         <p className="mb-2">{createdTournament.name}</p>
-        <p className="text-xs text-muted-foreground mb-4">
-          Tournament ID: {createdTournament.id}
-        </p>
         {form.visibility === "private" && inviteCode ? (
           <>
             <p className="mb-2">Share this private invite code:</p>
@@ -154,7 +151,9 @@ export const CreateTournamentForm = () => {
               Copy Code
             </button>
             {copyMessage && (
-              <p className="text-sm text-muted-foreground mb-2">{copyMessage}</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {copyMessage}
+              </p>
             )}
           </>
         ) : form.visibility === "private" ? (
@@ -166,7 +165,10 @@ export const CreateTournamentForm = () => {
           <p className="mb-4">Your public tournament has been saved.</p>
         )}
         <button
-          onClick={() => navigate("/tournaments")}
+          onClick={() => {
+            setCreatedTournament(null);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
           className="bg-primary text-primary-foreground px-4 py-2 rounded w-full"
         >
           Back to Tournaments

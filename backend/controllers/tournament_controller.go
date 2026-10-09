@@ -14,7 +14,6 @@ import (
 	"arguehub/models"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -116,35 +115,15 @@ func CreateTournamentHandler(c *gin.Context) {
 		tournament.InviteCode = inviteCode
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+defer cancel()
 
-	_, err := db.MongoDatabase.Collection("tournaments").InsertOne(ctx, tournament)
+_, err := db.MongoDatabase.Collection("tournaments").InsertOne(ctx, tournament)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, tournament)
-}
-
-func GetTournamentHandler(c *gin.Context) {
-	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	var tournament models.Tournament
-	err = db.MongoDatabase.Collection("tournaments").FindOne(ctx, bson.M{"_id": objectID}).Decode(&tournament)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, tournament)
 }
