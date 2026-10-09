@@ -2,8 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createTournament,
-  type CreateTournamentData,
-} from "@/services/tournamentService";
+  type CreateTournamentData,} from "@/services/tournamentService";
+import { Calendar } from "@/components/ui/calendar";
+import {Popover,PopoverContent,PopoverTrigger,} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+
 
 const MIN_PARTICIPANTS_LIMIT = 3;
 const MAX_PARTICIPANTS_LIMIT = 16;
@@ -11,15 +15,13 @@ const CATEGORIES = ["chat_only", "voice_only", "voice_video"] as const;
 const VISIBILITIES = ["public", "private"] as const;
 const START_TYPES = ["direct", "scheduled"] as const;
 
+
 const isOneOf = <T extends readonly string[]>(
   values: T,
   value: string,
 ): value is T[number] => values.some((candidate) => candidate === value);
 
-const getLocalDateTimeValue = (date: Date) => {
-  const timezoneOffset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
-};
+
 
 export const CreateTournamentForm = () => {
   const navigate = useNavigate();
@@ -37,6 +39,7 @@ export const CreateTournamentForm = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [createdTournament, setCreatedTournament] = useState<{
     id: string;
     name: string;
@@ -60,11 +63,19 @@ export const CreateTournamentForm = () => {
     const description = form.description.trim();
     const moderatorName = form.moderatorName.trim();
     if (!name || !description || !moderatorName) {
-      setError("Tournament topic, description, and moderator name are required.");
+      setError(
+        "Tournament topic, description, and moderator name are required.",
+      );
       return;
     }
-    if (name.length > 100 || description.length > 2000 || moderatorName.length > 80) {
-      setError("Topic must be at most 100 characters, description 2000, and moderator name 80.");
+    if (
+      name.length > 100 ||
+      description.length > 2000 ||
+      moderatorName.length > 80
+    ) {
+      setError(
+        "Topic must be at most 100 characters, description 2000, and moderator name 80.",
+      );
       return;
     }
     if (
@@ -72,7 +83,9 @@ export const CreateTournamentForm = () => {
       form.minParticipants < MIN_PARTICIPANTS_LIMIT ||
       form.minParticipants > MAX_PARTICIPANTS_LIMIT
     ) {
-      setError(`Minimum participants must be between ${MIN_PARTICIPANTS_LIMIT} and ${MAX_PARTICIPANTS_LIMIT}.`);
+      setError(
+        `Minimum participants must be between ${MIN_PARTICIPANTS_LIMIT} and ${MAX_PARTICIPANTS_LIMIT}.`,
+      );
       return;
     }
     if (
@@ -80,22 +93,19 @@ export const CreateTournamentForm = () => {
       form.maxParticipants < form.minParticipants ||
       form.maxParticipants > MAX_PARTICIPANTS_LIMIT
     ) {
-      setError(`Maximum participants must be between the minimum and ${MAX_PARTICIPANTS_LIMIT}.`);
+      setError(
+        `Maximum participants must be between the minimum and ${MAX_PARTICIPANTS_LIMIT}.`,
+      );
       return;
     }
 
     let normalizedScheduleAt: string | undefined;
     if (form.startType === "scheduled") {
-      const scheduledAt = new Date(form.scheduleAt);
-      if (
-        !form.scheduleAt ||
-        Number.isNaN(scheduledAt.getTime()) ||
-        scheduledAt <= new Date()
-      ) {
-        setError("Choose a valid future date and time.");
+      if (!scheduleDate || scheduleDate <= new Date()) {
+        setError("Choose a valid future date.");
         return;
       }
-      normalizedScheduleAt = scheduledAt.toISOString();
+      normalizedScheduleAt = scheduleDate.toISOString();
     }
 
     const payload: CreateTournamentData = {
@@ -114,7 +124,7 @@ export const CreateTournamentForm = () => {
         !/^\d{6}$/.test(result.inviteCode ?? "")
       ) {
         setError(
-          `Tournament was created, but the backend returned an invalid invite code. Restart the backend and contact support with tournament ID: ${result.id}`
+          `Tournament was created, but the backend returned an invalid invite code. Restart the backend and contact support with tournament ID: ${result.id}`,
         );
         return;
       }
@@ -125,7 +135,7 @@ export const CreateTournamentForm = () => {
       });
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to create tournament."
+        err instanceof Error ? err.message : "Failed to create tournament.",
       );
     } finally {
       setLoading(false);
@@ -167,7 +177,7 @@ export const CreateTournamentForm = () => {
         <button
           onClick={() => {
             setCreatedTournament(null);
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            navigate("/tournaments");
           }}
           className="bg-primary text-primary-foreground px-4 py-2 rounded w-full"
         >
@@ -180,7 +190,7 @@ export const CreateTournamentForm = () => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-2xl mx-auto p-6 bg-card rounded-lg"
+      className="max-w-3xl mx-auto p-6 bg-card rounded-lg"
     >
       <h2 className="text-2xl font-bold mb-6">Create Tournament</h2>
 
@@ -335,16 +345,30 @@ export const CreateTournamentForm = () => {
         {form.startType === "scheduled" && (
           <div>
             <label className="block mb-1 font-medium">Schedule Date *</label>
-            <input
-              type="datetime-local"
-              value={form.scheduleAt}
-              min={getLocalDateTimeValue(new Date())}
-              onChange={(e) =>
-                setForm({ ...form, scheduleAt: e.target.value })
-              }
-              className="w-full p-2 border border-border rounded bg-background"
-              required
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full p-2 border border-border rounded bg-background text-left flex items-center justify-between"
+                >
+                  {scheduleDate ? (
+                    format(scheduleDate, "PPP")
+                  ) : (
+                    <span className="text-muted-foreground">Pick a date</span>
+                  )}
+                  <CalendarIcon className="h-4 w-4 opacity-50" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={scheduleDate}
+                  onSelect={setScheduleDate}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </div>
