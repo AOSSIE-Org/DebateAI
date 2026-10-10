@@ -20,7 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"  
 )
 
-const maxTournamentParticipants = 16
+const maxTournamentParticipants = 11
 
 type CreateTournamentInput struct {
 	Topic           string `json:"topic" binding:"required,max=100"`
@@ -63,7 +63,7 @@ func CreateTournamentHandler(c *gin.Context) {
 		return
 	}
 	if input.MaxParticipants > maxTournamentParticipants {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Max cannot exceed 16"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Max cannot exceed 11"})
 		return
 	}
 

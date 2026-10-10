@@ -14,7 +14,7 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 
 const MIN_PARTICIPANTS_LIMIT = 3;
-const MAX_PARTICIPANTS_LIMIT = 16;
+const MAX_PARTICIPANTS_LIMIT = 11;
 const VISIBILITIES = ["public", "private"] as const;
 const START_TYPES = ["direct", "scheduled"] as const;
 const STANCES = ["for", "against"] as const;
@@ -31,7 +31,7 @@ const createEmptyForm = (): CreateTournamentData => ({
   visibility: "public",
   stance: "for",
   minParticipants: 3,
-  maxParticipants: 16,
+  maxParticipants: 11,
   startType: "direct",
   scheduleAt: "",
 });
