@@ -2099,6 +2099,10 @@ const OnlineDebateRoom = (): JSX.Element => {
   };
 
   const handleRoleSelection = (role: DebateRole) => {
+    if (localReady) {
+      alert("Please cancel ready before changing your stance.");
+      return;
+    }
     if (peerRole === role) {
       alert(
         `Your opponent already chose "${role}". Please select the other side.`
@@ -2115,6 +2119,13 @@ const OnlineDebateRoom = (): JSX.Element => {
     if (!isWsConnected || !socket || socket.readyState !== WebSocket.OPEN) {
       window.alert(
         "The room connection is still reconnecting. Please try again."
+      );
+      return;
+    }
+
+    if (!localReady && !localRole) {
+      window.alert(
+        "Please select a stance (For or Against) before marking yourself ready."
       );
       return;
     }
@@ -2397,21 +2408,23 @@ const OnlineDebateRoom = (): JSX.Element => {
                     <div className="mt-2 flex space-x-2">
                       <button
                         onClick={() => handleRoleSelection("for")}
+                        disabled={localReady}
                         className={`px-2 py-1 rounded text-xs border transition ${
                           localRole === "for"
                             ? "bg-primary text-primary-foreground border-transparent"
                             : "bg-muted text-muted-foreground border-border"
-                        }`}
+                        } ${localReady ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         For
                       </button>
                       <button
                         onClick={() => handleRoleSelection("against")}
+                        disabled={localReady}
                         className={`px-2 py-1 rounded text-xs border transition ${
                           localRole === "against"
                             ? "bg-primary text-primary-foreground border-transparent"
                             : "bg-muted text-muted-foreground border-border"
-                        }`}
+                        } ${localReady ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         Against
                       </button>
@@ -2474,7 +2487,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                 <div>
                   <Button
                     onClick={toggleReady}
-                    disabled={!isWsConnected}
+                    disabled={!isWsConnected || (!localReady && !localRole)}
                     className={`w-full py-2 rounded-lg transition ${
                       localReady
                         ? "bg-destructive text-destructive-foreground"
@@ -2483,6 +2496,8 @@ const OnlineDebateRoom = (): JSX.Element => {
                   >
                     {!isWsConnected
                       ? "Connecting..."
+                      : !localRole && !localReady
+                      ? "Select Stance First"
                       : localReady
                       ? "Cancel Ready"
                       : "I'm Ready"}

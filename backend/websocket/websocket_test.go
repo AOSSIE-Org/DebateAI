@@ -37,3 +37,78 @@ func TestBuildParticipantsMessageIncludesRecoverableRoomState(t *testing.T) {
 		t.Fatalf("expected role=for, got %#v", participant["role"])
 	}
 }
+
+func TestHandleReadyStatusRejectsWithoutRole(t *testing.T) {
+	conn := &gorilla.Conn{}
+	client := &Client{
+		UserID:   "user-1",
+		Username: "Alice",
+		Role:     "",
+		Ready:    false,
+	}
+	room := &Room{
+		Clients: map[*gorilla.Conn]*Client{
+			conn: client,
+		},
+	}
+
+	readyTrue := true
+	handleReadyStatus(room, conn, Message{Type: "ready", Ready: &readyTrue}, "room-1")
+
+	if client.Ready {
+		t.Fatalf("expected client.Ready to remain false when client has no role")
+	}
+}
+
+func TestHandleReadyStatusAllowsWithRole(t *testing.T) {
+	conn := &gorilla.Conn{}
+	client := &Client{
+		UserID:   "user-1",
+		Username: "Alice",
+		Role:     "for",
+		Ready:    false,
+	}
+	room := &Room{
+		Clients: map[*gorilla.Conn]*Client{
+			conn: client,
+		},
+	}
+
+	readyTrue := true
+	handleReadyStatus(room, conn, Message{Type: "ready", Ready: &readyTrue}, "room-1")
+
+	if !client.Ready {
+		t.Fatalf("expected client.Ready to be true when client has role 'for'")
+	}
+
+	readyFalse := false
+	handleReadyStatus(room, conn, Message{Type: "ready", Ready: &readyFalse}, "room-1")
+
+	if client.Ready {
+		t.Fatalf("expected client.Ready to be false after unready")
+	}
+}
+
+func TestHandleRoleSelectionResetsReadyStatus(t *testing.T) {
+	conn := &gorilla.Conn{}
+	client := &Client{
+		UserID:   "user-1",
+		Username: "Alice",
+		Role:     "for",
+		Ready:    true,
+	}
+	room := &Room{
+		Clients: map[*gorilla.Conn]*Client{
+			conn: client,
+		},
+	}
+
+	handleRoleSelection(room, conn, Message{Type: "roleSelection", Role: "against"}, "room-1")
+
+	if client.Role != "against" {
+		t.Fatalf("expected client.Role to be 'against', got %s", client.Role)
+	}
+	if client.Ready {
+		t.Fatalf("expected client.Ready to be reset to false after changing role")
+	}
+}
