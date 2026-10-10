@@ -20,6 +20,7 @@ type User struct {
 	Twitter                 string             `bson:"twitter,omitempty" json:"twitter,omitempty"`
 	Instagram               string             `bson:"instagram,omitempty" json:"instagram,omitempty"`
 	LinkedIn                string             `bson:"linkedin,omitempty" json:"linkedin,omitempty"`
+	GitHub                  string             `bson:"github,omitempty" json:"github,omitempty"`
 	Password                string             `bson:"password"`
 	Nickname                string             `bson:"nickname"`
 	IsVerified              bool               `bson:"isVerified"`

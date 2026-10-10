@@ -3,11 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UserPlus, UserCheck, Users } from 'lucide-react';
+import { UserPlus, UserCheck, Users, Twitter, Instagram, Linkedin, Github } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import defaultAvatar from '@/assets/avatar2.jpg';
 import ProfileHover from './ProfileHover';
 import LoadingSpinner from './LoadingSpinner';
+import SocialVerificationBadge from './SocialVerificationBadge';
+import {
+  parseAndValidateSocialInput,
+  getStandardizedSocialDisplay,
+  SupportedPlatform,
+} from '../utils/socialValidation';
 
 interface UserProfile {
   id: string;
@@ -16,6 +22,10 @@ interface UserProfile {
   bio?: string;
   rating?: number;
   avatarUrl?: string;
+  twitter?: string;
+  instagram?: string;
+  linkedin?: string;
+  github?: string;
 }
 
 interface UserProfileModalProps {
@@ -123,14 +133,18 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           console.warn('Profile ID mismatch! Expected:', userId, 'Got:', data.profile.id);
         }
         
-        setProfile({
-          id: data.profile?.id || data.id || userId,
-          displayName: data.profile?.displayName || data.displayName || 'User',
-          email: data.profile?.email || data.email || '',
-          bio: data.profile?.bio || data.bio || '',
-          rating: data.profile?.rating || data.rating || 1500,
-          avatarUrl: data.profile?.avatarUrl || data.avatarUrl || defaultAvatar,
-        });
+          setProfile({
+            id: data.profile?.id || data.id || userId,
+            displayName: data.profile?.displayName || data.displayName || 'User',
+            email: data.profile?.email || data.email || '',
+            bio: data.profile?.bio || data.bio || '',
+            rating: data.profile?.rating || data.rating || 1500,
+            avatarUrl: data.profile?.avatarUrl || data.avatarUrl || defaultAvatar,
+            twitter: data.profile?.twitter || data.twitter || '',
+            instagram: data.profile?.instagram || data.instagram || '',
+            linkedin: data.profile?.linkedin || data.linkedin || '',
+            github: data.profile?.github || data.github || '',
+          });
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
         console.error('Failed to fetch profile:', errorData);
@@ -301,6 +315,65 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <p className="text-sm text-gray-700">{profile.bio}</p>
               </div>
             )}
+
+            {/* Verified Social Profiles */}
+            {(() => {
+              const socialPlatformsList: Array<{
+                platform: SupportedPlatform;
+                Icon: React.ComponentType<{ className?: string }>;
+                label: string;
+              }> = [
+                { platform: "twitter", Icon: Twitter, label: "X / Twitter" },
+                { platform: "instagram", Icon: Instagram, label: "Instagram" },
+                { platform: "linkedin", Icon: Linkedin, label: "LinkedIn" },
+                { platform: "github", Icon: Github, label: "GitHub" },
+              ];
+
+              const verifiedSocials = socialPlatformsList
+                .map(({ platform, Icon, label }) => {
+                  const handle = profile[platform];
+                  if (!handle) return null;
+                  const validation = parseAndValidateSocialInput(platform, handle);
+                  if (!validation.isValid || !validation.handle) return null;
+                  return {
+                    platform,
+                    Icon,
+                    label,
+                    url: validation.url,
+                    display: getStandardizedSocialDisplay(platform, validation.handle),
+                  };
+                })
+                .filter((item): item is NonNullable<typeof item> => item !== null);
+
+              if (verifiedSocials.length === 0) return null;
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-sm">Verified Social Profiles</h3>
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                      ✓ Whitelist Verified
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {verifiedSocials.map((item) => (
+                      <a
+                        key={item.platform}
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary bg-muted/60 hover:bg-muted px-2.5 py-1 rounded-full border border-border transition-colors"
+                        title={`${item.label}: ${item.display} (Verified)`}
+                      >
+                        <item.Icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span>{item.display}</span>
+                        <SocialVerificationBadge verified={true} size="xs" showText={true} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Followers Section */}
             <div className="space-y-2">
