@@ -8,4 +8,5 @@ import (
 
 func SetupTournamentRoutes(auth *gin.RouterGroup) {
 	auth.POST("/tournaments", controllers.CreateTournamentHandler)
+	  auth.DELETE("/tournaments/:id", controllers.DeleteTournamentHandler)
 }

@@ -2,47 +2,50 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createTournament,
-  type CreateTournamentData,} from "@/services/tournamentService";
+  type CreateTournamentData,
+} from "@/services/tournamentService";
 import { Calendar } from "@/components/ui/calendar";
-import {Popover,PopoverContent,PopoverTrigger,} from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 
-
 const MIN_PARTICIPANTS_LIMIT = 3;
 const MAX_PARTICIPANTS_LIMIT = 16;
-const CATEGORIES = ["chat_only", "voice_only", "voice_video"] as const;
 const VISIBILITIES = ["public", "private"] as const;
 const START_TYPES = ["direct", "scheduled"] as const;
-
+const STANCES = ["for", "against"] as const;
 
 const isOneOf = <T extends readonly string[]>(
   values: T,
   value: string,
 ): value is T[number] => values.some((candidate) => candidate === value);
 
-
+const createEmptyForm = (): CreateTournamentData => ({
+  topic: "",
+  description: "",
+  moderatorName: "",
+  visibility: "public",
+  stance: "for",
+  minParticipants: 3,
+  maxParticipants: 16,
+  startType: "direct",
+  scheduleAt: "",
+});
 
 export const CreateTournamentForm = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState<CreateTournamentData>({
-    title: "",
-    description: "",
-    moderatorName: "",
-    category: "chat_only",
-    visibility: "public",
-    minParticipants: 3,
-    maxParticipants: 16,
-    startType: "direct",
-    scheduleAt: "",
-  });
+  const [form, setForm] = useState<CreateTournamentData>(createEmptyForm());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [createdTournament, setCreatedTournament] = useState<{
     id: string;
-    title: string;
+    topic: string;
     inviteCode?: string;
   } | null>(null);
 
@@ -55,21 +58,30 @@ export const CreateTournamentForm = () => {
     }
   };
 
+  const resetForm = () => {
+    setCreatedTournament(null);
+    setForm(createEmptyForm());
+    setScheduleDate(undefined);
+    setCopyMessage("");
+    setError("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    const title = form.title.trim();
+    const topic = form.topic.trim();
     const description = form.description.trim();
     const moderatorName = form.moderatorName.trim();
-    if (!title || !description || !moderatorName) {
+
+    if (!topic || !description || !moderatorName) {
       setError(
         "Tournament topic, description, and moderator name are required.",
       );
       return;
     }
     if (
-      title.length > 100 ||
+      topic.length > 100 ||
       description.length > 2000 ||
       moderatorName.length > 80
     ) {
@@ -110,7 +122,7 @@ export const CreateTournamentForm = () => {
 
     const payload: CreateTournamentData = {
       ...form,
-      title,
+      topic,
       description,
       moderatorName,
       ...(normalizedScheduleAt ? { scheduleAt: normalizedScheduleAt } : {}),
@@ -124,13 +136,13 @@ export const CreateTournamentForm = () => {
         !/^\d{6}$/.test(result.inviteCode ?? "")
       ) {
         setError(
-          `Tournament was created, but the backend returned an invalid invite code. Restart the backend and contact support with tournament ID: ${result.id}`,
+          `Tournament was created, but the backend returned an invalid invite code. Contact support with tournament ID: ${result.id}`,
         );
         return;
       }
       setCreatedTournament({
         id: result.id,
-        title: result.title,
+        topic: result.topic,
         ...(result.inviteCode ? { inviteCode: result.inviteCode } : {}),
       });
     } catch (err: unknown) {
@@ -147,7 +159,7 @@ export const CreateTournamentForm = () => {
     return (
       <div className="max-w-md mx-auto p-6 bg-card rounded-lg text-center">
         <h2 className="text-2xl font-bold mb-4">Tournament Created! 🎉</h2>
-        <p className="mb-2">Title : {createdTournament.title}</p>
+        <p className="mb-2">Topic: {createdTournament.topic}</p>
         {form.visibility === "private" && inviteCode ? (
           <>
             <p className="mb-2">Share this private invite code:</p>
@@ -169,36 +181,14 @@ export const CreateTournamentForm = () => {
         ) : form.visibility === "private" ? (
           <p className="text-destructive mb-4">
             The tournament was created, but the server did not return an invite
-            code. Contact support with the tournament ID above.
+            code. Contact support.
           </p>
         ) : (
           <p className="mb-4">Your public tournament has been saved.</p>
         )}
-        {/* <button
-          onClick={() => {
-            setCreatedTournament(null);
-            navigate("/tournaments");
-          }}
-          className="bg-primary text-primary-foreground px-4 py-2 rounded w-full"
-        >
-          Back to Tournaments
-        </button> */}
         <button
           onClick={() => {
-            setCreatedTournament(null);
-            setForm({
-              title: "",
-              description: "",
-              moderatorName: "",
-              category: "chat_only",
-              visibility: "public",
-              minParticipants: 3,
-              maxParticipants: 16,
-              startType: "direct",
-              scheduleAt: "",
-            });
-            setScheduleDate(undefined);
-            setCopyMessage("");
+            resetForm();
             navigate("/tournaments");
           }}
           className="bg-primary text-primary-foreground px-4 py-2 rounded w-full"
@@ -225,10 +215,10 @@ export const CreateTournamentForm = () => {
       <div className="space-y-4">
         {/* Topic */}
         <div>
-          <label className="block mb-1 font-medium">Tournament Title *</label>
+          <label className="block mb-1 font-medium">Tournament Topic *</label>
           <input
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            value={form.topic}
+            onChange={(e) => setForm({ ...form, topic: e.target.value })}
             placeholder="e.g. Should AI be regulated?"
             className="w-full p-2 border border-border rounded bg-background"
             required
@@ -262,52 +252,47 @@ export const CreateTournamentForm = () => {
           />
         </div>
 
-        {/* Category + Visibility */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block mb-1 font-medium">Category *</label>
-            <select
-              value={form.category}
-              onChange={(e) => {
-                const category = e.target.value;
-                if (isOneOf(CATEGORIES, category)) {
-                  setForm((previous) => ({
-                    ...previous,
-                    category,
-                  }));
-                }
-              }}
-              className="w-full p-2 border border-border rounded bg-background"
-            >
-              <option value="chat_only">Chat Only</option>
-              <option value="voice_only">Voice Only</option>
-              <option value="voice_video">Voice + Video</option>
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1 font-medium">Visibility *</label>
-            <select
-              value={form.visibility}
-              onChange={(e) => {
-                const visibility = e.target.value;
-                if (isOneOf(VISIBILITIES, visibility)) {
-                  setForm((previous) => ({
-                    ...previous,
-                    visibility,
-                  }));
-                }
-              }}
-              className="w-full p-2 border border-border rounded bg-background"
-            >
-              <option value="public">Public</option>
-              <option value="private">Private</option>
-            </select>
-            {form.visibility === "private" && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Requires invite code
-              </p>
-            )}
-          </div>
+        {/* Visibility */}
+        <div>
+          <label className="block mb-1 font-medium">Visibility *</label>
+          <select
+            value={form.visibility}
+            onChange={(e) => {
+              const visibility = e.target.value;
+              if (isOneOf(VISIBILITIES, visibility)) {
+                setForm((previous) => ({ ...previous, visibility }));
+              }
+            }}
+            className="w-full p-2 border border-border rounded bg-background"
+          >
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+          {form.visibility === "private" && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Requires invite code
+            </p>
+          )}
+        </div>
+        {/* Stance */}
+        <div>
+          <label className="block mb-1 font-medium">Your Stance *</label>
+          <select
+            value={form.stance}
+            onChange={(e) => {
+              const stance = e.target.value;
+              if (isOneOf(STANCES, stance)) {
+                setForm((previous) => ({ ...previous, stance }));
+              }
+            }}
+            className="w-full p-2 border border-border rounded bg-background"
+          >
+            <option value="for">For</option>
+            <option value="against">Against</option>
+          </select>
+          <p className="text-xs text-muted-foreground mt-1">
+            Choose which side you'll argue from
+          </p>
         </div>
 
         {/* Min + Max */}
@@ -350,10 +335,7 @@ export const CreateTournamentForm = () => {
             onChange={(e) => {
               const startType = e.target.value;
               if (isOneOf(START_TYPES, startType)) {
-                setForm((previous) => ({
-                  ...previous,
-                  startType,
-                }));
+                setForm((previous) => ({ ...previous, startType }));
               }
             }}
             className="w-full p-2 border border-border rounded bg-background"
@@ -366,6 +348,7 @@ export const CreateTournamentForm = () => {
         {/* Schedule */}
         {form.startType === "scheduled" && (
           <div>
+            <label className="block mb-1 font-medium">Schedule Date *</label>
             <div className="relative">
               <input
                 type="text"
@@ -383,6 +366,7 @@ export const CreateTournamentForm = () => {
                     id="schedule-popover-trigger"
                     type="button"
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
+                    aria-label="Open calendar"
                   >
                     <CalendarIcon className="h-4 w-4 opacity-50" />
                   </button>

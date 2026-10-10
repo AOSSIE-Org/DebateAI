@@ -5,7 +5,7 @@ import { CreateTournamentForm } from "@/components/tournament/CreateTournamentFo
 
 export interface Tournament {
   id: string;
-  title: string;
+  topic: string; 
   maxParticipants: number;
   currentParticipants: number;
   date: string;
@@ -16,7 +16,7 @@ export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
     {
       id: "1",
-      title: "Spring Showdown",
+      topic: "Spring Showdown",
       maxParticipants: 8,
       currentParticipants: 6,
       date: "2025-04-20",
@@ -25,7 +25,7 @@ export default function TournamentPage() {
     },
     {
       id: "2",
-      title: "Summer Slam",
+      topic: "Summer Slam",
       maxParticipants: 8,
       currentParticipants: 8,
       date: "2025-06-15",
@@ -34,7 +34,7 @@ export default function TournamentPage() {
     },
     {
       id: "3",
-      title: "Rapid Fire Blitz",
+      topic: "Rapid Fire Blitz", 
       maxParticipants: 8,
       currentParticipants: 3,
       date: "2025-05-05",
@@ -116,6 +116,7 @@ export default function TournamentPage() {
     return avatars;
   };
 
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <h1 className="text-4xl sm:text-5xl font-extrabold mb-10 text-center text-primary animate-pulse">
@@ -137,7 +138,7 @@ export default function TournamentPage() {
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
                   <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
-                    {t.title}
+                    {t.topic} 
                   </h2>
                   <button
                     onClick={() => handleViewBracket(t)}
@@ -195,7 +196,7 @@ export default function TournamentPage() {
         {/* Right: Create Tournament Form */}
         <div className="w-full lg:w-1/3 space-y-8">
           <div className="bg-card rounded-lg border border-border shadow-md p-2">
-            <CreateTournamentForm />
+            <CreateTournamentForm/>
           </div>
         </div>
       </div>

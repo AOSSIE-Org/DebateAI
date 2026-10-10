@@ -4,12 +4,18 @@ import { getAuthToken } from "@/utils/auth";
 const API_BASE_URL =
   config.baseUrl?.replace(/\/+$/, "") ?? "http://localhost:1313";
 
+export interface TournamentParticipant {
+  userId: string;
+  name: string;
+  stance: "for" | "against";
+}
+
 export interface CreateTournamentData {
-  title: string;
+  topic: string;
   description: string;
   moderatorName: string;
-  category: "chat_only" | "voice_only" | "voice_video";
   visibility: "public" | "private";
+  stance: "for" | "against";
   minParticipants: number;
   maxParticipants: number;
   startType: "direct" | "scheduled";
@@ -18,18 +24,23 @@ export interface CreateTournamentData {
 
 export interface CreatedTournament {
   id: string;
-  title: string;
-  description: string;
+  hostId: string;
   moderatorName: string;
-  category: CreateTournamentData["category"];
-  visibility: CreateTournamentData["visibility"];
+  topic: string;
+  description: string;
+  visibility: "public" | "private";
   status: "upcoming" | "live" | "completed";
   minParticipants: number;
   maxParticipants: number;
-  participants: string[];
+  participants: TournamentParticipant[];
   inviteCode?: string;
   scheduleAt?: string;
   createdAt: string;
+}
+
+interface ApiError {
+  error?: string;
+  message?: string;
 }
 
 export const createTournament = async (
@@ -49,10 +60,16 @@ export const createTournament = async (
     body: JSON.stringify(tournament),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const data: ApiError | CreatedTournament = await response
+    .json()
+    .catch(() => ({}));
+
   if (!response.ok) {
+    const errorData = data as ApiError;
     throw new Error(
-      data.error || data.message || `Tournament creation failed (${response.status}).`
+      errorData.error ||
+      errorData.message ||
+      `Tournament creation failed (${response.status}).`
     );
   }
 
