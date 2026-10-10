@@ -45,6 +45,8 @@ import {
   Award,
   Instagram,
   Linkedin,
+  Github,
+  BadgeCheck,
   Pen,
   X,
   Image as ImageIcon,
@@ -82,6 +84,13 @@ import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
 import ProfileHover from "../components/ProfileHover";
+import SocialVerificationBadge from "../components/SocialVerificationBadge";
+import {
+  parseAndValidateSocialInput,
+  getStandardizedSocialUrl,
+  getStandardizedSocialDisplay,
+  SupportedPlatform,
+} from "../utils/socialValidation";
 import { useUser } from "../hooks/useUser";
 import {
   transcriptService,
@@ -114,6 +123,7 @@ interface ProfileData {
   twitter?: string;
   instagram?: string;
   linkedin?: string;
+  github?: string;
   avatarUrl?: string;
 }
 
@@ -164,11 +174,7 @@ interface FollowUser {
   avatarUrl?: string;
 }
 
-const socialValidation: Record<string, { pattern: RegExp; maxLength: number }> = {
-  twitter: { pattern: /[^a-zA-Z0-9_]/g, maxLength: 15 },
-  instagram: { pattern: /[^a-zA-Z0-9_.]/g, maxLength: 30 },
-  linkedin: { pattern: /[^a-z0-9-]/g, maxLength: 100 },
-};
+
 
 const BIO_MAX_LENGTH = 300;
 
@@ -319,6 +325,18 @@ const Profile: React.FC = () => {
       return;
     }
 
+    if (["twitter", "instagram", "linkedin", "github"].includes(field)) {
+      const validation = parseAndValidateSocialInput(field as SupportedPlatform, draftValue);
+      if (!validation.isValid) {
+        setErrorMessage(validation.error || `Invalid ${field} format.`);
+        return;
+      }
+    }
+
+    const cleanSocialValue = ["twitter", "instagram", "linkedin", "github"].includes(field)
+      ? parseAndValidateSocialInput(field as SupportedPlatform, draftValue).handle
+      : draftValue;
+
     const token = getAuthToken();
     if (!token) {
       setErrorMessage("Authentication token is missing.");
@@ -332,10 +350,11 @@ const Profile: React.FC = () => {
         token,
         field === "displayName" ? draftValue.trim() : dashboard.profile.displayName,
         field === "bio" ? draftValue : dashboard.profile.bio,
-        field === "twitter" ? draftValue : dashboard.profile.twitter,
-        field === "instagram" ? draftValue : dashboard.profile.instagram,
-        field === "linkedin" ? draftValue : dashboard.profile.linkedin,
-        dashboard.profile.avatarUrl
+        field === "twitter" ? cleanSocialValue : dashboard.profile.twitter,
+        field === "instagram" ? cleanSocialValue : dashboard.profile.instagram,
+        field === "linkedin" ? cleanSocialValue : dashboard.profile.linkedin,
+        dashboard.profile.avatarUrl,
+        field === "github" ? cleanSocialValue : dashboard.profile.github
       );
       setSuccessMessage(
         `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully!`
@@ -373,7 +392,8 @@ const Profile: React.FC = () => {
         dashboard.profile.twitter,
         dashboard.profile.instagram,
         dashboard.profile.linkedin,
-        avatarUrl
+        avatarUrl,
+        dashboard.profile.github
       );
       setSuccessMessage("Avatar updated successfully!");
       setErrorMessage("");
@@ -404,70 +424,93 @@ const Profile: React.FC = () => {
   }
 
   const renderEditableSocialField = (
-    field: keyof ProfileData,
+    field: "twitter" | "instagram" | "linkedin" | "github",
     label: string,
     Icon: React.ComponentType<{ className?: string }>,
     placeholder: string = `Enter your ${label.toLowerCase()}`
   ) => {
-    return editingField === field ? (
-      <form
-        onSubmit={(e) => handleSubmit(e, field as string)}
-        className="space-y-2 mb-2 w-full"
-      >
-        <div className="flex items-center gap-2 w-full">
-          <Icon className="w-4 h-4 text-primary flex-shrink-0" />
-          <Input
-            id={field}
-            type="text"
-            value={draftValue}
-            onChange={(e) => {
-              const rules = socialValidation[field as string];
-              let val = e.target.value;
-              if (field === "linkedin") val = val.toLowerCase();
-              val = rules ? val.replace(rules.pattern, "").slice(0, rules.maxLength) : val;
-              setDraftValue(val);
-            }}
-            placeholder={placeholder}
-            className="text-sm w-full [.contrast_&]:border-border"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button type="submit" size="sm" variant="default" className="flex-1">
-            Save
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleCancelEdit}
-            className="flex-1"
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
-    ) : (
-      <div className="flex items-center justify-between mb-2 w-full min-w-0">
-        {dashboard?.profile[field] ? (
-          <a
-            href={
-              field === "twitter"
-                ? `https://twitter.com/${dashboard.profile[field]}`
-                : field === "instagram"
-                  ? `https://instagram.com/${dashboard.profile[field]}`
-                  : `https://linkedin.com/in/${dashboard.profile[field]}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline flex items-center gap-2 truncate min-w-0"
-          >
+    const isEditing = editingField === field;
+    const currentVal = (dashboard?.profile[field] as string) || "";
+    const validation = isEditing
+      ? parseAndValidateSocialInput(field, draftValue)
+      : parseAndValidateSocialInput(field, currentVal);
+
+    if (isEditing) {
+      return (
+        <form
+          onSubmit={(e) => handleSubmit(e, field)}
+          className="space-y-2 mb-3 w-full p-2.5 rounded-lg border border-border/80 bg-muted/20"
+        >
+          <div className="flex items-center gap-2 w-full">
             <Icon className="w-4 h-4 text-primary flex-shrink-0" />
-            <span className="truncate">
-              {field === "twitter" || field === "instagram"
-                ? `@${dashboard.profile[field]}`
-                : dashboard.profile[field]}
-            </span>
-          </a>
+            <Input
+              id={field}
+              type="text"
+              value={draftValue}
+              onChange={(e) => setDraftValue(e.target.value)}
+              placeholder={placeholder}
+              className={`text-sm w-full [.contrast_&]:border-border ${
+                draftValue.trim() && !validation.isValid ? "border-red-500 focus-visible:ring-red-500" : ""
+              }`}
+            />
+          </div>
+
+          {draftValue.trim() && !validation.isValid && (
+            <p className="text-xs text-red-500 flex items-center gap-1 pl-6">
+              {validation.error}
+            </p>
+          )}
+
+          {draftValue.trim() && validation.isValid && (
+            <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 pl-6">
+              <span className="truncate">Will link to: {validation.url}</span>
+              <SocialVerificationBadge verified={true} size="xs" showText={true} />
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              size="sm"
+              variant="default"
+              className="flex-1"
+              disabled={Boolean(draftValue.trim() && !validation.isValid)}
+            >
+              Save
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleCancelEdit}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      );
+    }
+
+    const hasValue = Boolean(currentVal && validation.isValid);
+    const displayHandle = hasValue ? getStandardizedSocialDisplay(field, currentVal) : "";
+    const profileUrl = hasValue ? getStandardizedSocialUrl(field, currentVal) : "";
+
+    return (
+      <div className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/40 transition-colors w-full min-w-0">
+        {hasValue ? (
+          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-primary hover:underline flex items-center gap-1.5 truncate min-w-0"
+            >
+              <Icon className="w-4 h-4 text-primary flex-shrink-0" />
+              <span className="truncate">{displayHandle}</span>
+            </a>
+            <SocialVerificationBadge verified={true} size="xs" showText={true} />
+          </div>
         ) : (
           <span className="text-sm text-muted-foreground flex items-center gap-2 truncate">
             <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -475,11 +518,11 @@ const Profile: React.FC = () => {
           </span>
         )}
         <button
-          onClick={() => handleStartEdit(field as string, (dashboard?.profile[field] as string) || "")}
+          onClick={() => handleStartEdit(field, currentVal)}
           className="p-1 hover:bg-muted rounded-full transition-colors flex-shrink-0"
           title={`Edit ${label}`}
         >
-          <Pen className="w-3 h-3 text-muted-foreground" />
+          <Pen className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
         </button>
       </div>
     );
@@ -867,10 +910,16 @@ const Profile: React.FC = () => {
         </p>
 
         <div className="space-y-2 mb-4">
-          <h3 className="text-xs sm:text-sm font-semibold text-foreground">Socials</h3>
-          {renderEditableSocialField("twitter", "X / Twitter", Twitter, "Your Twitter handle (without @)")}
-          {renderEditableSocialField("instagram", "Instagram", Instagram, "Your Instagram handle (without @)")}
-          {renderEditableSocialField("linkedin", "LinkedIn", Linkedin, "Your LinkedIn profile (username or ID)")}
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs sm:text-sm font-semibold text-foreground">Socials</h3>
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+              <BadgeCheck className="w-3 h-3 text-emerald-500" /> Whitelist Verified
+            </span>
+          </div>
+          {renderEditableSocialField("twitter", "X / Twitter", Twitter, "Username or x.com profile URL")}
+          {renderEditableSocialField("instagram", "Instagram", Instagram, "Username or instagram.com profile URL")}
+          {renderEditableSocialField("linkedin", "LinkedIn", Linkedin, "Username or linkedin.com profile URL")}
+          {renderEditableSocialField("github", "GitHub", Github, "Username or github.com profile URL")}
         </div>
 
         <Separator className="my-2" />
