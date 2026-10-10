@@ -68,17 +68,21 @@ func CreateTournamentHandler(c *gin.Context) {
 	}
 
 	userIDRaw, _ := c.Get("userID")
-	displayNameRaw, _ := c.Get("displayName")
+displayNameRaw, _ := c.Get("displayName")
 
-	userID, ok := userIDRaw.(primitive.ObjectID)
-	hostName, hostNameOK := displayNameRaw.(string)
-	
-	if !ok || !hostNameOK || strings.TrimSpace(hostName) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Please set your display name in your profile before creating a tournament.",
-		})
-		return
-	}
+userID, ok := userIDRaw.(primitive.ObjectID)
+if !ok {
+    c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
+    return
+}
+
+hostName, hostNameOK := displayNameRaw.(string)
+if !hostNameOK || strings.TrimSpace(hostName) == "" {
+    c.JSON(http.StatusBadRequest, gin.H{
+        "error": "Please set your display name in your profile before creating a tournament.",
+    })
+    return
+}
 
 	now := time.Now()
 	tournament := models.Tournament{

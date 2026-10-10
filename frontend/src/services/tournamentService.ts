@@ -60,11 +60,16 @@ export const createTournament = async (
     body: JSON.stringify(tournament),
   });
 
-  const data: ApiError | CreatedTournament = await response
-    .json()
-    .catch(() => ({}));
+  let data: ApiError | CreatedTournament;
 
-  if (!response.ok) {
+  if (response.ok) {
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error("Server returned an invalid response. Please try again.");
+    }
+  } else {
+    data = await response.json().catch(() => ({} as ApiError));
     const errorData = data as ApiError;
     throw new Error(
       errorData.error ||

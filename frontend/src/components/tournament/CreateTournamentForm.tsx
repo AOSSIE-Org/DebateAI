@@ -254,8 +254,11 @@ export const CreateTournamentForm = () => {
 
         {/* Visibility */}
         <div>
-          <label className="block mb-1 font-medium">Visibility *</label>
+          <label htmlFor="visibility" className="block mb-1 font-medium">
+            Visibility *
+          </label>
           <select
+            id="visibility"
             value={form.visibility}
             onChange={(e) => {
               const visibility = e.target.value;
