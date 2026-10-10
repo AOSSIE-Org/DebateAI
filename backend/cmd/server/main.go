@@ -140,6 +140,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.PUT("/notifications/:id/read", routes.MarkNotificationAsReadRouteHandler)
 		auth.PUT("/notifications/read-all", routes.MarkAllNotificationsAsReadRouteHandler)
 		auth.DELETE("/notifications/:id", routes.DeleteNotificationRouteHandler)
+
+		routes.SetupTournamentRoutes(auth)
+		log.Println("Tournament routes registered")
 	}
 
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
@@ -148,6 +151,5 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	log.Println("Admin routes registered")
 
 	router.GET("/ws/debate/:debateID", websocket.DebateWebsocketHandler)
-
 	return router
 }

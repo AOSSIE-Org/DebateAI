@@ -1,24 +1,22 @@
-import { useState, FormEvent } from "react";
+import { useState } from "react";
 import { Users, Calendar, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { CreateTournamentForm } from "@/components/tournament/CreateTournamentForm";
 
 export interface Tournament {
   id: string;
-  name: string;
+  topic: string; 
   maxParticipants: number;
   currentParticipants: number;
   date: string;
   description: string;
 }
 
-const MIN_PARTICIPANTS = 4;
-const MAX_PARTICIPANTS = 64;
-
 export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
     {
       id: "1",
-      name: "Spring Showdown",
+      topic: "Spring Showdown",
       maxParticipants: 8,
       currentParticipants: 6,
       date: "2025-04-20",
@@ -27,7 +25,7 @@ export default function TournamentPage() {
     },
     {
       id: "2",
-      name: "Summer Slam",
+      topic: "Summer Slam",
       maxParticipants: 8,
       currentParticipants: 8,
       date: "2025-06-15",
@@ -36,7 +34,7 @@ export default function TournamentPage() {
     },
     {
       id: "3",
-      name: "Rapid Fire Blitz",
+      topic: "Rapid Fire Blitz", 
       maxParticipants: 8,
       currentParticipants: 3,
       date: "2025-05-05",
@@ -47,75 +45,7 @@ export default function TournamentPage() {
 
   const [tournaments, setTournaments] =
     useState<Tournament[]>(initialTournaments);
-  const [name, setName] = useState("");
-  const [date, setDate] = useState("");
-  const [description, setDescription] = useState("");
-  const [participantOption, setParticipantOption] = useState<string>("8");
-  const [customParticipants, setCustomParticipants] = useState<string>("");
-  const [customError, setCustomError] = useState("");
-  const [error, setError] = useState("");
   const navigate = useNavigate();
-
-  const isPowerOfTwo = (n: number) => n > 1 && (n & (n - 1)) === 0;
-
-  const getMaxParticipants = (): number | null => {
-    if (participantOption === "custom") {
-      const val = Number(customParticipants);
-      if (!Number.isInteger(val) || val < MIN_PARTICIPANTS) {
-        setCustomError(`Must be at least ${MIN_PARTICIPANTS}.`);
-        return null;
-      }
-      if (val > MAX_PARTICIPANTS) {
-        setCustomError(`Must be at most ${MAX_PARTICIPANTS}.`);
-        return null;
-      }
-      if (!isPowerOfTwo(val)) {
-        setCustomError("Must be a power of 2 (e.g. 4, 8, 16, 32, 64...).");
-        return null;
-      }
-      setCustomError("");
-      return val;
-    }
-    return parseInt(participantOption);
-  };
-
-  const handleCreate = (e: FormEvent) => {
-    e.preventDefault();
-    if (!name) {
-      setError("Tournament name is required.");
-      return;
-    }
-
-    // Submit-time date validation — cannot be bypassed via manipulated form state
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(`${date}T00:00:00`);
-    if (!date || Number.isNaN(selectedDate.getTime()) || selectedDate < today) {
-      setError("Start date cannot be in the past.");
-      return;
-    }
-
-    const maxParticipants = getMaxParticipants();
-    if (maxParticipants === null) return;
-
-    const newTournament: Tournament = {
-      id: Date.now().toString(),
-      name,
-      maxParticipants,
-      currentParticipants: 0,
-      date,
-      description,
-    };
-
-    setTournaments([newTournament, ...tournaments]);
-    setName("");
-    setDate("");
-    setDescription("");
-    setParticipantOption("8");
-    setCustomParticipants("");
-    setCustomError("");
-    setError("");
-  };
 
   const handleJoin = (tournament: Tournament) => {
     if (tournament.currentParticipants < tournament.maxParticipants) {
@@ -186,12 +116,14 @@ export default function TournamentPage() {
     return avatars;
   };
 
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <h1 className="text-4xl sm:text-5xl font-extrabold mb-10 text-center text-primary animate-pulse">
         Tournament Arena
       </h1>
       <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
+        {/* Left: Dummy Tournament List */}
         <div className="flex-1">
           {tournaments.length === 0 ? (
             <p className="text-center text-muted-foreground text-lg">
@@ -206,7 +138,7 @@ export default function TournamentPage() {
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
                   <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
-                    {t.name}
+                    {t.topic} 
                   </h2>
                   <button
                     onClick={() => handleViewBracket(t)}
@@ -260,108 +192,11 @@ export default function TournamentPage() {
             </div>
           )}
         </div>
+
+        {/* Right: Create Tournament Form */}
         <div className="w-full lg:w-1/3 space-y-8">
-          <div className="bg-popover rounded-lg p-6 border border-border shadow-md">
-            <h2 className="text-2xl font-semibold mb-6 text-foreground">
-              Create New Tournament
-            </h2>
-            {error && (
-              <p className="text-destructive mb-4 bg-destructive/10 p-2 rounded-md">
-                {error}
-              </p>
-            )}
-            <form onSubmit={handleCreate} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Tournament Name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
-                  placeholder="e.g. Autumn Argument Arena"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Date
-                </label>
-                {/* min attribute prevents selecting past dates in the date picker */}
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                  min={new Date().toISOString().split("T")[0]}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Max Participants
-                </label>
-                <select
-                  value={participantOption}
-                  onChange={(e) => {
-                    setParticipantOption(e.target.value);
-                    setCustomParticipants("");
-                    setCustomError("");
-                  }}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
-                >
-                  <option value="4">4 players</option>
-                  <option value="8">8 players</option>
-                  <option value="16">16 players</option>
-                  <option value="custom">Custom...</option>
-                </select>
-                {participantOption === "custom" && (
-                  <div className="mt-2">
-                    <input
-                      type="number"
-                      value={customParticipants}
-                      onChange={(e) => {
-                        setCustomParticipants(e.target.value);
-                        setCustomError("");
-                      }}
-                      min={MIN_PARTICIPANTS}
-                      max={MAX_PARTICIPANTS}
-                      step={1}
-                      placeholder="e.g. 4, 8, 16, 32"
-                      className="block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                    />
-                    {customError ? (
-                      <p className="text-destructive text-xs mt-1">
-                        {customError}
-                      </p>
-                    ) : (
-                      <p className="text-muted-foreground text-xs mt-1">
-                        Must be a power of 2 between 4 and 64 (e.g. 4, 8, 16, 32, 64)
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground">
-                  Description
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  className="mt-1 block w-full border border-input rounded-md p-3 bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition [.contrast_&]:border-border"
-                  placeholder="Describe your epic tournament..."
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-primary text-primary-foreground font-medium rounded-lg px-4 py-3 hover:bg-primary/90 transition-colors duration-200 transform hover:scale-105"
-              >
-                Create Tournament
-              </button>
-            </form>
+          <div className="bg-card rounded-lg border border-border shadow-md p-2">
+            <CreateTournamentForm/>
           </div>
         </div>
       </div>
