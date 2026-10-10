@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -177,34 +178,6 @@ func SubmitTranscripts(
 				// Determine the actual debate topic
 				topic := resolveDebateTopic(ctx, roomID, forSubmission, againstSubmission)
 
-				// Save transcript for "for" user
-				err = SaveDebateTranscript(
-					forUser.ID,
-					forUser.Email,
-					"user_vs_user",
-					topic,
-					againstUser.Email,
-					resultFor,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					forSubmission.Transcripts,
-				)
-				if err != nil {
-				}
-
-				// Save transcript for "against" user
-				err = SaveDebateTranscript(
-					againstUser.ID,
-					againstUser.Email,
-					"user_vs_user",
-					topic,
-					forUser.Email,
-					resultAgainst,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					againstSubmission.Transcripts,
-				)
-				if err != nil {
-				}
-
 				// Update ratings based on the result
 				outcomeFor := 0.5
 				switch strings.ToLower(resultFor) {
@@ -214,8 +187,10 @@ func SubmitTranscripts(
 					outcomeFor = 0.0
 				}
 
+				var forEloChange, againstEloChange float64
 				debateRecord, opponentRecord, ratingErr := UpdateRatings(forUser.ID, againstUser.ID, outcomeFor, time.Now())
 				if ratingErr != nil {
+					log.Printf("Warning: failed to update ratings: %v", ratingErr)
 				} else {
 					debateRecord.Topic = topic
 					debateRecord.Result = resultFor
@@ -224,11 +199,11 @@ func SubmitTranscripts(
 
 					records := []interface{}{debateRecord, opponentRecord}
 					if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
+						log.Printf("Warning: failed to insert debate records: %v", insertErr)
 					}
 
-					// Persist calculated Elo rating changes onto the saved debate transcripts
-					_ = UpdateTranscriptEloChange(ctx, forUser.ID, topic, debateRecord.RatingChange)
-					_ = UpdateTranscriptEloChange(ctx, againstUser.ID, topic, opponentRecord.RatingChange)
+					forEloChange = debateRecord.RatingChange
+					againstEloChange = opponentRecord.RatingChange
 
 					ratingSummary = map[string]interface{}{
 						"for": map[string]float64{
@@ -240,6 +215,36 @@ func SubmitTranscripts(
 							"change": opponentRecord.RatingChange,
 						},
 					}
+				}
+
+				// Save transcript for "for" user directly with calculated EloChange
+				if err = SaveDebateTranscriptWithElo(
+					forUser.ID,
+					forUser.Email,
+					"user_vs_user",
+					topic,
+					againstUser.Email,
+					resultFor,
+					forEloChange,
+					[]models.Message{}, // You might want to reconstruct messages from transcripts
+					forSubmission.Transcripts,
+				); err != nil {
+					log.Printf("Warning: failed to save debate transcript for user %s: %v", forUser.Email, err)
+				}
+
+				// Save transcript for "against" user directly with calculated EloChange
+				if err = SaveDebateTranscriptWithElo(
+					againstUser.ID,
+					againstUser.Email,
+					"user_vs_user",
+					topic,
+					forUser.Email,
+					resultAgainst,
+					againstEloChange,
+					[]models.Message{}, // You might want to reconstruct messages from transcripts
+					againstSubmission.Transcripts,
+				); err != nil {
+					log.Printf("Warning: failed to save debate transcript for user %s: %v", againstUser.Email, err)
 				}
 			} else {
 			}
@@ -746,8 +751,16 @@ func UpdateTranscriptEloChange(ctx context.Context, userID primitive.ObjectID, t
 			"updatedAt": time.Now(),
 		},
 	}
-	_, err := collection.UpdateOne(ctx, filter, update)
-	return err
+	opts := options.FindOneAndUpdate().SetSort(bson.D{{Key: "createdAt", Value: -1}})
+	var updated models.SavedDebateTranscript
+	err := collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updated)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("no recent transcript found for user %s and topic %s", userID.Hex(), topic)
+		}
+		return err
+	}
+	return nil
 }
 
 // UpdatePendingTranscripts updates any existing transcripts with "pending" results

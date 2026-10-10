@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -82,9 +83,13 @@ func UpdateRatingAfterDebateRouteHandler(c *gin.Context) {
 	}
 
 	// Persist calculated Elo rating changes onto the saved debate transcripts
-	_ = services.UpdateTranscriptEloChange(context.Background(), request.UserID, request.Topic, debate.RatingChange)
+	if err := services.UpdateTranscriptEloChange(context.Background(), request.UserID, request.Topic, debate.RatingChange); err != nil {
+		log.Printf("Warning: failed to update transcript Elo change for user %s: %v", request.UserID.Hex(), err)
+	}
 	if opponentDebate != nil {
-		_ = services.UpdateTranscriptEloChange(context.Background(), request.OpponentID, request.Topic, opponentDebate.RatingChange)
+		if err := services.UpdateTranscriptEloChange(context.Background(), request.OpponentID, request.Topic, opponentDebate.RatingChange); err != nil {
+			log.Printf("Warning: failed to update transcript Elo change for opponent %s: %v", request.OpponentID.Hex(), err)
+		}
 	}
 
 	opponentSummary := gin.H{}
