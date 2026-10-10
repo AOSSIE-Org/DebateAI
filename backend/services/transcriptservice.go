@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -176,34 +178,6 @@ func SubmitTranscripts(
 				// Determine the actual debate topic
 				topic := resolveDebateTopic(ctx, roomID, forSubmission, againstSubmission)
 
-				// Save transcript for "for" user
-				err = SaveDebateTranscript(
-					forUser.ID,
-					forUser.Email,
-					"user_vs_user",
-					topic,
-					againstUser.Email,
-					resultFor,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					forSubmission.Transcripts,
-				)
-				if err != nil {
-				}
-
-				// Save transcript for "against" user
-				err = SaveDebateTranscript(
-					againstUser.ID,
-					againstUser.Email,
-					"user_vs_user",
-					topic,
-					forUser.Email,
-					resultAgainst,
-					[]models.Message{}, // You might want to reconstruct messages from transcripts
-					againstSubmission.Transcripts,
-				)
-				if err != nil {
-				}
-
 				// Update ratings based on the result
 				outcomeFor := 0.5
 				switch strings.ToLower(resultFor) {
@@ -213,8 +187,10 @@ func SubmitTranscripts(
 					outcomeFor = 0.0
 				}
 
+				var forEloChange, againstEloChange float64
 				debateRecord, opponentRecord, ratingErr := UpdateRatings(forUser.ID, againstUser.ID, outcomeFor, time.Now())
 				if ratingErr != nil {
+					log.Printf("Warning: failed to update ratings: %v", ratingErr)
 				} else {
 					debateRecord.Topic = topic
 					debateRecord.Result = resultFor
@@ -223,7 +199,11 @@ func SubmitTranscripts(
 
 					records := []interface{}{debateRecord, opponentRecord}
 					if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
+						log.Printf("Warning: failed to insert debate records: %v", insertErr)
 					}
+
+					forEloChange = debateRecord.RatingChange
+					againstEloChange = opponentRecord.RatingChange
 
 					ratingSummary = map[string]interface{}{
 						"for": map[string]float64{
@@ -235,6 +215,36 @@ func SubmitTranscripts(
 							"change": opponentRecord.RatingChange,
 						},
 					}
+				}
+
+				// Save transcript for "for" user directly with calculated EloChange
+				if err = SaveDebateTranscriptWithElo(
+					forUser.ID,
+					forUser.Email,
+					"user_vs_user",
+					topic,
+					againstUser.Email,
+					resultFor,
+					forEloChange,
+					[]models.Message{}, // You might want to reconstruct messages from transcripts
+					forSubmission.Transcripts,
+				); err != nil {
+					log.Printf("Warning: failed to save debate transcript for user %s: %v", forUser.Email, err)
+				}
+
+				// Save transcript for "against" user directly with calculated EloChange
+				if err = SaveDebateTranscriptWithElo(
+					againstUser.ID,
+					againstUser.Email,
+					"user_vs_user",
+					topic,
+					forUser.Email,
+					resultAgainst,
+					againstEloChange,
+					[]models.Message{}, // You might want to reconstruct messages from transcripts
+					againstSubmission.Transcripts,
+				); err != nil {
+					log.Printf("Warning: failed to save debate transcript for user %s: %v", againstUser.Email, err)
 				}
 			} else {
 			}
@@ -655,6 +665,11 @@ func buildFallbackJudgeResult(merged map[string]string) string {
 
 // SaveDebateTranscript saves a debate transcript for later viewing
 func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, opponent, result string, messages []models.Message, transcripts map[string]string) error {
+	return SaveDebateTranscriptWithElo(userID, email, debateType, topic, opponent, result, 0, messages, transcripts)
+}
+
+// SaveDebateTranscriptWithElo saves a debate transcript along with Elo rating change
+func SaveDebateTranscriptWithElo(userID primitive.ObjectID, email, debateType, topic, opponent, result string, eloChange float64, messages []models.Message, transcripts map[string]string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -674,17 +689,18 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 	err := collection.FindOne(ctx, filter).Decode(&existingTranscript)
 	if err == nil {
 		// Transcript already exists, check if we need to update it
-
-		// If the result has changed or is "pending", update the transcript
-		if existingTranscript.Result != result || existingTranscript.Result == "pending" {
-			update := bson.M{
-				"$set": bson.M{
-					"result":      result,
-					"messages":    messages,
-					"transcripts": transcripts,
-					"updatedAt":   time.Now(),
-				},
+		// If the result has changed, is "pending", or eloChange is updated
+		if existingTranscript.Result != result || existingTranscript.Result == "pending" || (eloChange != 0 && existingTranscript.EloChange == 0) {
+			updateSet := bson.M{
+				"result":      result,
+				"messages":    messages,
+				"transcripts": transcripts,
+				"updatedAt":   time.Now(),
 			}
+			if eloChange != 0 {
+				updateSet["eloChange"] = eloChange
+			}
+			update := bson.M{"$set": updateSet}
 
 			_, err = collection.UpdateOne(ctx, bson.M{"_id": existingTranscript.ID}, update)
 			if err != nil {
@@ -706,6 +722,7 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		Topic:       topic,
 		Opponent:    opponent,
 		Result:      result,
+		EloChange:   eloChange,
 		Messages:    messages,
 		Transcripts: transcripts,
 		CreatedAt:   time.Now(),
@@ -717,6 +734,32 @@ func SaveDebateTranscript(userID primitive.ObjectID, email, debateType, topic, o
 		return fmt.Errorf("failed to save transcript: %v", err)
 	}
 
+	return nil
+}
+
+// UpdateTranscriptEloChange updates the eloChange on the most recent saved transcript for a user and topic
+func UpdateTranscriptEloChange(ctx context.Context, userID primitive.ObjectID, topic string, eloChange float64) error {
+	collection := db.MongoDatabase.Collection("saved_debate_transcripts")
+	filter := bson.M{
+		"userId":    userID,
+		"topic":     topic,
+		"createdAt": bson.M{"$gte": time.Now().Add(-15 * time.Minute)},
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"eloChange": eloChange,
+			"updatedAt": time.Now(),
+		},
+	}
+	opts := options.FindOneAndUpdate().SetSort(bson.D{{Key: "createdAt", Value: -1}})
+	var updated models.SavedDebateTranscript
+	err := collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updated)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("no recent transcript found for user %s and topic %s", userID.Hex(), topic)
+		}
+		return err
+	}
 	return nil
 }
 
@@ -963,7 +1006,7 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 			"opponent":   transcript.Opponent,
 			"debateType": transcript.DebateType,
 			"date":       transcript.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			"eloChange":  0, // TODO: Add actual Elo change tracking
+			"eloChange":  math.Round(transcript.EloChange*10) / 10,
 		})
 	}
 

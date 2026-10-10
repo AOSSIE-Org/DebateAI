@@ -34,6 +34,7 @@ type SaveTranscriptRequest struct {
 	Topic       string            `json:"topic" binding:"required"`
 	Opponent    string            `json:"opponent" binding:"required"`
 	Result      string            `json:"result"`
+	EloChange   float64           `json:"eloChange,omitempty"`
 	Messages    []models.Message  `json:"messages"`
 	Transcripts map[string]string `json:"transcripts,omitempty"`
 }
@@ -106,13 +107,14 @@ func SaveDebateTranscriptHandler(c *gin.Context) {
 		return
 	}
 
-	err = services.SaveDebateTranscript(
+	err = services.SaveDebateTranscriptWithElo(
 		userID,
 		email,
 		req.DebateType,
 		req.Topic,
 		req.Opponent,
 		req.Result,
+		req.EloChange,
 		req.Messages,
 		req.Transcripts,
 	)
