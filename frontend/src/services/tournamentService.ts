@@ -5,7 +5,7 @@ const API_BASE_URL =
   config.baseUrl?.replace(/\/+$/, "") ?? "http://localhost:1313";
 
 export interface CreateTournamentData {
-  name: string;
+  title: string;
   description: string;
   moderatorName: string;
   category: "chat_only" | "voice_only" | "voice_video";
@@ -18,9 +18,8 @@ export interface CreateTournamentData {
 
 export interface CreatedTournament {
   id: string;
-  name: string;
+  title: string;
   description: string;
-  hostName: string;
   moderatorName: string;
   category: CreateTournamentData["category"];
   visibility: CreateTournamentData["visibility"];

@@ -5,7 +5,7 @@ import { CreateTournamentForm } from "@/components/tournament/CreateTournamentFo
 
 export interface Tournament {
   id: string;
-  name: string;
+  title: string;
   maxParticipants: number;
   currentParticipants: number;
   date: string;
@@ -16,7 +16,7 @@ export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
     {
       id: "1",
-      name: "Spring Showdown",
+      title: "Spring Showdown",
       maxParticipants: 8,
       currentParticipants: 6,
       date: "2025-04-20",
@@ -25,7 +25,7 @@ export default function TournamentPage() {
     },
     {
       id: "2",
-      name: "Summer Slam",
+      title: "Summer Slam",
       maxParticipants: 8,
       currentParticipants: 8,
       date: "2025-06-15",
@@ -34,7 +34,7 @@ export default function TournamentPage() {
     },
     {
       id: "3",
-      name: "Rapid Fire Blitz",
+      title: "Rapid Fire Blitz",
       maxParticipants: 8,
       currentParticipants: 3,
       date: "2025-05-05",
@@ -137,7 +137,7 @@ export default function TournamentPage() {
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
                   <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
-                    {t.name}
+                    {t.title}
                   </h2>
                   <button
                     onClick={() => handleViewBracket(t)}

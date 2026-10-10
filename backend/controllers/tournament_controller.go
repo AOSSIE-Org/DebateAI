@@ -20,7 +20,7 @@ import (
 const maxTournamentParticipants = 16
 
 type CreateTournamentInput struct {
-	Name            string `json:"name" binding:"required,max=100"`
+Title           string `json:"title" binding:"required,max=100"`
 	Description     string `json:"description" binding:"required,max=2000"`
 	ModeratorName   string `json:"moderatorName" binding:"required,max=80"`
 	Category        string `json:"category" binding:"required,oneof=chat_only voice_only voice_video"`
@@ -46,13 +46,13 @@ func CreateTournamentHandler(c *gin.Context) {
 		return
 	}
 
-	input.Name = strings.TrimSpace(input.Name)
+input.Title = strings.TrimSpace(input.Title)
 	input.Description = strings.TrimSpace(input.Description)
 	input.ModeratorName = strings.TrimSpace(input.ModeratorName)
-	if input.Name == "" || input.Description == "" || input.ModeratorName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Name, description, and moderator name cannot be blank"})
-		return
-	}
+	if input.Title == "" || input.Description == "" || input.ModeratorName == "" {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "Title, description, and moderator name cannot be blank"})
+    return
+}
 
 	if input.MaxParticipants < input.MinParticipants {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Max must be >= min"})
@@ -66,20 +66,20 @@ func CreateTournamentHandler(c *gin.Context) {
 	userIDRaw, _ := c.Get("userID")
 	displayNameRaw, _ := c.Get("displayName")
 
-	userID, ok := userIDRaw.(primitive.ObjectID)
-	hostName, hostNameOK := displayNameRaw.(string)
-	if !ok || !hostNameOK || strings.TrimSpace(hostName) == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
-		return
-	}
+userID, ok := userIDRaw.(primitive.ObjectID)
+displayName, displayNameOK := displayNameRaw.(string)
+if !ok || !displayNameOK || strings.TrimSpace(displayName) == "" {
+    c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+    return
+}
+_ = displayName  
 
 	now := time.Now()
 	tournament := models.Tournament{
 		ID:              primitive.NewObjectID(),
 		HostID:          userID,
-		HostName:        hostName,
 		ModeratorName:   input.ModeratorName,
-		Name:            input.Name,
+	Title:           input.Title,
 		Description:     input.Description,
 		Category:        input.Category,
 		Visibility:      input.Visibility,

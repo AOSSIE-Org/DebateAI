@@ -26,7 +26,7 @@ const isOneOf = <T extends readonly string[]>(
 export const CreateTournamentForm = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState<CreateTournamentData>({
-    name: "",
+    title: "",
     description: "",
     moderatorName: "",
     category: "chat_only",
@@ -42,7 +42,7 @@ export const CreateTournamentForm = () => {
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [createdTournament, setCreatedTournament] = useState<{
     id: string;
-    name: string;
+    title: string;
     inviteCode?: string;
   } | null>(null);
 
@@ -59,17 +59,17 @@ export const CreateTournamentForm = () => {
     e.preventDefault();
     setError("");
 
-    const name = form.name.trim();
+    const title = form.title.trim();
     const description = form.description.trim();
     const moderatorName = form.moderatorName.trim();
-    if (!name || !description || !moderatorName) {
+    if (!title || !description || !moderatorName) {
       setError(
         "Tournament topic, description, and moderator name are required.",
       );
       return;
     }
     if (
-      name.length > 100 ||
+      title.length > 100 ||
       description.length > 2000 ||
       moderatorName.length > 80
     ) {
@@ -110,7 +110,7 @@ export const CreateTournamentForm = () => {
 
     const payload: CreateTournamentData = {
       ...form,
-      name,
+      title,
       description,
       moderatorName,
       ...(normalizedScheduleAt ? { scheduleAt: normalizedScheduleAt } : {}),
@@ -130,7 +130,7 @@ export const CreateTournamentForm = () => {
       }
       setCreatedTournament({
         id: result.id,
-        name: result.name,
+        title: result.title,
         ...(result.inviteCode ? { inviteCode: result.inviteCode } : {}),
       });
     } catch (err: unknown) {
@@ -147,7 +147,7 @@ export const CreateTournamentForm = () => {
     return (
       <div className="max-w-md mx-auto p-6 bg-card rounded-lg text-center">
         <h2 className="text-2xl font-bold mb-4">Tournament Created! 🎉</h2>
-        <p className="mb-2">{createdTournament.name}</p>
+        <p className="mb-2">Title : {createdTournament.title}</p>
         {form.visibility === "private" && inviteCode ? (
           <>
             <p className="mb-2">Share this private invite code:</p>
@@ -174,9 +174,31 @@ export const CreateTournamentForm = () => {
         ) : (
           <p className="mb-4">Your public tournament has been saved.</p>
         )}
+        {/* <button
+          onClick={() => {
+            setCreatedTournament(null);
+            navigate("/tournaments");
+          }}
+          className="bg-primary text-primary-foreground px-4 py-2 rounded w-full"
+        >
+          Back to Tournaments
+        </button> */}
         <button
           onClick={() => {
             setCreatedTournament(null);
+            setForm({
+              title: "",
+              description: "",
+              moderatorName: "",
+              category: "chat_only",
+              visibility: "public",
+              minParticipants: 3,
+              maxParticipants: 16,
+              startType: "direct",
+              scheduleAt: "",
+            });
+            setScheduleDate(undefined);
+            setCopyMessage("");
             navigate("/tournaments");
           }}
           className="bg-primary text-primary-foreground px-4 py-2 rounded w-full"
@@ -203,10 +225,10 @@ export const CreateTournamentForm = () => {
       <div className="space-y-4">
         {/* Topic */}
         <div>
-          <label className="block mb-1 font-medium">Tournament Topic *</label>
+          <label className="block mb-1 font-medium">Tournament Title *</label>
           <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="e.g. Should AI be regulated?"
             className="w-full p-2 border border-border rounded bg-background"
             required

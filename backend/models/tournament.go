@@ -26,12 +26,18 @@ const (
 	VisibilityPrivate = "private"
 )
 
+type JoinRequest struct {
+ UserID primitive.ObjectID `bson:"userId"`
+ Status string `bson:"status"` // "pending", "approved", "rejected"
+ CreatedAt time.Time `bson:"createdAt"`
+}
+
+
 type Tournament struct {
 	ID              primitive.ObjectID   `bson:"_id,omitempty" json:"id,omitempty"`
 	HostID          primitive.ObjectID   `bson:"hostId" json:"hostId"`
-	HostName        string               `bson:"hostName" json:"hostName"`
 	ModeratorName   string               `bson:"moderatorName" json:"moderatorName"`
-	Name            string               `bson:"name" json:"name"`
+Title            string               `bson:"title" json:"title"`
 	Description     string               `bson:"description" json:"description"`
 	Category        string               `bson:"category" json:"category"`
 	Status          string               `bson:"status" json:"status"`
@@ -39,6 +45,7 @@ type Tournament struct {
 	MinParticipants int                  `bson:"minParticipants" json:"minParticipants"`
 	MaxParticipants int                  `bson:"maxParticipants" json:"maxParticipants"`
 	Participants    []primitive.ObjectID `bson:"participants" json:"participants"`
+	JoinRequests []JoinRequest `bson:"joinRequests"`
 	InviteCode      string               `bson:"inviteCode,omitempty" json:"inviteCode,omitempty"`
 	ScheduleAt      *time.Time           `bson:"scheduleAt,omitempty" json:"scheduleAt,omitempty"`
 	CreatedAt       time.Time            `bson:"createdAt" json:"createdAt"`
