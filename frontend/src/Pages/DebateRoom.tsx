@@ -382,6 +382,8 @@ const DebateRoom: React.FC = () => {
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState<boolean>(true);
+  const [speechPermissionDenied, setSpeechPermissionDenied] = useState<boolean>(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
@@ -432,63 +434,172 @@ const DebateRoom: React.FC = () => {
 
   // Initialize SpeechRecognition
   useEffect(() => {
-    if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = "en-US";
+    const hasSupport =
+      typeof window !== "undefined" &&
+      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
 
-        recognitionRef.current.onresult = (event) => {
-          let newFinalTranscript = "";
-          let newInterimTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const result = event.results[i];
-            if (result.isFinal) {
-              newFinalTranscript += result[0].transcript + " ";
-            } else {
-              newInterimTranscript = result[0].transcript;
-            }
-          }
-          if (newFinalTranscript) {
-            setFinalInput((prev) =>
-              prev
-                ? prev + " " + newFinalTranscript.trim()
-                : newFinalTranscript.trim()
-            );
-            setInterimInput("");
+    if (!hasSupport) {
+      setIsSpeechSupported(false);
+      return;
+    }
+
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setIsSpeechSupported(false);
+      return;
+    }
+
+    try {
+      recognitionRef.current = new SpeechRecognitionCtor();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = "en-US";
+
+      recognitionRef.current.onstart = () => {
+        setIsRecognizing(true);
+      };
+
+      recognitionRef.current.onresult = (event) => {
+        let newFinalTranscript = "";
+        let newInterimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            newFinalTranscript += result[0].transcript + " ";
           } else {
-            setInterimInput(newInterimTranscript);
+            newInterimTranscript = result[0].transcript;
           }
-        };
+        }
+        if (newFinalTranscript) {
+          setFinalInput((prev) =>
+            prev
+              ? prev + " " + newFinalTranscript.trim()
+              : newFinalTranscript.trim()
+          );
+          setInterimInput("");
+        } else {
+          setInterimInput(newInterimTranscript);
+        }
+      };
 
-        recognitionRef.current.onend = () => setIsRecognizing(false);
-        recognitionRef.current.onerror = (event: Event) => {
-          const errorEvent = event as Event & { error?: string };
-          console.error("Speech recognition error:", errorEvent.error ?? event);
-          setIsRecognizing(false);
-        };
-      }
+      recognitionRef.current.onend = () => setIsRecognizing(false);
+      recognitionRef.current.onerror = (event: Event) => {
+        const errorEvent = event as Event & { error?: string };
+        console.error("Speech recognition error:", errorEvent.error ?? event);
+        setIsRecognizing(false);
+
+        switch (errorEvent.error) {
+          case "not-allowed":
+            setSpeechPermissionDenied(true);
+            toast({
+              variant: "destructive",
+              title: "Microphone Access Denied",
+              description:
+                "Microphone permission was denied. Please allow microphone access in your browser settings to use speech-to-text.",
+            });
+            break;
+          case "service-not-allowed":
+            toast({
+              variant: "destructive",
+              title: "Speech Service Unavailable",
+              description:
+                "Speech recognition service is currently unavailable. Please check your network connection or enter text manually.",
+            });
+            break;
+          case "audio-capture":
+            toast({
+              variant: "destructive",
+              title: "Microphone Not Found",
+              description:
+                "No microphone was detected. Please connect an audio input device to use speech-to-text.",
+            });
+            break;
+          case "network":
+            toast({
+              variant: "destructive",
+              title: "Network Error",
+              description:
+                "A network error occurred during speech recognition. Please check your connection.",
+            });
+            break;
+          case "no-speech":
+          case "aborted":
+            // Normal events, no toast notification needed
+            break;
+          default:
+            toast({
+              variant: "destructive",
+              title: "Speech Recognition Error",
+              description:
+                "An unexpected speech recognition error occurred. Please type your message.",
+            });
+            break;
+        }
+      };
+    } catch (err) {
+      console.error("Failed to initialize speech recognition:", err);
+      setIsSpeechSupported(false);
     }
 
     return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore stop error on unmount
+        }
+      }
     };
-  }, []);
+  }, [toast]);
 
   // Start/Stop Speech Recognition
   const startRecognition = () => {
-    if (recognitionRef.current && !isRecognizing) {
-      recognitionRef.current.start();
-      setIsRecognizing(true);
+    if (!isSpeechSupported || !recognitionRef.current) {
+      toast({
+        variant: "destructive",
+        title: "Browser Unsupported",
+        description:
+          "Speech recognition is not supported in this browser. Please use Chrome or Edge, or type your response.",
+      });
+      return;
+    }
+
+    if (speechPermissionDenied) {
+      toast({
+        variant: "destructive",
+        title: "Microphone Access Blocked",
+        description:
+          "Microphone access was denied. Please allow microphone permissions in your browser settings and reload the page.",
+      });
+      return;
+    }
+
+    if (!isRecognizing) {
+      try {
+        recognitionRef.current.start();
+        setIsRecognizing(true);
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+        setIsRecognizing(false);
+        toast({
+          variant: "destructive",
+          title: "Speech Recognition Error",
+          description:
+            "Could not start speech recognition. Please check your microphone and try again.",
+        });
+      }
     }
   };
 
   const stopRecognition = () => {
     if (recognitionRef.current && isRecognizing) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error("Error stopping speech recognition:", error);
+      }
       setIsRecognizing(false);
     }
   };
@@ -1048,11 +1159,34 @@ const DebateRoom: React.FC = () => {
                   className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary"
                 />
                 <Button
+                  type="button"
                   onClick={isRecognizing ? stopRecognition : startRecognition}
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-md p-2"
+                  title={
+                    !isSpeechSupported
+                      ? "Speech recognition is not supported in this browser"
+                      : speechPermissionDenied
+                        ? "Microphone access blocked (click for details)"
+                        : isRecognizing
+                          ? "Stop voice input"
+                          : "Start voice input"
+                  }
+                  aria-label={
+                    !isSpeechSupported
+                      ? "Speech recognition unsupported"
+                      : isRecognizing
+                        ? "Stop voice input"
+                        : "Start voice input"
+                  }
+                  className={`rounded-md p-2 transition-colors ${
+                    !isSpeechSupported || speechPermissionDenied
+                      ? "bg-secondary/50 text-muted-foreground hover:bg-secondary/70"
+                      : isRecognizing
+                        ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
+                        : "bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                  }`}
                 >
                   {isRecognizing ? (
                     <MicOff className="w-5 h-5" />
