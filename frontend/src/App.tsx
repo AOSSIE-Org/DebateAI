@@ -109,14 +109,14 @@ function AppRoutes() {
           />
           <Route path="coach/pros-cons" element={<ProsConsChallenge />} />
           <Route path="support-os" element={<SupportOpenSource />} />
+          <Route path="debate/:roomId" element={<DebateRoom />} />
+          <Route path="debate-room/:roomId" element={<OnlineDebateRoom />} />
+          <Route path="team-debate/:debateId" element={<TeamDebateRoom />} />
+          <Route path="spectator/:roomId" element={<ChatRoom />} />
+          <Route path="debate/:debateID/view" element={<ViewDebate />} />
+          <Route path="view-debate/:debateID" element={<ViewDebate />} />
+          <Route path="speech-test" element={<SpeechTest />} />
         </Route>
-        <Route path="/debate/:roomId" element={<DebateRoom />} />
-        <Route path="/debate-room/:roomId" element={<OnlineDebateRoom />} />
-        <Route path="/team-debate/:debateId" element={<TeamDebateRoom />} />
-        <Route path="/spectator/:roomId" element={<ChatRoom />} />
-        <Route path="/debate/:debateID/view" element={<ViewDebate />} />
-        <Route path="/view-debate/:debateID" element={<ViewDebate />} />
-        <Route path="/speech-test" element={<SpeechTest />} />
       </Route>
       {/* Show 404 page for unknown routes */}
       <Route path="*" element={<NotFound />} />

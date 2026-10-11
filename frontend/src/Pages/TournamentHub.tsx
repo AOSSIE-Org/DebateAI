@@ -118,8 +118,8 @@ export default function TournamentPage() {
 
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <h1 className="text-4xl sm:text-5xl font-extrabold mb-10 text-center text-primary animate-pulse">
+    <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
+      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6 sm:mb-10 text-center text-primary animate-pulse">
         Tournament Arena
       </h1>
       <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">

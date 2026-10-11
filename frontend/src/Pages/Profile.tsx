@@ -831,13 +831,13 @@ const Profile: React.FC = () => {
               </div>
             </form>
           ) : (
-            <div className="flex items-center space-x-2">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground truncate">
+            <div className="flex items-center justify-center space-x-2 w-full">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground text-center break-words min-w-0">
                 {profile.displayName || "Set your name"}
               </h2>
               <button
                 onClick={() => handleStartEdit("displayName", profile.displayName || "")}
-                className="p-1 hover:bg-muted rounded-full"
+                className="p-1 hover:bg-muted rounded-full flex-shrink-0"
                 title="Edit Display Name"
               >
                 <Pen className={`w-4 h-4 ${profile.displayName ? "text-primary" : "text-muted-foreground"}`} />
@@ -862,9 +862,9 @@ const Profile: React.FC = () => {
         </div>
 
         <Separator className="my-2" />
-        <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
+        <div className="text-xs sm:text-sm text-muted-foreground mb-2 overflow-x-auto whitespace-nowrap pb-0.5">
           Email: {profile.email}
-        </p>
+        </div>
 
         <div className="space-y-2 mb-4">
           <h3 className="text-xs sm:text-sm font-semibold text-foreground">Socials</h3>
@@ -1136,7 +1136,7 @@ const Profile: React.FC = () => {
       </div>
 
       <Dialog open={isDebateDialogOpen} onOpenChange={setIsDebateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:w-full max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="w-5 h-5" />
@@ -1145,7 +1145,7 @@ const Profile: React.FC = () => {
           </DialogHeader>
           {selectedDebate && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
                 <div>
                   <span className="font-semibold">Topic:</span>
                   <p className="text-muted-foreground">{selectedDebate.topic}</p>
@@ -1192,7 +1192,7 @@ const Profile: React.FC = () => {
               <Separator />
               <div>
                 <h4 className="font-semibold mb-3">Your Performance</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 text-sm">
                   <div className="text-center p-3 bg-muted/50 rounded-lg">
                     <div className="text-2xl font-bold text-primary">{dashboard?.stats?.totalDebates || 0}</div>
                     <div className="text-xs text-muted-foreground">Total Debates</div>

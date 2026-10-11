@@ -1689,31 +1689,31 @@ const TeamDebateRoom: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
       <div className="w-full max-w-6xl mx-auto py-2">
         <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 break-words">
             Team Debate: {topic || "No topic set"}
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Phase: <span className="font-medium">{debatePhase}</span> | My Team:{" "}
-            <span className="font-medium">{myTeamName}</span> | Opponent:{" "}
-            <span className="font-medium">{opponentTeamName}</span> | Current
-            Turn:{" "}
+          <p className="mt-2 text-sm text-gray-700 flex flex-wrap justify-center gap-1">
+            <span>Phase: <span className="font-medium">{debatePhase}</span> |</span>
+            <span>My Team: <span className="font-medium truncate max-w-[100px] inline-block align-bottom">{myTeamName}</span> |</span>
+            <span>Opponent: <span className="font-medium truncate max-w-[100px] inline-block align-bottom">{opponentTeamName}</span> |</span>
+            <span>Turn:{" "}
             <span className="font-semibold text-orange-600">
               {isMyTurn ? "Your Team" : "Opponent Team"} to{" "}
               {debatePhase.includes("Question")
-                ? "ask a question"
+                ? "ask"
                 : debatePhase.includes("Answer")
                 ? "answer"
-                : "make a statement"}
-            </span>
+                : "state"}
+            </span></span>
           </p>
         </div>
       </div>
 
       {/* Setup Popup */}
       {showSetupPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-card text-foreground p-6 rounded-lg shadow-lg max-w-4xl w-full">
-            <h2 className="text-2xl font-bold mb-6">Team Debate Setup</h2>
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-2 sm:p-4">
+          <div className="bg-card text-foreground p-4 sm:p-6 rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold mb-6">Team Debate Setup</h2>
 
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -1784,11 +1784,11 @@ const TeamDebateRoom: React.FC = () => {
                 </div>
 
                 <div>
-                  {/* Players List - Side by Side */}
-                  <div className="mb-6 grid grid-cols-2 gap-4">
+                  {/* Players List - Stacks on mobile */}
+                  <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Left Team - My Team */}
                     <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                      <h3 className="text-sm font-semibold mb-3 text-gray-700">
+                      <h3 className="text-sm font-semibold mb-3 text-gray-700 text-center">
                         {myTeamName}
                       </h3>
                       <div className="space-y-3">
@@ -1798,7 +1798,7 @@ const TeamDebateRoom: React.FC = () => {
                           return (
                             <div
                               key={member.userId}
-                              className="flex items-center gap-3"
+                              className="flex flex-col items-center gap-2 text-center"
                             >
                               <div className="relative">
                                 <img
@@ -1807,7 +1807,7 @@ const TeamDebateRoom: React.FC = () => {
                                     "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
                                   }
                                   alt={member.displayName}
-                                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div
                                   className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
@@ -1816,7 +1816,7 @@ const TeamDebateRoom: React.FC = () => {
                                   title={isReady ? "Ready" : "Not Ready"}
                                 />
                               </div>
-                              <div className="flex-1">
+                              <div>
                                 <div className="text-sm font-medium text-gray-800">
                                   {member.displayName}
                                 </div>
@@ -1832,7 +1832,7 @@ const TeamDebateRoom: React.FC = () => {
 
                     {/* Right Team - Opponent Team */}
                     <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                      <h3 className="text-sm font-semibold mb-3 text-gray-700">
+                      <h3 className="text-sm font-semibold mb-3 text-gray-700 text-center">
                         {opponentTeamName}
                       </h3>
                       <div className="space-y-3">
@@ -1842,7 +1842,7 @@ const TeamDebateRoom: React.FC = () => {
                           return (
                             <div
                               key={member.userId}
-                              className="flex items-center gap-3"
+                              className="flex flex-col items-center gap-2 text-center"
                             >
                               <div className="relative">
                                 <img
@@ -1851,7 +1851,7 @@ const TeamDebateRoom: React.FC = () => {
                                     "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
                                   }
                                   alt={member.displayName}
-                                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div
                                   className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
@@ -1860,7 +1860,7 @@ const TeamDebateRoom: React.FC = () => {
                                   title={isReady ? "Ready" : "Not Ready"}
                                 />
                               </div>
-                              <div className="flex-1">
+                              <div>
                                 <div className="text-sm font-medium text-gray-800">
                                   {member.displayName}
                                 </div>
@@ -1958,10 +1958,10 @@ const TeamDebateRoom: React.FC = () => {
             isMyTurn && debatePhase !== DebatePhase.Finished
               ? "animate-glow"
               : ""
-          } bg-white border border-gray-200 shadow-md min-h-[540px] flex flex-col`}
+          } bg-white border border-gray-200 shadow-md min-h-[350px] sm:min-h-[450px] md:min-h-[540px] flex flex-col`}
         >
           <div className="p-3 bg-gray-50 border-b">
-            <h2 className="text-lg font-bold text-gray-900 text-center">
+            <h2 className="text-lg font-bold text-gray-900 text-center break-words">
               {myTeamName}
             </h2>
             <p className="text-xs text-gray-600 text-center">
@@ -2156,10 +2156,10 @@ const TeamDebateRoom: React.FC = () => {
             !isMyTurn && debatePhase !== DebatePhase.Finished
               ? "animate-glow"
               : ""
-          } bg-white border border-gray-200 shadow-md min-h-[540px] flex flex-col`}
+          } bg-white border border-gray-200 shadow-md min-h-[350px] sm:min-h-[450px] md:min-h-[540px] flex flex-col`}
         >
           <div className="p-3 bg-gray-50 border-b">
-            <h2 className="text-lg font-bold text-gray-900 text-center">
+            <h2 className="text-lg font-bold text-gray-900 text-center break-words">
               {opponentTeamName}
             </h2>
             <p className="text-xs text-gray-600 text-center">

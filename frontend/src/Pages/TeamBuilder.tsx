@@ -536,45 +536,47 @@ const TeamBuilder: React.FC = () => {
                   className="relative overflow-hidden p-6 bg-card border rounded-lg shadow-sm hover:shadow-md transition-all"
                 >
                   <div className="relative">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
+                    <div className="flex items-start justify-between mb-3 gap-3">
+                      <div className="flex-1 min-w-0">
                         {editingTeamId === team.id && isCaptain(team) ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Input
                               value={editTeamName}
                               onChange={(e) => setEditTeamName(e.target.value)}
-                              className="flex-1"
+                              className="flex-1 min-w-0"
                               onKeyPress={(e) =>
                                 e.key === "Enter" && handleSaveTeamName(team.id)
                               }
                               autoFocus
                             />
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveTeamName(team.id)}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingTeamId(null);
-                                setEditTeamName("");
-                              }}
-                            >
-                              Cancel
-                            </Button>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveTeamName(team.id)}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingTeamId(null);
+                                  setEditTeamName("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-2xl text-foreground">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h3 className="font-bold text-xl sm:text-2xl text-foreground break-words min-w-0">
                               {team.name}
                             </h3>
                             {isCaptain(team) && (
                               <button
                                 onClick={() => handleEditTeamName(team)}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                                 title="Edit team name"
                               >
                                 <FaEdit className="text-gray-400" />
@@ -582,16 +584,16 @@ const TeamBuilder: React.FC = () => {
                             )}
                           </div>
                         )}
-                        <div className="flex items-center gap-3 mt-2 text-sm">
-                          <div className="flex items-center gap-1 text-gray-600 dark:text-muted-foreground [.contrast_&]:text-foreground">
-                            <span className="font-medium">
+                        <div className="flex flex-wrap items-center gap-2 mt-2 text-sm w-full">
+                          <div className="flex items-center gap-1 text-gray-600 dark:text-muted-foreground [.contrast_&]:text-foreground min-w-0 flex-1">
+                            <span className="font-medium flex-shrink-0">
                               <FaCrown className="inline text-yellow-500" />{" "}
                               Captain:
                             </span>
-                            <span>{team.captainEmail}</span>
+                            <div className="overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">{team.captainEmail}</div>
                           </div>
                           {team.code && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               <Badge variant="secondary">
                                 Code: {team.code}
                               </Badge>
@@ -606,11 +608,11 @@ const TeamBuilder: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground mb-1">
-                          Average Rating
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">
+                          Avg Rating
                         </div>
-                        <div className="text-2xl font-bold text-primary">
+                        <div className="text-lg sm:text-2xl font-bold text-primary">
                           {Math.round(team.averageElo || 0)}
                         </div>
                       </div>
@@ -694,25 +696,33 @@ const TeamBuilder: React.FC = () => {
                         />
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                         {(team.members || []).map((member: TeamMember) => (
-                          <Badge
+                          <div
                             key={member.userId}
-                            className="bg-white text-gray-700 border border-gray-300 shadow-sm cursor-pointer hover:shadow-md transition-all group relative"
+                            className="flex items-center justify-between p-3 bg-card border rounded-lg shadow-sm cursor-pointer hover:border-primary hover:shadow-md transition-all group relative"
                             onClick={() =>
                               handleViewMemberProfile(member.userId, team)
                             }
                           >
-                            <div className="flex items-center gap-1.5">
-                              {member.userId === team.captainId && (
-                                <FaCrown className="text-yellow-500" />
-                              )}
-                              <span className="font-medium">
-                                {member.displayName}
-                              </span>
-                              <span className="text-xs">
-                                ({Math.round(member.elo)})
-                              </span>
+                            <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                {member.userId === team.captainId ? (
+                                  <FaCrown className="text-yellow-500 w-4 h-4" />
+                                ) : (
+                                  <span className="text-primary font-bold text-sm">
+                                    {member.displayName.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-medium truncate text-sm">
+                                  {member.displayName}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate">
+                                  Elo: {Math.round(member.elo)}
+                                </span>
+                              </div>
                             </div>
                             {isCaptain(team) &&
                               member.userId !== team.captainId && (
@@ -721,13 +731,13 @@ const TeamBuilder: React.FC = () => {
                                     e.stopPropagation();
                                     handleRemoveMember(team.id, member.userId);
                                   }}
-                                  className="ml-2 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="ml-2 p-1.5 text-destructive bg-destructive/10 rounded hover:bg-destructive hover:text-destructive-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 transition-all flex-shrink-0"
                                   title="Remove member"
                                 >
-                                  <FaTimes />
+                                  <FaTimes className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                          </Badge>
+                          </div>
                         ))}
                       </div>
                       <div className="mt-3 pt-3 border-t">
@@ -780,11 +790,11 @@ const TeamBuilder: React.FC = () => {
                     {memberProfile.displayName[0]}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="text-xl font-bold">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xl font-bold truncate">
                     {memberProfile.displayName}
                   </h3>
-                  <p className="text-sm text-gray-500">{memberProfile.email}</p>
+                  <div className="text-sm text-gray-500 overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">{memberProfile.email}</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -918,12 +928,12 @@ const TeamBuilder: React.FC = () => {
                               </Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <FaCrown className="text-primary" />
-                              <span className="font-medium">
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground w-full">
+                            <div className="flex items-center gap-1 min-w-0 max-w-[200px] sm:max-w-xs">
+                              <FaCrown className="text-primary flex-shrink-0" />
+                              <div className="font-medium overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">
                                 {team.captainEmail}
-                              </span>
+                              </div>
                             </div>
                             <div className="flex items-center gap-1">
                               <FaChartLine className="text-primary" />
