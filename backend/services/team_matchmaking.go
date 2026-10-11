@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -123,4 +124,79 @@ func GetMatchmakingPool() map[string]*TeamMatchmakingEntry {
 		snapshot[teamID] = &clone
 	}
 	return snapshot
+}
+
+// ValidateTeamsMatch checks whether both teams are currently in the matchmaking pool
+// and meet the criteria to be matched against each other.
+func ValidateTeamsMatch(team1ID, team2ID primitive.ObjectID) error {
+	teamMatchmakingMutex.RLock()
+	defer teamMatchmakingMutex.RUnlock()
+
+	if teamMatchmakingPool == nil {
+		return errors.New("neither team is in the matchmaking pool")
+	}
+
+	entry1, exists1 := teamMatchmakingPool[team1ID.Hex()]
+	if !exists1 {
+		return errors.New("team 1 is not in the matchmaking pool")
+	}
+
+	entry2, exists2 := teamMatchmakingPool[team2ID.Hex()]
+	if !exists2 {
+		return errors.New("team 2 is not in the matchmaking pool")
+	}
+
+	// Verify that the team sizes match
+	if entry1.MaxSize != entry2.MaxSize {
+		return errors.New("teams do not have matching team sizes")
+	}
+
+	// Verify that the Elo difference is within the acceptable range (<= 200)
+	eloDiff := entry1.AverageElo - entry2.AverageElo
+	if eloDiff < 0 {
+		eloDiff = -eloDiff
+	}
+	if eloDiff > 200 {
+		return errors.New("team Elo difference exceeds acceptable matchmaking range")
+	}
+
+	return nil
+}
+
+// IsTeamInMatchmaking checks if a specific team is currently in the matchmaking pool
+func IsTeamInMatchmaking(teamID primitive.ObjectID) bool {
+	teamMatchmakingMutex.RLock()
+	defer teamMatchmakingMutex.RUnlock()
+
+	if teamMatchmakingPool == nil {
+		return false
+	}
+	_, exists := teamMatchmakingPool[teamID.Hex()]
+	return exists
+}
+
+// AddTeamToMatchmakingPoolDirect adds a team directly to the pool (useful for testing or direct matching)
+func AddTeamToMatchmakingPoolDirect(team models.Team) {
+	teamMatchmakingMutex.Lock()
+	defer teamMatchmakingMutex.Unlock()
+
+	if teamMatchmakingPool == nil {
+		teamMatchmakingPool = make(map[string]*TeamMatchmakingEntry)
+	}
+
+	teamMatchmakingPool[team.ID.Hex()] = &TeamMatchmakingEntry{
+		TeamID:     team.ID,
+		Team:       team,
+		MaxSize:    team.MaxSize,
+		AverageElo: team.AverageElo,
+		Timestamp:  time.Now(),
+	}
+}
+
+// ClearMatchmakingPool clears all teams from the matchmaking pool (useful for cleanup and testing)
+func ClearMatchmakingPool() {
+	teamMatchmakingMutex.Lock()
+	defer teamMatchmakingMutex.Unlock()
+
+	teamMatchmakingPool = make(map[string]*TeamMatchmakingEntry)
 }

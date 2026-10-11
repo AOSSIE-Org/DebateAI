@@ -27,6 +27,23 @@ func CreateTeamDebate(c *gin.Context) {
 		return
 	}
 
+	if req.Team1ID == req.Team2ID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot create a debate with the same team on both sides"})
+		return
+	}
+
+	// 1. Authenticate requesting user
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userObjectID, ok := userID.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
 	collection := db.GetCollection("teams")
 	var team1, team2 models.Team
 
@@ -44,8 +61,32 @@ func CreateTeamDebate(c *gin.Context) {
 		return
 	}
 
-	if req.Team1ID == req.Team2ID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot create a debate with the same team on both sides"})
+	// 2. Authorize requesting user: must be the captain of at least one of the participating teams
+	if team1.CaptainID != userObjectID && team2.CaptainID != userObjectID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the captain of a participating team can initiate a debate"})
+		return
+	}
+
+	// 3. Verify that both teams are currently in the matchmaking pool and matched together
+	if err := services.ValidateTeamsMatch(req.Team1ID, req.Team2ID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Teams must be in the matchmaking pool and matched to create a debate: " + err.Error()})
+		return
+	}
+
+	// 4. Verify neither team already has an active debate
+	debateCollection := db.GetCollection("team_debates")
+	var activeDebate models.TeamDebate
+	err = debateCollection.FindOne(context.Background(), bson.M{
+		"$or": []bson.M{
+			{"team1Id": req.Team1ID},
+			{"team2Id": req.Team1ID},
+			{"team1Id": req.Team2ID},
+			{"team2Id": req.Team2ID},
+		},
+		"status": "active",
+	}).Decode(&activeDebate)
+	if err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "One or both teams already have an active debate"})
 		return
 	}
 
@@ -82,14 +123,13 @@ func CreateTeamDebate(c *gin.Context) {
 	}
 
 	// Insert debate
-	debateCollection := db.GetCollection("team_debates")
-	result, err := debateCollection.InsertOne(context.Background(), debate)
-	if err != nil {
+	insertResult, insertErr := debateCollection.InsertOne(context.Background(), debate)
+	if insertErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create debate"})
 		return
 	}
 
-	debate.ID = result.InsertedID.(primitive.ObjectID)
+	debate.ID = insertResult.InsertedID.(primitive.ObjectID)
 
 	// Remove teams from matchmaking
 	services.RemoveFromMatchmaking(req.Team1ID)
