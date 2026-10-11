@@ -97,7 +97,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
           setEmail(e.target.value);
           if (error) clearError();
         }}
-        className="mb-2 dark:border-white"
+        className="mb-2 border dark:border-white [.contrast_&]:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
@@ -108,7 +108,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
           if (error) clearError();
           if (localError) setLocalError(null);
         }}
-        className="mb-1 dark:border-white"
+        className="mb-1 border dark:border-white [.contrast_&]:border-white"
       />
       {localError && (
         <p className="text-red-500 text-sm mt-2">
@@ -227,7 +227,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
           setEmail(e.target.value);
           if (error) clearError();
         }}
-        className="mb-2 dark:border-white"
+        className="mb-2 border dark:border-white [.contrast_&]:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
@@ -237,7 +237,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
           setPassword(e.target.value);
           if (error) clearError();
         }}
-        className="mb-2 dark:border-white"
+        className="mb-2 border dark:border-white [.contrast_&]:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
@@ -247,7 +247,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
           setConfirmPassword(e.target.value);
           if (error) clearError();
         }}
-        className="mb-4 dark:border-white"
+        className="mb-4 border dark:border-white [.contrast_&]:border-white"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -335,7 +335,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
             if (error) clearError();
           }}
           placeholder="Enter OTP"
-          className="w-full mb-4 dark:border-white"
+          className="w-full mb-4 border dark:border-white [.contrast_&]:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         {resendMessage && <p className="text-sm text-green-500 mb-2">{resendMessage}</p>}
