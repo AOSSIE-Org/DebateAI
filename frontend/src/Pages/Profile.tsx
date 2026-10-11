@@ -491,7 +491,7 @@ const Profile: React.FC = () => {
         onSubmit={(e) => handleSubmit(e, "bio")}
         className="space-y-2 mb-2 w-full min-w-0 max-w-full"
       >
-        <Label htmlFor="bio" className="text-sm">Bio</Label>
+        <Label htmlFor="bio" className="sr-only">Bio</Label>
         <Textarea
           maxLength={BIO_MAX_LENGTH}
           id="bio"
@@ -502,7 +502,7 @@ const Profile: React.FC = () => {
             e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
           }}
           placeholder="Share your story"
-          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
+          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words border [.contrast_&]:border-border"
         />
         <p className={`text-xs text-right ${draftValue.length >= BIO_MAX_LENGTH
           ? "text-red-500"

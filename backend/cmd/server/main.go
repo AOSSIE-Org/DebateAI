@@ -80,7 +80,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -108,7 +108,6 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
 		auth.GET("/user/check-displayname", routes.CheckDisplayNameRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
-		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 
 		auth.POST("/api/award-badge", routes.AwardBadgeRouteHandler)
 		auth.POST("/api/update-score", routes.UpdateScoreRouteHandler)
@@ -144,6 +143,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		routes.SetupTournamentRoutes(auth)
 		log.Println("Tournament routes registered")
 	}
+
+	routes.SetupTournamentRoutes(auth)
+	log.Println("Tournament routes registered")
 
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
 
