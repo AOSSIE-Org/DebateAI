@@ -16,18 +16,81 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+type TournamentResponse struct {
+	ID              primitive.ObjectID             `json:"id"`
+	HostID          primitive.ObjectID             `json:"hostId"`
+	ModeratorName   string                         `json:"moderatorName"`
+	Topic           string                         `json:"topic"`
+	Description     string                         `json:"description"`
+	Status          string                         `json:"status"`
+	Visibility      string                         `json:"visibility"`
+	MinParticipants int                            `json:"minParticipants"`
+	MaxParticipants int                            `json:"maxParticipants"`
+	Participants    []models.TournamentParticipant `json:"participants"`
+	ScheduleAt      *time.Time                     `json:"scheduleAt,omitempty"`
+	CreatedAt       time.Time                      `json:"createdAt"`
+	InviteCode      string                         `json:"inviteCode,omitempty"`
+	JoinRequests    []models.JoinRequest           `json:"joinRequests,omitempty"`
+}
+
+func toTournamentResponse(
+	tournament models.Tournament,
+	isHost bool,
+) TournamentResponse {
+	response := TournamentResponse{
+		ID:              tournament.ID,
+		HostID:          tournament.HostID,
+		ModeratorName:   tournament.ModeratorName,
+		Topic:           tournament.Topic,
+		Description:     tournament.Description,
+		Status:          tournament.Status,
+		Visibility:      tournament.Visibility,
+		MinParticipants: tournament.MinParticipants,
+		MaxParticipants: tournament.MaxParticipants,
+		Participants:    tournament.Participants,
+		ScheduleAt:      tournament.ScheduleAt,
+		CreatedAt:       tournament.CreatedAt,
+	}
+
+	if isHost {
+		response.InviteCode = tournament.InviteCode
+		response.JoinRequests = tournament.JoinRequests
+	}
+
+	return response
+}
+
+func getCurrentUserID(c *gin.Context) (primitive.ObjectID, bool) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		return primitive.NilObjectID, false
+	}
+
+	id, ok := userID.(primitive.ObjectID)
+	return id, ok
+}
+
 func GetTournaments(c *gin.Context) {
-	status := c.Query("status")
+	currentUserID, ok := getCurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Invalid user ID",
+		})
+		return
+	}
 
-	filter := bson.M{}
+	filter := bson.M{
+		"$or": []bson.M{
+			{"visibility": models.VisibilityPublic},
+			{"hostId": currentUserID},
+			{"participants.userId": currentUserID},
+		},
+	}
 
-	if status != "" {
+	if status := c.Query("status"); status != "" {
 		switch status {
-		case models.StatusLive,
-			models.StatusUpcoming,
-			models.StatusCompleted:
+		case models.StatusLive, models.StatusUpcoming, models.StatusCompleted:
 			filter["status"] = status
-
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Invalid tournament status",
@@ -51,7 +114,6 @@ func GetTournaments(c *gin.Context) {
 	defer cursor.Close(ctx)
 
 	tournaments := make([]models.Tournament, 0)
-
 	if err := cursor.All(ctx, &tournaments); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve tournaments",
@@ -59,13 +121,27 @@ func GetTournaments(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, tournaments)
+	responses := make([]TournamentResponse, 0, len(tournaments))
+	for _, tournament := range tournaments {
+		responses = append(responses, toTournamentResponse(
+			tournament,
+			tournament.HostID == currentUserID,
+		))
+	}
+
+	c.JSON(http.StatusOK, responses)
 }
 
 func GetTournamentByID(c *gin.Context) {
-	id := c.Param("id")
+	currentUserID, ok := getCurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Invalid user ID",
+		})
+		return
+	}
 
-	tournamentID, err := primitive.ObjectIDFromHex(id)
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid tournament ID",
@@ -81,7 +157,7 @@ func GetTournamentByID(c *gin.Context) {
 	var tournament models.Tournament
 	err = collection.FindOne(
 		ctx,
-		bson.M{"_id": tournamentID},
+		bson.M{"_id": id},
 	).Decode(&tournament)
 
 	if err != nil {
@@ -97,7 +173,28 @@ func GetTournamentByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, tournament)
+	isHost := tournament.HostID == currentUserID
+	isParticipant := false
+
+	for _, participant := range tournament.Participants {
+		if participant.UserID == currentUserID {
+			isParticipant = true
+			break
+		}
+	}
+
+	if tournament.Visibility == models.VisibilityPrivate &&
+		!isHost && !isParticipant {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tournament not found",
+		})
+		return
+	}
+
+	c.JSON(
+		http.StatusOK,
+		toTournamentResponse(tournament, isHost),
+	)
 }
 
 type UpdateTournamentInput struct {
