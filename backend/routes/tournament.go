@@ -7,6 +7,7 @@ import (
 )
 
 func SetupTournamentRoutes(auth *gin.RouterGroup) {
+	auth.POST("/tournaments", controllers.CreateTournamentHandler)
 	auth.GET("/tournaments", controllers.GetTournaments)
 	auth.PATCH("/tournaments/:id", controllers.UpdateTournamentHandler)
 	auth.GET("/tournaments/:id", controllers.GetTournamentByID)
