@@ -80,7 +80,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -141,6 +141,9 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.PUT("/notifications/read-all", routes.MarkAllNotificationsAsReadRouteHandler)
 		auth.DELETE("/notifications/:id", routes.DeleteNotificationRouteHandler)
 	}
+
+	routes.SetupTournamentRoutes(auth)
+	log.Println("Tournament routes registered")
 
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
 
