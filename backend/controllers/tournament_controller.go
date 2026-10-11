@@ -36,7 +36,7 @@ func GetTournaments(c *gin.Context) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	collection := db.MongoDatabase.Collection("tournaments")
@@ -60,6 +60,44 @@ func GetTournaments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, tournaments)
+}
+
+func GetTournamentByID(c *gin.Context) {
+	id := c.Param("id")
+
+	tournamentID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid tournament ID",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	collection := db.MongoDatabase.Collection("tournaments")
+
+	var tournament models.Tournament
+	err = collection.FindOne(
+		ctx,
+		bson.M{"_id": tournamentID},
+	).Decode(&tournament)
+
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Tournament not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to retrieve tournament",
+			})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, tournament)
 }
 
 type UpdateTournamentInput struct {

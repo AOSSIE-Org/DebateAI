@@ -9,4 +9,5 @@ import (
 func SetupTournamentRoutes(auth *gin.RouterGroup) {
 	auth.GET("/tournaments", controllers.GetTournaments)
 	auth.PATCH("/tournaments/:id", controllers.UpdateTournamentHandler)
+	auth.GET("/tournaments/:id", controllers.GetTournamentByID)
 }
