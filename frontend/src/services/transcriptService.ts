@@ -11,6 +11,7 @@ export interface SavedDebateTranscript {
   topic: string;
   opponent: string;
   result: 'win' | 'loss' | 'draw' | 'pending';
+  eloChange?: number;
   messages: Array<{
     sender: string;
     text: string;
@@ -26,6 +27,7 @@ export interface SaveTranscriptRequest {
   topic: string;
   opponent: string;
   result?: string;
+  eloChange?: number;
   messages: Array<{
     sender: string;
     text: string;
@@ -46,7 +48,7 @@ export interface DebateStats {
     opponent: string;
     debateType: 'user_vs_bot' | 'user_vs_user';
     date: string;
-    eloChange?: number; // We'll need to add this to the backend
+    eloChange?: number;
   }>;
 }
 
