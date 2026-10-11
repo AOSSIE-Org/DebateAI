@@ -108,7 +108,6 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.PUT("/user/updateprofile", routes.UpdateProfileRouteHandler)
 		auth.GET("/user/check-displayname", routes.CheckDisplayNameRouteHandler)
 		auth.GET("/leaderboard", routes.GetLeaderboardRouteHandler)
-		auth.POST("/debate/result", routes.UpdateRatingAfterDebateRouteHandler)
 
 		auth.POST("/api/award-badge", routes.AwardBadgeRouteHandler)
 		auth.POST("/api/update-score", routes.UpdateScoreRouteHandler)
