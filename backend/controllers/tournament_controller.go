@@ -189,7 +189,12 @@ func JoinPrivateTournament(c *gin.Context) {
 			_, err = db.TournamentCollection.UpdateOne(
 				context.Background(),
 				bson.M{"_id": tournament.ID},
-				bson.M{"$pull": bson.M{"joinRequests": bson.M{"userId": userObjID}}},
+				bson.M{"$pull": bson.M{
+					"joinRequests": bson.M{
+						"userId": userObjID,
+						"status": "rejected",
+					},
+				}},
 			)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process request"})
@@ -446,9 +451,18 @@ func ManageJoinRequest(c *gin.Context) {
 			return
 		}
 
+		// Name copy karo JoinRequest se
+		var requestName string
+		for _, r := range tournament.JoinRequests {
+			if r.UserID.Hex() == requestUserObjID.Hex() {
+				requestName = r.Name
+				break
+			}
+		}
+
 		newParticipant := models.TournamentParticipant{
 			UserID: requestUserObjID,
-			Name:   "",
+			Name:   requestName,
 			Stance: "",
 		}
 
@@ -459,6 +473,7 @@ func ManageJoinRequest(c *gin.Context) {
 				"joinRequests": bson.M{
 					"$elemMatch": bson.M{"userId": requestUserObjID, "status": "pending"},
 				},
+				"participants.userId": bson.M{"$ne": requestUserObjID},
 				"$expr": bson.M{
 					"$lt": []interface{}{
 						bson.M{"$size": "$participants"},
