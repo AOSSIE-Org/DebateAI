@@ -1,6 +1,19 @@
 import React, { useState, useContext, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Menu, X, BarChart, User, Info, LogOut, Heart, Trophy, Users, MessageCircle, MessageSquare } from "lucide-react";
+import {
+  Bell,
+  Menu,
+  X,
+  BarChart,
+  User,
+  Info,
+  LogOut,
+  Heart,
+  Trophy,
+  Users,
+  MessageCircle,
+  MessageSquare,
+} from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { AuthContext } from "@/context/authContext";
@@ -23,6 +36,7 @@ import debateAiLogo from "@/assets/aossie.png";
 import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
+import { ThemeToggle } from "./ThemeToggle";
 
 const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) => {
   const image = event.currentTarget;
@@ -251,9 +265,9 @@ function Header() {
                     onError={handleAvatarLoadError}
                     className="w-12 h-12 rounded-full border-2 border-border object-cover"
                   />
-                  <div className="overflow-hidden">
-                    <h4 className="font-semibold truncate">{user?.displayName || "User"}</h4>
-                    <p className="text-sm text-muted-foreground truncate">{user?.email || "No email"}</p>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold break-words">{user?.displayName || "User"}</h4>
+                    <div className="text-sm text-muted-foreground overflow-x-auto whitespace-nowrap pb-0.5">{user?.email || "No email"}</div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -373,6 +387,7 @@ function Header() {
                 icon={<Heart className="mr-3 h-4 w-4 text-red-500 transition-all duration-300 group-hover:fill-red-500 group-hover:scale-110" />}
                 onClick={toggleDrawer}
               />
+              <ThemeToggle />
             </nav>
           </div>
         </div>

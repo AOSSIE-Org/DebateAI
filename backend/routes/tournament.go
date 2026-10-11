@@ -7,6 +7,18 @@ import (
 )
 
 func SetupTournamentRoutes(router *gin.RouterGroup) {
+	// ============================================
+	// SHREYAS/JIKRANA KE ROUTES
+	// ============================================
+	router.POST("/tournaments", controllers.CreateTournamentHandler)
+	router.GET("/tournaments", controllers.GetTournaments)
+	router.PATCH("/tournaments/:id", controllers.UpdateTournamentHandler)
+	router.GET("/tournaments/:id", controllers.GetTournamentByID)
+	router.DELETE("/tournaments/:id", controllers.DeleteTournamentHandler)
+
+	// ============================================
+	// TUMHARE ROUTES
+	// ============================================
 	// Public Tournament Join
 	router.POST("/tournaments/:id/join", controllers.JoinPublicTournament)
 

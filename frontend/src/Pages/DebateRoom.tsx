@@ -925,7 +925,7 @@ const DebateRoom: React.FC = () => {
         {/* Bot Section */}
         <div
           className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""
-            } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
+            } bg-card border border-border shadow-md transition-colors h-[400px] md:h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -972,7 +972,7 @@ const DebateRoom: React.FC = () => {
         {/* User Section */}
         <div
           className={`relative w-full md:w-1/2 ${!state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
-            } bg-card border border-border shadow-md transition-colors h-[540px] flex flex-col`}
+            } bg-card border border-border shadow-md transition-colors h-[400px] md:h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-muted flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
