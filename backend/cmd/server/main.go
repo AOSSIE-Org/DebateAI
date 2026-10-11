@@ -144,9 +144,6 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		log.Println("Tournament routes registered")
 	}
 
-	routes.SetupTournamentRoutes(auth)
-	log.Println("Tournament routes registered")
-
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
 
 	routes.SetupAdminRoutes(router, "./config/config.prod.yml")
