@@ -177,6 +177,8 @@ func UpdateTeamSize(c *gin.Context) {
 		return
 	}
 
+	services.RemoveFromMatchmaking(objectID)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Team size updated successfully"})
 }
 
@@ -367,20 +369,30 @@ func JoinTeam(c *gin.Context) {
 	for _, member := range team.Members {
 		totalElo += member.Elo
 	}
-	if len(team.Members) >= team.MaxSize {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Team is already full"})
-		return
-	}
 	totalElo += newMember.Elo
 	newAverageElo := totalElo / float64(len(team.Members)+1)
 
 	update["$set"].(bson.M)["averageElo"] = newAverageElo
 
-	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objectID}, update)
+	filter := buildJoinTeamFilter(objectID, userID.(primitive.ObjectID))
+
+	result, err := collection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join team"})
 		return
 	}
+	if result.MatchedCount == 0 {
+		var count int64
+		count, err = collection.CountDocuments(context.Background(), bson.M{"_id": objectID})
+		if err == nil && count == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Team is already full"})
+		return
+	}
+
+	services.RemoveFromMatchmaking(objectID)
 
 	// Notify team captain
 	go func() {
@@ -453,6 +465,8 @@ func LeaveTeam(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to leave team"})
 		return
 	}
+
+	services.RemoveFromMatchmaking(objectID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully left team"})
 }
@@ -655,4 +669,23 @@ func GetAvailableTeams(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, teams)
+}
+
+// buildJoinTeamFilter constructs an atomic filter ensuring the team exists,
+// user is not already a member, and member count is strictly less than maxSize.
+func buildJoinTeamFilter(objectID primitive.ObjectID, userID primitive.ObjectID) bson.M {
+	return bson.M{
+		"_id":            objectID,
+		"members.userId": bson.M{"$ne": userID},
+		"$expr": bson.M{
+			"$lt": bson.A{
+				bson.M{"$size": "$members"},
+				bson.M{"$cond": bson.A{
+					bson.M{"$gt": bson.A{"$maxSize", 0}},
+					"$maxSize",
+					4,
+				}},
+			},
+		},
+	}
 }
