@@ -20,9 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// ============================================
-// HELPER FUNCTION (Tumhara)
-// ============================================
 
 func getUserIDFromContext(c *gin.Context) (primitive.ObjectID, error) {
 	userIDRaw, exists := c.Get("userID")
@@ -36,9 +33,7 @@ func getUserIDFromContext(c *gin.Context) (primitive.ObjectID, error) {
 	return userObjID, nil
 }
 
-// ============================================
-// PUBLIC TOURNAMENT JOIN (Tumhara)
-// ============================================
+
 
 func JoinPublicTournament(c *gin.Context) {
 	tournamentID := c.Param("id")
@@ -84,7 +79,7 @@ func JoinPublicTournament(c *gin.Context) {
 		Stance: "",
 	}
 
-	// Atomic update: Capacity + Duplicate check in filter
+	
 	result, err := db.TournamentCollection.UpdateOne(
 		context.Background(),
 		bson.M{
@@ -127,9 +122,7 @@ func JoinPublicTournament(c *gin.Context) {
 	})
 }
 
-// ============================================
-// PRIVATE TOURNAMENT JOIN (Tumhara)
-// ============================================
+
 
 func JoinPrivateTournament(c *gin.Context) {
 	var req struct {
@@ -174,7 +167,7 @@ func JoinPrivateTournament(c *gin.Context) {
 		}
 	}
 
-	// Existing request check
+
 	for _, r := range tournament.JoinRequests {
 		if r.UserID.Hex() == userObjID.Hex() {
 			if r.Status == "pending" {
@@ -185,7 +178,7 @@ func JoinPrivateTournament(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Your request was already approved"})
 				return
 			}
-			// Rejected - purana request hatao, naya bhejne do
+			
 			_, err = db.TournamentCollection.UpdateOne(
 				context.Background(),
 				bson.M{"_id": tournament.ID},
@@ -213,7 +206,7 @@ func JoinPrivateTournament(c *gin.Context) {
 		Status: "pending",
 	}
 
-	// Atomic update: Duplicate request check in filter
+	
 	result, err := db.TournamentCollection.UpdateOne(
 		context.Background(),
 		bson.M{
@@ -239,9 +232,7 @@ func JoinPrivateTournament(c *gin.Context) {
 	})
 }
 
-// ============================================
-// MODERATOR: GET PENDING REQUESTS (Tumhara)
-// ============================================
+
 
 func GetPendingRequests(c *gin.Context) {
 	tournamentID := c.Param("id")
@@ -289,9 +280,7 @@ func GetPendingRequests(c *gin.Context) {
 	})
 }
 
-// ============================================
-// CHOOSE STANCE (Tumhara)
-// ============================================
+
 
 func ChooseStance(c *gin.Context) {
 	tournamentID := c.Param("id")
@@ -370,9 +359,7 @@ func ChooseStance(c *gin.Context) {
 	})
 }
 
-// ============================================
-// MODERATOR: MANAGE REQUEST (Tumhara)
-// ============================================
+
 
 func ManageJoinRequest(c *gin.Context) {
 	tournamentID := c.Param("id")
@@ -425,7 +412,7 @@ func ManageJoinRequest(c *gin.Context) {
 		return
 	}
 
-	// Check moderator (Jikrana's model uses HostID)
+
 	if tournament.HostID.Hex() != userObjID.Hex() {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderator can manage requests"})
 		return
@@ -451,7 +438,7 @@ func ManageJoinRequest(c *gin.Context) {
 			return
 		}
 
-		// Name copy karo JoinRequest se
+		
 		var requestName string
 		for _, r := range tournament.JoinRequests {
 			if r.UserID.Hex() == requestUserObjID.Hex() {
@@ -547,9 +534,7 @@ func ManageJoinRequest(c *gin.Context) {
 	}
 }
 
-// ============================================
-// SHREYAS/JIKRANA KE FUNCTIONS
-// ============================================
+
 
 const maxTournamentParticipants = 11
 
