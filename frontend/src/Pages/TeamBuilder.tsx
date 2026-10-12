@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   FaCrown,
   FaUsers,
@@ -79,6 +80,13 @@ interface SelectedMember {
   teamCaptainEmail?: string;
 }
 
+type TeamConfirmation =
+  | { type: "leave"; teamId: string }
+  | { type: "delete"; teamId: string }
+  | { type: "remove"; teamId: string; memberId: string }
+  | { type: "transfer"; teamId: string; memberId: string }
+  | { type: "leaveAfterTransfer"; teamId: string };
+
 const TeamBuilder: React.FC = () => {
   const { user } = useUser();
   const [teamName, setTeamName] = useState("");
@@ -106,6 +114,8 @@ const TeamBuilder: React.FC = () => {
   const [userTeamsError, setUserTeamsError] = useState<string>("");
   const [availableTeamsError, setAvailableTeamsError] = useState<string>("");
   const [isTransferringCaptaincy, setIsTransferringCaptaincy] = useState(false);
+  const [teamConfirmation, setTeamConfirmation] =
+    useState<TeamConfirmation | null>(null);
   // Fetch available teams
   const fetchAvailableTeams = useCallback(async () => {
     setAvailableTeamsError("");
@@ -217,12 +227,10 @@ const TeamBuilder: React.FC = () => {
     } catch (error) {}
   };
 
-  const handleRemoveMember = async (
+  const executeRemoveMember = async (
     teamId: string,
     memberId: string
   ): Promise<void> => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
-
     try {
       await removeMember(teamId, memberId);
       setSuccess("Member removed successfully");
@@ -235,14 +243,7 @@ const TeamBuilder: React.FC = () => {
     }
   };
 
-  const handleDeleteTeam = async (teamId: string): Promise<void> => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this team? This action cannot be undone."
-      )
-    )
-      return;
-
+  const executeDeleteTeam = async (teamId: string): Promise<void> => {
     try {
       await deleteTeam(teamId);
       setSuccess("Team deleted successfully");
@@ -253,6 +254,14 @@ const TeamBuilder: React.FC = () => {
       setError((error as Error).message || "Failed to delete team");
       setTimeout(() => setError(""), 5000);
     }
+  };
+
+  const handleRemoveMember = (teamId: string, memberId: string): void => {
+    setTeamConfirmation({ type: "remove", teamId, memberId });
+  };
+
+  const handleDeleteTeam = (teamId: string): void => {
+    setTeamConfirmation({ type: "delete", teamId });
   };
 
   const isCaptain = (team: Team | null): boolean => {
@@ -319,11 +328,11 @@ const TeamBuilder: React.FC = () => {
     setTimeout(() => setSuccess(""), 3000);
   };
 
-  const handleLeaveTeam = async (teamId: string): Promise<void> => {
-    if (!window.confirm("Are you sure you want to leave this team?")) {
-      return;
-    }
+  const handleLeaveTeam = (teamId: string): void => {
+    setTeamConfirmation({ type: "leave", teamId });
+  };
 
+  const confirmLeaveTeam = async (teamId: string): Promise<void> => {
     try {
       await leaveTeam(teamId);
       setSuccess("You have left the team");
@@ -363,14 +372,6 @@ const TeamBuilder: React.FC = () => {
     teamId: string,
     newCaptainId: string
   ): Promise<void> => {
-    if (
-      !window.confirm(
-        "Are you sure you want to transfer captaincy to this member?"
-      )
-    ) {
-      return;
-    }
-
     setIsTransferringCaptaincy(true);
     setError("");
     setSuccess("");
@@ -381,8 +382,7 @@ const TeamBuilder: React.FC = () => {
         await transferTeamCaptain(teamId, newCaptainId);
       } catch (transferError: unknown) {
         setError(
-          (transferError as Error).message ||
-            "Failed to transfer captaincy."
+          (transferError as Error).message || "Failed to transfer captaincy."
         );
         return;
       }
@@ -393,32 +393,11 @@ const TeamBuilder: React.FC = () => {
       await fetchUserTeams();
       await fetchAvailableTeams();
 
-      const shouldLeave = window.confirm(
-        "Captaincy transferred successfully!\n\n" +
-          "Would you like to leave the team?\n\n" +
-          "Choose OK to leave, or Cancel to stay as a regular member."
+      setSuccess(
+        "Captaincy transferred successfully. You remain a regular member."
       );
-
-      if (shouldLeave) {
-        try {
-          await leaveTeam(teamId);
-          setSuccess(
-            "Captaincy transferred successfully, and you left the team."
-          );
-          setError("");
-        } catch (leaveError: unknown) {
-          setError(
-            `Captaincy was transferred, but leaving the team failed: ${
-              (leaveError as Error).message || "Please try again."
-            }`
-          );
-        }
-      } else {
-        setSuccess(
-          "Captaincy transferred successfully. You remain a regular member."
-        );
-        setError("");
-      }
+      setError("");
+      setTeamConfirmation({ type: "leaveAfterTransfer", teamId });
 
       // Refresh again to reflect whether the former captain left.
       await fetchUserTeams();
@@ -429,6 +408,31 @@ const TeamBuilder: React.FC = () => {
       );
     } finally {
       setIsTransferringCaptaincy(false);
+    }
+  };
+
+  const handleConfirmTeamAction = async (): Promise<void> => {
+    const confirmation = teamConfirmation;
+    if (!confirmation) return;
+    setTeamConfirmation(null);
+
+    switch (confirmation.type) {
+      case "leave":
+      case "leaveAfterTransfer":
+        await confirmLeaveTeam(confirmation.teamId);
+        break;
+      case "delete":
+        await executeDeleteTeam(confirmation.teamId);
+        break;
+      case "remove":
+        await executeRemoveMember(confirmation.teamId, confirmation.memberId);
+        break;
+      case "transfer":
+        await handleTransferCaptaincy(
+          confirmation.teamId,
+          confirmation.memberId
+        );
+        break;
     }
   };
 
@@ -936,10 +940,11 @@ const TeamBuilder: React.FC = () => {
                             className="w-full"
                             disabled={isTransferringCaptaincy}
                             onClick={() => {
-                              void handleTransferCaptaincy(
-                                selectedMember.teamId,
-                                selectedMember.memberUserId
-                              );
+                              setTeamConfirmation({
+                                type: "transfer",
+                                teamId: selectedMember.teamId,
+                                memberId: selectedMember.memberUserId,
+                              });
                             }}
                           >
                             <FaCrown className="mr-2" />
@@ -971,6 +976,57 @@ const TeamBuilder: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmationDialog
+        open={teamConfirmation !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTeamConfirmation(null);
+          }
+        }}
+        title={
+          teamConfirmation?.type === "delete"
+            ? "Delete team?"
+            : teamConfirmation?.type === "remove"
+              ? "Remove member?"
+              : teamConfirmation?.type === "transfer"
+                ? "Transfer captaincy?"
+                : teamConfirmation?.type === "leaveAfterTransfer"
+                  ? "Leave team now?"
+                  : "Leave team?"
+        }
+        description={
+          teamConfirmation?.type === "delete"
+            ? "This will permanently delete the team and cannot be undone."
+            : teamConfirmation?.type === "remove"
+              ? "Are you sure you want to remove this member from the team?"
+              : teamConfirmation?.type === "transfer"
+                ? "This member will become the team captain, and you will become a regular member."
+                : teamConfirmation?.type === "leaveAfterTransfer"
+                  ? "Captaincy was transferred successfully. Would you like to leave the team now?"
+                  : "Are you sure you want to leave this team? You may need a new invitation to join again."
+        }
+        confirmLabel={
+          teamConfirmation?.type === "delete"
+            ? "Delete team"
+            : teamConfirmation?.type === "remove"
+              ? "Remove member"
+              : teamConfirmation?.type === "transfer"
+                ? "Transfer captaincy"
+                : teamConfirmation?.type === "leaveAfterTransfer"
+                  ? "Leave team"
+                  : "Leave team"
+        }
+        cancelLabel={
+          teamConfirmation?.type === "leaveAfterTransfer"
+            ? "Stay in team"
+            : "Cancel"
+        }
+        onConfirm={() => {
+          void handleConfirmTeamAction();
+        }}
+        destructive={teamConfirmation?.type !== "transfer"}
+      />
 
       {/* Available Teams */}
       <Card>
