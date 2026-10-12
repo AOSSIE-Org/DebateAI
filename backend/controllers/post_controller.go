@@ -177,7 +177,7 @@ func GetFeedHandler(c *gin.Context) {
 
 	// Fetch posts with pagination
 	findOptions := options.Find().
-		SetSort(bson.D{{"createdAt", -1}}).
+		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
 		SetLimit(int64(limit)).
 		SetSkip(int64(skip))
 
@@ -350,7 +350,7 @@ func GetTopLikedPostsHandler(c *gin.Context) {
 	postCollection := db.MongoDatabase.Collection("debate_posts")
 
 	findOptions := options.Find().
-		SetSort(bson.D{{"likeCount", -1}}).
+		SetSort(bson.D{{Key: "likeCount", Value: -1}}).
 		SetLimit(int64(limit))
 
 	cursor, err := postCollection.Find(ctx, bson.M{"isPublic": true}, findOptions)
