@@ -385,6 +385,7 @@ const DebateRoom: React.FC = () => {
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
+  const [isConceding, setIsConceding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -409,26 +410,32 @@ const DebateRoom: React.FC = () => {
   }, [debateData, navigate, toast]);
 
   const handleConcede = async () => {
+    if (isConceding) {
+      return;
+    }
+
+    setIsConceding(true);
     setIsConcedeDialogOpen(false);
-      try {
-        if (debateData?.debateId) {
-          await concedeDebate(debateData.debateId, state.messages);
-        }
-
-        setState(prev => ({ ...prev, isDebateEnded: true }));
-        setPopup({
-          show: true,
-          message: "You have conceded the debate.",
-          isJudging: false
-        });
-
-        setTimeout(() => {
-          navigate("/startDebate");
-        }, 2000);
-
-      } catch (error) {
-        console.error("Error conceding:", error);
+    try {
+      if (debateData?.debateId) {
+        await concedeDebate(debateData.debateId, state.messages);
       }
+
+      setState((prev) => ({ ...prev, isDebateEnded: true }));
+      setPopup({
+        show: true,
+        message: "You have conceded the debate.",
+        isJudging: false,
+      });
+
+      setTimeout(() => {
+        navigate("/startDebate");
+      }, 2000);
+    } catch (error) {
+      console.error("Error conceding:", error);
+    } finally {
+      setIsConceding(false);
+    }
   };
 
   // Initialize SpeechRecognition
@@ -997,6 +1004,7 @@ const DebateRoom: React.FC = () => {
             {!state.isDebateEnded && (
               <Button
                 onClick={() => setIsConcedeDialogOpen(true)}
+                disabled={isConceding}
                 className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md px-3 text-sm"
               >
                 Concede

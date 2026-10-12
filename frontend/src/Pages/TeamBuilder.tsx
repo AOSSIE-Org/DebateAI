@@ -113,6 +113,7 @@ const TeamBuilder: React.FC = () => {
   const [userTeamsError, setUserTeamsError] = useState<string>("");
   const [availableTeamsError, setAvailableTeamsError] = useState<string>("");
   const [isTransferringCaptaincy, setIsTransferringCaptaincy] = useState(false);
+  const [isConfirmingTeamAction, setIsConfirmingTeamAction] = useState(false);
   const [teamConfirmation, setTeamConfirmation] =
     useState<TeamConfirmation | null>(null);
   // Fetch available teams
@@ -407,25 +408,30 @@ const TeamBuilder: React.FC = () => {
 
   const handleConfirmTeamAction = async (): Promise<void> => {
     const confirmation = teamConfirmation;
-    if (!confirmation) return;
-    setTeamConfirmation(null);
+    if (!confirmation || isConfirmingTeamAction) return;
 
-    switch (confirmation.type) {
-      case "leave":
-        await confirmLeaveTeam(confirmation.teamId);
-        break;
-      case "delete":
-        await executeDeleteTeam(confirmation.teamId);
-        break;
-      case "remove":
-        await executeRemoveMember(confirmation.teamId, confirmation.memberId);
-        break;
-      case "transfer":
-        await handleTransferCaptaincy(
-          confirmation.teamId,
-          confirmation.memberId
-        );
-        break;
+    setIsConfirmingTeamAction(true);
+    try {
+      switch (confirmation.type) {
+        case "leave":
+          await confirmLeaveTeam(confirmation.teamId);
+          break;
+        case "delete":
+          await executeDeleteTeam(confirmation.teamId);
+          break;
+        case "remove":
+          await executeRemoveMember(confirmation.teamId, confirmation.memberId);
+          break;
+        case "transfer":
+          await handleTransferCaptaincy(
+            confirmation.teamId,
+            confirmation.memberId
+          );
+          break;
+      }
+    } finally {
+      setIsConfirmingTeamAction(false);
+      setTeamConfirmation(null);
     }
   };
 
@@ -1007,6 +1013,7 @@ const TeamBuilder: React.FC = () => {
         onConfirm={() => {
           void handleConfirmTeamAction();
         }}
+        isConfirming={isConfirmingTeamAction}
         destructive={teamConfirmation?.type !== "transfer"}
       />
 

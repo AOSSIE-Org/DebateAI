@@ -123,7 +123,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     try {
       setDeletingId(id);
       await transcriptService.deleteTranscript(id);
-      setTranscripts(transcripts.filter((t) => t.id !== id));
+      setTranscripts((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete transcript');
     } finally {
