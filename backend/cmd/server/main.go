@@ -53,6 +53,11 @@ func main() {
 		} else {
 			log.Println("Connected to Redis")
 		}
+
+		if err := db.ConnectRedis(redisURL, cfg.Redis.Password, cfg.Redis.DB); err != nil {
+			log.Printf("⚠️ Warning: Failed to initialize community Redis client: %v", err)
+			log.Printf("⚠️ Community features like follow rate limiting and like counters will be unavailable")
+		}
 	} else {
 		log.Println("Redis Addr not configured; continuing without Redis-backed features")
 	}

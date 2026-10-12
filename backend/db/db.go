@@ -108,7 +108,7 @@ func GetLatestDebateVsBot(email string) (*models.DebateVsBot, error) {
 }
 
 func ConnectRedis(addr, password string, db int) error {
-	RedisClient = redis.NewClient(&redis.Options{
+	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: password,
 		DB:       db,
@@ -117,11 +117,21 @@ func ConnectRedis(addr, password string, db int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := RedisClient.Ping(ctx).Result()
+	_, err := client.Ping(ctx).Result()
 	if err != nil {
+		RedisClient = nil
 		return fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
+	RedisClient = client
 	log.Println("Connected to Redis")
 	return nil
+}
+
+func SetRedisClient(client *redis.Client) {
+	RedisClient = client
+}
+
+func GetRedisClient() *redis.Client {
+	return RedisClient
 }
