@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
+import DebateAnalyticsReport from "@/components/DebateAnalyticsReport";
 import { Mic, MicOff } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
@@ -381,6 +382,7 @@ const DebateRoom: React.FC = () => {
     isJudging?: boolean;
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -846,31 +848,79 @@ const DebateRoom: React.FC = () => {
 
   if (judgmentData) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-black">
-        <JudgmentPopup
-          judgment={judgmentData}
+    <div className="fixed inset-0 z-[9999] bg-black">
+      <JudgmentPopup
+        judgment={judgmentData}
+        userAvatar={userAvatar}
+        botAvatar={bot.avatar}
+        botName={debateData?.botName || "Bot"}
+        userStance={state.userStance}
+        botStance={state.botStance}
+        botDesc={bot.desc}
+        onClose={() => {
+          setJudgmentData(null);
+          navigate("/startDebate");
+        }}
+      />
+      {!showAnalytics && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 10000,
+        }}>
+          <button
+            onClick={() => setShowAnalytics(true)}
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              color: '#fff',
+              border: 'none',
+              padding: '14px 28px',
+              borderRadius: 16,
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 8px 32px rgba(59,130,246,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'transform 0.2s, box-shadow 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 12px 40px rgba(59,130,246,0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(59,130,246,0.4)';
+            }}
+          >
+            📊 View Full Analytics
+          </button>
+        </div>
+      )}
+      {showAnalytics && (
+        <DebateAnalyticsReport
+          history={state.messages}
+          topic={debateData?.topic || "Debate"}
+          userStance={state.userStance}
+          botName={debateData?.botName || "Bot"}
           userAvatar={userAvatar}
           botAvatar={bot.avatar}
-          botName={debateData?.botName || "Bot"}
-          userStance={state.userStance}
-          botStance={state.botStance}
-          botDesc={bot.desc}
-          onClose={() => {
-            setJudgmentData(null);
-            navigate("/startDebate");
-          }}
+          onClose={() => setShowAnalytics(false)}
         />
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
 
-  if (!debateData) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground text-sm">Redirecting to debate setup...</p>
-      </div>
-    );
-  }
+if (!debateData) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground text-sm">Redirecting to debate setup...</p>
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-background p-4 transition-colors duration-300">

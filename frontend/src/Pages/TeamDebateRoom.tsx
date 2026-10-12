@@ -216,7 +216,7 @@ const TeamDebateRoom: React.FC = () => {
 
   // Speech recognition state
   const [isListening, setIsListening] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [_currentTranscript, setCurrentTranscript] = useState("");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [speechTranscripts, setSpeechTranscripts] = useState<{
@@ -655,7 +655,7 @@ const TeamDebateRoom: React.FC = () => {
   }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
 
   useEffect(() => {
-  currentUserIdRef.current = currentUser?.id;
+  currentUserIdRef.current = currentUser?.id ?? null;
   myTeamIdRef.current = myTeamId;
   isTeam1Ref.current = isTeam1;
   debatePhaseRef.current = debatePhase;
@@ -740,7 +740,7 @@ const TeamDebateRoom: React.FC = () => {
       const amTeam1 = isTeam1Ref.current;
       const currentMyTeamId = myTeamIdRef.current;
       const currentUserId = currentUserIdRef.current;
-      const currentPhase = debatePhaseRef.current;
+      // const currentPhase = debatePhaseRef.current; // available via ref if needed
 
       switch (data.type) {
         case "stateSync": {
@@ -2207,7 +2207,7 @@ const TeamDebateRoom: React.FC = () => {
           <SpeechTranscripts
             transcripts={speechTranscripts}
             currentPhase={debatePhase}
-            liveTranscript={currentTranscript}
+
           />
         </div>
       )}
