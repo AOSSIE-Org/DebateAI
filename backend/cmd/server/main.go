@@ -48,8 +48,8 @@ func main() {
 			redisURL = "localhost:6379"
 		}
 		if err := debate.InitRedis(redisURL, cfg.Redis.Password, cfg.Redis.DB); err != nil {
-			log.Printf("⚠️ Warning: Failed to initialize Redis: %v", err)
-			log.Printf("⚠️ Some realtime features will be unavailable until Redis is reachable")
+			log.Printf("Warning: Failed to initialize Redis: %v", err)
+			log.Printf("Some realtime features will be unavailable until Redis is reachable")
 		} else {
 			log.Println("Connected to Redis")
 		}
