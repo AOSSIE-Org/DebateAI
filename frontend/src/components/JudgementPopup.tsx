@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button'; // Adjust the path as needed
 import { useNavigate } from 'react-router-dom';
+import { Trophy } from 'lucide-react';
+import { ShareVictoryCardModal } from './ShareVictoryCard';
+import { DebateVictoryCardData } from './ShareVictoryCard/types';
 
 // Define both possible JudgmentData types
 type JudgmentDataUserBot = {
@@ -81,6 +84,7 @@ type JudgmentPopupProps = {
   opponentDisplayName?: string | null;
   opponentAvatarUrl?: string | null;
   ratingSummary?: RatingSummary | null;
+  topic?: string;
   onClose: () => void;
 };
 
@@ -122,9 +126,11 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   opponentDisplayName,
   opponentAvatarUrl,
   ratingSummary,
+  topic,
   onClose,
 }) => {
   const navigate = useNavigate();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const userName = 'You';
 
   const localAvatar =
@@ -332,6 +338,63 @@ const player2RatingSummary =
   };
 
   const recommendedSkills = recommendSkills();
+
+  const isPlayer1Winner = (() => {
+    const winnerRaw = (judgment.verdict.winner || '').toLowerCase();
+    if (isUserBotFormat) {
+      if (winnerRaw.includes('user') || winnerRaw === player1Name.toLowerCase()) return true;
+      if (winnerRaw.includes('bot') || winnerRaw === player2Name.toLowerCase()) return false;
+    } else {
+      if (winnerRaw.includes('for') || winnerRaw === player1Name.toLowerCase()) return true;
+      if (winnerRaw.includes('against') || winnerRaw === player2Name.toLowerCase()) return false;
+    }
+    const { score: s1 } = getScoreAndReason('total', 'player1');
+    const { score: s2 } = getScoreAndReason('total', 'player2');
+    return s1 >= s2;
+  })();
+
+  const { score: p1Total } = getScoreAndReason('total', 'player1');
+  const { score: p2Total } = getScoreAndReason('total', 'player2');
+
+  const player1Info = {
+    name: player1Name,
+    avatarUrl: player1Avatar,
+    stance: player1Stance,
+    score: p1Total,
+    maxScore: 100,
+    eloRating: player1RatingSummary?.rating,
+    eloChange: player1RatingSummary?.change,
+    isWinner: isPlayer1Winner,
+  };
+
+  const player2Info = {
+    name: player2Name,
+    avatarUrl: player2Avatar,
+    stance: player2Stance,
+    score: p2Total,
+    maxScore: 100,
+    eloRating: player2RatingSummary?.rating,
+    eloChange: player2RatingSummary?.change,
+    isWinner: !isPlayer1Winner,
+  };
+
+  const victoryCardData: DebateVictoryCardData = {
+    topic: topic || 'Debate Arena Showdown',
+    matchType: isUserBotFormat
+      ? `AI Bot Arena${botName ? ` vs ${botName}` : ''}`
+      : forRole === 'Your Team' || againstRole === 'Your Team'
+      ? 'Team Debate'
+      : '1v1 Ranked Match',
+    date: new Date(),
+    winner: isPlayer1Winner ? player1Info : player2Info,
+    opponent: isPlayer1Winner ? player2Info : player1Info,
+    isDraw: false,
+    verdictHighlight:
+      judgment.verdict.reason ||
+      judgment.verdict.congratulations ||
+      judgment.verdict.opponent_analysis ||
+      null,
+  };
 
   return (
     <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 p-4'>
@@ -732,8 +795,22 @@ const player2RatingSummary =
           </div>
         </div>
 
+        {/* Share Victory Card Section */}
+        <div className='mt-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl text-center'>
+          <p className='text-sm text-amber-700 font-medium mb-3'>
+            🏆 Share your debate result on Discord, Twitter, and social media!
+          </p>
+          <Button
+            onClick={() => setIsShareModalOpen(true)}
+            className='bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-6 py-3 rounded-full text-base font-semibold transition-all duration-200 transform hover:scale-105 shadow-md shadow-amber-200'
+          >
+            <Trophy className='inline w-4 h-4 mr-2' />
+            Share Victory Card
+          </Button>
+        </div>
+
         {/* Buttons */}
-        <div className='text-center mt-8'>
+        <div className='text-center mt-6'>
           <Button
             onClick={handleGoHome}
             className='bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 mr-4'
@@ -748,6 +825,13 @@ const player2RatingSummary =
           </Button>
         </div>
       </div>
+
+      {/* Share Victory Card Modal */}
+      <ShareVictoryCardModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        data={victoryCardData}
+      />
     </div>
   );
 };

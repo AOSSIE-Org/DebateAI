@@ -2431,6 +2431,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       {showJudgment && judgmentData && (
         <JudgmentPopup
           judgment={judgmentData}
+          topic={topic}
           forRole={
             localRole === "for"
               ? "You"

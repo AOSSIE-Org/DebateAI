@@ -86,6 +86,8 @@ import {
   transcriptService,
   SavedDebateTranscript,
 } from "@/services/transcriptService";
+import { ShareVictoryCardModal } from "@/components/ShareVictoryCard";
+import { DebateVictoryCardData } from "@/components/ShareVictoryCard/types";
 
 const handleProfileAvatarLoadError = (
   event: React.SyntheticEvent<HTMLImageElement>
@@ -214,6 +216,8 @@ const Profile: React.FC = () => {
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isShareCardOpen, setIsShareCardOpen] = useState(false);
+  const [shareCardData, setShareCardData] = useState<DebateVictoryCardData | null>(null);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -263,6 +267,40 @@ const Profile: React.FC = () => {
     } finally {
       setTranscriptLoading(false);
     }
+  };
+
+  const handleShareCard = (debate: {
+    id: string;
+    topic: string;
+    result: "win" | "loss" | "draw" | "pending";
+    opponent: string;
+    debateType: "user_vs_bot" | "user_vs_user";
+    date: string;
+    eloChange?: number;
+  }) => {
+    const currentUser = dashboard?.profile;
+    const isWin = debate.result === "win";
+    const isDraw = debate.result === "draw";
+    const userInfo = {
+      name: currentUser?.displayName || "You",
+      avatarUrl: currentUser?.avatarUrl || null,
+      stance: "Debater",
+      eloChange: isWin && debate.eloChange ? debate.eloChange : isDraw ? 0 : debate.eloChange,
+    };
+    const opponentInfo = {
+      name: debate.opponent || "Opponent",
+      stance: debate.debateType === "user_vs_bot" ? "AI Bot" : "Debater",
+    };
+    const cardData: DebateVictoryCardData = {
+      topic: debate.topic,
+      matchType: debate.debateType === "user_vs_bot" ? "AI Arena" : "1v1 Ranked Match",
+      date: debate.date,
+      winner: isWin ? userInfo : opponentInfo,
+      opponent: isWin ? opponentInfo : userInfo,
+      isDraw,
+    };
+    setShareCardData(cardData);
+    setIsShareCardOpen(true);
   };
 
   useEffect(() => {
@@ -1058,22 +1096,39 @@ const Profile: React.FC = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
                   <p className="text-xs sm:text-sm text-muted-foreground">Loading debate history...</p>
                 </div>
-              ) : recentDebates && recentDebates.length > 0 ? (
+                ) : recentDebates && recentDebates.length > 0 ? (
                 <ul className="space-y-1">
                   {recentDebates.map((debate, idx) => {
                     const IconComponent = debate.result === "win" ? CheckCircle : debate.result === "loss" ? XCircle : MinusCircle;
                     const iconColor = debate.result === "win" ? "text-green-600" : debate.result === "loss" ? "text-red-600" : "text-gray-600";
                     return (
-                      <li key={idx} className="flex items-center justify-between border-b border-muted py-1 last:border-none text-xs sm:text-sm hover:bg-muted/50 transition-colors cursor-pointer group" onClick={() => handleDebateClick(debate)}>
-                        <span className="font-medium flex items-center truncate">
-                          <IconComponent className={`w-3 h-3 mr-1 ${iconColor}`} />
+                      <li key={idx} className="flex items-center justify-between border-b border-muted py-1.5 last:border-none text-xs sm:text-sm group">
+                        <span
+                          className="font-medium flex items-center truncate flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => handleDebateClick(debate)}
+                        >
+                          <IconComponent className={`w-3 h-3 mr-1 flex-shrink-0 ${iconColor}`} />
                           <span className="truncate">{debate.topic}</span>
                         </span>
-                        <span className={`${iconColor} font-semibold text-xs flex items-center gap-1`}>
-                          {debate.result.toUpperCase()}{" "}
-                          {debate.eloChange && debate.eloChange > 0 && `(+${debate.eloChange})`}
-                          {debate.eloChange && debate.eloChange < 0 && `(${debate.eloChange})`}
-                          <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className="flex items-center gap-2 ml-2">
+                          <span className={`${iconColor} font-semibold text-xs flex items-center gap-1`}>
+                            {debate.result.toUpperCase()}{" "}
+                            {debate.eloChange && debate.eloChange > 0 && `(+${debate.eloChange})`}
+                            {debate.eloChange && debate.eloChange < 0 && `(${debate.eloChange})`}
+                          </span>
+                          {(debate.result === "win" || debate.result === "loss") && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleShareCard(debate); }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                              title="Share match card"
+                            >
+                              <FaTrophy className="w-3 h-3" />
+                            </button>
+                          )}
+                          <ChevronRight
+                            className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            onClick={() => handleDebateClick(debate)}
+                          />
                         </span>
                       </li>
                     );
@@ -1195,7 +1250,14 @@ const Profile: React.FC = () => {
                   <p className="text-sm text-muted-foreground mb-2">Full transcript not available</p>
                 </div>
               )}
-              <div className="text-center">
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <Button
+                  onClick={() => selectedDebate && handleShareCard(selectedDebate)}
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold shadow-md"
+                >
+                  <FaTrophy className="w-4 h-4 mr-2" />
+                  Share Victory Card
+                </Button>
                 <Button variant="outline" onClick={() => (window.location.href = "/debates")}>
                   Start New Debate
                 </Button>
@@ -1204,6 +1266,13 @@ const Profile: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Share Victory Card Modal */}
+      <ShareVictoryCardModal
+        isOpen={isShareCardOpen}
+        onClose={() => setIsShareCardOpen(false)}
+        data={shareCardData}
+      />
     </div>
   );
 };

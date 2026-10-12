@@ -1930,6 +1930,7 @@ const TeamDebateRoom: React.FC = () => {
       {showJudgment && judgmentData && (
         <JudgmentPopup
           judgment={judgmentData}
+          topic={topic}
           forRole={localRole === "for" ? "Your Team" : "Opponent Team"}
           againstRole={localRole === "against" ? "Your Team" : "Opponent Team"}
           onClose={() => setShowJudgment(false)}

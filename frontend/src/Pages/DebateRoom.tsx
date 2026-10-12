@@ -690,6 +690,7 @@ setPopup({ show: false, message: "" });
     <div className="fixed inset-0 z-[9999] bg-black">
       <JudgmentPopup
         judgment={judgmentData}
+        topic={debateData.topic}
         userAvatar={userAvatar}
         botAvatar={bot.avatar}
         botName={debateData.botName}
