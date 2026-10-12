@@ -4,7 +4,7 @@ import { useAtomValue } from "jotai";
 import { ArrowLeft, Check, Copy, Play, RefreshCw, Trash2, Trophy, X } from "lucide-react";
 import { AuthContext } from "@/context/authContext";
 import { userAtom } from "@/state/userAtom";
-import { chooseTournamentStance, decideTournamentRequest, deleteTournament, getTournament, joinTournament, startTournament, type CreatedTournament } from "@/services/tournamentService";
+import { chooseTournamentStance, decideTournamentRequest, deleteTournament, getTournament, joinTournament, startTournament, TournamentRequestError, type CreatedTournament } from "@/services/tournamentService";
 
 export default function TournamentDetails() {
   const { id = "" } = useParams();
@@ -22,14 +22,24 @@ export default function TournamentDetails() {
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
     generation.current++;
     setRecord(null); setError(""); setNotice(""); setBusy(false); setLoading(true);
     async function poll() {
+      if (controller.signal.aborted || stopped) return;
       try {
         const next = await getTournament(id, controller.signal);
-        if (!controller.signal.aborted) setRecord(current => !current || next.revision >= current.revision ? next : current);
-      } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Unable to load tournament."); }
-      finally { if (!controller.signal.aborted) { setLoading(false); timer = setTimeout(poll, 5000); } }
+        if (!controller.signal.aborted) {
+          setRecord(current => !current || next.revision >= current.revision ? next : current);
+          setError("");
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          stopped = err instanceof TournamentRequestError && [400, 401, 403, 404].includes(err.status);
+          setError(err instanceof Error ? err.message : "Unable to load tournament.");
+        }
+      }
+      finally { if (!controller.signal.aborted) { setLoading(false); if (!stopped) timer = setTimeout(poll, 5000); } }
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };

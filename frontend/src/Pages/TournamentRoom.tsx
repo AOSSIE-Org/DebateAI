@@ -4,7 +4,7 @@ import { useAtomValue } from "jotai";
 import { ArrowLeft, Check, Clock, Mic, MicOff, RefreshCw, Send, Trophy } from "lucide-react";
 import { AuthContext } from "@/context/authContext";
 import { userAtom } from "@/state/userAtom";
-import { getTournamentExecution, submitTournamentTranscript, type TournamentExecution, type TournamentPhase, type TournamentReceipt } from "@/services/tournamentService";
+import { getTournamentExecution, submitTournamentTranscript, TournamentRequestError, type TournamentExecution, type TournamentPhase, type TournamentReceipt } from "@/services/tournamentService";
 import { tournamentPhaseNames as phaseNames } from "@/components/tournament/phaseNames";
 
 const bytes = (text: string) => new TextEncoder().encode(text).length;
@@ -133,25 +133,45 @@ export default function TournamentRoom() {
     let timer: ReturnType<typeof setTimeout>;
     let fetching = false;
     let requested = false;
+    let stopped = false;
+    let failures = 0;
+    let backingOff = false;
+    let revision = -1;
     setSample(null); setError(""); setLoading(true);
     async function poll() {
+      if (controller.signal.aborted || stopped || backingOff) return;
       if (fetching) { requested = true; return; }
       fetching = true; clearTimeout(timer);
+      let delay = 1500;
       const sentAt = performance.now();
       try {
         const next = await getTournamentExecution(id, controller.signal);
         const receivedAt = performance.now();
         if (!controller.signal.aborted) {
+          if (next.revision >= revision) {
+            revision = next.revision;
+            stopped = next.state === "finished";
+          }
           setSample(current => !current || current.owner !== owner || next.revision >= current.record.revision ? { owner, record: next, sampledAt: (sentAt + receivedAt) / 2 } : current);
           setError("");
+          failures = 0;
+          backingOff = false;
+          if (requested) delay = 0;
         }
-      } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Unable to load execution."); }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          stopped = err instanceof TournamentRequestError && [400, 401, 403, 404].includes(err.status);
+          setError(err instanceof Error ? err.message : "Unable to load execution.");
+          delay = Math.min(30000, 5000 * 2 ** Math.min(failures++, 3));
+          backingOff = true;
+        }
+      }
       finally {
         fetching = false;
+        requested = false;
         if (!controller.signal.aborted) {
           setLoading(false);
-          const delay = requested ? 0 : 1500; requested = false;
-          timer = setTimeout(poll, delay);
+          if (!stopped) timer = setTimeout(() => { backingOff = false; void poll(); }, delay);
         }
       }
     }
