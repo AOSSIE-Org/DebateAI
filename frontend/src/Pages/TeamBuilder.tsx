@@ -11,6 +11,7 @@ import {
   leaveTeam,
   getTeamByCode,
   updateTeamSize,
+  transferTeamCaptain,
 } from "@/services/teamService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,6 @@ import {
 } from "react-icons/fa";
 import TeamMatchmaking from "@/components/TeamMatchmaking";
 import MatchmakingPool from "@/components/MatchmakingPool";
-
 interface TeamMember {
   userId: string;
   email: string;
@@ -105,7 +105,7 @@ const TeamBuilder: React.FC = () => {
   const [isLoadingAvailableTeams, setIsLoadingAvailableTeams] = useState(true);
   const [userTeamsError, setUserTeamsError] = useState<string>("");
   const [availableTeamsError, setAvailableTeamsError] = useState<string>("");
-
+  const [isTransferringCaptaincy, setIsTransferringCaptaincy] = useState(false);
   // Fetch available teams
   const fetchAvailableTeams = useCallback(async () => {
     setAvailableTeamsError("");
@@ -214,8 +214,7 @@ const TeamBuilder: React.FC = () => {
       }
 
       setIsMemberProfileOpen(true);
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const handleRemoveMember = async (
@@ -258,17 +257,19 @@ const TeamBuilder: React.FC = () => {
 
   const isCaptain = (team: Team | null): boolean => {
     if (!team || !user) return false;
-    
+
     // Convert captainId to string if it's an object (for backwards compatibility)
-    const captainIdStr = typeof team.captainId === 'string' 
-      ? team.captainId 
-      : (team.captainId as any)?.$oid || String(team.captainId);
-    
+    const captainIdStr =
+      typeof team.captainId === "string"
+        ? team.captainId
+        : (team.captainId as any)?.$oid || String(team.captainId);
+
     // Convert user.id to string if needed
-    const userIdStr = typeof user.id === 'string'
-      ? user.id
-      : (user.id as any)?.$oid || String(user.id);
-    
+    const userIdStr =
+      typeof user.id === "string"
+        ? user.id
+        : (user.id as any)?.$oid || String(user.id);
+
     // Check both ID and email
     return captainIdStr === userIdStr || team.captainEmail === user?.email;
   };
@@ -358,10 +359,85 @@ const TeamBuilder: React.FC = () => {
     }
   };
 
+  const handleTransferCaptaincy = async (
+    teamId: string,
+    newCaptainId: string
+  ): Promise<void> => {
+    if (
+      !window.confirm(
+        "Are you sure you want to transfer captaincy to this member?"
+      )
+    ) {
+      return;
+    }
+
+    setIsTransferringCaptaincy(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      // Transfer captaincy first.
+      try {
+        await transferTeamCaptain(teamId, newCaptainId);
+      } catch (transferError: unknown) {
+        setError(
+          (transferError as Error).message ||
+            "Failed to transfer captaincy."
+        );
+        return;
+      }
+
+      setIsMemberProfileOpen(false);
+
+      // Refresh the teams after the transfer.
+      await fetchUserTeams();
+      await fetchAvailableTeams();
+
+      const shouldLeave = window.confirm(
+        "Captaincy transferred successfully!\n\n" +
+          "Would you like to leave the team?\n\n" +
+          "Choose OK to leave, or Cancel to stay as a regular member."
+      );
+
+      if (shouldLeave) {
+        try {
+          await leaveTeam(teamId);
+          setSuccess(
+            "Captaincy transferred successfully, and you left the team."
+          );
+          setError("");
+        } catch (leaveError: unknown) {
+          setError(
+            `Captaincy was transferred, but leaving the team failed: ${
+              (leaveError as Error).message || "Please try again."
+            }`
+          );
+        }
+      } else {
+        setSuccess(
+          "Captaincy transferred successfully. You remain a regular member."
+        );
+        setError("");
+      }
+
+      // Refresh again to reflect whether the former captain left.
+      await fetchUserTeams();
+      await fetchAvailableTeams();
+    } catch {
+      setError(
+        "Something went wrong while updating team information. Please refresh the page and verify the current captain."
+      );
+    } finally {
+      setIsTransferringCaptaincy(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Team Builder</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Team Builder
+        </h1>
         <p className="text-gray-600 dark:text-muted-foreground [.contrast_&]:text-foreground">
           Create or join a team to participate in team debates
         </p>
@@ -590,7 +666,9 @@ const TeamBuilder: React.FC = () => {
                               <FaCrown className="inline text-yellow-500" />{" "}
                               Captain:
                             </span>
-                            <div className="overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">{team.captainEmail}</div>
+                            <div className="overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">
+                              {team.captainEmail}
+                            </div>
                           </div>
                           {team.code && (
                             <div className="flex items-center gap-1 flex-shrink-0">
@@ -794,7 +872,9 @@ const TeamBuilder: React.FC = () => {
                   <h3 className="text-xl font-bold truncate">
                     {memberProfile.displayName}
                   </h3>
-                  <div className="text-sm text-gray-500 overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">{memberProfile.email}</div>
+                  <div className="text-sm text-gray-500 overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">
+                    {memberProfile.email}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -825,20 +905,36 @@ const TeamBuilder: React.FC = () => {
               {/* Captain Actions */}
               {selectedMember &&
                 selectedMember.teamId &&
-                userTeams &&
                 userTeams.find((t) => t.id === selectedMember.teamId) && (
                   <div className="pt-4 border-t border-border space-y-2">
                     {isCaptain(
                       userTeams.find((t) => t.id === selectedMember.teamId) ||
                         null
-                    ) && (
-                      <>
-                        {selectedMember.memberUserId !==
-                          (userTeams.find((t) => t.id === selectedMember.teamId)
-                            ?.captainId || "") && (
+                    ) &&
+                      selectedMember.memberUserId !==
+                        (userTeams.find((t) => t.id === selectedMember.teamId)
+                          ?.captainId || "") && (
+                        <>
+                          <Button
+                            className="w-full"
+                            disabled={isTransferringCaptaincy}
+                            onClick={() => {
+                              void handleTransferCaptaincy(
+                                selectedMember.teamId,
+                                selectedMember.memberUserId
+                              );
+                            }}
+                          >
+                            <FaCrown className="mr-2" />
+                            {isTransferringCaptaincy
+                              ? "Transferring..."
+                              : "Transfer Captaincy"}
+                          </Button>
+
                           <Button
                             variant="destructive"
                             className="w-full"
+                            disabled={isTransferringCaptaincy}
                             onClick={() => {
                               handleRemoveMember(
                                 selectedMember.teamId,
@@ -850,9 +946,8 @@ const TeamBuilder: React.FC = () => {
                             <FaTimes className="mr-2" />
                             Remove Member from Team
                           </Button>
-                        )}
-                      </>
-                    )}
+                        </>
+                      )}
                   </div>
                 )}
             </div>

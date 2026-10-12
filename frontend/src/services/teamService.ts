@@ -371,3 +371,26 @@ export const updateTeamSize = async (teamId: string, maxSize: number): Promise<v
   }
 };
 
+export const transferTeamCaptain = async (
+  teamId: string,
+  newCaptainId: string
+): Promise<void> => {
+  const token = getAuthToken();
+
+  const response = await fetch(
+    `${API_BASE_URL}/teams/${teamId}/captain`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ newCaptainId }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to transfer captaincy");
+  }
+};
