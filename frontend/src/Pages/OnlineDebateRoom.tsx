@@ -2232,28 +2232,28 @@ const OnlineDebateRoom = (): JSX.Element => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
       <div className="w-full max-w-5xl mx-auto py-2">
         <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 break-words">
             Debate: {topic || "No topic set"}
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Phase: <span className="font-medium">{debatePhase}</span> |
-            Participants:{" "}
-            <span className="font-medium">{roomParticipants.length}/2</span> |
-            Spectators: <span className="font-medium">{spectatorPresence}</span>{" "}
-            | Current Turn:{" "}
+          <p className="mt-2 text-xs sm:text-sm text-gray-700 flex flex-wrap justify-center gap-1">
+            <span>Phase: <span className="font-medium">{debatePhase}</span> |</span>
+            <span>Participants:{" "}
+            <span className="font-medium">{roomParticipants.length}/2</span></span>
+            <span className="hidden sm:inline"> | Spectators: <span className="font-medium">{spectatorPresence}</span></span>{" "}
+            <span>| Current Turn:{" "}
             <span className="font-semibold text-orange-600">
               {isMyTurn ? "You" : "Opponent"} to{" "}
               {debatePhase.includes("Question")
-                ? "ask a question"
+                ? "ask"
                 : debatePhase.includes("Answer")
                 ? "answer"
-                : "make a statement"}
+                : "state"}
             </span>
             {isAutoMuted && (
               <span className="ml-2 text-red-500 font-medium">
                 🔇 Auto-muted (not your turn)
               </span>
-            )}
+            )}</span>
           </p>
           {debatePhase !== DebatePhase.Finished &&
             debatePhase !== DebatePhase.Setup && (
@@ -2276,7 +2276,7 @@ const OnlineDebateRoom = (): JSX.Element => {
           onClick={() => setShowSetupPopup(false)}
         >
           <div
-            className="bg-card text-foreground p-6 rounded-lg shadow-lg max-w-md w-full"
+            className="bg-card text-foreground p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with title and close icon */}
@@ -2300,18 +2300,18 @@ const OnlineDebateRoom = (): JSX.Element => {
               </p>
 
               <div className="flex items-center gap-2">
-                <div className="flex-1 border border-border rounded-md px-3 py-2 bg-muted">
-                  <span className="text-sm text-muted-foreground mr-2">
+                <div className="flex-1 min-w-0 border border-border rounded-md px-3 py-2 bg-muted overflow-x-auto">
+                  <span className="text-sm text-muted-foreground mr-2 whitespace-nowrap">
                     Room Code:
                   </span>
 
-                  <span className="font-semibold tracking-wider">{roomId}</span>
+                  <span className="font-semibold tracking-wider break-all">{roomId}</span>
                 </div>
 
                 <Button
                   type="button"
                   onClick={handleCopyRoomId}
-                  className="px-4"
+                  className="px-4 flex-shrink-0"
                 >
                   {roomIdCopied ? "Copied" : "Copy"}
                 </Button>
@@ -2571,7 +2571,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             isMyTurn && debatePhase !== DebatePhase.Finished
               ? "animate-glow"
               : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          } bg-white border border-gray-200 shadow-md h-[350px] sm:h-[450px] md:h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -2608,7 +2608,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               autoPlay
               muted
               playsInline
-              className="w-full h-80 object-cover"
+              className="w-full h-36 sm:h-64 md:h-80 object-cover"
             />
             {/* Speaking Controls */}
             <div className="mt-3 flex flex-col items-center gap-2">
@@ -2636,7 +2636,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             !isMyTurn && debatePhase !== DebatePhase.Finished
               ? "animate-glow"
               : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          } bg-white border border-gray-200 shadow-md h-[350px] sm:h-[450px] md:h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -2673,7 +2673,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              className="w-full h-80 object-cover"
+              className="w-full h-48 sm:h-64 md:h-80 object-cover"
             />
           </div>
         </div>
