@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -33,6 +34,8 @@ var upgrader = websocket.Upgrader{
 type Room struct {
 	Clients map[*websocket.Conn]*Client
 	OwnerID string
+	Topic   string
+	IsEnded bool
 	Mutex   sync.Mutex
 }
 
@@ -636,6 +639,13 @@ func handleLiveTranscript(room *Room, conn *websocket.Conn, message Message, cli
 
 // handlePhaseChange handles phase changes
 func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID string) {
+	room.Mutex.Lock()
+	sender, exists := room.Clients[conn]
+	if !exists || sender.IsSpectator {
+		room.Mutex.Unlock()
+		return
+	}
+
 	// Determine whose turn it is based on the phase
 	var currentTurn string
 	switch message.Phase {
@@ -647,27 +657,35 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 		currentTurn = ""
 	}
 
-	// Automatically mute/unmute users based on turn
-	room.Mutex.Lock()
-	for clientConn, client := range room.Clients {
+	type muteNotification struct {
+		client  *Client
+		payload map[string]interface{}
+	}
+	var notifications []muteNotification
+
+	for _, client := range room.Clients {
 		if client.Role != "" {
 			shouldBeMuted := client.Role != currentTurn
 			client.IsMuted = shouldBeMuted
 
-			// Send mute status to each client
-			response := map[string]interface{}{
-				"type":        "autoMuteStatus",
-				"userId":      client.UserID,
-				"username":    client.Username,
-				"isMuted":     shouldBeMuted,
-				"currentTurn": currentTurn,
-				"phase":       message.Phase,
-			}
-			if err := clientConn.WriteJSON(response); err != nil {
-			}
+			notifications = append(notifications, muteNotification{
+				client: client,
+				payload: map[string]interface{}{
+					"type":        "autoMuteStatus",
+					"userId":      client.UserID,
+					"username":    client.Username,
+					"isMuted":     shouldBeMuted,
+					"currentTurn": currentTurn,
+					"phase":       message.Phase,
+				},
+			})
 		}
 	}
 	room.Mutex.Unlock()
+
+	for _, n := range notifications {
+		_ = n.client.SafeWriteJSON(n.payload)
+	}
 
 	// Broadcast phase change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
@@ -681,11 +699,12 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 	room.Mutex.Lock()
 	client, exists := room.Clients[conn]
 	isOwner := exists && !client.IsSpectator && client.UserID == room.OwnerID
-	room.Mutex.Unlock()
-
 	if !isOwner {
+		room.Mutex.Unlock()
 		return
 	}
+	room.Topic = message.Topic
+	room.Mutex.Unlock()
 
 	// Broadcast topic change to other clients
 	for _, r := range snapshotRecipients(room, conn) {
@@ -696,15 +715,27 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 
 // handleRoleSelection handles role selection
 func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, roomID string) {
-	// Store the role in the client
 	room.Mutex.Lock()
-	if client, exists := room.Clients[conn]; exists {
-		if client.IsSpectator {
-			room.Mutex.Unlock()
-			return
-		}
-		client.Role = message.Role
+	client, exists := room.Clients[conn]
+	if !exists || client.IsSpectator {
+		room.Mutex.Unlock()
+		return
 	}
+
+	if message.Role == "for" || message.Role == "against" {
+		for otherConn, other := range room.Clients {
+			if otherConn != conn && !other.IsSpectator && other.Role == message.Role {
+				room.Mutex.Unlock()
+				_ = client.SafeWriteJSON(map[string]interface{}{
+					"type":  "error",
+					"error": fmt.Sprintf("Role '%s' is already taken", message.Role),
+				})
+				return
+			}
+		}
+	}
+
+	client.Role = message.Role
 	room.Mutex.Unlock()
 
 	// Broadcast role selection to other clients
@@ -807,6 +838,34 @@ func getUserDetails(email string) (string, string, string, int, error) {
 
 // handleConcede handles concede requests
 func handleConcede(room *Room, conn *websocket.Conn, message Message, client *Client, roomID string) {
+	if client.IsSpectator {
+		return
+	}
+
+	room.Mutex.Lock()
+	if room.IsEnded {
+		room.Mutex.Unlock()
+		return
+	}
+
+	// Find opponent
+	var opponent *Client
+	for _, c := range room.Clients {
+		if !c.IsSpectator && c.UserID != client.UserID {
+			opponent = c
+			break
+		}
+	}
+
+	if opponent == nil {
+		room.Mutex.Unlock()
+		return
+	}
+
+	room.IsEnded = true
+	topic := room.Topic
+	room.Mutex.Unlock()
+
 	// Broadcast concede message to all clients (including spectators)
 	broadcastMessage := Message{
 		Type:     "concede",
@@ -816,31 +875,43 @@ func handleConcede(room *Room, conn *websocket.Conn, message Message, client *Cl
 		Content:  "User conceded the debate",
 	}
 
-	// Send to all clients
 	for _, r := range snapshotRecipients(room, nil) {
-		r.SafeWriteJSON(broadcastMessage)
+		_ = r.SafeWriteJSON(broadcastMessage)
 	}
 
-	// Find opponent
-	var opponent *Client
-	room.Mutex.Lock()
-	for _, c := range room.Clients {
-		if !c.IsSpectator && c.UserID != client.UserID {
-			opponent = c
-			break
-		}
+	// Update ratings and persist debate records
+	userID, errUser := primitive.ObjectIDFromHex(client.UserID)
+	opponentID, errOpp := primitive.ObjectIDFromHex(opponent.UserID)
+	if errUser != nil || errOpp != nil {
+		return
 	}
-	room.Mutex.Unlock()
 
-	if opponent != nil {
-		// Update ratings
-		// User lost (0.0), Opponent won (1.0)
-		userID, _ := primitive.ObjectIDFromHex(client.UserID)
-		opponentID, _ := primitive.ObjectIDFromHex(opponent.UserID)
+	debateRecord, opponentRecord, err := services.UpdateRatings(userID, opponentID, 0.0, time.Now())
+	if err != nil {
+		log.Printf("Error updating ratings after concede: %v", err)
+		return
+	}
 
-		_, _, err := services.UpdateRatings(userID, opponentID, 0.0, time.Now())
-		if err != nil {
-			log.Printf("Error updating ratings after concede: %v", err)
+	if db.MongoDatabase != nil && debateRecord != nil && opponentRecord != nil {
+		if topic == "" {
+			topic = "General Debate"
 		}
+		debateRecord.Topic = topic
+		debateRecord.Result = "loss"
+		opponentRecord.Topic = topic
+		opponentRecord.Result = "win"
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		records := []interface{}{debateRecord, opponentRecord}
+		if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
+			log.Printf("Error saving concede debate records: %v", insertErr)
+		}
+
+		_, _ = db.MongoDatabase.Collection("rooms").UpdateOne(ctx,
+			bson.M{"_id": roomID},
+			bson.M{"$set": bson.M{"status": "completed"}},
+		)
 	}
 }
