@@ -39,12 +39,27 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
         }
       }
     };
+
     updateScale();
+
+    // Use ResizeObserver for instant responsive updates on orientation change or window resize
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      observer = new ResizeObserver(() => {
+        updateScale();
+      });
+      observer.observe(containerRef.current);
+    }
+
     window.addEventListener('resize', updateScale);
-    const timer = setTimeout(updateScale, 100);
+    const timer1 = setTimeout(updateScale, 50);
+    const timer2 = setTimeout(updateScale, 200);
+
     return () => {
+      if (observer) observer.disconnect();
       window.removeEventListener('resize', updateScale);
-      clearTimeout(timer);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
     };
   }, [isOpen]);
 
@@ -110,19 +125,19 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl w-[92vw] p-5 bg-card text-card-foreground border border-border shadow-2xl rounded-2xl overflow-hidden">
+      <DialogContent className="max-w-3xl w-[94vw] sm:w-[90vw] p-3.5 sm:p-5 bg-card text-card-foreground border border-border shadow-2xl rounded-2xl max-h-[95vh] overflow-y-auto sm:overflow-hidden">
         <DialogHeader className="text-left pb-2 border-b border-border">
-          <DialogTitle className="text-lg font-bold text-primary flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-primary" />
+          <DialogTitle className="text-base sm:text-lg font-bold text-primary flex items-center gap-2">
+            <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             Share Debate Victory Card
           </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground">
             Download your victory banner or share it directly to social channels.
           </DialogDescription>
         </DialogHeader>
 
         {/* Card Live Preview Container */}
-        <div className="w-full flex items-center justify-center my-3 rounded-xl bg-muted/40 p-2.5 border border-border overflow-hidden">
+        <div className="w-full flex items-center justify-center my-2 sm:my-3 rounded-xl bg-muted/40 p-1.5 sm:p-2.5 border border-border overflow-hidden">
           <div
             ref={containerRef}
             className="w-full max-w-[650px] relative overflow-hidden rounded-lg shadow-md border border-border/60"
@@ -145,15 +160,15 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
         </div>
 
         {/* Action Controls Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-border">
-          <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2.5 border-t border-border">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Download Button */}
             <Button
               onClick={handleDownload}
               disabled={isDownloading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-all shadow-sm"
+              className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-3.5 py-2 text-xs sm:text-sm rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               {isDownloading ? 'Exporting...' : 'Download PNG'}
             </Button>
 
@@ -162,16 +177,16 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
               onClick={handleCopy}
               disabled={isCopying}
               variant="outline"
-              className="border-border bg-background hover:bg-muted text-foreground font-semibold px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-all"
+              className="flex-1 sm:flex-none border-border bg-background hover:bg-muted text-foreground font-semibold px-3.5 py-2 text-xs sm:text-sm rounded-lg flex items-center justify-center gap-1.5 transition-all"
             >
               {copied ? (
                 <>
-                  <Check className="w-4 h-4 text-emerald-500" />
+                  <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
                   <span className="text-emerald-500 font-bold">Copied!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4" />
+                  <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>{isCopying ? 'Copying...' : 'Copy Image'}</span>
                 </>
               )}
@@ -179,7 +194,7 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
           </div>
 
           {/* AOSSIE SocialShareButton Auto-Init Container */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center sm:justify-end gap-2">
             <div
               data-social-share
               data-url="https://debateai.aossie.org"
