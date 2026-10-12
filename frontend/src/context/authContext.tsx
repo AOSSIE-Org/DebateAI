@@ -7,7 +7,8 @@ import {
   useRef,
   ReactNode,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { tournamentResultsReturnPath } from '@/utils/tournamentReturnPath';
 import { useSetAtom } from 'jotai';
 import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
@@ -48,6 +49,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnPath = tournamentResultsReturnPath(location.state?.returnTo);
   const setUser = useSetAtom(userAtom);
 
   const clearError = useCallback(() => {
@@ -195,7 +198,7 @@ const verifyToken = useCallback(async () => {
       };
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-      navigate('/');
+      navigate(returnPath || '/');
     } catch (error) {
       handleError(error);
       throw error;
@@ -270,7 +273,7 @@ const verifyToken = useCallback(async () => {
         };
         setUser(normalizedUser);
         localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
-        navigate('/');
+        navigate(returnPath || '/');
       }
     } catch (error) {
       handleError(error);
@@ -398,7 +401,7 @@ const verifyToken = useCallback(async () => {
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
       console.log('User after Google login:', data.user);
-      navigate('/');
+      navigate(returnPath || '/');
     } catch (error) {
       handleError(error);
       throw error;

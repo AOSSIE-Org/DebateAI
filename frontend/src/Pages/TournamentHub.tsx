@@ -1,205 +1,123 @@
-import { useState } from "react";
-import { Users, Calendar, Eye } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { CreateTournamentForm } from "@/components/tournament/CreateTournamentForm";
+import { useContext, useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAtomValue } from "jotai";
+import { ArrowRight, KeyRound, Plus, RefreshCw, Users } from "lucide-react";
+import { AuthContext } from "@/context/authContext";
+import { userAtom } from "@/state/userAtom";
+import { getTournamentRequest, joinTournament, listTournaments, requestTournamentAdmission, type CreatedTournament, type TournamentRequestStatus } from "@/services/tournamentService";
 
-export interface Tournament {
-  id: string;
-  topic: string; 
-  maxParticipants: number;
-  currentParticipants: number;
-  date: string;
-  description: string;
-}
+const message = (error: unknown) => error instanceof Error ? error.message : "Request failed.";
 
-export default function TournamentPage() {
-  const initialTournaments: Tournament[] = [
-    {
-      id: "1",
-      topic: "Spring Showdown",
-      maxParticipants: 8,
-      currentParticipants: 6,
-      date: "2025-04-20",
-      description:
-        "Compete in our annual spring debate championship with top contenders from around the globe.",
-    },
-    {
-      id: "2",
-      topic: "Summer Slam",
-      maxParticipants: 8,
-      currentParticipants: 8,
-      date: "2025-06-15",
-      description:
-        "A heated summer debate tournament featuring live audience polls and special guest judges.",
-    },
-    {
-      id: "3",
-      topic: "Rapid Fire Blitz", 
-      maxParticipants: 8,
-      currentParticipants: 3,
-      date: "2025-05-05",
-      description:
-        "Quick-thinking, lightning round debates — think you can keep up?",
-    },
-  ];
-
-  const [tournaments, setTournaments] =
-    useState<Tournament[]>(initialTournaments);
+export default function TournamentHub() {
+  const auth = useContext(AuthContext);
+  const user = useAtomValue(userAtom);
   const navigate = useNavigate();
+  const [tournaments, setTournaments] = useState<CreatedTournament[]>([]);
+  const [cache, setCache] = useState<{owner: string; requests: TournamentRequestStatus[]}>({owner: "", requests: []});
+  const [filter, setFilter] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const generation = useRef(0);
 
-  const handleJoin = (tournament: Tournament) => {
-    if (tournament.currentParticipants < tournament.maxParticipants) {
-      const updatedTournaments = tournaments.map((t) =>
-        t.id === tournament.id
-          ? { ...t, currentParticipants: t.currentParticipants + 1 }
-          : t
-      );
-      setTournaments(updatedTournaments);
-      const updatedTournament = updatedTournaments.find(
-        (t) => t.id === tournament.id
-      );
-      if (updatedTournament) {
-        navigate(`/tournament/${tournament.id}/bracket`, {
-          state: { tournament: updatedTournament },
-        });
+  useEffect(() => {
+    const controller = new AbortController();
+    generation.current++;
+    setTournaments([]); setLoading(true); setError(""); setBusy("");
+    listTournaments(filter, controller.signal).then(next => {
+      if (!controller.signal.aborted) setTournaments(next);
+    }).catch((err: unknown) => {
+      if (!controller.signal.aborted) setError(message(err));
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [auth?.token, filter, refresh]);
+
+  useEffect(() => {
+    let requests: TournamentRequestStatus[] = [];
+    if (user?.id) {
+      try {
+        const saved: unknown = JSON.parse(localStorage.getItem(`tournamentRequests:${user.id}`) || "[]");
+        if (Array.isArray(saved)) requests = saved.filter((item): item is TournamentRequestStatus =>
+          item && typeof item.tournamentId === "string" && /^[a-f0-9]{24}$/.test(item.tournamentId) && ["pending", "approved", "rejected"].includes(item.status)).slice(-20);
+      } catch { /* Corrupt cache must not prevent admission. */ }
+    }
+    setCache({owner: user?.id || "", requests});
+  }, [user?.id]);
+
+  const requests = cache.owner === user?.id ? cache.requests : [];
+  const requestIds = requests.map(request => request.tournamentId).join(",");
+  useEffect(() => {
+    if (!requestIds) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      for (const id of requestIds.split(",")) {
+        try {
+          const next = await getTournamentRequest(id, controller.signal);
+          if (!controller.signal.aborted) setCache(current => ({
+            ...current, requests: current.requests.map(request => request.tournamentId === id ? next : request),
+          }));
+        } catch { /* Deleted requests remain dismissible. */ }
       }
+      if (!controller.signal.aborted) timer = setTimeout(poll, 5000);
     }
-  };
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [requestIds, auth?.token]);
 
-  const handleViewBracket = (tournament: Tournament) => {
-    navigate(`/tournament/${tournament.id}/bracket`, { state: { tournament } });
-  };
+  useEffect(() => {
+    if (!user?.id || cache.owner !== user.id) return;
+    try { localStorage.setItem(`tournamentRequests:${user.id}`, JSON.stringify(cache.requests)); }
+    catch { /* Browser storage is optional. */ }
+  }, [cache, user?.id]);
 
-  const renderAvatars = (current: number, max: number) => {
-    const avatars = [];
-    const MAX_VISIBLE = 6;
-    const visible = Math.min(max, MAX_VISIBLE);
-    const overflow = max - MAX_VISIBLE;
+  async function join(id: string) {
+    const current = generation.current;
+    setBusy(id); setError("");
+    try { await joinTournament(id); if (current === generation.current) navigate(`/tournament/${id}`); }
+    catch (err) { if (current === generation.current) setError(message(err)); }
+    finally { if (current === generation.current) setBusy(""); }
+  }
 
-    for (let i = 0; i < visible; i++) {
-      const isActive = i < current;
-      avatars.push(
-        <div
-          key={i}
-          className="relative flex-shrink-0"
-          style={{ marginLeft: i > 0 ? "-1.25rem" : "0" }}
-        >
-          {isActive ? (
-            <img
-              src={`https://i.pravatar.cc/32?u=${i}`}
-              alt="Participant"
-              className="w-8 h-8 rounded-full border-2 border-primary bg-background"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center text-muted-foreground text-xs">
-              ?
-            </div>
-          )}
-        </div>
-      );
-    }
+  async function requestAdmission(event: React.FormEvent) {
+    event.preventDefault();
+    const current = generation.current;
+    setBusy("invite"); setError("");
+    try {
+      const next = await requestTournamentAdmission(inviteCode);
+      if (current !== generation.current) return;
+      setCache(existing => ({owner: user?.id || "", requests: [...existing.requests.filter(item => item.tournamentId !== next.tournamentId), next].slice(-20)}));
+      setInviteCode("");
+      if (next.status === "approved") navigate(`/tournament/${next.tournamentId}`);
+    } catch (err) { if (current === generation.current) setError(message(err)); }
+    finally { if (current === generation.current) setBusy(""); }
+  }
 
-    if (overflow > 0) {
-      avatars.push(
-        <div
-          key="overflow"
-          className="relative flex-shrink-0"
-          style={{ marginLeft: "-1.25rem" }}
-        >
-          <div className="w-8 h-8 rounded-full bg-muted border-2 border-border flex items-center justify-center text-muted-foreground text-xs font-medium">
-            +{overflow}
-          </div>
-        </div>
-      );
-    }
-
-    return avatars;
-  };
-
-
-  return (
-    <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6 sm:mb-10 text-center text-primary animate-pulse">
-        Tournament Arena
-      </h1>
-      <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
-        {/* Left: Dummy Tournament List */}
-        <div className="flex-1">
-          {tournaments.length === 0 ? (
-            <p className="text-center text-muted-foreground text-lg">
-              No live tournaments yet. Create one to start the debate!
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tournaments.map((t) => (
-                <div
-                  key={t.id}
-                  className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden flex flex-col"
-                >
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
-                  <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
-                    {t.topic} 
-                  </h2>
-                  <button
-                    onClick={() => handleViewBracket(t)}
-                    className="flex items-center gap-2 text-primary hover:text-primary/80 transition-all duration-200 mb-3 text-sm font-medium"
-                    aria-label="View Tournament Bracket with Logs"
-                  >
-                    <Eye className="w-5 h-5" />
-                    Spectate
-                  </button>
-                  <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    <span>{new Date(t.date).toLocaleDateString()}</span>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="w-4 h-4 text-primary" />
-                      <span>
-                        {t.currentParticipants}/{t.maxParticipants} Participants
-                      </span>
-                    </div>
-                    <div className="flex mt-2 px-4">
-                      {renderAvatars(t.currentParticipants, t.maxParticipants)}
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="w-full bg-muted rounded-full h-2.5">
-                      <div
-                        className="bg-primary h-2.5 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${
-                            (t.currentParticipants / t.maxParticipants) * 100
-                          }%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                  <p className="text-base text-foreground mb-4">
-                    {t.description}
-                  </p>
-                  <button
-                    onClick={() => handleJoin(t)}
-                    className="w-full bg-primary text-primary-foreground py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold disabled:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground mt-auto"
-                    disabled={t.currentParticipants >= t.maxParticipants}
-                  >
-                    {t.currentParticipants >= t.maxParticipants
-                      ? "Full"
-                      : "Join Tournament"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Create Tournament Form */}
-        <div className="w-full lg:w-1/3 space-y-8">
-          <div className="bg-card rounded-lg border border-border shadow-md p-2">
-            <CreateTournamentForm/>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+      <h1 className="text-2xl font-semibold">Tournaments</h1>
+      <Link className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground" to="/tournament/create"><Plus size={18}/>Create tournament</Link>
+    </header>
+    <section className="flex flex-wrap items-end gap-4 border-b border-border pb-5">
+      <form onSubmit={requestAdmission} className="flex max-w-full flex-wrap items-end gap-2">
+        <label className="space-y-1 text-sm">Private invite code<input aria-label="Private invite code" className="block w-44 rounded-md border border-input bg-background px-3 py-2" value={inviteCode} onChange={event => setInviteCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required /></label>
+        <button className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm disabled:opacity-50" disabled={!!busy || !user?.id}><KeyRound size={16}/>Request admission</button>
+      </form>
+      <label className="space-y-1 text-sm">Status<select className="block rounded-md border border-input bg-background px-3 py-2" value={filter} onChange={event => setFilter(event.target.value)}><option value="">All</option><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="completed">Completed</option></select></label>
+      <button type="button" title="Refresh tournaments" aria-label="Refresh tournaments" className="rounded-md border border-input p-2" onClick={() => setRefresh(value => value + 1)} disabled={loading || !!busy}><RefreshCw size={18}/></button>
+    </section>
+    {error && <p role="alert" className="break-words text-sm text-destructive">{error}</p>}
+    {requests.length > 0 && <section aria-label="Your admission requests" className="space-y-2"><h2 className="text-lg font-semibold">Your requests</h2>{requests.map(request => <div key={request.tournamentId} className="flex flex-wrap items-center gap-3 border-b border-border py-2 text-sm"><span className="min-w-0 break-all">{request.tournamentId}</span><span className="capitalize">{request.status}</span>{request.status === "approved" && <Link className="text-primary underline" to={`/tournament/${request.tournamentId}`}>Open tournament</Link>}<button className="ml-auto text-muted-foreground underline" onClick={() => setCache(current => ({...current, requests: current.requests.filter(item => item.tournamentId !== request.tournamentId)}))}>Dismiss</button></div>)}</section>}
+    {loading ? <p role="status">Loading tournaments...</p> : tournaments.length === 0 ? <p className="text-muted-foreground">No tournaments found.</p> : <section aria-label="Tournament list" className="divide-y divide-border">
+      {tournaments.map(tournament => {
+        const member = tournament.participants.some(participant => participant.userId === user?.id);
+        return <article key={tournament.id} className="flex flex-wrap items-start justify-between gap-4 py-5">
+          <div className="min-w-0 flex-1 basis-64 space-y-2"><Link className="break-words text-lg font-semibold hover:underline" to={`/tournament/${tournament.id}`}>{tournament.topic}</Link><p className="break-words text-sm text-muted-foreground">{tournament.description}</p><div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1"><Users size={16}/>{tournament.participants.length}/{tournament.maxParticipants}</span><span className="capitalize">{tournament.status}</span><span className="capitalize">{tournament.visibility}</span>{tournament.scheduleAt && <time>{new Date(tournament.scheduleAt).toLocaleString()}</time>}</div></div>
+          {member ? <Link className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm" to={`/tournament/${tournament.id}`}>Open lobby<ArrowRight size={16}/></Link> : tournament.visibility === "public" && <button className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50" disabled={!!busy || !user?.id || !tournament.lobbyOpen || tournament.participants.length >= tournament.maxParticipants} onClick={() => void join(tournament.id)}><ArrowRight size={16}/>{tournament.participants.length >= tournament.maxParticipants ? "Full" : tournament.lobbyOpen ? "Join tournament" : "Closed"}</button>}
+        </article>;
+      })}
+    </section>}
+  </main>;
 }
