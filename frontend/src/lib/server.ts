@@ -1,5 +1,34 @@
 const OFFICIAL = import.meta.env.VITE_BASE_URL;
 const KEY = 'debateai:server';
+const CONFIRMED_KEY = 'debateai:server_confirmed';
+
+function safeGetItem(key: string): string | null {
+  try {
+    return typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(key, value);
+    }
+  } catch {
+    // Storage access disabled or quota exceeded
+  }
+}
+
+function safeRemoveItem(key: string): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage access disabled
+  }
+}
 
 // Clean origin, or null if invalid. https only (http allowed for localhost).
 export function normalize(raw: unknown): string | null {
@@ -14,38 +43,55 @@ export function normalize(raw: unknown): string | null {
   }
 }
 
-export const isOfficial = (): boolean => localStorage.getItem(KEY) === null;
+export const isOfficial = (): boolean => safeGetItem(KEY) === null;
 
-// Active backend origin, or null when a custom URL is stored but invalid.
+export const isConfirmed = (): boolean => {
+  if (isOfficial()) return true;
+  return safeGetItem(CONFIRMED_KEY) === 'true';
+};
+
+// Active backend origin, or null when a custom URL is stored but invalid or unconfirmed.
 // NEVER falls back to OFFICIAL once a custom value is stored.
 export function getServer(): string | null {
-  const stored = localStorage.getItem(KEY);
+  const stored = safeGetItem(KEY);
   if (stored === null) return OFFICIAL ?? null;
+  if (!isConfirmed()) return null;
   return normalize(stored);
 }
 
 export function serverLabel(): string {
   if (isOfficial()) return 'Official';
+  const stored = safeGetItem(KEY);
+  if (!isConfirmed()) {
+    const host = stored ? (normalize(stored) ? new URL(normalize(stored)!).host : stored) : '';
+    return host ? `Unconfirmed server: ${host}` : 'Unconfirmed server';
+  }
   const s = getServer();
   return s ? new URL(s).host : 'Invalid server URL';
 }
 
 const clearAuth = (): void => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('userProfile');
-  localStorage.removeItem('adminToken');
-  localStorage.removeItem('admin');
+  safeRemoveItem('token');
+  safeRemoveItem('userProfile');
+  safeRemoveItem('adminToken');
+  safeRemoveItem('admin');
 }; // TODO(confirm): use the repo's real auth storage keys: token, userProfile, adminToken, admin
 
-export function setServer(raw: unknown): void {
+export function setServer(raw: unknown, confirmed = true): void {
   const clean = normalize(raw);
   const next = clean ?? String(raw);
-  if (localStorage.getItem(KEY) !== next) clearAuth(); // tokens belong to one server
-  localStorage.setItem(KEY, next);
+  if (safeGetItem(KEY) !== next) clearAuth(); // tokens belong to one server
+  safeSetItem(KEY, next);
+  if (confirmed) {
+    safeSetItem(CONFIRMED_KEY, 'true');
+  } else {
+    safeRemoveItem(CONFIRMED_KEY);
+  }
 }
 
 export function resetServer(): void {
-  localStorage.removeItem(KEY);
+  safeRemoveItem(KEY);
+  safeRemoveItem(CONFIRMED_KEY);
   clearAuth();
 }
 
@@ -55,8 +101,28 @@ function initServer(): void {
   if (!params.has('server')) return;
 
   const p = params.get('server');
-  if (p === 'official') resetServer();
-  else if (p !== null) setServer(p); // invalid values are stored too, which blocks requests
+  if (p === 'official') {
+    resetServer();
+  } else if (p !== null) {
+    const clean = normalize(p);
+    const target = clean ?? p;
+    if (clean && OFFICIAL && clean === normalize(OFFICIAL)) {
+      resetServer();
+    } else {
+      let confirmed = false;
+      try {
+        if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+          confirmed = window.confirm(
+            `Do you want to connect to the custom server at "${target}"?\n\nWarning: Only connect to servers you trust, as authentication credentials will be sent to this server.`
+          );
+        }
+      } catch {
+        confirmed = false;
+      }
+
+      setServer(p, confirmed);
+    }
+  }
 
   // Clean the address bar. This must never throw, because it runs at import time.
   try {
@@ -70,3 +136,4 @@ function initServer(): void {
 }
 
 initServer(); // runs on first import, so nothing reads the URL too early
+

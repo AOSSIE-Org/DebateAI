@@ -4,16 +4,38 @@ import { getServer } from './server';
 // ".invalid" never resolves, so a blocked state can never reach a real server.
 const BLOCKED_URL = 'https://blocked.invalid';
 
-export const socket: Socket = io(getServer() ?? BLOCKED_URL, {
+const getInitialServerUrl = (): string => {
+  try {
+    return getServer() ?? BLOCKED_URL;
+  } catch {
+    return BLOCKED_URL;
+  }
+};
+
+const getStoredToken = (): string | null => {
+  try {
+    return typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  } catch {
+    return null;
+  }
+};
+
+export const socket: Socket = io(getInitialServerUrl(), {
   autoConnect: false,
-  auth: (cb) => cb({ token: localStorage.getItem('token') }), // TODO(confirm): use the repo's real auth token key
+  auth: (cb: (data: Record<string, unknown>) => void) => {
+    cb({ token: getStoredToken() });
+  },
 });
 
 // Connects only when a valid server is active. Returns false when blocked.
 export function connectSocket(): boolean {
-  if (!getServer()) return false;
-  if (!socket.connected) socket.connect();
-  return true;
+  try {
+    if (!getServer()) return false;
+    if (!socket.connected) socket.connect();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function disconnectSocket(): void {

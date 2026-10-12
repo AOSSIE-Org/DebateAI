@@ -1,9 +1,9 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { getServer, isOfficial } from './server';
 
 const api = axios.create();
 
-api.interceptors.request.use((cfg) => {
+api.interceptors.request.use((cfg: InternalAxiosRequestConfig) => {
   const base = getServer();
   if (!base) {
     const msg = 'The custom server URL is invalid. Fix it, or switch to the official server.';
@@ -14,8 +14,8 @@ api.interceptors.request.use((cfg) => {
 });
 
 api.interceptors.response.use(
-  (r) => r,
-  (err) => {
+  (r: AxiosResponse) => r,
+  (err: any) => {
     const base = getServer();
     if (!err.response && base && !isOfficial()) {
       err.userMessage = `Couldn't reach ${new URL(base).host}. Check the server URL and try again.`;

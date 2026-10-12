@@ -369,31 +369,43 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const baseURL = config.baseUrl;
+  const authContext = useContext(AuthContext);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+
+    const baseURL = config.baseUrl;
+    if (!baseURL) {
+      setError('The server URL is invalid. Fix it, or switch to the official server.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${baseURL}/forgotPassword`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      if (authContext) {
+        await authContext.forgotPassword(email);
+      } else {
+        const cleanBase = baseURL.replace(/\/+$/, '');
+        const response = await fetch(`${cleanBase}/forgotPassword`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setError(data.error || data.message || 'Failed to send reset password code. Please try again.');
-        return;
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          setError(data.error || data.message || 'Failed to send reset password code. Please try again.');
+          return;
+        }
       }
 
       startResetPassword(email);
-    } catch {
-      setError('An unexpected error occurred. Please try again later.');
+    } catch (err: any) {
+      const msg = err?.userMessage ?? err?.message;
+      setError(msg || 'An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
