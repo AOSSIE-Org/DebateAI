@@ -272,7 +272,7 @@ func GetTeam(c *gin.Context) {
 	var team models.Team
 	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&team)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
+		if err == mongo.ErrNoDocuments {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
 			return
 		}

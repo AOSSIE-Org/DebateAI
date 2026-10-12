@@ -390,7 +390,17 @@ export const transferTeamCaptain = async (
   );
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to transfer captaincy");
+    let message = "Failed to transfer captaincy. Please try again.";
+
+    try {
+      const error: { error?: string } = await response.json();
+      if (error.error) {
+        message = error.error;
+      }
+    } catch {
+      // The server may return an empty body or non-JSON response.
+    }
+
+    throw new Error(message);
   }
 };

@@ -464,7 +464,24 @@ const TeamBuilder: React.FC = () => {
           </p>
         </div>
       </div>
+      {/* Error and Success Messages */}
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
 
+      {success && (
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-700 dark:text-green-400"
+        >
+          {success}
+        </div>
+      )}
       {/* Join by Code Section */}
       {canCreateOrJoin && (
         <Card className="mb-6 border">
