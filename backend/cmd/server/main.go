@@ -48,8 +48,8 @@ func main() {
 			redisURL = "localhost:6379"
 		}
 		if err := debate.InitRedis(redisURL, cfg.Redis.Password, cfg.Redis.DB); err != nil {
-			log.Printf("⚠️ Warning: Failed to initialize Redis: %v", err)
-			log.Printf("⚠️ Some realtime features will be unavailable until Redis is reachable")
+			log.Printf("Warning: Failed to initialize Redis: %v", err)
+			log.Printf("Some realtime features will be unavailable until Redis is reachable")
 		} else {
 			log.Println("Connected to Redis")
 		}
@@ -130,18 +130,20 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		routes.SetupTeamDebateRoutes(auth)
 		routes.SetupTeamChatRoutes(auth)
 		routes.SetupTeamMatchmakingRoutes(auth)
+
 		log.Println("Team routes registered")
 
 		routes.SetupCommunityRoutes(auth)
 		log.Println("Community routes registered")
+
+		routes.SetupTournamentRoutes(auth)
+		log.Println("Tournament routes registered")
 
 		auth.GET("/notifications", routes.GetNotificationsRouteHandler)
 		auth.PUT("/notifications/:id/read", routes.MarkNotificationAsReadRouteHandler)
 		auth.PUT("/notifications/read-all", routes.MarkAllNotificationsAsReadRouteHandler)
 		auth.DELETE("/notifications/:id", routes.DeleteNotificationRouteHandler)
 
-		routes.SetupTournamentRoutes(auth)
-		log.Println("Tournament routes registered")
 	}
 
 	router.GET("/ws/team", websocket.TeamWebsocketHandler)
