@@ -113,3 +113,69 @@ func TestValidateTeamsMatch(t *testing.T) {
 		t.Fatal("Expected error after team1 was removed, got nil")
 	}
 }
+
+func TestClaimMatchedTeams_AndRestore(t *testing.T) {
+	ClearMatchmakingPool()
+	defer ClearMatchmakingPool()
+
+	team1ID := primitive.NewObjectID()
+	team2ID := primitive.NewObjectID()
+
+	team1 := models.Team{
+		ID:         team1ID,
+		Name:       "Alpha",
+		MaxSize:    2,
+		AverageElo: 1200,
+		CreatedAt:  time.Now(),
+	}
+	team2 := models.Team{
+		ID:         team2ID,
+		Name:       "Beta",
+		MaxSize:    2,
+		AverageElo: 1250,
+		CreatedAt:  time.Now(),
+	}
+
+	AddTeamToMatchmakingPoolDirect(team1)
+	AddTeamToMatchmakingPoolDirect(team2)
+
+	claimed, err := ClaimMatchedTeams(team1ID, team2ID)
+	if err != nil {
+		t.Fatalf("Expected successful claim, got error: %v", err)
+	}
+	if len(claimed) != 2 {
+		t.Fatalf("Expected 2 claimed entries, got %d", len(claimed))
+	}
+	if IsTeamInMatchmaking(team1ID) || IsTeamInMatchmaking(team2ID) {
+		t.Fatal("Expected claimed teams to be removed from matchmaking pool")
+	}
+
+	// Restore claimed entries
+	RestoreClaimedTeams(claimed)
+	if !IsTeamInMatchmaking(team1ID) || !IsTeamInMatchmaking(team2ID) {
+		t.Fatal("Expected teams to be restored to matchmaking pool")
+	}
+
+	// Verify restore does not overwrite newer timestamp entry
+	newerTime := time.Now().Add(10 * time.Minute)
+	team1Newer := team1
+	team1Newer.AverageElo = 1400
+	teamMatchmakingMutex.Lock()
+	teamMatchmakingPool[team1ID.Hex()] = &TeamMatchmakingEntry{
+		TeamID:     team1ID,
+		Team:       team1Newer,
+		MaxSize:    2,
+		AverageElo: 1400,
+		Timestamp:  newerTime,
+	}
+	teamMatchmakingMutex.Unlock()
+
+	// Calling restore with older entry should not overwrite team1Newer
+	RestoreClaimedTeams(claimed)
+	teamMatchmakingMutex.RLock()
+	currentEntry := teamMatchmakingPool[team1ID.Hex()]
+	teamMatchmakingMutex.RUnlock()
+	if currentEntry.AverageElo != 1400 {
+		t.Errorf("Expected AverageElo to remain 1400 (newer entry), got %v", currentEntry.AverageElo)
+	}
+}

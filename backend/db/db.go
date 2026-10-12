@@ -20,6 +20,9 @@ var DebateVsBotCollection *mongo.Collection
 var RedisClient *redis.Client
 
 func GetCollection(collectionName string) *mongo.Collection {
+	if MongoDatabase == nil {
+		return nil
+	}
 	return MongoDatabase.Collection(collectionName)
 }
 
