@@ -84,8 +84,7 @@ type TeamConfirmation =
   | { type: "leave"; teamId: string }
   | { type: "delete"; teamId: string }
   | { type: "remove"; teamId: string; memberId: string }
-  | { type: "transfer"; teamId: string; memberId: string }
-  | { type: "leaveAfterTransfer"; teamId: string };
+  | { type: "transfer"; teamId: string; memberId: string };
 
 const TeamBuilder: React.FC = () => {
   const { user } = useUser();
@@ -397,11 +396,6 @@ const TeamBuilder: React.FC = () => {
         "Captaincy transferred successfully. You remain a regular member."
       );
       setError("");
-      setTeamConfirmation({ type: "leaveAfterTransfer", teamId });
-
-      // Refresh again to reflect whether the former captain left.
-      await fetchUserTeams();
-      await fetchAvailableTeams();
     } catch {
       setError(
         "Something went wrong while updating team information. Please refresh the page and verify the current captain."
@@ -418,7 +412,6 @@ const TeamBuilder: React.FC = () => {
 
     switch (confirmation.type) {
       case "leave":
-      case "leaveAfterTransfer":
         await confirmLeaveTeam(confirmation.teamId);
         break;
       case "delete":
@@ -991,9 +984,7 @@ const TeamBuilder: React.FC = () => {
               ? "Remove member?"
               : teamConfirmation?.type === "transfer"
                 ? "Transfer captaincy?"
-                : teamConfirmation?.type === "leaveAfterTransfer"
-                  ? "Leave team now?"
-                  : "Leave team?"
+                : "Leave team?"
         }
         description={
           teamConfirmation?.type === "delete"
@@ -1002,9 +993,7 @@ const TeamBuilder: React.FC = () => {
               ? "Are you sure you want to remove this member from the team?"
               : teamConfirmation?.type === "transfer"
                 ? "This member will become the team captain, and you will become a regular member."
-                : teamConfirmation?.type === "leaveAfterTransfer"
-                  ? "Captaincy was transferred successfully. Would you like to leave the team now?"
-                  : "Are you sure you want to leave this team? You may need a new invitation to join again."
+                : "Are you sure you want to leave this team? You may need a new invitation to join again."
         }
         confirmLabel={
           teamConfirmation?.type === "delete"
@@ -1013,14 +1002,7 @@ const TeamBuilder: React.FC = () => {
               ? "Remove member"
               : teamConfirmation?.type === "transfer"
                 ? "Transfer captaincy"
-                : teamConfirmation?.type === "leaveAfterTransfer"
-                  ? "Leave team"
-                  : "Leave team"
-        }
-        cancelLabel={
-          teamConfirmation?.type === "leaveAfterTransfer"
-            ? "Stay in team"
-            : "Cancel"
+                : "Leave team"
         }
         onConfirm={() => {
           void handleConfirmTeamAction();
