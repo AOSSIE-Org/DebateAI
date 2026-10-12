@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button'; // Adjust the path as needed
 import { useNavigate } from 'react-router-dom';
+import { ShareVictoryCardModal } from './ShareVictoryCard/ShareVictoryCardModal';
+import { DebateVictoryCardData } from './ShareVictoryCard/types';
 
 // Define both possible JudgmentData types
 type JudgmentDataUserBot = {
@@ -81,6 +83,7 @@ type JudgmentPopupProps = {
   opponentDisplayName?: string | null;
   opponentAvatarUrl?: string | null;
   ratingSummary?: RatingSummary | null;
+  topic?: string;
   onClose: () => void;
 };
 
@@ -122,9 +125,11 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   opponentDisplayName,
   opponentAvatarUrl,
   ratingSummary,
+  topic,
   onClose,
 }) => {
   const navigate = useNavigate();
+  const [showShareModal, setShowShareModal] = useState(false);
   const userName = 'You';
 
   const localAvatar =
@@ -733,7 +738,13 @@ const player2RatingSummary =
         </div>
 
         {/* Buttons */}
-        <div className='text-center mt-8'>
+        <div className='text-center mt-8 flex flex-wrap justify-center gap-3'>
+          <Button
+            onClick={() => setShowShareModal(true)}
+            className='bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-6 py-3 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-md'
+          >
+            🏆 Share Victory Card
+          </Button>
           <Button
             onClick={handleGoHome}
             className='bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 mr-4'
@@ -747,6 +758,39 @@ const player2RatingSummary =
             Close
           </Button>
         </div>
+
+        {/* Share Victory Card Modal */}
+        {showShareModal && (() => {
+          const isWinnerBot = judgment.verdict.winner.toLowerCase().includes('bot') || judgment.verdict.winner.toLowerCase().includes('against');
+          const cardData: DebateVictoryCardData = {
+            topic: topic || localStorage.getItem('debateTopic') || 'Competitive Debate',
+            matchType: isUserBotFormat ? 'AI Bot Arena' : '1v1 Ranked Debate',
+            winner: {
+              name: isWinnerBot ? player2Name : player1Name,
+              avatarUrl: isWinnerBot ? player2Avatar : player1Avatar,
+              stance: isWinnerBot ? player2Stance : player1Stance,
+              score: isWinnerBot
+                ? (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.bot : (judgment as JudgmentDataForAgainst).total.against)
+                : (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.user : (judgment as JudgmentDataForAgainst).total.for),
+            },
+            opponent: {
+              name: isWinnerBot ? player1Name : player2Name,
+              avatarUrl: isWinnerBot ? player1Avatar : player2Avatar,
+              stance: isWinnerBot ? player1Stance : player2Stance,
+              score: isWinnerBot
+                ? (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.user : (judgment as JudgmentDataForAgainst).total.for)
+                : (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.bot : (judgment as JudgmentDataForAgainst).total.against),
+            },
+            verdictReason: judgment.verdict.reason || judgment.verdict.opponent_analysis,
+          };
+          return (
+            <ShareVictoryCardModal
+              isOpen={showShareModal}
+              onClose={() => setShowShareModal(false)}
+              data={cardData}
+            />
+          );
+        })()}
       </div>
     </div>
   );

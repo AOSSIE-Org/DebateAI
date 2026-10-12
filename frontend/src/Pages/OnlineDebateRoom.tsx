@@ -2560,6 +2560,7 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           opponentAvatarUrl={opponentUser?.avatarUrl || null}
           ratingSummary={ratingSummary}
+          topic={topic}
           onClose={() => setShowJudgment(false)}
         />
       )}

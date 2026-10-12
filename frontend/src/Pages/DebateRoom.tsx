@@ -855,6 +855,7 @@ const DebateRoom: React.FC = () => {
           userStance={state.userStance}
           botStance={state.botStance}
           botDesc={bot.desc}
+          topic={debateData?.topic}
           onClose={() => {
             setJudgmentData(null);
             navigate("/startDebate");
