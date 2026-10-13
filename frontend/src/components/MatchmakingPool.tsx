@@ -162,7 +162,7 @@ const MatchmakingPool: React.FC = () => {
           </div>
         )}
 
-        <div className='mt-4 pt-3 border-t text-xs text-gray-500'>
+        <div className='mt-4 pt-3 border-t text-xs text-gray-500 dark:text-muted-foreground [.contrast_&]:text-foreground'>
           <p>
             • Teams match when they have the same size and Elo difference ≤ 200
           </p>

@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import PlayerCard from "../components/PlayerCard";
@@ -274,7 +275,7 @@ const Game: React.FC = () => {
   );
 
   useEffect(() => {
-    const wsURL = `${import.meta.env.VITE_BASE_URL}/ws?userId=${userId}`;
+    const wsURL = `${config.baseUrl}/ws?userId=${userId}`;
     const ws = new WebSocket(wsURL);
     ws.binaryType = "arraybuffer";
     websocketRef.current = ws;

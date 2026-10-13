@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
-  const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+  const baseURL = config.baseUrl || 'http://localhost:1313';
 
   useEffect(() => {
     console.log('=== UserProfileModal useEffect ===');
@@ -244,7 +245,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>User Profile</DialogTitle>
         </DialogHeader>

@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +17,7 @@ interface Evaluation {
   score: number;
 }
 
-const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+const baseURL = config.baseUrl || 'http://localhost:1313';
 
 const ProsConsChallenge: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);

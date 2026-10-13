@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -146,7 +147,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
         return;
       }
 
-      const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+      const baseURL = config.baseUrl || 'http://localhost:1313';
       const response = await fetch(`${baseURL}/posts`, {
         method: 'POST',
         headers: {
