@@ -1,6 +1,19 @@
 import React, { useState, useContext, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Menu, X, Home, BarChart, User, Info, LogOut, Heart } from "lucide-react";
+import {
+  Bell,
+  Menu,
+  X,
+  BarChart,
+  User,
+  Info,
+  LogOut,
+  Heart,
+  Trophy,
+  Users,
+  MessageCircle,
+  MessageSquare,
+} from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { AuthContext } from "@/context/authContext";
@@ -23,6 +36,7 @@ import debateAiLogo from "@/assets/aossie.png";
 import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
+import { ThemeToggle } from "./ThemeToggle";
 
 const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) => {
   const image = event.currentTarget;
@@ -114,15 +128,18 @@ function Header() {
             </BreadcrumbLink>
           </BreadcrumbItem>
           {pathnames.map((value, index) => {
-            const to = `/${pathnames.slice(0, index + 1).join("/")}`;
-            const isLast = index === pathnames.length - 1;
+            let to = `/${pathnames.slice(0, index + 1).join("/")}`;
+            if (value === "tournament"){
+              to = "/tournaments";
+            }
+              const isLast = index === pathnames.length - 1;
             return (
               <React.Fragment key={to}>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   {isLast ? (
                     <BreadcrumbPage className="capitalize">
-                      {value === "support-debateai" 
+                      {value === "support-debateai" || value === "support-os"
                         ? "Support DebateAI" 
                         : value === "bot-selection" 
                         ? "Bot Selection" 
@@ -131,7 +148,7 @@ function Header() {
                   ) : (
                     <BreadcrumbLink asChild>
                       <NavLink to={to} className="capitalize">
-                        {value === "support-debateai" 
+                        {value === "support-debateai" || value === "support-os"
                           ? "Support DebateAI" 
                           : value === "bot-selection" 
                           ? "Bot Selection" 
@@ -150,9 +167,9 @@ function Header() {
 
   return (
     <>
-      <header className="flex items-center justify-between h-16 px-4 border-b border-border bg-background">
-        <div className="text-lg font-semibold">{getBreadcrumbs()}</div>
-        <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between h-16 px-2 sm:px-4 border-b border-border bg-background">
+        <div className="hidden xs:flex flex-1 min-w-0 overflow-hidden text-sm sm:text-lg font-semibold mr-2">{getBreadcrumbs()}</div>
+        <div className="flex-shrink-0 flex items-center gap-2 sm:gap-4">
           <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
             <PopoverTrigger asChild>
               <button
@@ -166,7 +183,7 @@ function Header() {
                 )}
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0 bg-popover text-popover-foreground border-border" align="end">
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 bg-popover text-popover-foreground border-border" align="end">
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <h4 className="font-semibold">Notifications</h4>
                 {unreadCount > 0 && (
@@ -239,7 +256,7 @@ function Header() {
                 />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0 bg-popover text-popover-foreground border-border" align="end">
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 bg-popover text-popover-foreground border-border" align="end">
               <div className="p-4 border-b border-border">
                 <div className="flex items-center gap-3 mb-3">
                   <img
@@ -248,9 +265,9 @@ function Header() {
                     onError={handleAvatarLoadError}
                     className="w-12 h-12 rounded-full border-2 border-border object-cover"
                   />
-                  <div className="overflow-hidden">
-                    <h4 className="font-semibold truncate">{user?.displayName || "User"}</h4>
-                    <p className="text-sm text-muted-foreground truncate">{user?.email || "No email"}</p>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-semibold break-words">{user?.displayName || "User"}</h4>
+                    <div className="text-sm text-muted-foreground overflow-x-auto whitespace-nowrap pb-0.5">{user?.email || "No email"}</div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -280,7 +297,7 @@ function Header() {
           
           <button
             onClick={toggleDrawer}
-            className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            className="lg:hidden p-2 rounded-md text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Open menu"
           >
             <Menu className="h-6 w-6" />
@@ -289,12 +306,12 @@ function Header() {
       </header>
 
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[1000] md:hidden">
+        <div className="fixed inset-0 z-[1000] lg:hidden">
           <div
             className="absolute inset-0 bg-black bg-opacity-50"
             onClick={toggleDrawer}
           ></div>
-          <div className="relative w-64 h-full bg-background border-l border-border shadow-lg transform transition-transform duration-300 ease-in-out translate-x-0 ml-auto">
+          <div className="relative w-64 h-full bg-background border-l border-border shadow-lg flex flex-col ml-auto">
             <div className="flex items-center justify-between h-16 px-4 border-b border-border">
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold">
@@ -321,17 +338,35 @@ function Header() {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <nav className="flex-1 px-2 py-4 space-y-2">
+            <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
               <NavItem
                 to="/startDebate"
-                label="Home"
-                icon={<Home className="mr-3 h-4 w-4" />}
+                label="Start Debate"
+                icon={<MessageSquare className="mr-3 h-4 w-4" />}
+                onClick={toggleDrawer}
+              />
+              <NavItem
+                to="/tournaments"
+                label="Tournaments"
+                icon={<Trophy className="mr-3 h-4 w-4" />}
+                onClick={toggleDrawer}
+              />
+              <NavItem
+                to="/team-builder"
+                label="Team Debates"
+                icon={<Users className="mr-3 h-4 w-4" />}
                 onClick={toggleDrawer}
               />
               <NavItem
                 to="/leaderboard"
                 label="Leaderboard"
                 icon={<BarChart className="mr-3 h-4 w-4" />}
+                onClick={toggleDrawer}
+              />
+              <NavItem
+                to="/community"
+                label="Community"
+                icon={<MessageCircle className="mr-3 h-4 w-4" />}
                 onClick={toggleDrawer}
               />
               <NavItem
@@ -347,11 +382,12 @@ function Header() {
                 onClick={toggleDrawer}
               />
               <NavItem
-                to="/support-debateai"
+                to="/support-os"
                 label="Support DebateAI"
                 icon={<Heart className="mr-3 h-4 w-4 text-red-500 transition-all duration-300 group-hover:fill-red-500 group-hover:scale-110" />}
                 onClick={toggleDrawer}
               />
+              <ThemeToggle />
             </nav>
           </div>
         </div>

@@ -114,7 +114,7 @@ Provide ONLY the JSON output without additional text or markdown formatting.`,
 }
 
 // UpdateUserPoints increments the user's total points in the database
-func UpdateUserPoints(userID string, points int) error {
+func UpdateUserPoints(userID interface{} , points int) error {// added inteface type so that it can handle both primitive.ObjectID and string 
 	_, err := db.MongoDatabase.Collection("users").UpdateOne(
 		context.Background(),
 		bson.M{"_id": userID},

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
 
-import DebateCover from "../assets/DebateCover4.svg";
+import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { Button } from "../components/ui/button";
 import { AuthContext } from "../context/authContext";
 import DebatePopup from "@/components/DebatePopup";
@@ -33,19 +33,19 @@ const StartDebate = () => {
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-center flex-1">
-        <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
-          <div className="w-full md:w-2/3 p-4 md:p-16">
-            <img
-              src={DebateCover}
-              alt="Debate Cover"
-              className="w-full object-cover"
+        <div className="flex flex-col-reverse items-center justify-center w-full px-4 lg:flex-row lg:px-8">
+          <div className="w-full lg:w-2/3 p-4 lg:p-12">
+            <DebateCoverIllustration
+              className="w-full h-auto object-cover"
+              role="img"
+              aria-label="Debate Cover"
             />
           </div>
-          <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
+          <div className="flex w-full lg:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <div className="flex flex-col items-center mb-6">
-              <a 
-                href="https://aossie.org" 
-                target="_blank" 
+              <a
+                href="https://aossie.org"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="mb-2 hover:opacity-80 transition-opacity"
               >
@@ -55,7 +55,7 @@ const StartDebate = () => {
                 <span className="text-sm text-muted-foreground uppercase tracking-[0.2em] font-black">by AOSSIE</span>
               </div>
             </div>
-            <h3 className="text-xl md:text-4xl font-bold text-center">
+            <h3 className="text-2xl md:text-4xl font-bold text-center">
               Play Debate Online on the <span className="text-primary">#1</span>{" "}
               Site!
             </h3>

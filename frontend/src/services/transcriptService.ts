@@ -1,6 +1,7 @@
+import config from "../config/config";
 import { getAuthToken } from '@/utils/auth';
 
-const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+const API_BASE_URL = config.baseUrl || 'http://localhost:1313';
 
 export interface SavedDebateTranscript {
   id: string;

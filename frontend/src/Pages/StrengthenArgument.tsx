@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { getAuthToken } from "@/utils/auth";
 
-const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+const baseURL = config.baseUrl || 'http://localhost:1313';
 
 // Dummy list of topics for suggestions
 const sampleTopics = [
