@@ -125,7 +125,34 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl w-[94vw] sm:w-[90vw] p-3.5 sm:p-5 bg-card text-card-foreground border border-border shadow-2xl rounded-2xl max-h-[95vh] overflow-y-auto sm:overflow-hidden">
+      <DialogContent
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (
+            target?.closest?.('.social-share-modal-overlay') ||
+            target?.closest?.('.social-share-modal-content') ||
+            document.querySelector('.social-share-modal-overlay.active')
+          ) {
+            e.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          const socialModal = document.querySelector(
+            '.social-share-modal-overlay.active, .social-share-modal-overlay[style*="display: flex"]'
+          ) as HTMLElement;
+          if (socialModal) {
+            e.preventDefault();
+            const closeBtn = socialModal.querySelector('.social-share-modal-close') as HTMLElement;
+            if (closeBtn) {
+              closeBtn.click();
+            } else {
+              socialModal.style.display = 'none';
+              socialModal.classList.remove('active');
+            }
+          }
+        }}
+        className="max-w-3xl w-[94vw] sm:w-[90vw] p-3.5 sm:p-5 bg-card text-card-foreground border border-border shadow-2xl rounded-2xl max-h-[95vh] overflow-y-auto sm:overflow-hidden"
+      >
         <DialogHeader className="text-left pb-2 border-b border-border">
           <DialogTitle className="text-base sm:text-lg font-bold text-primary flex items-center gap-2">
             <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
