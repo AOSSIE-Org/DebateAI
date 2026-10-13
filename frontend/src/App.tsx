@@ -36,7 +36,6 @@ import PageTitle from "./components/PageTitle";
 import LoadingSpinner from "./components/LoadingSpinner";
 import TournamentBracket from "./Pages/TournamentBracketPage";
 import CreateTournament from "./Pages/CreateTournament";
-import TestVictoryCard from "./Pages/TestVictoryCard";
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
@@ -84,7 +83,6 @@ function AppRoutes() {
         <Route path="about" element={<About />} />
         <Route path="privacy-policy" element={<PrivacyPolicy />} />
         <Route path="terms-of-service" element={<TermsOfService />} />
-        <Route path="test-card" element={<TestVictoryCard />} />
       </Route>
 
       {/* Protected routes with layout */}
