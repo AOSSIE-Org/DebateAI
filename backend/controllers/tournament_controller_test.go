@@ -10,6 +10,26 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func TestIsTournamentCompleted(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   string
+		expected bool
+	}{
+		{name: "completed", status: models.StatusCompleted, expected: true},
+		{name: "live", status: models.StatusLive, expected: false},
+		{name: "upcoming", status: models.StatusUpcoming, expected: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isTournamentCompleted(models.Tournament{Status: test.status}); got != test.expected {
+				t.Errorf("isTournamentCompleted() = %t, want %t", got, test.expected)
+			}
+		})
+	}
+}
+
 func TestToTournamentResponse_HostCanSeeManagementFields(t *testing.T) {
 	hostID := primitive.NewObjectID()
 
