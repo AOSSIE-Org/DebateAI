@@ -193,22 +193,9 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
             </Button>
           </div>
 
-          {/* AOSSIE SocialShareButton Auto-Init Container */}
-          <div className="flex items-center justify-center sm:justify-end gap-2">
-            <div
-              data-social-share
-              data-url="https://debateai.aossie.org"
-              data-title={`🏆 I won a debate on DebateAI by AOSSIE! Motion: "${data.topic}"`}
-              data-description={`Score: ${data.winner.score || 0} vs ${data.opponent.score || 0} | Join DebateAI.`}
-              data-hashtags="DebateAI,AOSSIE,CompetitiveDebate"
-              data-via="AOSSIE_Org"
-              data-theme="dark"
-              data-button-text="Share to Socials"
-              data-button-style="primary"
-              data-button-color="#ea580c"
-              data-button-hover-color="#c2410c"
-              className="inline-block"
-            />
+          {/* AOSSIE SocialShareButton */}
+          <div className="flex items-center justify-center sm:justify-end">
+            <div data-social-share></div>
           </div>
         </div>
       </DialogContent>
