@@ -41,3 +41,10 @@ googleOAuth:
   clientID: "<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
   # Google OAuth Client ID for OAuth login
   # Obtain from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs)
+
+llmRateLimit:
+  maxRequests: 10
+  # Maximum number of Gemini-backed requests per user during the window
+
+  windowSeconds: 60
+  # Rolling rate-limit window in seconds

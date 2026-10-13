@@ -6,13 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupTranscriptRoutes(router *gin.RouterGroup) {
+func SetupTranscriptRoutes(router *gin.RouterGroup, llmRateLimit gin.HandlerFunc) {
 	// Add a test endpoint to verify routes are working
 	router.GET("/transcripts/test", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "Transcript routes are working!"})
 	})
 
-	router.POST("/submit-transcripts", controllers.SubmitTranscripts)
+	router.POST("/submit-transcripts", llmRateLimit, controllers.SubmitTranscripts)
 	router.POST("/save-transcript", controllers.SaveDebateTranscriptHandler)
 	router.GET("/debate-stats", controllers.GetDebateStatsHandler)
 	router.POST("/create-test-transcript", controllers.CreateTestTranscriptHandler)
