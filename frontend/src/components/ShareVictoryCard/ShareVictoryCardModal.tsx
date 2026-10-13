@@ -151,7 +151,7 @@ export const ShareVictoryCardModal: React.FC<ShareVictoryCardModalProps> = ({
             }
           }
         }}
-        className="max-w-3xl w-[94vw] sm:w-[90vw] p-3.5 sm:p-5 bg-card text-card-foreground border border-border shadow-2xl rounded-2xl max-h-[95vh] overflow-y-auto sm:overflow-hidden"
+        className="max-w-3xl w-[94vw] sm:w-[90vw] p-3.5 sm:p-5 bg-card text-card-foreground border border-border shadow-2xl rounded-2xl max-h-[95vh] overflow-y-auto sm:overflow-hidden z-[10001]"
       >
         <DialogHeader className="text-left pb-2 border-b border-border">
           <DialogTitle className="text-base sm:text-lg font-bold text-primary flex items-center gap-2">

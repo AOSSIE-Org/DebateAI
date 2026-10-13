@@ -394,7 +394,7 @@ const DebateRoom: React.FC = () => {
   const userAvatar =
     user?.avatarUrl || DEFAULT_AVATAR_URL;
 
-  // Redirect to start-debate if no debate data is present
+  // Redirect to startDebate if no debate data is present
   useEffect(() => {
     if (!debateData) {
       toast({
@@ -402,7 +402,7 @@ const DebateRoom: React.FC = () => {
         title: "Debate Session Not Found",
         description: "No active debate session found. Redirecting to debate setup.",
       });
-      navigate("/start-debate", { replace: true });
+      navigate("/startDebate", { replace: true });
     }
   }, [debateData, navigate, toast]);
 
@@ -752,13 +752,12 @@ const DebateRoom: React.FC = () => {
         judgment = JSON.parse(jsonString);
       } else {
         const res: any = result;
+        judgment = res as JudgmentData;
+      }
 
-        if (res?.opening_statement && res?.verdict) {
-          judgment = res as JudgmentData;
-        } else {
-          console.error("Invalid judgment structure:", result);
-          return;
-        }
+      if (!judgment || typeof judgment !== "object" || !judgment.opening_statement || !judgment.verdict) {
+        console.error("Invalid judgment structure:", judgment);
+        throw new Error("Invalid or incomplete judgment structure received from AI");
       }
 
       console.log("FINAL PARSED:", judgment);
@@ -840,28 +839,26 @@ const DebateRoom: React.FC = () => {
     );
   };
 
-  const currentStance = phaseSequences[state.currentPhase][state.phaseStep];
+  const currentStance = phaseSequences[state.currentPhase]?.[state.phaseStep] ?? "For";
   const currentEntity = state.userStance === currentStance ? "User" : "Bot";
-  const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
+  const currentTurnType = turnTypes[state.currentPhase]?.[state.phaseStep] ?? "statement";
 
   if (judgmentData) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-black">
-        <JudgmentPopup
-          judgment={judgmentData}
-          userAvatar={userAvatar}
-          botAvatar={bot.avatar}
-          botName={debateData?.botName || "Bot"}
-          userStance={state.userStance}
-          botStance={state.botStance}
-          botDesc={bot.desc}
-          topic={debateData?.topic}
-          onClose={() => {
-            setJudgmentData(null);
-            navigate("/startDebate");
-          }}
-        />
-      </div>
+      <JudgmentPopup
+        judgment={judgmentData}
+        userAvatar={userAvatar}
+        botAvatar={bot.avatar}
+        botName={debateData?.botName || "Bot"}
+        userStance={state.userStance}
+        botStance={state.botStance}
+        botDesc={bot.desc}
+        topic={debateData?.topic}
+        onClose={() => {
+          setJudgmentData(null);
+          navigate("/startDebate");
+        }}
+      />
     );
   }
 

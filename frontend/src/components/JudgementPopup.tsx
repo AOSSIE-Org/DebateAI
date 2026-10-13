@@ -139,7 +139,15 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
     localStorage.getItem('opponentAvatar') ||
     'https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan';
 
-const isUserBotFormat = 'user' in judgment.opening_statement;
+const isUserBotFormat = Boolean(
+  judgment &&
+  judgment.opening_statement &&
+  (
+    'user' in (judgment.opening_statement as any) ||
+    'bot' in (judgment.opening_statement as any) ||
+    ('total' in (judgment as any) && 'user' in ((judgment as any).total || {}))
+  )
+);
 
 const defaultForName = forRole || 'For Debater';
 const defaultAgainstName = againstRole || 'Against Debater';
@@ -201,7 +209,7 @@ const player2RatingSummary =
   !isUserBotFormat && ratingSummary ? ratingSummary.against : null;
 
   const handleGoHome = () => {
-    navigate('/startdebate');
+    navigate('/startDebate');
   };
 
   // Helper function to safely access scores and reasons
@@ -209,61 +217,71 @@ const player2RatingSummary =
     section: string,
     player: 'player1' | 'player2'
   ) => {
+    if (!judgment) return { score: 0, reason: 'Data not available' };
+
     if (isUserBotFormat) {
-      const data = judgment as JudgmentDataUserBot;
+      const data = judgment as any;
       const key = player === 'player1' ? 'user' : 'bot';
       switch (section) {
         case 'opening_statement':
           return {
-            score: data.opening_statement[key].score,
-            reason: data.opening_statement[key].reason,
+            score: data.opening_statement?.[key]?.score ?? 0,
+            reason: data.opening_statement?.[key]?.reason ?? '',
           };
-        case 'cross_examination':
+        case 'cross_examination': {
+          const cross = data.cross_examination || data.cross_examination_questions;
           return {
-            score: data.cross_examination[key].score,
-            reason: data.cross_examination[key].reason,
+            score: cross?.[key]?.score ?? 0,
+            reason: cross?.[key]?.reason ?? '',
           };
-        case 'answers':
+        }
+        case 'answers': {
+          const ans = data.answers || data.cross_examination_answers;
           return {
-            score: data.answers[key].score,
-            reason: data.answers[key].reason,
+            score: ans?.[key]?.score ?? 0,
+            reason: ans?.[key]?.reason ?? '',
           };
+        }
         case 'closing':
           return {
-            score: data.closing[key].score,
-            reason: data.closing[key].reason,
+            score: data.closing?.[key]?.score ?? 0,
+            reason: data.closing?.[key]?.reason ?? '',
           };
         case 'total':
-          return { score: data.total[key], reason: '' };
+          return { score: data.total?.[key] ?? 0, reason: '' };
         default:
           return { score: 0, reason: 'Data not available' };
       }
     } else {
-      const data = judgment as JudgmentDataForAgainst;
+      const data = judgment as any;
       const key = player === 'player1' ? 'for' : 'against';
       switch (section) {
         case 'opening_statement':
           return {
-            score: data.opening_statement[key].score,
-            reason: data.opening_statement[key].reason,
+            score: data.opening_statement?.[key]?.score ?? 0,
+            reason: data.opening_statement?.[key]?.reason ?? '',
           };
-        case 'cross_examination_questions':
+        case 'cross_examination_questions': {
+          const cross = data.cross_examination_questions || data.cross_examination;
           return {
-            score: data.cross_examination_questions[key].score,
-            reason: data.cross_examination_questions[key].reason,
+            score: cross?.[key]?.score ?? 0,
+            reason: cross?.[key]?.reason ?? '',
           };
-        case 'cross_examination_answers':
+        }
+        case 'cross_examination_answers': {
+          const ans = data.cross_examination_answers || data.answers;
           return {
-            score: data.cross_examination_answers[key].score,
-            reason: data.cross_examination_answers[key].reason,
+            score: ans?.[key]?.score ?? 0,
+            reason: ans?.[key]?.reason ?? '',
           };
+        }
         case 'closing':
           return {
-            score: data.closing[key].score,
-            reason: data.closing[key].reason,
+            score: data.closing?.[key]?.score ?? 0,
+            reason: data.closing?.[key]?.reason ?? '',
           };
         case 'total':
-          return { score: data.total[key], reason: '' };
+          return { score: data.total?.[key] ?? 0, reason: '' };
         default:
           return { score: 0, reason: 'Data not available' };
       }
@@ -284,23 +302,14 @@ const player2RatingSummary =
       closing: getScoreAndReason('closing', 'player1').score,
     };
     const player1Reasons = {
-      opening: getScoreAndReason(
-        'opening_statement',
-        'player1'
-      ).reason.toLowerCase(),
+      opening: (getScoreAndReason('opening_statement', 'player1').reason || '').toLowerCase(),
       cross_questions: isUserBotFormat
-        ? getScoreAndReason('cross_examination', 'player1').reason.toLowerCase()
-        : getScoreAndReason(
-            'cross_examination_questions',
-            'player1'
-          ).reason.toLowerCase(),
+        ? (getScoreAndReason('cross_examination', 'player1').reason || '').toLowerCase()
+        : (getScoreAndReason('cross_examination_questions', 'player1').reason || '').toLowerCase(),
       cross_answers: isUserBotFormat
-        ? getScoreAndReason('answers', 'player1').reason.toLowerCase()
-        : getScoreAndReason(
-            'cross_examination_answers',
-            'player1'
-          ).reason.toLowerCase(),
-      closing: getScoreAndReason('closing', 'player1').reason.toLowerCase(),
+        ? (getScoreAndReason('answers', 'player1').reason || '').toLowerCase()
+        : (getScoreAndReason('cross_examination_answers', 'player1').reason || '').toLowerCase(),
+      closing: (getScoreAndReason('closing', 'player1').reason || '').toLowerCase(),
     };
 
     // Strengthen Argument: Low scores in opening/closing or weak argument-related feedback
@@ -695,11 +704,13 @@ const player2RatingSummary =
         <div className='mt-10 bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg shadow-md text-white text-center'>
           <h3 className='text-2xl font-bold'>Verdict</h3>
           <p className='mt-4 text-3xl font-bold'>
-            {judgment.verdict.winner} Wins!
+            {judgment?.verdict?.winner || 'Debate Completed'} Wins!
           </p>
-          <p className='mt-3 text-lg'>{judgment.verdict.congratulations}</p>
+          {judgment?.verdict?.congratulations && (
+            <p className='mt-3 text-lg'>{judgment.verdict.congratulations}</p>
+          )}
           <p className='mt-2 text-md leading-relaxed'>
-            {judgment.verdict.opponent_analysis}
+            {judgment?.verdict?.reason || judgment?.verdict?.opponent_analysis || 'Debate concluded successfully.'}
           </p>
         </div>
 
@@ -761,7 +772,9 @@ const player2RatingSummary =
 
         {/* Share Victory Card Modal */}
         {showShareModal && (() => {
-          const isWinnerBot = judgment.verdict.winner.toLowerCase().includes('bot') || judgment.verdict.winner.toLowerCase().includes('against');
+          const winnerStr = judgment?.verdict?.winner || '';
+          const isWinnerBot = winnerStr.toLowerCase().includes('bot') || winnerStr.toLowerCase().includes('against');
+          const totalScores = (judgment as any)?.total || {};
           const cardData: DebateVictoryCardData = {
             topic: topic || localStorage.getItem('debateTopic') || 'Competitive Debate',
             matchType: isUserBotFormat ? 'AI Bot Arena' : '1v1 Ranked Debate',
@@ -770,18 +783,18 @@ const player2RatingSummary =
               avatarUrl: isWinnerBot ? player2Avatar : player1Avatar,
               stance: isWinnerBot ? player2Stance : player1Stance,
               score: isWinnerBot
-                ? (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.bot : (judgment as JudgmentDataForAgainst).total.against)
-                : (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.user : (judgment as JudgmentDataForAgainst).total.for),
+                ? (isUserBotFormat ? totalScores.bot ?? 0 : totalScores.against ?? 0)
+                : (isUserBotFormat ? totalScores.user ?? 0 : totalScores.for ?? 0),
             },
             opponent: {
               name: isWinnerBot ? player1Name : player2Name,
               avatarUrl: isWinnerBot ? player1Avatar : player2Avatar,
               stance: isWinnerBot ? player1Stance : player2Stance,
               score: isWinnerBot
-                ? (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.user : (judgment as JudgmentDataForAgainst).total.for)
-                : (isUserBotFormat ? (judgment as JudgmentDataUserBot).total.bot : (judgment as JudgmentDataForAgainst).total.against),
+                ? (isUserBotFormat ? totalScores.user ?? 0 : totalScores.for ?? 0)
+                : (isUserBotFormat ? totalScores.bot ?? 0 : totalScores.against ?? 0),
             },
-            verdictReason: judgment.verdict.reason || judgment.verdict.opponent_analysis,
+            verdictReason: judgment?.verdict?.reason || judgment?.verdict?.opponent_analysis || 'Debate completed.',
           };
           return (
             <ShareVictoryCardModal
