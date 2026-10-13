@@ -182,21 +182,6 @@ func JoinPrivateTournament(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Your request was already approved"})
 				return
 			}
-
-			_, err = db.TournamentCollection.UpdateOne(
-				context.Background(),
-				bson.M{"_id": tournament.ID},
-				bson.M{"$pull": bson.M{
-					"joinRequests": bson.M{
-						"userId": userObjID,
-						"status": "rejected",
-					},
-				}},
-			)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process request"})
-				return
-			}
 			break
 		}
 	}
@@ -213,11 +198,35 @@ func JoinPrivateTournament(c *gin.Context) {
 	result, err := db.TournamentCollection.UpdateOne(
 		context.Background(),
 		bson.M{
-			"_id":                 tournament.ID,
-			"joinRequests.userId": bson.M{"$ne": userObjID},
-			"status":              bson.M{"$ne": models.StatusCompleted},
+			"_id":    tournament.ID,
+			"status": bson.M{"$ne": models.StatusCompleted},
+			"joinRequests": bson.M{
+				"$not": bson.M{
+					"$elemMatch": bson.M{
+						"userId": userObjID,
+						"status": bson.M{"$in": bson.A{
+							models.JoinRequestPending,
+							models.JoinRequestApproved,
+						}},
+					},
+				},
+			},
 		},
-		bson.M{"$push": bson.M{"joinRequests": newRequest}},
+		mongo.Pipeline{
+			{{Key: "$set", Value: bson.M{
+				"joinRequests": bson.M{"$concatArrays": bson.A{
+					bson.M{"$filter": bson.M{
+						"input": bson.M{"$ifNull": bson.A{"$joinRequests", bson.A{}}},
+						"as":    "request",
+						"cond": bson.M{"$or": bson.A{
+							bson.M{"$ne": bson.A{"$$request.userId", userObjID}},
+							bson.M{"$ne": bson.A{"$$request.status", models.JoinRequestRejected}},
+						}},
+					}},
+					bson.A{newRequest},
+				}},
+			}}},
+		},
 	)
 
 	if err != nil {
