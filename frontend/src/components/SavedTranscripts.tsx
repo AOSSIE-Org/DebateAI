@@ -2,6 +2,7 @@ import config from "../config/config";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -56,6 +57,7 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     useState<SavedDebateTranscript | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [transcriptToDelete, setTranscriptToDelete] = useState<string | null>(null);
   const [creatingPost, setCreatingPost] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,20 +112,18 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
     }
   };
 
-  const handleDeleteTranscript = async (id: string) => {
+  const handleDeleteTranscript = (id: string) => {
+    setTranscriptToDelete(id);
+  };
 
-    if (
-      !confirm(
-        'Are you sure you want to delete this transcript? This action cannot be undone.'
-      )
-    ) {
-      return;
-    }
-
+  const confirmDeleteTranscript = async () => {
+    if (!transcriptToDelete) return;
+    const id = transcriptToDelete;
+    setTranscriptToDelete(null);
     try {
       setDeletingId(id);
       await transcriptService.deleteTranscript(id);
-      setTranscripts(transcripts.filter((t) => t.id !== id));
+      setTranscripts((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete transcript');
     } finally {
@@ -592,6 +592,19 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
           )}
         </DialogContent>
       </Dialog>
+      <ConfirmationDialog
+        open={transcriptToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTranscriptToDelete(null);
+        }}
+        title='Delete transcript?'
+        description='This transcript will be permanently deleted and cannot be recovered.'
+        confirmLabel='Delete transcript'
+        onConfirm={() => {
+          void confirmDeleteTranscript();
+        }}
+        destructive
+      />
     </>
   );
 };

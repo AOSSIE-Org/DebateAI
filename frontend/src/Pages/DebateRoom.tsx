@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
@@ -383,6 +384,8 @@ const DebateRoom: React.FC = () => {
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
+  const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
+  const [isConceding, setIsConceding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -407,26 +410,31 @@ const DebateRoom: React.FC = () => {
   }, [debateData, navigate, toast]);
 
   const handleConcede = async () => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
-      try {
-        if (debateData?.debateId) {
-          await concedeDebate(debateData.debateId, state.messages);
-        }
+    if (isConceding) {
+      return;
+    }
 
-        setState(prev => ({ ...prev, isDebateEnded: true }));
-        setPopup({
-          show: true,
-          message: "You have conceded the debate.",
-          isJudging: false
-        });
-
-        setTimeout(() => {
-          navigate("/startDebate");
-        }, 2000);
-
-      } catch (error) {
-        console.error("Error conceding:", error);
+    setIsConceding(true);
+    setIsConcedeDialogOpen(false);
+    try {
+      if (debateData?.debateId) {
+        await concedeDebate(debateData.debateId, state.messages);
       }
+
+      setState((prev) => ({ ...prev, isDebateEnded: true }));
+      setPopup({
+        show: true,
+        message: "You have conceded the debate.",
+        isJudging: false,
+      });
+
+      setTimeout(() => {
+        navigate("/startDebate");
+      }, 2000);
+    } catch (error) {
+      console.error("Error conceding:", error);
+    } finally {
+      setIsConceding(false);
     }
   };
 
@@ -995,7 +1003,8 @@ const DebateRoom: React.FC = () => {
             </div>
             {!state.isDebateEnded && (
               <Button
-                onClick={handleConcede}
+                onClick={() => setIsConcedeDialogOpen(true)}
+                disabled={isConceding}
                 className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md px-3 text-sm"
               >
                 Concede
@@ -1091,6 +1100,17 @@ const DebateRoom: React.FC = () => {
           animation: glow 2s infinite;
         }
       `}</style>
+      <ConfirmationDialog
+        open={isConcedeDialogOpen}
+        onOpenChange={setIsConcedeDialogOpen}
+        title="Concede debate?"
+        description="Are you sure you want to concede? This will count as a loss."
+        confirmLabel="Concede"
+        onConfirm={() => {
+          void handleConcede();
+        }}
+        destructive
+      />
     </div>
   );
 };
