@@ -61,6 +61,9 @@ type Client struct {
 func (c *Client) SafeWriteJSON(v any) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if c.Conn == nil {
+		return nil
+	}
 	return c.Conn.WriteJSON(v)
 }
 
@@ -68,6 +71,9 @@ func (c *Client) SafeWriteJSON(v any) error {
 func (c *Client) SafeWriteMessage(messageType int, data []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if c.Conn == nil {
+		return nil
+	}
 	return c.Conn.WriteMessage(messageType, data)
 }
 
@@ -704,6 +710,7 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 			return
 		}
 		client.Role = message.Role
+		client.Ready = false
 	}
 	room.Mutex.Unlock()
 
@@ -727,6 +734,14 @@ func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID
 	client, exists := room.Clients[conn]
 	if !exists || client.IsSpectator {
 		room.Mutex.Unlock()
+		return
+	}
+	if *message.Ready && client.Role == "" {
+		room.Mutex.Unlock()
+		_ = client.SafeWriteJSON(map[string]interface{}{
+			"type":    "error",
+			"message": "Cannot mark ready without selecting a role",
+		})
 		return
 	}
 	client.Ready = *message.Ready
