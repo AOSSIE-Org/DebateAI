@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider, AuthContext } from "./context/authContext";
 import { ThemeProvider } from "./context/theme-provider";
 // Pages
@@ -24,6 +24,9 @@ import CoachPage from "./Pages/CoachPage";
 import ChatRoom from "./components/ChatRoom";
 import TournamentHub from "./Pages/TournamentHub";
 import TournamentDetails from "./Pages/TournamentDetails";
+import TournamentRoom from "./Pages/TournamentRoom";
+import TournamentResults from "./Pages/TournamentResults";
+import { tournamentResultsReturnPath } from "./utils/tournamentReturnPath";
 import ProsConsChallenge from "./Pages/ProsConsChallenge";
 import TeamBuilder from "./Pages/TeamBuilder";
 import TeamDebateRoom from "./Pages/TeamDebateRoom";
@@ -39,6 +42,7 @@ import CreateTournament from "./Pages/CreateTournament";
 
 // Protects routes based on authentication status
 function ProtectedRoute() {
+  const location = useLocation();
   const authContext = useContext(AuthContext);
   if (!authContext) {
     throw new Error("ProtectedRoute must be used within an AuthProvider");
@@ -47,7 +51,8 @@ function ProtectedRoute() {
   if (isLoading) {
     return <LoadingSpinner />;
   }
-  return isAuthenticated ? <Outlet /> : <Navigate to="/" replace />;
+  const returnTo = tournamentResultsReturnPath(location.pathname);
+  return isAuthenticated ? <Outlet /> : returnTo ? <Navigate to="/auth" state={{ returnTo }} replace /> : <Navigate to="/" replace />;
 }
 
 // Defines application routes
@@ -98,6 +103,8 @@ function AppRoutes() {
           <Route path="/tournaments" element={<TournamentHub />} />
           <Route path="/tournament/create" element={<CreateTournament/>} />
           <Route path="/tournament/:id" element={<TournamentDetails />} />
+          <Route path="/tournament/:id/room" element={<TournamentRoom />} />
+          <Route path="/tournament/:id/results" element={<TournamentResults />} />
           <Route
             path="/tournament/:id/bracket"
             element={<TournamentBracket />}
