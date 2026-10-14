@@ -13,6 +13,7 @@ import (
 	"arguehub/services"
 	"arguehub/utils"
 	"arguehub/websocket"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,9 @@ func main() {
 	cfg, err := config.LoadConfig("./config/config.prod.yml")
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
+	}
+	if err := cfg.ValidateLLMRateLimit(); err != nil {
+		log.Fatalf("Invalid LLM rate-limit configuration: %v", err)
 	}
 
 	services.InitDebateVsBotService(cfg)
@@ -113,13 +117,17 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		auth.POST("/api/update-score", routes.UpdateScoreRouteHandler)
 		auth.GET("/api/leaderboard", routes.GetGamificationLeaderboardRouteHandler)
 
-		routes.SetupDebateVsBotRoutes(auth)
+		llmRateLimit := middlewares.LLMRateLimit(
+			cfg.LLMRateLimit.MaxRequests,
+			time.Duration(cfg.LLMRateLimit.WindowSeconds)*time.Second,
+		)
+		routes.SetupDebateVsBotRoutes(auth, llmRateLimit)
 
 		router.GET("/ws", websocket.WebsocketHandler)
 
-		routes.SetupTranscriptRoutes(auth)
+		routes.SetupTranscriptRoutes(auth, llmRateLimit)
 
-		routes.SetupCoachRoutes(auth)
+		routes.SetupCoachRoutes(auth, llmRateLimit)
 
 		auth.GET("/rooms", routes.GetRoomsHandler)
 		auth.POST("/rooms", routes.CreateRoomHandler)

@@ -9,13 +9,13 @@ import (
 )
 
 // SetupCoachRoutes registers all coach-related routes on the given router group
-func SetupCoachRoutes(router *gin.RouterGroup) {
+func SetupCoachRoutes(router *gin.RouterGroup, llmRateLimit gin.HandlerFunc) {
 	coach := router.Group("/coach")
 	{
-		coach.GET("/strengthen-argument/weak-statement", GetWeakStatement)
-		coach.POST("/strengthen-argument/evaluate", EvaluateStrengthenedArgument)
-		coach.GET("/pros-cons/topic", GetProsConsTopic)
-		coach.POST("/pros-cons/submit", SubmitProsCons)
+		coach.GET("/strengthen-argument/weak-statement", llmRateLimit, GetWeakStatement)
+		coach.POST("/strengthen-argument/evaluate", llmRateLimit, EvaluateStrengthenedArgument)
+		coach.GET("/pros-cons/topic", llmRateLimit, GetProsConsTopic)
+		coach.POST("/pros-cons/submit", llmRateLimit, SubmitProsCons)
 	}
 }
 

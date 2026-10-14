@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -54,7 +55,17 @@ type Config struct {
 	GoogleOAuth struct {
 		ClientID string `yaml:"clientID"`
 	} `yaml:"googleOAuth"`
+
+	LLMRateLimit struct {
+		MaxRequests   int `yaml:"maxRequests"`
+		WindowSeconds int `yaml:"windowSeconds"`
+	} `yaml:"llmRateLimit"`
 }
+
+const (
+	DefaultLLMRateLimitMaxRequests   = 10
+	DefaultLLMRateLimitWindowSeconds = 60
+)
 
 // LoadConfig reads the configuration file
 func LoadConfig(path string) (*Config, error) {
@@ -67,6 +78,12 @@ func LoadConfig(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal yaml: %w", err)
+	}
+	if cfg.LLMRateLimit.MaxRequests == 0 {
+		cfg.LLMRateLimit.MaxRequests = DefaultLLMRateLimitMaxRequests
+	}
+	if cfg.LLMRateLimit.WindowSeconds == 0 {
+		cfg.LLMRateLimit.WindowSeconds = DefaultLLMRateLimitWindowSeconds
 	}
 
 	// Override with environment variables if present
@@ -89,7 +106,31 @@ func LoadConfig(path string) (*Config, error) {
 	if envGoogleClient := os.Getenv("GOOGLE_CLIENT_ID"); envGoogleClient != "" {
 		cfg.GoogleOAuth.ClientID = envGoogleClient
 	}
-	// Add other overrides as needed
+
+	if envMax := os.Getenv("LLM_RATE_LIMIT_MAX"); envMax != "" {
+		max, err := strconv.Atoi(envMax)
+		if err != nil {
+			return nil, fmt.Errorf("invalid LLM_RATE_LIMIT_MAX: %w", err)
+		}
+		cfg.LLMRateLimit.MaxRequests = max
+	}
+	if envWindow := os.Getenv("LLM_RATE_LIMIT_WINDOW_SECONDS"); envWindow != "" {
+		window, err := strconv.Atoi(envWindow)
+		if err != nil {
+			return nil, fmt.Errorf("invalid LLM_RATE_LIMIT_WINDOW_SECONDS: %w", err)
+		}
+		cfg.LLMRateLimit.WindowSeconds = window
+	}
 
 	return &cfg, nil
+}
+
+func (c *Config) ValidateLLMRateLimit() error {
+	if c.LLMRateLimit.MaxRequests <= 0 {
+		return fmt.Errorf("LLM rate-limit max requests must be greater than zero")
+	}
+	if c.LLMRateLimit.WindowSeconds <= 0 {
+		return fmt.Errorf("LLM rate-limit window seconds must be greater than zero")
+	}
+	return nil
 }
