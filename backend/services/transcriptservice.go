@@ -59,7 +59,8 @@ func SubmitTranscripts(
 	opponentEmail string,
 	opponentTranscripts map[string]string,
 ) (map[string]interface{}, error) {
-	if strings.TrimSpace(roomID) == "" {
+	roomID = strings.ToLower(strings.TrimSpace(roomID))
+	if roomID == "" {
 		return nil, errors.New("room ID is required")
 	}
 	unlock := lockTranscriptSubmission(roomID)
@@ -506,6 +507,21 @@ func teamContainsMember(members []models.TeamMember, email string) bool {
 	return false
 }
 
+var roleAllowedPhases = map[string]map[string]bool{
+	"for": {
+		"openingFor":           true,
+		"crossForQuestion":     true,
+		"crossForAnswer":       true,
+		"closingFor":           true,
+	},
+	"against": {
+		"openingAgainst":       true,
+		"crossAgainstAnswer":   true,
+		"crossAgainstQuestion": true,
+		"closingAgainst":      true,
+	},
+}
+
 func upsertTeamMemberTranscript(
 	ctx context.Context,
 	roomID string,
@@ -513,6 +529,18 @@ func upsertTeamMemberTranscript(
 	email string,
 	transcripts map[string]string,
 ) error {
+	role = strings.ToLower(strings.TrimSpace(role))
+	allowed, ok := roleAllowedPhases[role]
+	if !ok {
+		return fmt.Errorf("invalid role %q for transcript submission", role)
+	}
+
+	for phase := range transcripts {
+		if !allowed[phase] {
+			return fmt.Errorf("phase %q is not allowed for role %q", phase, role)
+		}
+	}
+
 	email = strings.ToLower(strings.TrimSpace(email))
 	key := strings.ToLower(strings.TrimSpace(roomID)) + "|" + strings.ToLower(strings.TrimSpace(role)) + "|" + email
 	now := time.Now()
