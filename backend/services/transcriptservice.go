@@ -253,7 +253,14 @@ func SubmitTranscripts(
 				case "Against":
 					resultFor, resultAgainst = "loss", "win"
 				}
-
+				if teamDebate != nil {
+					if err := saveTeammateTranscripts(ctx, userCollection, teamDebate, "for", forUser.Email, againstUser.Email, topic, resultFor, forSubmission.Transcripts); err != nil {
+						return nil, err
+					}
+					if err := saveTeammateTranscripts(ctx, userCollection, teamDebate, "against", againstUser.Email, forUser.Email, topic, resultAgainst, againstSubmission.Transcripts); err != nil {
+						return nil, err
+					}
+				}
 				// Save transcript for "for" user
 				err = SaveDebateTranscript(
 					forUser.ID,
@@ -505,6 +512,47 @@ func teamContainsMember(members []models.TeamMember, email string) bool {
 		}
 	}
 	return false
+}
+
+// saveTeammateTranscripts stores the shared side transcript for every team member
+// other than the representative user, who is saved by the caller.
+func saveTeammateTranscripts(
+	ctx context.Context,
+	userCollection *mongo.Collection,
+	teamDebate *models.TeamDebate,
+	role string,
+	representativeEmail string,
+	opponentEmail string,
+	topic string,
+	result string,
+	transcripts map[string]string,
+) error {
+	memberEmails, err := teamDebateSubmitters(teamDebate, role)
+	if err != nil {
+		return err
+	}
+	for _, memberEmail := range memberEmails {
+		if strings.EqualFold(memberEmail, representativeEmail) {
+			continue
+		}
+		var member models.User
+		if err := findUserByIdentifier(ctx, userCollection, memberEmail, &member); err != nil {
+			return fmt.Errorf("failed to load %s-side team member %s: %w", role, memberEmail, err)
+		}
+		if err := SaveDebateTranscript(
+			member.ID,
+			member.Email,
+			"user_vs_user",
+			topic,
+			opponentEmail,
+			result,
+			[]models.Message{},
+			transcripts,
+		); err != nil {
+			return fmt.Errorf("failed to save %s-side transcript for %s: %w", role, memberEmail, err)
+		}
+	}
+	return nil
 }
 
 var roleAllowedPhases = map[string]map[string]bool{
