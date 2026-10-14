@@ -1,16 +1,75 @@
 import { useState } from "react";
-import { Users, Calendar, Eye } from "lucide-react";
+import { Users, Calendar, Eye, Trophy, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { CreateTournamentForm } from "@/components/tournament/CreateTournamentForm";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type TournamentStatus = "live" | "upcoming";
 
 export interface Tournament {
   id: string;
-  topic: string; 
+  topic: string;
   maxParticipants: number;
   currentParticipants: number;
   date: string;
   description: string;
+  status?: TournamentStatus;
 }
+
+interface PastTournament {
+  id: string;
+  topic: string;
+  date: string;
+  participants: number;
+  winner: string;
+  winnerAvatar: string;
+}
+
+const STATUS_LABELS: Record<TournamentStatus, string> = {
+  live: "Live",
+  upcoming: "Upcoming",
+};
+
+const pastTournaments: PastTournament[] = [
+  {
+    id: "past-1",
+    topic: "Monsoon Masters",
+    date: "2026-10-04",
+    participants: 8,
+    winner: "Ishaan Mehta",
+    winnerAvatar: "https://i.pravatar.cc/32?u=3",
+  },
+  {
+    id: "past-2",
+    topic: "Autumn Arguments",
+    date: "2026-09-26",
+    participants: 8,
+    winner: "Aarav Singh",
+    winnerAvatar: "https://i.pravatar.cc/32?u=2",
+  },
+  {
+    id: "past-3",
+    topic: "Logic League",
+    date: "2026-09-19",
+    participants: 6,
+    winner: "Kabir Malhotra",
+    winnerAvatar: "https://i.pravatar.cc/32?u=8",
+  },
+  {
+    id: "past-4",
+    topic: "Rebuttal Royale",
+    date: "2026-09-12",
+    participants: 8,
+    winner: "Rishit Tiwari",
+    winnerAvatar: "https://i.pravatar.cc/32?u=1",
+  },
+];
 
 export default function TournamentPage() {
   const initialTournaments: Tournament[] = [
@@ -41,11 +100,47 @@ export default function TournamentPage() {
       description:
         "Quick-thinking, lightning round debates — think you can keep up?",
     },
-  ];
+    {
+      id: "4",
+      topic: "Midnight Mic Drop",
+      maxParticipants: 8,
+      currentParticipants: 5,
+      date: "2026-10-13",
+      description:
+        "A late-night showdown happening right now — tune in and watch the arguments fly.",
+      status: "live",
+    },
+    {
+      id: "5",
+      topic: "Winter Cup",
+      maxParticipants: 8,
+      currentParticipants: 2,
+      date: "2026-12-05",
+      description:
+        "Sharpen your rebuttals for the season's biggest debate cup. Registrations are open.",
+      status: "upcoming",
+    },
+    {
+      id: "6",
+      topic: "New Year Clash",
+      maxParticipants: 8,
+      currentParticipants: 4,
+      date: "2027-01-09",
+      description:
+        "Kick off the new year with fiery debates on the ideas set to shape the future.",
+      status: "upcoming",
+    },  ];
 
   const [tournaments, setTournaments] =
     useState<Tournament[]>(initialTournaments);
+  const [statusFilter, setStatusFilter] = useState<TournamentStatus | "all">(
+    "all"
+  );
   const navigate = useNavigate();
+
+  const visibleTournaments = tournaments.filter(
+    (t) => statusFilter === "all" || t.status === statusFilter
+  );
 
   const handleJoin = (tournament: Tournament) => {
     if (tournament.currentParticipants < tournament.maxParticipants) {
@@ -119,24 +214,49 @@ export default function TournamentPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6 sm:mb-10 text-center text-primary animate-pulse">
-        Tournament Arena
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 max-w-7xl mx-auto mb-6 sm:mb-10">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-primary animate-pulse">
+          Tournament Arena
+        </h1>
+        <Select
+          value={statusFilter}
+          onValueChange={(val) =>
+            setStatusFilter(val as TournamentStatus | "all")
+          }
+        >
+          <SelectTrigger
+            className="w-32 h-9 px-3 bg-background text-foreground border-border"
+            aria-label="Filter tournaments"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="live">{STATUS_LABELS.live}</SelectItem>
+            <SelectItem value="upcoming">{STATUS_LABELS.upcoming}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
         {/* Left: Dummy Tournament List */}
         <div className="flex-1">
-          {tournaments.length === 0 ? (
+          {visibleTournaments.length === 0 ? (
             <p className="text-center text-muted-foreground text-lg">
               No live tournaments yet. Create one to start the debate!
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tournaments.map((t) => (
+              {visibleTournaments.map((t) => (
                 <div
                   key={t.id}
                   className="relative bg-card rounded-xl p-6 border border-border shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 bg-gradient-to-br from-primary/10 to-secondary/10 overflow-hidden flex flex-col"
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 bg-primary/20 rounded-bl-full"></div>
+                  {t.status && (
+                    <span className="self-start mb-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground">
+                      {STATUS_LABELS[t.status]}
+                    </span>
+                  )}
                   <h2 className="text-2xl font-bold mb-2 text-card-foreground tracking-tight">
                     {t.topic} 
                   </h2>
@@ -191,6 +311,75 @@ export default function TournamentPage() {
               ))}
             </div>
           )}
+
+          {/* Past Tournaments */}
+          <section className="mt-12">
+            <div className="flex items-end justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+                  Past Tournaments
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Relive the battles and see who claimed the crown.
+                </p>
+              </div>
+              <span className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary">
+                {pastTournaments.length} completed
+              </span>
+            </div>
+            <div className="space-y-4">
+              {pastTournaments.map((t) => (
+                <div
+                  key={t.id}
+                  className="group relative overflow-hidden flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5 bg-card bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl border border-border shadow-lg hover:shadow-2xl hover:border-primary/60 transition-all duration-300 transform hover:-translate-y-1"
+                >
+                  <div className="absolute -top-6 -right-6 w-20 h-20 bg-primary/20 rounded-full"></div>
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 ring-2 ring-primary/40 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                      <Trophy className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-bold text-card-foreground tracking-tight truncate">
+                          {t.topic}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-muted text-muted-foreground">
+                          Completed
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4 text-primary" />
+                          {new Date(t.date).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-4 h-4 text-primary" />
+                          {t.participants} Participants
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Crown className="w-4 h-4 text-primary" />
+                          <img
+                            src={t.winnerAvatar}
+                            alt={t.winner}
+                            className="w-5 h-5 rounded-full border border-primary"
+                          />
+                          <span className="font-medium text-foreground">
+                            {t.winner}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="relative w-full sm:w-auto flex-shrink-0 bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm"
+                  >
+                    View Tournament
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
 
         {/* Right: Create Tournament Form */}
