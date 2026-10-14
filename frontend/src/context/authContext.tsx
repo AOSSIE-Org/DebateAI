@@ -81,10 +81,7 @@ const verifyToken = useCallback(async () => {
     if (requestId !== currentRequest.current) return;
 
     if (!response.ok) {
-      localStorage.removeItem('token');
-      setToken(null);
-      setUser(null);
-      navigate('/auth');
+      logout();
       return;
     }
 
