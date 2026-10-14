@@ -142,6 +142,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   const handleLeaveMatchmaking = async () => {
     try {
       await leaveMatchmaking(team.id);
+      setIsSearching(false);
       setHasJoined(false);
       setMatchedTeam(null);
     } catch (error: unknown) {
