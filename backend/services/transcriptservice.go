@@ -509,16 +509,16 @@ func teamContainsMember(members []models.TeamMember, email string) bool {
 
 var roleAllowedPhases = map[string]map[string]bool{
 	"for": {
-		"openingFor":           true,
-		"crossForQuestion":     true,
-		"crossForAnswer":       true,
-		"closingFor":           true,
+		"openingFor":       true,
+		"crossForQuestion": true,
+		"crossForAnswer":   true,
+		"closingFor":       true,
 	},
 	"against": {
 		"openingAgainst":       true,
 		"crossAgainstAnswer":   true,
 		"crossAgainstQuestion": true,
-		"closingAgainst":      true,
+		"closingAgainst":       true,
 	},
 }
 
