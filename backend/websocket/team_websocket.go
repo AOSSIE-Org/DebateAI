@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // TeamRoom represents a team debate room with connected team members
@@ -53,6 +55,10 @@ type TeamClient struct {
 	PartialText  string
 	LastActivity time.Time
 	IsMuted      bool
+	CameraOn     bool
+	MicrophoneOn bool
+	AvatarURL    string
+	Elo          int
 	Role         string // "for" or "against"
 	SpeechText   string
 	Tokens       int // Remaining speaking tokens
@@ -74,33 +80,46 @@ func (tc *TeamClient) SafeWriteMessage(messageType int, data []byte) error {
 
 // TeamMessage represents a message in team debate
 type TeamMessage struct {
-	Type           string          `json:"type"`
-	Room           string          `json:"room,omitempty"`
-	Username       string          `json:"username,omitempty"`
-	UserID         string          `json:"userId,omitempty"`
-	FromUserID     string          `json:"fromUserId,omitempty"`
-	TargetUserID   string          `json:"targetUserId,omitempty"`
-	Content        string          `json:"content,omitempty"`
-	Extra          json.RawMessage `json:"extra,omitempty"`
-	IsTyping       bool            `json:"isTyping,omitempty"`
-	IsSpeaking     bool            `json:"isSpeaking,omitempty"`
-	PartialText    string          `json:"partialText,omitempty"`
-	Timestamp      int64           `json:"timestamp,omitempty"`
-	Mode           string          `json:"mode,omitempty"`
-	Phase          string          `json:"phase,omitempty"`
-	Topic          string          `json:"topic,omitempty"`
-	Role           string          `json:"role,omitempty"`
-	Ready          *bool           `json:"ready,omitempty"`
-	IsMuted        bool            `json:"isMuted,omitempty"`
-	CurrentTurn    string          `json:"currentTurn,omitempty"`
-	SpeechText     string          `json:"speechText,omitempty"`
-	LiveTranscript string          `json:"liveTranscript,omitempty"`
-	TeamID         string          `json:"teamId,omitempty"`
-	Tokens         int             `json:"tokens,omitempty"`
-	CanSpeak       bool            `json:"canSpeak,omitempty"`
-	Offer          map[string]any  `json:"offer,omitempty"`
-	Answer         map[string]any  `json:"answer,omitempty"`
-	Candidate      map[string]any  `json:"candidate,omitempty"`
+	Type         string          `json:"type"`
+	Room         string          `json:"room,omitempty"`
+	Username     string          `json:"username,omitempty"`
+	UserID       string          `json:"userId,omitempty"`
+	FromUserID   string          `json:"fromUserId,omitempty"`
+	TargetUserID string          `json:"targetUserId,omitempty"`
+	Content      string          `json:"content,omitempty"`
+	Extra        json.RawMessage `json:"extra,omitempty"`
+	IsTyping     bool            `json:"isTyping,omitempty"`
+	IsSpeaking   bool            `json:"isSpeaking,omitempty"`
+	PartialText  string          `json:"partialText,omitempty"`
+	Timestamp    int64           `json:"timestamp,omitempty"`
+	Mode         string          `json:"mode,omitempty"`
+	Phase        string          `json:"phase,omitempty"`
+	Topic        string          `json:"topic,omitempty"`
+	Role         string          `json:"role,omitempty"`
+	Ready        *bool           `json:"ready,omitempty"`
+	IsMuted      bool            `json:"isMuted,omitempty"`
+	CameraOn     *bool           `json:"cameraOn,omitempty"`
+	MicrophoneOn *bool           `json:"microphoneOn,omitempty"`
+	TranscriptID string          `json:"transcriptId,omitempty"`
+	CurrentTurn  string          `json:"currentTurn,omitempty"`
+	SpeechText   string          `json:"speechText,omitempty"`
+	TeamID       string          `json:"teamId,omitempty"`
+	Tokens       int             `json:"tokens,omitempty"`
+	CanSpeak     bool            `json:"canSpeak,omitempty"`
+	Offer        map[string]any  `json:"offer,omitempty"`
+	Answer       map[string]any  `json:"answer,omitempty"`
+	Candidate    map[string]any  `json:"candidate,omitempty"`
+}
+
+type TeamTranscriptEntry struct {
+	TranscriptID string `json:"transcriptId" bson:"transcriptId"`
+	DocumentID   string `json:"-" bson:"_id"`
+	RoomID       string `json:"-" bson:"roomId"`
+	Phase        string `json:"phase" bson:"phase"`
+	UserID       string `json:"userId" bson:"userId"`
+	Username     string `json:"username" bson:"username"`
+	SpeechText   string `json:"speechText" bson:"speechText"`
+	Timestamp    int64  `json:"timestamp" bson:"timestamp"`
 }
 
 var teamRooms = make(map[string]*TeamRoom)
@@ -138,7 +157,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 	}
 
 	// Get user details from database
-	userID, username, _, _, err := getUserDetails(email)
+	userID, username, avatarURL, rating, err := getUserDetails(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user details"})
 		return
@@ -164,7 +183,14 @@ func TeamWebsocketHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Team debate not found"})
 		return
 	}
-
+	profileCtx, cancelProfiles := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancelProfiles()
+	if err := services.RefreshTeamDebateMembers(profileCtx, &debate); err != nil {
+		cancelProfiles()
+		log.Printf("failed to refresh members for debate %s: %v", debateID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load debate participants"})
+		return
+	}
 	// Check if user is part of either team
 	teamCollection := db.MongoDatabase.Collection("teams")
 	var userTeamID primitive.ObjectID
@@ -194,6 +220,21 @@ func TeamWebsocketHandler(c *gin.Context) {
 			return
 		}
 	}
+	_, err = debateCollection.UpdateOne(profileCtx, bson.M{"_id": debateObjectID}, bson.M{
+		"$set": bson.M{
+			"team1Name":    debate.Team1Name,
+			"team2Name":    debate.Team2Name,
+			"team1Members": debate.Team1Members,
+			"team2Members": debate.Team2Members,
+			"currentPhase": debate.CurrentPhase,
+		},
+	})
+	cancelProfiles()
+	if err != nil {
+		log.Printf("failed to refresh participant roster for debate %s: %v", debateID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to synchronize debate participants"})
+		return
+	}
 
 	// Prepare room outside lock
 	roomKey := debateID
@@ -222,11 +263,14 @@ func TeamWebsocketHandler(c *gin.Context) {
 		TurnManager:  turnManager,
 		TokenBucket:  tokenBucket,
 		CurrentTopic: debate.Topic,
-		CurrentPhase: "setup",
+		CurrentPhase: debate.CurrentPhase,
 		Team1Role:    debate.Team1Stance,
 		Team2Role:    debate.Team2Stance,
 		Team1Ready:   make(map[string]bool),
 		Team2Ready:   make(map[string]bool),
+	}
+	if preparedRoom.CurrentPhase == "" {
+		preparedRoom.CurrentPhase = "setup"
 	}
 
 	// Insert room if absent
@@ -273,6 +317,8 @@ func TeamWebsocketHandler(c *gin.Context) {
 		PartialText:  "",
 		LastActivity: time.Now(),
 		IsMuted:      false,
+		AvatarURL:    avatarURL,
+		Elo:          rating,
 		Role:         "",
 		SpeechText:   "",
 		Tokens:       10, // Initial tokens
@@ -320,6 +366,19 @@ func TeamWebsocketHandler(c *gin.Context) {
 		}
 		team2ReadyStatus[userId] = ready
 	}
+	participants := make([]map[string]any, 0, len(room.Clients))
+	for _, connected := range room.Clients {
+		participants = append(participants, map[string]any{
+			"id":           connected.UserID.Hex(),
+			"username":     connected.Username,
+			"displayName":  connected.Username,
+			"avatarUrl":    connected.AvatarURL,
+			"elo":          connected.Elo,
+			"teamId":       connected.TeamID.Hex(),
+			"cameraOn":     connected.CameraOn,
+			"microphoneOn": connected.MicrophoneOn,
+		})
+	}
 	room.Mutex.Unlock()
 
 	// Send state sync message with individual ready status and team names
@@ -337,6 +396,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 		"team2ReadyStatus":  team2ReadyStatus, // Individual ready status for Team2
 		"team1Name":         debate.Team1Name, // Team names
 		"team2Name":         debate.Team2Name,
+		"roomParticipants":  participants,
 	})
 
 	// Send team member lists
@@ -345,6 +405,13 @@ func TeamWebsocketHandler(c *gin.Context) {
 		"team1Members": debate.Team1Members,
 		"team2Members": debate.Team2Members,
 	})
+	transcriptEntries, err := loadTeamTranscriptEntries(context.Background(), debateObjectID.Hex())
+	if err != nil {
+		log.Printf("failed to load transcript for debate %s: %v", debateID, err)
+		client.SafeWriteJSON(map[string]any{"type": "error", "message": "Could not restore the debate transcript."})
+	} else {
+		client.SafeWriteJSON(map[string]any{"type": "transcriptSync", "entries": transcriptEntries})
+	}
 
 	// Listen for messages
 	for {
@@ -366,6 +433,7 @@ func TeamWebsocketHandler(c *gin.Context) {
 			broadcastExcept(room, conn, map[string]any{
 				"type":   "leave",
 				"userId": userID,
+				"teamId": client.TeamID.Hex(),
 			})
 			break
 		}
@@ -401,8 +469,8 @@ func TeamWebsocketHandler(c *gin.Context) {
 			handleTeamSpeakingIndicator(room, conn, message, client, roomKey)
 		case "speechText":
 			handleTeamSpeechText(room, conn, message, client, roomKey)
-		case "liveTranscript":
-			handleTeamLiveTranscript(room, conn, message, client, roomKey)
+		case "mediaState":
+			handleTeamMediaState(room, message, client, roomKey)
 		case "phaseChange":
 			handleTeamPhaseChange(room, conn, message, roomKey)
 		case "topicChange":
@@ -516,6 +584,19 @@ func handleTeamJoin(room *TeamRoom, conn *websocket.Conn, message TeamMessage, c
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
 		}
 	}
+	broadcastAll(room, map[string]any{
+		"type": "participantJoined",
+		"participant": map[string]any{
+			"id":           client.UserID.Hex(),
+			"username":     client.Username,
+			"displayName":  client.Username,
+			"avatarUrl":    client.AvatarURL,
+			"elo":          client.Elo,
+			"teamId":       client.TeamID.Hex(),
+			"cameraOn":     client.CameraOn,
+			"microphoneOn": client.MicrophoneOn,
+		},
+	})
 }
 
 // handleTeamChatMessage handles team chat messages
@@ -597,19 +678,68 @@ func handleTeamSpeakingIndicator(room *TeamRoom, conn *websocket.Conn, message T
 
 // handleTeamSpeechText handles speech-to-text conversion
 func handleTeamSpeechText(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
+	text := strings.TrimSpace(message.SpeechText)
+	phase := strings.TrimSpace(message.Phase)
+	if text == "" || teamDebatePhaseRole(phase) == "" {
+		return
+	}
+
 	room.Mutex.Lock()
-	client.SpeechText = message.SpeechText
+	role := room.Team1Role
+	if client.TeamID == room.Team2ID {
+		role = room.Team2Role
+	}
+	client.SpeechText = text
 	room.Mutex.Unlock()
+	if !strings.EqualFold(strings.TrimSpace(role), teamDebatePhaseRole(phase)) {
+		log.Printf("rejected transcript from user %s for phase %s in room %s", client.UserID.Hex(), phase, roomKey)
+		return
+	}
+
+	transcriptID := strings.TrimSpace(message.TranscriptID)
+	if transcriptID == "" {
+		transcriptID = primitive.NewObjectID().Hex()
+	}
+	entry := TeamTranscriptEntry{
+		TranscriptID: transcriptID,
+		DocumentID:   room.DebateID.Hex() + ":" + client.UserID.Hex() + ":" + transcriptID,
+		RoomID:       room.DebateID.Hex(),
+		Phase:        phase,
+		UserID:       client.UserID.Hex(),
+		Username:     client.Username,
+		SpeechText:   text,
+		Timestamp:    time.Now().UnixMilli(),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	result, err := db.MongoDatabase.Collection("team_debate_transcripts").UpdateOne(
+		ctx,
+		bson.M{"_id": entry.DocumentID},
+		bson.M{"$setOnInsert": entry},
+		options.Update().SetUpsert(true),
+	)
+	cancel()
+	if err != nil {
+		log.Printf("failed to persist transcript entry for room %s: %v", roomKey, err)
+		_ = client.SafeWriteJSON(map[string]any{
+			"type":    "error",
+			"message": "Transcript could not be synchronized.",
+		})
+		return
+	}
+	if result.UpsertedCount == 0 {
+		return
+	}
 
 	// Broadcast speech text to all clients
-	for _, r := range snapshotTeamRecipients(room, conn) {
+	for _, r := range snapshotTeamRecipients(room, nil) {
 		response := map[string]interface{}{
-			"type":       "speechText",
-			"userId":     client.UserID.Hex(),
-			"username":   client.Username,
-			"speechText": client.SpeechText,
-			"phase":      message.Phase,
-			"teamId":     client.TeamID.Hex(),
+			"type":         "speechText",
+			"transcriptId": entry.TranscriptID,
+			"userId":       client.UserID.Hex(),
+			"username":     client.Username,
+			"speechText":   text,
+			"phase":        phase,
+			"teamId":       client.TeamID.Hex(),
 		}
 		if err := r.SafeWriteJSON(response); err != nil {
 			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
@@ -617,37 +747,160 @@ func handleTeamSpeechText(room *TeamRoom, conn *websocket.Conn, message TeamMess
 	}
 }
 
-// handleTeamLiveTranscript handles live/interim transcript updates
-func handleTeamLiveTranscript(room *TeamRoom, conn *websocket.Conn, message TeamMessage, client *TeamClient, roomKey string) {
-	// Broadcast live transcript to all clients
-	for _, r := range snapshotTeamRecipients(room, conn) {
-		response := map[string]interface{}{
-			"type":           "liveTranscript",
-			"userId":         client.UserID.Hex(),
-			"username":       client.Username,
-			"liveTranscript": message.LiveTranscript,
-			"phase":          message.Phase,
-			"teamId":         client.TeamID.Hex(),
-		}
-		if err := r.SafeWriteJSON(response); err != nil {
-			log.Printf("Team WebSocket write error in room %s: %v", roomKey, err)
+func loadTeamTranscriptEntries(ctx context.Context, roomID string) ([]TeamTranscriptEntry, error) {
+	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	cursor, err := db.MongoDatabase.Collection("team_debate_transcripts").Find(
+		queryCtx,
+		bson.M{"roomId": roomID},
+		options.Find().SetSort(bson.D{{Key: "timestamp", Value: 1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(queryCtx)
+
+	var entries []TeamTranscriptEntry
+	if err := cursor.All(queryCtx, &entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+func handleTeamMediaState(room *TeamRoom, message TeamMessage, client *TeamClient, roomKey string) {
+	room.Mutex.Lock()
+	if message.CameraOn != nil {
+		client.CameraOn = *message.CameraOn
+	}
+	if message.MicrophoneOn != nil {
+		client.MicrophoneOn = *message.MicrophoneOn
+	}
+	cameraOn := client.CameraOn
+	microphoneOn := client.MicrophoneOn
+	room.Mutex.Unlock()
+
+	payload := map[string]any{
+		"type":         "mediaState",
+		"userId":       client.UserID.Hex(),
+		"teamId":       client.TeamID.Hex(),
+		"cameraOn":     cameraOn,
+		"microphoneOn": microphoneOn,
+	}
+	for _, recipient := range snapshotTeamRecipients(room, nil) {
+		if err := recipient.SafeWriteJSON(payload); err != nil {
+			log.Printf("failed to broadcast media state in room %s: %v", roomKey, err)
 		}
 	}
 }
 
-// handleTeamPhaseChange handles phase changes
+func nextTeamDebatePhase(phase string) (string, bool) {
+	nextPhases := map[string]string{
+		"openingFor":           "openingAgainst",
+		"openingAgainst":       "crossForQuestion",
+		"crossForQuestion":     "crossAgainstAnswer",
+		"crossAgainstAnswer":   "crossAgainstQuestion",
+		"crossAgainstQuestion": "crossForAnswer",
+		"crossForAnswer":       "closingFor",
+		"closingFor":           "closingAgainst",
+		"closingAgainst":       "finished",
+	}
+	next, ok := nextPhases[phase]
+	return next, ok
+}
+
+func teamDebatePhaseRole(phase string) string {
+	switch phase {
+	case "openingFor", "crossForQuestion", "crossForAnswer", "closingFor":
+		return "for"
+	case "openingAgainst", "crossAgainstAnswer", "crossAgainstQuestion", "closingAgainst":
+		return "against"
+	default:
+		return ""
+	}
+}
+
+func teamCanAdvanceDebatePhase(phase, teamRole string) bool {
+	expectedRole := teamDebatePhaseRole(phase)
+	return expectedRole != "" && strings.EqualFold(strings.TrimSpace(teamRole), expectedRole)
+}
+
+func persistTeamDebatePhase(debateID primitive.ObjectID, phase string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	status := "active"
+	if phase == "finished" {
+		status = "finished"
+	}
+	result, err := db.MongoDatabase.Collection("team_debates").UpdateOne(
+		ctx,
+		bson.M{"_id": debateID},
+		bson.M{"$set": bson.M{"currentPhase": phase, "status": status, "updatedAt": time.Now()}},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save debate phase: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return errors.New("team debate no longer exists")
+	}
+	return nil
+}
+
+// handleTeamPhaseChange accepts only the next phase from the team whose turn is ending.
 func handleTeamPhaseChange(room *TeamRoom, conn *websocket.Conn, message TeamMessage, roomKey string) {
-	// Update room state
 	room.Mutex.Lock()
 	oldPhase := room.CurrentPhase
-	if message.Phase != "" {
+	client, exists := room.Clients[conn]
+	if !exists {
+		room.Mutex.Unlock()
+		log.Printf("[handleTeamPhaseChange] Rejected phase change from a client not in room %s", roomKey)
+		return
+	}
+
+	if message.Phase == "" {
+		room.Mutex.Unlock()
+		log.Printf("[handleTeamPhaseChange] Rejected empty phase change in room %s", roomKey)
+		return
+	}
+
+	if message.Phase != oldPhase {
+		expectedPhase, hasNextPhase := nextTeamDebatePhase(oldPhase)
+		clientRole := ""
+		if client.TeamID == room.Team1ID {
+			clientRole = room.Team1Role
+		} else if client.TeamID == room.Team2ID {
+			clientRole = room.Team2Role
+		}
+		if !hasNextPhase || message.Phase != expectedPhase || !teamCanAdvanceDebatePhase(oldPhase, clientRole) {
+			room.Mutex.Unlock()
+			log.Printf(
+				"[handleTeamPhaseChange] Rejected invalid transition %s -> %s from team role %q in room %s",
+				oldPhase, message.Phase, clientRole, roomKey,
+			)
+			return
+		}
+
 		room.CurrentPhase = message.Phase
 		log.Printf("[handleTeamPhaseChange] Phase changed from %s to %s", oldPhase, room.CurrentPhase)
-	} else {
-		log.Printf("[handleTeamPhaseChange] Received phase change message but Phase is empty")
 	}
 	currentPhase := room.CurrentPhase
 	room.Mutex.Unlock()
+	if currentPhase != oldPhase {
+		if err := persistTeamDebatePhase(room.DebateID, currentPhase); err != nil {
+			room.Mutex.Lock()
+			if room.CurrentPhase == currentPhase {
+				room.CurrentPhase = oldPhase
+			}
+			room.Mutex.Unlock()
+			log.Printf("failed to persist phase change for room %s: %v", roomKey, err)
+			for _, recipient := range snapshotTeamRecipients(room, nil) {
+				_ = recipient.SafeWriteJSON(map[string]any{
+					"type":    "phaseChangeError",
+					"message": "The debate phase could not be synchronized. Please retry.",
+				})
+			}
+			return
+		}
+	}
 
 	// Broadcast phase change to ALL clients (including sender for sync)
 	phaseMessage := TeamMessage{
@@ -892,6 +1145,16 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 			room.Mutex.Lock()
 			if room.CurrentPhase == "countdown" || room.CurrentPhase == "setup" {
 				room.CurrentPhase = "openingFor"
+				if err := persistTeamDebatePhase(room.DebateID, "openingFor"); err != nil {
+					room.CurrentPhase = "countdown"
+					room.Mutex.Unlock()
+					log.Printf("failed to persist debate start for room %s: %v", roomKey, err)
+					broadcastAll(room, map[string]any{
+						"type":    "phaseChangeError",
+						"message": "The debate could not be started. Please retry.",
+					})
+					return
+				}
 
 				// Broadcast phase change to ALL clients using proper TeamMessage format
 				phaseMessage := TeamMessage{
@@ -1084,6 +1347,16 @@ func handleCheckStart(room *TeamRoom, conn *websocket.Conn, roomKey string) {
 			room.Mutex.Lock()
 			if room.CurrentPhase == "countdown" || room.CurrentPhase == "setup" {
 				room.CurrentPhase = "openingFor"
+				if err := persistTeamDebatePhase(room.DebateID, "openingFor"); err != nil {
+					room.CurrentPhase = "countdown"
+					room.Mutex.Unlock()
+					log.Printf("failed to persist debate start for room %s: %v", roomKey, err)
+					broadcastAll(room, map[string]any{
+						"type":    "phaseChangeError",
+						"message": "The debate could not be started. Please retry.",
+					})
+					return
+				}
 
 				// Broadcast phase change to ALL clients
 				phaseMessage := TeamMessage{

@@ -4,7 +4,6 @@ import {
   useState,
   useEffect,
   useCallback,
-  useRef,
   ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -64,9 +63,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(message);
   }, []);
 
-const currentRequest = useRef(0);
+let currentRequest = 0;
 const verifyToken = useCallback(async () => {
-  const requestId = ++currentRequest.current;
+  const requestId = ++currentRequest;
 
   const storedToken = localStorage.getItem('token');
   if (!storedToken) return;
@@ -78,13 +77,13 @@ const verifyToken = useCallback(async () => {
     });
 
     // ignore if outdated
-    if (requestId !== currentRequest.current) return;
+    if (requestId !== currentRequest) return;
 
     if (!response.ok) {
       localStorage.removeItem('token');
       setToken(null);
       setUser(null);
-      navigate('/auth');
+      navigate('/login');
       return;
     }
 
@@ -96,13 +95,13 @@ const verifyToken = useCallback(async () => {
     });
 
     // ignore if outdated
-    if (requestId !== currentRequest.current) return;
+    if (requestId !== currentRequest) return;
 
     if (userResponse.ok) {
       const responseData = await userResponse.json();
 
       // ignore if outdated
-      if (requestId !== currentRequest.current) return;
+      if (requestId !== currentRequest) return;
 
       const userData = responseData.profile;
 
@@ -130,14 +129,12 @@ const verifyToken = useCallback(async () => {
       };
 
       // final safety check
-      if (requestId !== currentRequest.current) return;
+      if (requestId !== currentRequest) return;
 
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
     }
   } catch (error) {
-    if (requestId !== currentRequest.current) return;
-
     console.log('error', error);
     logout();
   }
@@ -408,7 +405,6 @@ const verifyToken = useCallback(async () => {
   };
 
   const logout = () => {
-    ++currentRequest.current;
     setError(null);
     setToken(null);
     localStorage.removeItem('token');

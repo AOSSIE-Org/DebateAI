@@ -70,6 +70,7 @@ type TeamDebate struct {
 	Team1Stance   string             `bson:"team1Stance" json:"team1Stance"` // "for" or "against"
 	Team2Stance   string             `bson:"team2Stance" json:"team2Stance"` // "for" or "against"
 	Status        string             `bson:"status" json:"status"`           // "waiting", "active", "finished"
+	CurrentPhase  string             `bson:"currentPhase,omitempty" json:"currentPhase,omitempty"`
 	CurrentTurn   string             `bson:"currentTurn" json:"currentTurn"` // "team1" or "team2"
 	CurrentUserID primitive.ObjectID `bson:"currentUserId,omitempty" json:"currentUserId,omitempty"`
 	TurnCount     int                `bson:"turnCount" json:"turnCount"`

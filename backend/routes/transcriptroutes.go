@@ -13,6 +13,7 @@ func SetupTranscriptRoutes(router *gin.RouterGroup) {
 	})
 
 	router.POST("/submit-transcripts", controllers.SubmitTranscripts)
+	router.GET("/debate-results/:roomId", controllers.GetDebateResultHandler)
 	router.POST("/save-transcript", controllers.SaveDebateTranscriptHandler)
 	router.GET("/debate-stats", controllers.GetDebateStatsHandler)
 	router.POST("/create-test-transcript", controllers.CreateTestTranscriptHandler)

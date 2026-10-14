@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"os"
 )
 
@@ -48,7 +49,7 @@ func SubmitTranscripts(c *gin.Context) {
 
 	token = strings.TrimPrefix(token, "Bearer ")
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
- 	if err != nil || !valid || email == "" {
+	if err != nil || !valid || email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}
@@ -500,4 +501,28 @@ func UpdateTranscriptResultHandler(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"message": "Transcript result updated successfully"})
+}
+
+// GetDebateResultHandler lets every participant retrieve the shared judgment once it is ready.
+func GetDebateResultHandler(c *gin.Context) {
+	roomID := strings.TrimSpace(c.Param("roomId"))
+	if roomID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Room ID is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	var result models.DebateResult
+	err := db.MongoDatabase.Collection("debate_results").FindOne(ctx, bson.M{"roomId": roomID}).Decode(&result)
+	if err == mongo.ErrNoDocuments {
+		c.JSON(http.StatusAccepted, gin.H{"message": "Judgment pending"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve debate judgment"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Debate judged", "result": result.Result})
 }

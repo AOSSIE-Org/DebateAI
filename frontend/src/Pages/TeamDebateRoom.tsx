@@ -6,10 +6,12 @@ import { userAtom } from "@/state/userAtom";
 import { useUser } from "@/hooks/useUser";
 import { getTeamDebate } from "@/services/teamDebateService";
 import { Button } from "@/components/ui/button";
+import { Mic, MicOff } from "lucide-react";
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
 import { getAuthToken } from "@/utils/auth";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import ReconnectingWebSocket from "reconnecting-websocket";
 
 // Define debate phases as an enum (same as OnlineDebateRoom)
 enum DebatePhase {
@@ -27,6 +29,7 @@ enum DebatePhase {
 
 // Define debate roles
 type DebateRole = "for" | "against";
+type TeamSocket = Pick<ReconnectingWebSocket, "readyState" | "send" | "close">;
 
 type JudgmentData = {
   opening_statement: {
@@ -70,6 +73,18 @@ interface UserDetails {
   elo: number;
   avatarUrl?: string;
   displayName?: string;
+  teamId?: string;
+  cameraOn?: boolean;
+  microphoneOn?: boolean;
+}
+
+interface TranscriptEntry {
+  transcriptId: string;
+  phase: DebatePhase;
+  userId: string;
+  username: string;
+  speechText: string;
+  timestamp: number;
 }
 
 // Define WebSocket message structure
@@ -85,6 +100,8 @@ interface WSMessage {
   message?: string;
   userDetails?: UserDetails;
   roomParticipants?: UserDetails[];
+  participant?: UserDetails;
+  participants?: UserDetails[];
   userId?: string;
   username?: string;
   timestamp?: number;
@@ -97,7 +114,10 @@ interface WSMessage {
   isMuted?: boolean;
   currentTurn?: string;
   speechText?: string;
-  liveTranscript?: string;
+  transcriptId?: string;
+  entries?: TranscriptEntry[];
+  cameraOn?: boolean;
+  microphoneOn?: boolean;
   teamId?: string;
   team1Members?: TeamMember[];
   team2Members?: TeamMember[];
@@ -132,6 +152,49 @@ const BASE_URL =
   (config.baseUrl as string | undefined)?.replace(/\/$/, "") ??
   window.location.origin;
 
+const renegotiatePeerConnection = async (
+  connection: RTCPeerConnection,
+  fromUserId: string,
+  targetUserId: string,
+  socket: TeamSocket | null
+) => {
+  const offer = await connection.createOffer();
+  await connection.setLocalDescription(offer);
+  if (socket?.readyState === WebSocket.OPEN) {
+    socket.send(
+      JSON.stringify({
+        type: "offer",
+        fromUserId,
+        targetUserId,
+        offer: { type: offer.type, sdp: offer.sdp },
+      })
+    );
+  }
+};
+
+const getMediaErrorMessage = (device: "camera" | "microphone", error: unknown) => {
+  const errorName =
+    error instanceof DOMException ? error.name : "";
+  switch (errorName) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return `Allow ${device} access for this site in your browser settings, then try again.`;
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return `No ${device} was found. Connect or select a ${device} and try again.`;
+    case "NotReadableError":
+    case "TrackStartError":
+      return `Your ${device} is already in use by another app or tab. Close it there and try again.`;
+    case "OverconstrainedError":
+    case "ConstraintNotSatisfiedError":
+      return `The selected ${device} does not support the requested settings. Check your device settings and try again.`;
+    case "SecurityError":
+      return `The browser blocked ${device} access. Open this debate on HTTPS or localhost and allow access.`;
+    default:
+      return `Could not start your ${device}. Check browser permissions and make sure the device is available.`;
+  }
+};
+
 // Function to extract JSON from response
 const extractJSON = (response: string): string => {
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
@@ -148,18 +211,6 @@ const TeamDebateRoom: React.FC = () => {
   // Use user from hook if available, otherwise fallback to atom
   const currentUser = userFromHook || user;
   
-  // Debug: Log user state
-  useEffect(() => {
-    console.log("[TeamDebateRoom] User state:", {
-      userFromAtom: user?.id,
-      userFromHook: userFromHook?.id,
-      currentUser: currentUser?.id,
-      isUserLoading,
-      isAuthenticated,
-      hasToken: !!getAuthToken()
-    });
-  }, [user?.id, userFromHook?.id, currentUser?.id, isUserLoading, isAuthenticated]);
-
   // Debate state
   const [debate, setDebate] = useState<any>(null);
   const [topic, setTopic] = useState("");
@@ -188,12 +239,14 @@ const TeamDebateRoom: React.FC = () => {
   const [hasDeterminedTeam, setHasDeterminedTeam] = useState(false);
 
   // Refs for WebSocket, PeerConnections, and media elements
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const pcRefs = useRef<Map<string, RTCPeerConnection>>(new Map());
   const localVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const debateStartedRef = useRef<boolean>(false); // Track if debate has started to prevent popup reopening
+  const countdownCompletedRef = useRef(false);
+  const finalSubmissionStartedRef = useRef(false);
   const currentUserIdRef = useRef<string | null>(null);
   const myTeamIdRef = useRef<string | null>(null);
   const isTeam1Ref = useRef<boolean>(false);
@@ -206,9 +259,43 @@ const TeamDebateRoom: React.FC = () => {
   const [remoteStreams, setRemoteStreams] = useState<
     Map<string, MediaStream>
   >(new Map());
+  const [remoteMediaStates, setRemoteMediaStates] = useState<
+    Map<string, { cameraOn: boolean; microphoneOn: boolean }>
+  >(new Map());
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [isWsConnected, setIsWsConnected] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isMicrophoneOn, setIsMicrophoneOn] = useState(false);
+  const publishMediaState = useCallback((cameraOn: boolean, microphoneOn: boolean) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({ type: "mediaState", cameraOn, microphoneOn })
+      );
+    }
+  }, []);
 
+  const isMyTurn =
+    !!localRole &&
+    ((debatePhase.includes("For") && localRole === "for") ||
+      (debatePhase.includes("Against") && localRole === "against"));
+  const canSpeakNow =
+    isMyTurn &&
+    debatePhase !== DebatePhase.Setup &&
+    debatePhase !== DebatePhase.Finished;
+  const canSpeakNowRef = useRef(canSpeakNow);
+  canSpeakNowRef.current = canSpeakNow;
+
+  useEffect(() => {
+    if (canSpeakNow || !isMicrophoneOn) return;
+    localStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    setIsMicrophoneOn(false);
+    publishMediaState(
+      localStreamRef.current?.getVideoTracks().some((track) => track.enabled) ?? false,
+      false
+    );
+  }, [canSpeakNow, isMicrophoneOn, publishMediaState]);
 
   // Timer state
   const [timer, setTimer] = useState<number>(0);
@@ -216,13 +303,68 @@ const TeamDebateRoom: React.FC = () => {
 
   // Speech recognition state
   const [isListening, setIsListening] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState("");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [speechTranscripts, setSpeechTranscripts] = useState<{
     [key: string]: string;
   }>({});
+  const speechTranscriptsRef = useRef(speechTranscripts);
+  const seenTranscriptIdsRef = useRef(new Set<string>());
   const [speechRecognitionDisabled, setSpeechRecognitionDisabled] = useState(false);
+  const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
+  const activeSpeakerTimeoutRef = useRef<number | null>(null);
+  const connectedParticipantsRef = useRef<Set<string>>(new Set());
+  const peerRetryRef = useRef<(remoteUserId: string) => void>(() => {});
+  const speechRecognitionRunningRef = useRef(false);
+  const speechRecognitionRestartRef = useRef<number | null>(null);
+  const speechRecognitionPhaseRef = useRef(DebatePhase.Setup);
+  const speechRecognitionStopWaitersRef = useRef<Array<() => void>>([]);
+  const speechRecognitionStopTimeoutRef = useRef<number | null>(null);
+  const speechRecognitionContextRef = useRef({
+    isMyTurn: false,
+    phase: DebatePhase.Setup,
+    microphoneEnabled: false,
+    disabled: false,
+    userId: undefined as string | undefined,
+    displayName: undefined as string | undefined,
+  });
+
+  const markActiveSpeaker = useCallback((userId: string) => {
+    setActiveSpeakerId(userId);
+    if (activeSpeakerTimeoutRef.current !== null) {
+      window.clearTimeout(activeSpeakerTimeoutRef.current);
+    }
+    activeSpeakerTimeoutRef.current = window.setTimeout(() => {
+      setActiveSpeakerId(null);
+      activeSpeakerTimeoutRef.current = null;
+    }, 1800);
+  }, []);
+
+  const appendTranscript = useCallback((
+    phase: DebatePhase,
+    text: string,
+    transcriptId?: string
+  ) => {
+    if (transcriptId && seenTranscriptIdsRef.current.has(transcriptId)) return;
+    if (transcriptId) seenTranscriptIdsRef.current.add(transcriptId);
+    const existing = speechTranscriptsRef.current[phase] || "";
+    const nextTranscript = `${existing}\n${text}`.trim();
+    const nextTranscripts = {
+      ...speechTranscriptsRef.current,
+      [phase]: nextTranscript,
+    };
+    speechTranscriptsRef.current = nextTranscripts;
+    setSpeechTranscripts(nextTranscripts);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (activeSpeakerTimeoutRef.current !== null) {
+        window.clearTimeout(activeSpeakerTimeoutRef.current);
+      }
+    },
+    []
+  );
 
   // Popup and countdown state
   const [showSetupPopup, setShowSetupPopup] = useState(true);
@@ -255,13 +397,18 @@ const TeamDebateRoom: React.FC = () => {
   const toggleCamera = useCallback(async () => {
     const shouldEnable = !isCameraOn;
 
-    // Acquire a stream if we're turning the camera back on after it was released
-    if (shouldEnable && !localStreamRef.current) {
+    if (
+      shouldEnable &&
+      (!localStreamRef.current || localStreamRef.current.getVideoTracks().length === 0)
+    ) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const cameraStream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 },
-          audio: true,
+          audio: false,
         });
+        const stream = localStreamRef.current ?? new MediaStream();
+        const videoTracks = cameraStream.getVideoTracks();
+        videoTracks.forEach((track) => stream.addTrack(track));
         localStreamRef.current = stream;
         setLocalStream(stream);
 
@@ -269,11 +416,20 @@ const TeamDebateRoom: React.FC = () => {
         if (localVideoEl) {
           localVideoEl.srcObject = stream;
         }
+        pcRefs.current.forEach((connection, remoteUserId) => {
+          videoTracks.forEach((track) => connection.addTrack(track, stream));
+          void renegotiatePeerConnection(
+            connection,
+            currentUserIdRef.current || "",
+            remoteUserId,
+            wsRef.current
+          ).catch((error: unknown) => {
+            console.error("Failed to share camera with debate participant:", error);
+          });
+        });
       } catch (error) {
         console.error("toggleCamera: failed to enable camera", error);
-        setMediaError(
-          "Unable to access the camera. Please check permissions and try again."
-        );
+        setMediaError(getMediaErrorMessage("camera", error));
         return;
       }
     }
@@ -289,14 +445,78 @@ const TeamDebateRoom: React.FC = () => {
     });
 
     setIsCameraOn(shouldEnable);
+    publishMediaState(
+      shouldEnable,
+      stream.getAudioTracks().some((track) => track.enabled)
+    );
     if (shouldEnable) {
       setMediaError(null);
     }
-  }, [currentUser?.id, isCameraOn, setIsCameraOn]);
+  }, [currentUser?.id, isCameraOn, publishMediaState]);
 
-  
+  const toggleMicrophone = useCallback(async () => {
+    if (!canSpeakNow) return;
+
+    let stream = localStreamRef.current;
+    let audioTracks = stream?.getAudioTracks() ?? [];
+    let acquiredTrack = false;
+
+    if (audioTracks.length === 0) {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Microphone access is not available in this browser.");
+        }
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!canSpeakNowRef.current) {
+          audioStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        const audioTrack = audioStream.getAudioTracks()[0];
+        if (!audioTrack) {
+          throw new Error("No microphone track was provided by the browser.");
+        }
+        if (!stream) {
+          stream = new MediaStream();
+          localStreamRef.current = stream;
+        }
+        const activeStream = stream;
+        activeStream.addTrack(audioTrack);
+        audioTracks = [audioTrack];
+        acquiredTrack = true;
+        setLocalStream(activeStream);
+
+        pcRefs.current.forEach((connection, remoteUserId) => {
+          connection.addTrack(audioTrack, activeStream);
+          void renegotiatePeerConnection(
+            connection,
+            currentUserIdRef.current || "",
+            remoteUserId,
+            wsRef.current
+          ).catch((error: unknown) => {
+            console.error("Failed to share microphone with debate participant:", error);
+          });
+        });
+      } catch (error) {
+        console.error("toggleMicrophone: failed to enable microphone", error);
+          setMediaError(getMediaErrorMessage("microphone", error));
+        return;
+      }
+    }
+
+    const shouldEnable = acquiredTrack || !isMicrophoneOn;
+    audioTracks.forEach((track) => {
+      track.enabled = shouldEnable;
+    });
+    setIsMicrophoneOn(shouldEnable);
+    publishMediaState(
+      localStreamRef.current?.getVideoTracks().some((track) => track.enabled) ?? false,
+      shouldEnable
+    );
+    if (shouldEnable) setMediaError(null);
+  }, [canSpeakNow, isMicrophoneOn, publishMediaState]);
 
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const pendingOffersRef = useRef<Map<string, RTCSessionDescriptionInit[]>>(new Map());
   const initiatedOffersRef = useRef<Set<string>>(new Set());
 
   const sendSignalMessage = useCallback((message: Record<string, unknown>) => {
@@ -336,6 +556,7 @@ const TeamDebateRoom: React.FC = () => {
         pcRefs.current.delete(remoteUserId);
       }
       pendingCandidatesRef.current.delete(remoteUserId);
+      pendingOffersRef.current.delete(remoteUserId);
       initiatedOffersRef.current.delete(remoteUserId);
 
       setRemoteStreams((prev) => {
@@ -395,7 +616,14 @@ const TeamDebateRoom: React.FC = () => {
 
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
-        if (state === "failed" || state === "disconnected" || state === "closed") {
+        if (state === "failed") {
+          closePeerConnection(remoteUserId);
+          window.setTimeout(() => {
+            if (connectedParticipantsRef.current.has(remoteUserId)) {
+              peerRetryRef.current(remoteUserId);
+            }
+          }, 1000);
+        } else if (state === "closed") {
           closePeerConnection(remoteUserId);
         }
       };
@@ -423,6 +651,33 @@ const TeamDebateRoom: React.FC = () => {
     }
     pendingCandidatesRef.current.delete(remoteUserId);
   }, []);
+
+  const processIncomingOffer = useCallback(
+    async (remoteUserId: string, offer: RTCSessionDescriptionInit) => {
+      let pc = pcRefs.current.get(remoteUserId);
+      if (!pc) pc = createPeerConnection(remoteUserId);
+      if (!pc) return;
+
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        await flushPendingCandidates(remoteUserId);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        const currentUserId = currentUserIdRef.current;
+        if (currentUserId) {
+          sendSignalMessage({
+            type: "answer",
+            fromUserId: currentUserId,
+            targetUserId: remoteUserId,
+            answer: { type: answer.type, sdp: answer.sdp },
+          });
+        }
+      } catch (error) {
+        console.error("Failed to process WebRTC offer", error);
+      }
+    },
+    [createPeerConnection, flushPendingCandidates, sendSignalMessage]
+  );
 
   const initiateOffer = useCallback(
     async (remoteUserId: string) => {
@@ -473,6 +728,24 @@ const TeamDebateRoom: React.FC = () => {
   );
 
   useEffect(() => {
+    peerRetryRef.current = ensurePeerConnection;
+    return () => {
+      peerRetryRef.current = () => {};
+    };
+  }, [ensurePeerConnection]);
+
+  useEffect(() => {
+    if (!localStream) return;
+    const pending = Array.from(pendingOffersRef.current.entries());
+    pendingOffersRef.current.clear();
+    pending.forEach(([remoteUserId, offers]) => {
+      offers.forEach((offer) => {
+        void processIncomingOffer(remoteUserId, offer);
+      });
+    });
+  }, [localStream, processIncomingOffer]);
+
+  useEffect(() => {
     remoteStreams.forEach((stream, userId) => {
       attachStreamToVideo(userId, stream);
     });
@@ -520,18 +793,6 @@ const TeamDebateRoom: React.FC = () => {
     DebatePhase.ClosingAgainst,
     DebatePhase.Finished,
   ];
-
-  // Determine if it's the local team's turn to speak
-  const isMyTurn = React.useMemo(() => {
-    if (!localRole || !debatePhase) return false;
-    
-    const isForPhase = debatePhase.includes("For");
-    const isAgainstPhase = debatePhase.includes("Against");
-    
-    if (isForPhase && localRole === "for") return true;
-    if (isAgainstPhase && localRole === "against") return true;
-    return false;
-  }, [debatePhase, localRole]);
 
   // Fetch debate details - proceed if we have debateId and either user or token
   useEffect(() => {
@@ -633,15 +894,6 @@ const TeamDebateRoom: React.FC = () => {
         setTimer((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current!);
-            if (isMyTurn && localRole) {
-              // Save any existing transcript for this phase
-              const existingTranscript =
-                speechTranscripts[debatePhase] || "No response";
-              localStorage.setItem(
-                `${debateId}_${debatePhase}_${localRole}`,
-                existingTranscript
-              );
-            }
             handlePhaseDone();
             return 0;
           }
@@ -652,10 +904,10 @@ const TeamDebateRoom: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
+  }, [timer, debatePhase, isMyTurn, localRole, debateId]);
 
   useEffect(() => {
-  currentUserIdRef.current = currentUser?.id;
+  currentUserIdRef.current = currentUser?.id ?? null;
   myTeamIdRef.current = myTeamId;
   isTeam1Ref.current = isTeam1;
   debatePhaseRef.current = debatePhase;
@@ -685,33 +937,98 @@ const TeamDebateRoom: React.FC = () => {
     let cancelled = false;
 
     const ensureMediaStream = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720 },
-          audio: true,
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-
-        const localVideo = localVideoRefs.current.get(
-          currentUserIdRef.current || ""
-        );
-        if (localVideo) {
-          localVideo.srcObject = stream;
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setMediaError(
-          "Failed to access camera/microphone. Please check permissions."
-        );
-        console.error("Media error:", err);
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMediaError("Camera and microphone access require a supported browser and a secure connection (HTTPS or localhost).");
+        return;
       }
+      let audioTracks: MediaStreamTrack[] = [];
+      let videoTracks: MediaStreamTrack[] = [];
+      let audioError: unknown;
+      let videoError: unknown;
+
+      try {
+        audioTracks = (await navigator.mediaDevices.getUserMedia({ audio: true })).getAudioTracks();
+      } catch (error) {
+        audioError = error;
+        console.error("Microphone access failed:", error);
+      }
+      try {
+        videoTracks = (
+          await navigator.mediaDevices.getUserMedia({
+            video: { width: 1280, height: 720 },
+            audio: false,
+          })
+        ).getVideoTracks();
+      } catch (error) {
+        videoError = error;
+        console.error("Camera access failed:", error);
+      }
+
+      if (cancelled) {
+        [...audioTracks, ...videoTracks].forEach((track) => track.stop());
+        return;
+      }
+
+      const stream = localStreamRef.current ?? new MediaStream();
+      audioTracks.forEach((track) => {
+        if (stream.getAudioTracks().length === 0) stream.addTrack(track);
+        else track.stop();
+      });
+      videoTracks.forEach((track) => {
+        if (stream.getVideoTracks().length === 0) stream.addTrack(track);
+        else track.stop();
+      });
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+      });
+      if (stream.getAudioTracks().length === 0 && !audioError) {
+        audioError = new Error("No microphone track was provided.");
+      }
+      if (stream.getVideoTracks().length === 0 && !videoError) {
+        videoError = new Error("No camera track was provided.");
+      }
+
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      const microphoneOn = stream.getAudioTracks().some((track) => track.enabled);
+      const cameraOn = stream.getVideoTracks().some((track) => track.enabled);
+      setIsMicrophoneOn(microphoneOn);
+      setIsCameraOn(cameraOn);
+      publishMediaState(cameraOn, microphoneOn);
+
+      pcRefs.current.forEach((connection, remoteUserId) => {
+        const existingTracks = new Set(
+          connection.getSenders().map((sender) => sender.track?.id).filter(Boolean)
+        );
+        stream.getTracks().forEach((track) => {
+          if (!existingTracks.has(track.id)) connection.addTrack(track, stream);
+        });
+        const currentUserId = currentUserIdRef.current;
+        if (
+          currentUserId &&
+          currentUserId < remoteUserId &&
+          connection.signalingState === "stable" &&
+          connection.getSenders().some((sender) => sender.track)
+        ) {
+          void renegotiatePeerConnection(
+            connection,
+            currentUserId,
+            remoteUserId,
+            wsRef.current
+          ).catch((error: unknown) => {
+            console.error("Failed to renegotiate debate media:", error);
+          });
+        }
+      });
+
+      const localVideo = localVideoRefs.current.get(currentUserIdRef.current || "");
+      if (localVideo) localVideo.srcObject = stream;
+      setMediaError(audioError || videoError
+        ? [audioError ? getMediaErrorMessage("microphone", audioError) : "",
+            videoError ? getMediaErrorMessage("camera", videoError) : ""]
+            .filter(Boolean)
+            .join(" ")
+        : null);
     };
 
     const wsUrl = new URL("/ws/team", BASE_URL);
@@ -719,7 +1036,13 @@ const TeamDebateRoom: React.FC = () => {
     wsUrl.searchParams.set("debateId", debateId);
     wsUrl.searchParams.set("token", token);
 
-    const ws = new WebSocket(wsUrl.toString());
+    const ws = new ReconnectingWebSocket(wsUrl.toString(), [], {
+      connectionTimeout: 4000,
+      maxRetries: Infinity,
+      maxReconnectionDelay: 10000,
+      minReconnectionDelay: 1000,
+      reconnectionDelayGrowFactor: 1.3,
+    });
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -728,9 +1051,14 @@ const TeamDebateRoom: React.FC = () => {
         return;
       }
 
+      setIsWsConnected(true);
       console.log("Team debate WebSocket connected");
       ws.send(JSON.stringify({ type: "join" }));
-      ensureMediaStream();
+      publishMediaState(
+        localStreamRef.current?.getVideoTracks().some((track) => track.enabled) ?? false,
+        localStreamRef.current?.getAudioTracks().some((track) => track.enabled) ?? false
+      );
+      if (!localStreamRef.current) void ensureMediaStream();
     };
 
     ws.onmessage = async (event) => {
@@ -740,8 +1068,6 @@ const TeamDebateRoom: React.FC = () => {
       const amTeam1 = isTeam1Ref.current;
       const currentMyTeamId = myTeamIdRef.current;
       const currentUserId = currentUserIdRef.current;
-      const currentPhase = debatePhaseRef.current;
-
       switch (data.type) {
         case "stateSync": {
           // Sync all state when joining or receiving state update
@@ -785,6 +1111,29 @@ const TeamDebateRoom: React.FC = () => {
           if (data.team2Ready !== undefined) setTeam2ReadyCount(data.team2Ready);
           if (data.team1MembersCount !== undefined) setTeam1MembersCount(data.team1MembersCount);
           if (data.team2MembersCount !== undefined) setTeam2MembersCount(data.team2MembersCount);
+          if (data.roomParticipants) {
+            connectedParticipantsRef.current = new Set(
+              data.roomParticipants
+                .map((participant) => participant.id)
+                .filter((id) => id !== currentUserId)
+            );
+            setRemoteMediaStates(
+              new Map(
+                data.roomParticipants
+                  .filter((participant) => participant.id !== currentUserId)
+                  .map((participant) => [
+                    participant.id,
+                    {
+                      cameraOn: participant.cameraOn ?? false,
+                      microphoneOn: participant.microphoneOn ?? false,
+                    },
+                  ])
+              )
+            );
+            data.roomParticipants.forEach((participant) => {
+              if (participant.id !== currentUserId) ensurePeerConnection(participant.id);
+            });
+          }
           
           // Update team names if provided (for late joiners)
           if ((data as any).team1Name) {
@@ -888,6 +1237,78 @@ const TeamDebateRoom: React.FC = () => {
               return updated;
             });
           }
+          break;
+        }
+        case "participantJoined": {
+          const participant = data.participant;
+          if (!participant?.id) break;
+          if (participant.id !== currentUserId) {
+            connectedParticipantsRef.current.add(participant.id);
+          }
+          setRemoteMediaStates((previous) => {
+            const next = new Map(previous);
+            next.set(participant.id, {
+              cameraOn: participant.cameraOn ?? false,
+              microphoneOn: participant.microphoneOn ?? false,
+            });
+            return next;
+          });
+          if (participant.teamId) {
+            const member: TeamMember = {
+              userId: participant.id,
+              email: "",
+              displayName: participant.displayName || participant.username || "Debater",
+              elo: participant.elo ?? 0,
+              avatarUrl: participant.avatarUrl,
+            };
+            const updateMembers = (members: TeamMember[]) =>
+              members.some((existing) => existing.userId === member.userId)
+                ? members.map((existing) =>
+                    existing.userId === member.userId
+                      ? {
+                          ...existing,
+                          displayName: member.displayName || existing.displayName,
+                          avatarUrl: member.avatarUrl || existing.avatarUrl,
+                        }
+                      : existing
+                  )
+                : [...members, member];
+            if (participant.teamId === currentMyTeamId) {
+              setMyTeamMembers(updateMembers);
+            } else {
+              setOpponentTeamMembers(updateMembers);
+            }
+          }
+          if (participant.id !== currentUserId) ensurePeerConnection(participant.id);
+          break;
+        }
+        case "mediaState": {
+          if (!data.userId) break;
+          setRemoteMediaStates((previous) => {
+            const next = new Map(previous);
+            next.set(data.userId!, {
+              cameraOn: data.cameraOn ?? false,
+              microphoneOn: data.microphoneOn ?? false,
+            });
+            return next;
+          });
+          break;
+        }
+        case "transcriptSync": {
+          data.entries?.forEach((entry) => {
+            if (
+              entry.transcriptId &&
+              entry.userId &&
+              typeof entry.speechText === "string" &&
+              entry.speechText.trim()
+            ) {
+              appendTranscript(
+                entry.phase,
+                `${entry.username || "Debater"}: ${entry.speechText.trim()}`,
+                entry.transcriptId
+              );
+            }
+          });
           break;
         }
         case "topicChange":
@@ -1065,24 +1486,25 @@ const TeamDebateRoom: React.FC = () => {
           }
           break;
         }
-        case "speechText": {
-          if (data.userId && data.speechText) {
-            const targetPhase = data.phase || debatePhaseRef.current;
-            setSpeechTranscripts((prev) => ({
-            ...prev,
-              [targetPhase]:
-                (prev[targetPhase] || "") + " " + data.speechText,
-            }));
-          }
+        case "phaseChangeError": {
+          setPopup({
+            show: true,
+            message: data.message || "The debate phase could not be synchronized.",
+            isJudging: false,
+          });
           break;
         }
-        case "liveTranscript": {
-          if (
-            data.userId &&
-            data.liveTranscript &&
-            data.userId !== currentUserId
-          ) {
-            setCurrentTranscript(data.liveTranscript);
+        case "error": {
+          setSpeechError(data.message || "The debate room reported an error.");
+          break;
+        }
+        case "speechText": {
+          if (data.userId && typeof data.speechText === "string" && data.speechText.trim()) {
+            const targetPhase = data.phase || debatePhaseRef.current;
+            const speaker = data.username?.trim() || "Teammate";
+            const speechText = data.speechText.trim();
+            markActiveSpeaker(data.userId);
+            appendTranscript(targetPhase, `${speaker}: ${speechText}`, data.transcriptId);
           }
           break;
         }
@@ -1113,32 +1535,12 @@ const TeamDebateRoom: React.FC = () => {
             break;
           }
           {
-            let pc = pcRefs.current.get(data.fromUserId);
-            if (!pc) {
-              pc = createPeerConnection(data.fromUserId);
-            }
-            if (!pc) break;
-            try {
-              await pc.setRemoteDescription(
-                new RTCSessionDescription(data.offer)
-              );
-              await flushPendingCandidates(data.fromUserId);
-
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              if (currentUserId) {
-                sendSignalMessage({
-                  type: "answer",
-                  fromUserId: currentUserId,
-                  targetUserId: data.fromUserId,
-                  answer: {
-                    type: answer.type,
-                    sdp: answer.sdp,
-                  },
-                });
-              }
-            } catch (error) {
-              console.error("Failed to process WebRTC offer", error);
+            if (!localStreamRef.current) {
+              const offers = pendingOffersRef.current.get(data.fromUserId) || [];
+              offers.push(data.offer);
+              pendingOffersRef.current.set(data.fromUserId, offers);
+            } else {
+              await processIncomingOffer(data.fromUserId, data.offer);
             }
           }
           break;
@@ -1176,7 +1578,13 @@ const TeamDebateRoom: React.FC = () => {
             if (!pc) {
               pc = createPeerConnection(data.fromUserId);
             }
-            if (!pc) break;
+            if (!pc) {
+              const queue =
+                pendingCandidatesRef.current.get(data.fromUserId) || [];
+              queue.push(data.candidate);
+              pendingCandidatesRef.current.set(data.fromUserId, queue);
+              break;
+            }
 
             const candidateInit = data.candidate as RTCIceCandidateInit;
             try {
@@ -1195,14 +1603,29 @@ const TeamDebateRoom: React.FC = () => {
           break;
         case "leave":
           if (data.userId) {
+            connectedParticipantsRef.current.delete(data.userId);
             closePeerConnection(data.userId);
+            setRemoteMediaStates((previous) => {
+              const next = new Map(previous);
+              next.delete(data.userId!);
+              return next;
+            });
+            setActiveSpeakerId((activeSpeaker) =>
+              activeSpeaker === data.userId ? null : activeSpeaker
+            );
           }
           break;
       }
     };
 
-    ws.onerror = (err) => console.error("WebSocket error:", err);
-    ws.onclose = () => console.log("WebSocket closed");
+    ws.onerror = (err) => {
+      setIsWsConnected(false);
+      console.error("WebSocket error:", err);
+    };
+    ws.onclose = () => {
+      if (!cancelled) setIsWsConnected(false);
+      console.log("WebSocket closed");
+    };
 
     return () => {
       cancelled = true;
@@ -1221,178 +1644,232 @@ const TeamDebateRoom: React.FC = () => {
     createPeerConnection,
     flushPendingCandidates,
     sendSignalMessage,
+    processIncomingOffer,
     closePeerConnection,
     myTeamId,
     currentUser?.id,
+    markActiveSpeaker,
+    appendTranscript,
+    publishMediaState,
   ]);
 
-  // Initialize Speech Recognition
   useEffect(() => {
-    if (speechRecognitionDisabled) {
-      recognitionRef.current = null;
+    speechRecognitionContextRef.current = {
+      isMyTurn,
+      phase: debatePhase,
+      microphoneEnabled: isMicrophoneOn,
+      disabled: speechRecognitionDisabled,
+      userId: currentUser?.id,
+      displayName: currentUser?.displayName,
+    };
+  }, [
+    isMyTurn,
+    debatePhase,
+    isMicrophoneOn,
+    speechRecognitionDisabled,
+    currentUser?.id,
+    currentUser?.displayName,
+  ]);
+
+  // Keep one recognition instance alive; changing turns or mic state should not abort it.
+  useEffect(() => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechRecognitionDisabled(true);
+      setSpeechError("Automatic speech transcription requires Chrome or Edge with speech recognition support.");
       return;
     }
 
-    const initializeSpeechRecognition = () => {
-      if (
-        "SpeechRecognition" in window ||
-        "webkitSpeechRecognition" in window
-      ) {
-        const SpeechRecognition =
-          window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-          setSpeechError("Speech recognition not available");
-          return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognitionRef.current = recognition;
+
+    recognition.onstart = () => {
+      speechRecognitionRunningRef.current = true;
+      setIsListening(true);
+      setSpeechError(null);
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const context = speechRecognitionContextRef.current;
+      let finalTranscript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0]?.transcript ?? "";
+        if (event.results[i].isFinal) finalTranscript += `${transcript} `;
+      }
+
+      if (finalTranscript.trim()) {
+        const speaker = context.displayName || "Speaker";
+        const phase = speechRecognitionPhaseRef.current;
+        const transcriptId =
+          typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `${context.userId || "speaker"}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        appendTranscript(phase, `${speaker}: ${finalTranscript.trim()}`, transcriptId);
+        if (context.userId) markActiveSpeaker(context.userId);
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(
+            JSON.stringify({
+              type: "speechText",
+              userId: context.userId,
+              username: speaker,
+              speechText: finalTranscript.trim(),
+              phase,
+              transcriptId,
+            })
+          );
         }
-        const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
-
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "en-US";
-
-        recognition.onstart = () => {
-          setIsListening(true);
-          setSpeechError(null);
-        };
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let interimTranscript = "";
-          let finalTranscript = "";
-
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const result = event.results[i];
-            if (result.isFinal) {
-              finalTranscript += result[0].transcript + " ";
-            } else {
-              interimTranscript += result[0].transcript;
-            }
-          }
-
-          if (finalTranscript.trim()) {
-            setSpeechTranscripts((prev) => ({
-              ...prev,
-              [debatePhase]: (
-                (prev[debatePhase] || "") + " " + finalTranscript
-              ).trim(),
-            }));
-
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(
-                JSON.stringify({
-                  type: "speechText",
-                  userId: currentUser?.id,
-                  username: currentUser?.displayName,
-                  speechText: finalTranscript,
-                  phase: debatePhase,
-                })
-              );
-            }
-          }
-          if (interimTranscript) {
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(
-                JSON.stringify({
-                  type: "liveTranscript",
-                  userId: currentUser?.id,
-                  username: currentUser?.displayName,
-                  liveTranscript: interimTranscript,
-                  phase: debatePhase,
-                })
-              );
-            }
-          }
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-          if (
-            isMyTurn &&
-            debatePhase !== DebatePhase.Setup &&
-            debatePhase !== DebatePhase.Finished
-            && !speechRecognitionDisabled
-          ) {
-            setTimeout(() => {
-              if (recognitionRef.current) {
-                try {
-                  recognitionRef.current.start();
-      } catch (error) {
-                  console.error("Error restarting speech recognition:", error);
-                }
-              }
-            }, 100);
-          }
-        };
-
-        recognition.onerror = (event: Event) => {
-          setIsListening(false);
-          console.error("Speech recognition error:", event);
-
-          const errorEvent = event as Event & { error?: string };
-          if (errorEvent.error === "not-allowed") {
-            setSpeechRecognitionDisabled(true);
-            setSpeechError(
-              "Speech recognition is blocked. Please grant microphone permission or disable speech-to-text."
-            );
-            try {
-              recognition.stop();
-            } catch {
-              // ignore
-            }
-            recognitionRef.current = null;
-          } else {
-            setSpeechError("Speech recognition error occurred.");
-          }
-        };
-      } else {
-        setSpeechRecognitionDisabled(true);
-        setSpeechError("Speech recognition not supported in this browser");
       }
     };
 
-    initializeSpeechRecognition();
+    recognition.onerror = (event: Event) => {
+      const error = (event as Event & { error?: string }).error || "unknown";
+      speechRecognitionRunningRef.current = false;
+      setIsListening(false);
+      console.error(`Speech recognition failed (${error}).`);
+
+      if (error === "aborted" || error === "no-speech") return;
+      if (error === "not-allowed" || error === "service-not-allowed") {
+        setSpeechRecognitionDisabled(true);
+        setSpeechError("Speech recognition permission was denied. Allow microphone access for this site, then reload the debate.");
+      } else if (error === "audio-capture") {
+        setSpeechError("Speech recognition cannot access a microphone. Check that one is connected and not in use by another app.");
+      } else if (error === "network") {
+        setSpeechError("The browser's speech-to-text service could not connect. Check your internet connection; transcription will retry while you are speaking.");
+      } else {
+        setSpeechError(`Speech recognition failed (${error}). Check microphone permissions and browser support.`);
+      }
+    };
+
+    recognition.onend = () => {
+      speechRecognitionRunningRef.current = false;
+      setIsListening(false);
+      if (speechRecognitionStopTimeoutRef.current !== null) {
+        window.clearTimeout(speechRecognitionStopTimeoutRef.current);
+        speechRecognitionStopTimeoutRef.current = null;
+      }
+      speechRecognitionStopWaitersRef.current.splice(0).forEach((resolve) => resolve());
+      const context = speechRecognitionContextRef.current;
+      if (
+        context.isMyTurn &&
+        context.microphoneEnabled &&
+        !context.disabled &&
+        context.phase !== DebatePhase.Setup &&
+        context.phase !== DebatePhase.Finished &&
+        speechRecognitionRestartRef.current === null
+      ) {
+        speechRecognitionRestartRef.current = window.setTimeout(() => {
+          speechRecognitionRestartRef.current = null;
+          const latest = speechRecognitionContextRef.current;
+          if (
+            latest.isMyTurn &&
+            latest.microphoneEnabled &&
+            !latest.disabled &&
+            !speechRecognitionRunningRef.current
+          ) {
+            try {
+              speechRecognitionPhaseRef.current = latest.phase;
+              speechRecognitionRunningRef.current = true;
+              recognition.start();
+            } catch (error) {
+              speechRecognitionRunningRef.current = false;
+              console.error("Failed to restart speech recognition:", error);
+            }
+          }
+        }, 300);
+      }
+    };
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      if (speechRecognitionRestartRef.current !== null) {
+        window.clearTimeout(speechRecognitionRestartRef.current);
+        speechRecognitionRestartRef.current = null;
       }
+      const wasRunning = speechRecognitionRunningRef.current;
+      speechRecognitionRunningRef.current = false;
+      recognitionRef.current = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      if (wasRunning) recognition.stop();
     };
-  }, [debatePhase, isMyTurn, currentUser?.id, currentUser?.displayName, speechRecognitionDisabled]);
+  }, [appendTranscript, markActiveSpeaker]);
 
-  // Start/stop speech recognition based on turn
   const startSpeechRecognition = useCallback(() => {
+    const context = speechRecognitionContextRef.current;
+    const recognition = recognitionRef.current;
     if (
-      !recognitionRef.current ||
-      speechRecognitionDisabled ||
-      isListening ||
-      debatePhase === DebatePhase.Setup ||
-      debatePhase === DebatePhase.Finished
+      !recognition ||
+      context.disabled ||
+      !context.microphoneEnabled ||
+      !context.isMyTurn ||
+      context.phase === DebatePhase.Setup ||
+      context.phase === DebatePhase.Finished ||
+      speechRecognitionRunningRef.current
     ) {
       return;
     }
 
     try {
-      recognitionRef.current.start();
+      speechRecognitionPhaseRef.current = context.phase;
+      speechRecognitionRunningRef.current = true;
+      recognition.start();
     } catch (error) {
-      console.error("Error starting speech recognition:", error);
+      speechRecognitionRunningRef.current = false;
+      console.error("Failed to start speech recognition:", error);
     }
-  }, [isListening, debatePhase, speechRecognitionDisabled]);
+  }, []);
 
-  const stopSpeechRecognition = useCallback(() => {
-    if (recognitionRef.current && isListening) {
+  const stopSpeechRecognition = useCallback((): Promise<void> => {
+    const recognition = recognitionRef.current;
+    if (speechRecognitionRestartRef.current !== null) {
+      window.clearTimeout(speechRecognitionRestartRef.current);
+      speechRecognitionRestartRef.current = null;
+    }
+    if (!recognition || !speechRecognitionRunningRef.current) {
+      return Promise.resolve();
+    }
+    speechRecognitionRunningRef.current = false;
+    return new Promise((resolve) => {
+      const finish = () => {
+        if (speechRecognitionStopTimeoutRef.current !== null) {
+          window.clearTimeout(speechRecognitionStopTimeoutRef.current);
+          speechRecognitionStopTimeoutRef.current = null;
+        }
+        speechRecognitionStopWaitersRef.current =
+          speechRecognitionStopWaitersRef.current.filter((waiter) => waiter !== finish);
+        resolve();
+      };
+      speechRecognitionStopWaitersRef.current.push(finish);
+      speechRecognitionStopTimeoutRef.current = window.setTimeout(finish, 1500);
       try {
-        recognitionRef.current.stop();
+        recognition.stop();
       } catch (error) {
-        console.error("Error stopping speech recognition:", error);
+        console.error("Failed to stop speech recognition cleanly:", error);
+        finish();
       }
-    }
-  }, [isListening]);
+    });
+  }, []);
 
- 
+  useEffect(() => {
+    if (canSpeakNow) return;
+
+    localStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    setIsMicrophoneOn(false);
+    stopSpeechRecognition();
+  }, [canSpeakNow, stopSpeechRecognition]);
+
   // Auto start/stop speech recognition based on turn
   useEffect(() => {
     if (
       isMyTurn &&
+      isMicrophoneOn &&
       debatePhase !== DebatePhase.Setup &&
       debatePhase !== DebatePhase.Finished
     ) {
@@ -1406,6 +1883,7 @@ const TeamDebateRoom: React.FC = () => {
     };
   }, [
     isMyTurn,
+    isMicrophoneOn,
     debatePhase,
     startSpeechRecognition,
     stopSpeechRecognition,
@@ -1416,19 +1894,34 @@ const TeamDebateRoom: React.FC = () => {
     const currentIndex = phaseOrder.indexOf(debatePhase);
     if (currentIndex >= 0 && currentIndex < phaseOrder.length - 1) {
       const nextPhase = phaseOrder[currentIndex + 1];
-      setDebatePhase(nextPhase);
-      wsRef.current?.send(
-        JSON.stringify({ type: "phaseChange", phase: nextPhase })
-      );
-    } else {
-      setDebatePhase(DebatePhase.Finished);
-      logMessageHistory();
+      const socket = wsRef.current;
+      if (socket?.readyState !== WebSocket.OPEN) {
+        console.error("Cannot advance debate phase while the WebSocket is disconnected.");
+        setPopup({
+          show: true,
+          message: "Connection lost. Reconnect before the debate can continue.",
+          isJudging: false,
+        });
+        return;
+      }
+      socket.send(JSON.stringify({ type: "phaseChange", phase: nextPhase }));
     }
   };
 
   // Log message history and send to backend (same as OnlineDebateRoom)
   const logMessageHistory = async () => {
     if (!localRole || !debateId) return;
+    speechRecognitionContextRef.current = {
+      ...speechRecognitionContextRef.current,
+      isMyTurn: false,
+      phase: DebatePhase.Finished,
+      microphoneEnabled: false,
+    };
+    localStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    setIsMicrophoneOn(false);
+    await stopSpeechRecognition();
 
     const debateTranscripts: { [key in DebatePhase]?: string } = {};
     const phasesForRole =
@@ -1447,10 +1940,7 @@ const TeamDebateRoom: React.FC = () => {
           ];
 
     phasesForRole.forEach((phase) => {
-      const transcript =
-        localStorage.getItem(`${debateId}_${phase}_${localRole}`) ||
-        speechTranscripts[phase] ||
-        "No response";
+      const transcript = speechTranscriptsRef.current[phase] || "No response";
       debateTranscripts[phase] = transcript;
     });
 
@@ -1462,38 +1952,96 @@ const TeamDebateRoom: React.FC = () => {
 
     try {
       const token = getAuthToken();
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+      const payload = {
+        roomId: debateId,
+        role: localRole,
+        transcripts: debateTranscripts,
+      };
       const response = await fetch(`${BASE_URL}/submit-transcripts`, {
-
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          roomId: debateId,
-          role: localRole,
-          transcripts: debateTranscripts,
-        }),
+        headers,
+        body: JSON.stringify(payload),
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.message === "Debate judged" || result.message === "Debate already judged") {
-          const jsonString = extractJSON(result.result);
-          const judgment: JudgmentData = JSON.parse(jsonString);
-          setJudgmentData(judgment);
-          setPopup({ show: false, message: "" });
-          setShowJudgment(true);
-        }
+      if (!response.ok) {
+        const errorBody: { error?: string } = await response.json();
+        throw new Error(
+          errorBody.error || `Transcript submission failed (${response.status})`
+        );
       }
+
+      let result: { message?: string; result?: string } = await response.json();
+      const deadline = Date.now() + 150_000;
+      while (
+        result.message !== "Debate judged" &&
+        result.message !== "Debate already judged" &&
+        Date.now() < deadline
+      ) {
+        setPopup({
+          show: true,
+          message:
+            result.message === "Waiting for teammates to submit"
+              ? "Waiting for every debater to submit their arguments..."
+              : result.message === "Debate has not ended"
+                ? "Waiting for the debate end to be confirmed..."
+              : result.message === "Waiting for opponent submission"
+                ? "Waiting for both teams' transcripts..."
+              : "The AI judge is analyzing the debate...",
+          isJudging: true,
+        });
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        const resultResponse = await fetch(
+          `${BASE_URL}/debate-results/${encodeURIComponent(debateId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (resultResponse.status === 202) {
+          result = { message: "Judgment pending" };
+          continue;
+        }
+        if (!resultResponse.ok) {
+          throw new Error(`Could not retrieve the AI judgment (${resultResponse.status})`);
+        }
+        result = await resultResponse.json();
+      }
+
+      if (result.message !== "Debate judged" && result.message !== "Debate already judged") {
+        throw new Error("The AI judge is taking longer than expected. Please reopen this debate shortly to check for results.");
+      }
+      if (!result.result) {
+        throw new Error("The AI judge returned an empty result.");
+      }
+      const jsonString = extractJSON(result.result);
+      const judgment: JudgmentData = JSON.parse(jsonString);
+      setJudgmentData(judgment);
+      setPopup({ show: false, message: "" });
+      setShowJudgment(true);
     } catch (error) {
-      console.error("Failed to submit transcripts:", error);
+      console.error("Failed to submit or retrieve debate judgment:", error);
       setPopup({
-        show: false,
-        message: "Error occurred while judging. Please try again.",
+        show: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Error occurred while judging. Please try again.",
+        isJudging: false,
       });
     }
   };
+
+  useEffect(() => {
+    if (debatePhase !== DebatePhase.Finished) {
+      finalSubmissionStartedRef.current = false;
+      return;
+    }
+    if (!localRole || !debateId || finalSubmissionStartedRef.current) return;
+
+    finalSubmissionStartedRef.current = true;
+    void logMessageHistory();
+  }, [debatePhase, debateId, localRole]);
+
 
   // Handlers for user actions
   const handleTopicChange = (
@@ -1569,7 +2117,7 @@ const TeamDebateRoom: React.FC = () => {
     if (allReady && debatePhase === DebatePhase.Setup) {
       // All ready - close popup and start countdown
       setShowSetupPopup(false);
-      if (countdown === null) {
+      if (countdown === null && !countdownCompletedRef.current) {
         console.log('🚀 All teams ready! Starting countdown...');
         setCountdown(3);
         
@@ -1584,6 +2132,7 @@ const TeamDebateRoom: React.FC = () => {
       }
     } else {
       // Not all ready yet - show popup
+      countdownCompletedRef.current = false;
       setShowSetupPopup(true);
       if (countdown !== null) {
         setCountdown(null);
@@ -1591,39 +2140,14 @@ const TeamDebateRoom: React.FC = () => {
     }
   }, [team1ReadyCount, team2ReadyCount, team1MembersCount, team2MembersCount, isTeam1, countdown, debatePhase]);
 
-  // Countdown logic - when countdown reaches 0, start the debate (like OnlineDebateRoom)
+  // The backend owns the opening transition; clients only display its countdown.
   useEffect(() => {
     if (countdown !== null && countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     } else if (countdown === 0) {
-      // Countdown finished - start the debate by transitioning to OpeningFor
-      console.log('✓✓✓ COUNTDOWN FINISHED! Starting debate at OpeningFor phase');
-      console.log('Current phase before change:', debatePhase);
-      
-      // Mark debate as started FIRST to prevent popup from reopening
-      debateStartedRef.current = true;
-      // Close popup FIRST before phase change
-      setShowSetupPopup(false);
+      countdownCompletedRef.current = true;
       setCountdown(null);
-      
-      // Change phase to OpeningFor
-      const newPhase = DebatePhase.OpeningFor;
-      console.log('Setting debate phase to:', newPhase);
-      setDebatePhase(newPhase);
-      
-      // Send phase change to backend
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        const phaseChangeMessage = JSON.stringify({ type: "phaseChange", phase: DebatePhase.OpeningFor });
-        console.log('Sending phase change to backend:', phaseChangeMessage);
-        wsRef.current.send(phaseChangeMessage);
-      } else {
-        console.error('❌ WebSocket not open, cannot send phase change');
-      }
-      
-      // Note: debatePhase state won't update immediately due to React batching
-      // The phase change handler will receive the backend's phase change message
-      // which will update the phase correctly
     }
   }, [countdown]);
 
@@ -1645,20 +2169,6 @@ const TeamDebateRoom: React.FC = () => {
   // Check for token - if token exists, user is authenticated even if user object isn't loaded yet
   const token = getAuthToken();
   const hasAuthToken = !!token;
-  
-  // Debug: Log user state for troubleshooting
-  useEffect(() => {
-    if (hasAuthToken && !currentUser?.id) {
-      console.log("[TeamDebateRoom] Has token but no user ID:", {
-        hasToken: hasAuthToken,
-        currentUser,
-        userFromAtom: user,
-        userFromHook,
-        isUserLoading,
-        isAuthenticated
-      });
-    }
-  }, [hasAuthToken, currentUser, user, userFromHook, isUserLoading, isAuthenticated]);
   
   // Show loading while debate is loading, or while user is loading (if we have a token)
   if (!debate || isLoading) {
@@ -1705,6 +2215,15 @@ const TeamDebateRoom: React.FC = () => {
                 ? "answer"
                 : "state"}
             </span></span>
+          </p>
+          <p
+            className={`mt-2 text-xs font-medium ${
+              isWsConnected ? "text-green-700" : "text-amber-700"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {isWsConnected ? "Room synchronized" : "Connection interrupted — reconnecting…"}
           </p>
         </div>
       </div>
@@ -1804,9 +2323,15 @@ const TeamDebateRoom: React.FC = () => {
                                 <img
                                   src={
                                     member.avatarUrl ||
-                                    "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
+                                    `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || member.displayName)}`
                                   }
                                   alt={member.displayName}
+                                  onError={(event) => {
+                                    const fallbackUrl = `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || member.displayName || "debater")}`;
+                                    if (event.currentTarget.src !== fallbackUrl) {
+                                      event.currentTarget.src = fallbackUrl;
+                                    }
+                                  }}
                                   className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div
@@ -1848,9 +2373,15 @@ const TeamDebateRoom: React.FC = () => {
                                 <img
                                   src={
                                     member.avatarUrl ||
-                                    "https://api.dicebear.com/9.x/big-ears/svg?seed=Nolan"
+                                    `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || member.displayName)}`
                                   }
                                   alt={member.displayName}
+                                  onError={(event) => {
+                                    const fallbackUrl = `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || member.displayName || "debater")}`;
+                                    if (event.currentTarget.src !== fallbackUrl) {
+                                      event.currentTarget.src = fallbackUrl;
+                                    }
+                                  }}
                                   className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div
@@ -1929,11 +2460,16 @@ const TeamDebateRoom: React.FC = () => {
             ) : (
               <>
                 <h3 className="text-xl font-bold text-orange-600 mb-2">
-                  Phase Transition
+                  Debate status
                 </h3>
                 <p className="text-gray-700 text-center text-sm">
                   {popup.message}
                 </p>
+                <div className="flex justify-center mt-4">
+                  <Button onClick={() => setPopup({ show: false, message: "" })}>
+                    Close
+                  </Button>
+                </div>
               </>
             )}
           </div>
@@ -1968,19 +2504,56 @@ const TeamDebateRoom: React.FC = () => {
               Stance: {localRole || "Not selected"}
             </p>
           </div>
-          <div className="flex-1 p-4 grid grid-cols-1 gap-4 overflow-y-auto">
+          <div className="flex-1 min-h-0 p-4 grid grid-cols-1 sm:grid-cols-2 auto-rows-fr gap-4 overflow-y-auto">
             {myTeamMembers.map((member) => {
               const isCurrentUser = member.userId === currentUser?.id;
+              const isActiveSpeaker = activeSpeakerId === member.userId;
+              const memberStream = isCurrentUser
+                ? localStream
+                : remoteStreams.get(member.userId);
+              const memberCameraOn = isCurrentUser
+                ? isCameraOn &&
+                  Boolean(localStream?.getVideoTracks().some((track) => track.enabled))
+                : remoteMediaStates.get(member.userId)?.cameraOn ?? true;
+              const memberAvatarUrl =
+                member.avatarUrl ||
+                `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || member.displayName)}`;
               return (
                 <div
                   key={member.userId}
-                  className="relative border border-gray-300 rounded-lg overflow-hidden bg-gray-50"
+                  className={`relative flex h-full min-h-0 flex-col rounded-lg overflow-hidden bg-gray-50 border-2 transition-colors ${
+                    isActiveSpeaker
+                      ? "border-green-500 ring-2 ring-green-300"
+                      : "border-gray-300"
+                  }`}
                 >
                   <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded flex items-center gap-2">
                     <span>
                       {member.displayName}
                       {isCurrentUser && " (You)"}
                     </span>
+                    {isActiveSpeaker && (
+                      <span className="flex items-center gap-1 text-green-300">
+                        <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+                        Speaking
+                      </span>
+                    )}
+                    {!isCurrentUser && remoteMediaStates.has(member.userId) && (
+                      <span
+                        className="flex items-center gap-1"
+                        title={
+                          remoteMediaStates.get(member.userId)?.microphoneOn
+                            ? "Microphone on"
+                            : "Microphone off"
+                        }
+                      >
+                        {remoteMediaStates.get(member.userId)?.microphoneOn ? (
+                          <Mic className="h-3 w-3 text-green-300" />
+                        ) : (
+                          <MicOff className="h-3 w-3 text-red-300" />
+                        )}
+                      </span>
+                    )}
                     {isCurrentUser && (
                       <button
                         onClick={toggleCamera}
@@ -2023,55 +2596,65 @@ const TeamDebateRoom: React.FC = () => {
                         )}
                       </button>
                     )}
+                    {isCurrentUser && (
+                      <button
+                        type="button"
+                        onClick={toggleMicrophone}
+                        disabled={!canSpeakNow}
+                        aria-label={isMicrophoneOn ? "Turn microphone off" : "Turn microphone on"}
+                        title={isMicrophoneOn ? "Turn microphone off" : "Turn microphone on"}
+                        className={`p-1 rounded transition ${
+                          isMicrophoneOn ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                        }`}
+                      >
+                        {isMicrophoneOn ? (
+                          <Mic className="h-4 w-4 text-white" />
+                        ) : (
+                          <MicOff className="h-4 w-4 text-white" />
+                        )}
+                      </button>
+                    )}
                   </div>
-                  {isCurrentUser && !isCameraOn ? (
-                    <div className="w-full h-48 bg-gray-800 flex items-center justify-center">
-                      <div className="text-center text-white">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-12 w-12 mx-auto mb-2"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
-                        </svg>
-                        <p className="text-sm">Camera Off</p>
-                      </div>
-                    </div>
-                  ) : (
+                  {memberStream && memberCameraOn ? (
                     <video
                       ref={(el) => {
                         if (el) {
                           if (isCurrentUser) {
                             localVideoRefs.current.set(member.userId, el);
-                            if (localStreamRef.current) {
-                              el.srcObject = localStreamRef.current;
-                            }
+                            el.srcObject = memberStream;
                           } else {
                             remoteVideoRefs.current.set(member.userId, el);
-                            const existingStream = remoteStreams.get(
-                              member.userId
-                            );
-                            if (existingStream) {
-                              attachStreamToVideo(
-                                member.userId,
-                                existingStream
-                              );
-                            }
+                            attachStreamToVideo(member.userId, memberStream);
                           }
                         }
                       }}
                       autoPlay
                       muted={isCurrentUser}
                       playsInline
-                      className="w-full h-48 object-cover"
-                      style={{
-                        display:
-                          isCurrentUser && !isCameraOn ? "none" : "block",
-                      }}
+                      className="block flex-1 min-h-0 w-full object-cover"
                     />
+                  ) : (
+                    <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 bg-gray-800 p-4">
+                      <img
+                        src={memberAvatarUrl}
+                        alt={`${member.displayName}'s profile`}
+                        onError={(event) => {
+                          event.currentTarget.src = `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || "debater")}`;
+                        }}
+                        className="h-24 w-24 rounded-full border-4 border-white object-cover shadow"
+                      />
+                      <span className="text-sm text-white">
+                        {isCurrentUser
+                          ? isCameraOn
+                            ? "Camera unavailable"
+                            : "Camera off"
+                          : remoteMediaStates.has(member.userId)
+                            ? memberCameraOn
+                              ? "Connecting camera..."
+                              : "Camera off"
+                            : "Not connected"}
+                      </span>
+                    </div>
                   )}
                 </div>
               );
@@ -2082,22 +2665,49 @@ const TeamDebateRoom: React.FC = () => {
               Time:{" "}
               {formatTime(isMyTurn ? timer : phaseDurations[debatePhase] || 0)}
             </p>
+            {currentUser &&
+              myTeamMembers.some((member) => member.userId === currentUser.id) && (
+                <div className="mt-2 flex flex-col items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void toggleMicrophone()}
+                    variant={isMicrophoneOn ? "destructive" : "default"}
+                    size="sm"
+                    disabled={!canSpeakNow}
+                    className="px-4"
+                  >
+                    {isMicrophoneOn ? "Stop Speaking" : "Start Speaking"}
+                  </Button>
+                  <p className="text-sm text-center text-gray-600">
+                    {isMicrophoneOn
+                      ? "Microphone and automatic transcript capture are active."
+                      : canSpeakNow
+                        ? "Click start when you're ready to speak."
+                        : debatePhase === DebatePhase.Setup ||
+                            debatePhase === DebatePhase.Finished
+                          ? "Speaking is unavailable outside debate turns."
+                          : "Auto-muted while the opponent is speaking."}
+                  </p>
+                </div>
+              )}
             {isMyTurn &&
               debatePhase !== DebatePhase.Setup &&
               debatePhase !== DebatePhase.Finished && (
                 <div className="flex items-center justify-center gap-2 mt-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-sm text-green-600">
-                    {isListening
-                      ? "Recording & Speech Recognition Active"
-                      : "Waiting..."}
+                    {isMicrophoneOn
+                      ? isListening
+                        ? "Speaking — transcript capture active"
+                        : "Speaking — starting transcript capture"
+                      : "Muted — start when you're ready"}
                   </span>
                 </div>
               )}
             {/* Camera Toggle Button - Only show for current user's team */}
             {currentUser &&
               myTeamMembers.some((m) => m.userId === currentUser.id) && (
-                <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
                   <button
                     onClick={toggleCamera}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
@@ -2166,31 +2776,93 @@ const TeamDebateRoom: React.FC = () => {
               Stance: {peerRole || "Not selected"}
             </p>
           </div>
-          <div className="flex-1 p-4 grid grid-cols-1 gap-4 overflow-y-auto">
-            {opponentTeamMembers.map((member) => (
+          <div className="flex-1 min-h-0 p-4 grid grid-cols-1 sm:grid-cols-2 auto-rows-fr gap-4 overflow-y-auto">
+            {opponentTeamMembers.map((member) => {
+              const isActiveSpeaker = activeSpeakerId === member.userId;
+              const remoteStream = remoteStreams.get(member.userId);
+              const cameraOn =
+                remoteMediaStates.get(member.userId)?.cameraOn ?? true;
+              const avatarUrl =
+                member.avatarUrl ||
+                `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || member.displayName)}`;
+              return (
               <div
                 key={member.userId}
-                className="relative border border-gray-300 rounded-lg overflow-hidden bg-gray-50"
+                className={`relative flex h-full min-h-0 flex-col rounded-lg overflow-hidden bg-gray-50 border-2 transition-colors ${
+                  isActiveSpeaker
+                    ? "border-green-500 ring-2 ring-green-300"
+                    : "border-gray-300"
+                }`}
               >
-                <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                <div className="absolute top-2 left-2 right-2 z-10 flex items-start justify-between gap-2">
+                  <span className="bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
                   {member.displayName}
-                </div>
-                <video
-                  ref={(el) => {
-                    if (el) {
-                      remoteVideoRefs.current.set(member.userId, el);
-                      const existingStream = remoteStreams.get(member.userId);
-                      if (existingStream) {
-                        attachStreamToVideo(member.userId, existingStream);
+                  </span>
+                  {isActiveSpeaker && (
+                    <span className="flex items-center gap-1 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                      <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                      Speaking
+                    </span>
+                  )}
+                  {remoteMediaStates.has(member.userId) && (
+                    <span
+                      className="rounded bg-black bg-opacity-60 p-1"
+                      title={
+                        remoteMediaStates.get(member.userId)?.microphoneOn
+                          ? "Microphone on"
+                          : "Microphone off"
                       }
-                    }
-                  }}
-                  autoPlay
-                  playsInline
-                  className="w-full h-48 object-cover bg-gray-200"
-                />
+                    >
+                      {remoteMediaStates.get(member.userId)?.microphoneOn ? (
+                        <Mic className="h-3 w-3 text-green-300" />
+                      ) : (
+                        <MicOff className="h-3 w-3 text-red-300" />
+                      )}
+                    </span>
+                  )}
+                  <img
+                    src={avatarUrl}
+                    alt={`${member.displayName}'s profile`}
+                    onError={(event) => {
+                      event.currentTarget.src = `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || "debater")}`;
+                    }}
+                    className="h-8 w-8 rounded-full border-2 border-white object-cover shadow"
+                  />
+                </div>
+                {remoteStream && cameraOn ? (
+                  <video
+                    ref={(el) => {
+                      if (el) {
+                        remoteVideoRefs.current.set(member.userId, el);
+                        attachStreamToVideo(member.userId, remoteStream);
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    className="block flex-1 min-h-0 w-full object-cover bg-gray-200"
+                  />
+                ) : (
+                  <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 bg-gray-100 p-4">
+                    <img
+                      src={avatarUrl}
+                      alt={`${member.displayName}'s profile`}
+                      onError={(event) => {
+                        event.currentTarget.src = `https://api.dicebear.com/9.x/big-ears/svg?seed=${encodeURIComponent(member.userId || "debater")}`;
+                      }}
+                      className="h-24 w-24 rounded-full border-4 border-white object-cover shadow"
+                    />
+                    <span className="text-sm text-gray-600">
+                      {remoteMediaStates.has(member.userId)
+                        ? cameraOn
+                          ? "Connecting camera..."
+                          : "Camera off"
+                        : "Not connected"}
+                    </span>
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="p-3 bg-gray-50 border-t">
             <p className="text-xs text-center text-gray-600">
@@ -2207,7 +2879,6 @@ const TeamDebateRoom: React.FC = () => {
           <SpeechTranscripts
             transcripts={speechTranscripts}
             currentPhase={debatePhase}
-            liveTranscript={currentTranscript}
           />
         </div>
       )}

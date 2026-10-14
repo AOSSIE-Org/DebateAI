@@ -72,6 +72,7 @@ func CreateTeamDebate(c *gin.Context) {
 		Team1Stance:  team1Stance,
 		Team2Stance:  team2Stance,
 		Status:       "active",
+		CurrentPhase: "setup",
 		CurrentTurn:  "team1",
 		TurnCount:    0,
 		MaxTurns:     12, // 12 total turns (6 per team)
@@ -126,6 +127,12 @@ func GetTeamDebate(c *gin.Context) {
 	err = collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&debate)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Debate not found"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	if err := services.RefreshTeamDebateMembers(ctx, &debate); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refresh debate team profiles"})
 		return
 	}
 
