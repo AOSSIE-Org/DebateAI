@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"arguehub/models"
 )
 
 const validJudgeResult = `{
@@ -105,5 +107,49 @@ func TestMergeTeamTranscriptsKeepsNoResponseWhenNobodySpoke(t *testing.T) {
 	)
 	if got := merged["openingFor"]; got != "No response" {
 		t.Errorf("openingFor = %q, want %q", got, "No response")
+	}
+}
+
+func TestTeamDebateSubmittersUseParticipantsRecordedAtStart(t *testing.T) {
+	debate := &models.TeamDebate{
+		Team1Stance: "for",
+		Team1Members: []models.TeamMember{
+			{Email: "new-member@example.com"},
+		},
+		Participants: []models.TeamDebateParticipant{
+			{Email: "participant@example.com", Role: "for"},
+			{Email: "opponent@example.com", Role: "against"},
+		},
+	}
+
+	submitters, err := teamDebateSubmitters(debate, "for")
+	if err != nil {
+		t.Fatalf("teamDebateSubmitters() error = %v", err)
+	}
+	if len(submitters) != 1 || submitters[0] != "participant@example.com" {
+		t.Fatalf("teamDebateSubmitters() = %v, want [participant@example.com]", submitters)
+	}
+	if !teamDebateHasSubmitter(debate, "for", "PARTICIPANT@example.com") {
+		t.Fatal("teamDebateHasSubmitter() rejected a recorded participant")
+	}
+	if teamDebateHasSubmitter(debate, "for", "new-member@example.com") {
+		t.Fatal("teamDebateHasSubmitter() accepted a member added after the debate started")
+	}
+}
+
+func TestTeamDebateSubmittersFallBackToRosterForLegacyDebates(t *testing.T) {
+	debate := &models.TeamDebate{
+		Team1Stance: "for",
+		Team1Members: []models.TeamMember{
+			{Email: "legacy-member@example.com"},
+		},
+	}
+
+	submitters, err := teamDebateSubmitters(debate, "for")
+	if err != nil {
+		t.Fatalf("teamDebateSubmitters() error = %v", err)
+	}
+	if len(submitters) != 1 || submitters[0] != "legacy-member@example.com" {
+		t.Fatalf("teamDebateSubmitters() = %v, want [legacy-member@example.com]", submitters)
 	}
 }

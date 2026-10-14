@@ -514,8 +514,28 @@ func GetDebateResultHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
+	teamDebate, err := services.GetTeamDebateByID(ctx, roomID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve debate"})
+		return
+	}
+	if teamDebate != nil {
+		email := strings.ToLower(strings.TrimSpace(c.GetString("email")))
+		isParticipant := false
+		for _, member := range append(append([]models.TeamMember{}, teamDebate.Team1Members...), teamDebate.Team2Members...) {
+			if email != "" && strings.EqualFold(strings.TrimSpace(member.Email), email) {
+				isParticipant = true
+				break
+			}
+		}
+		if !isParticipant {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only debate participants can view this judgment"})
+			return
+		}
+	}
+
 	var result models.DebateResult
-	err := db.MongoDatabase.Collection("debate_results").FindOne(ctx, bson.M{"roomId": roomID}).Decode(&result)
+	err = db.MongoDatabase.Collection("debate_results").FindOne(ctx, bson.M{"roomId": roomID}).Decode(&result)
 	if err == mongo.ErrNoDocuments {
 		c.JSON(http.StatusAccepted, gin.H{"message": "Judgment pending"})
 		return

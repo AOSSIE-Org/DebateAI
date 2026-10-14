@@ -102,11 +102,7 @@ func SubmitTranscripts(
 		if role != "for" && role != "against" {
 			return nil, fmt.Errorf("invalid team debate role %q", role)
 		}
-		members, err := teamMembersForRole(teamDebate, role)
-		if err != nil {
-			return nil, err
-		}
-		if !teamContainsMember(members, email) {
+		if !teamDebateHasSubmitter(teamDebate, role, email) {
 			return nil, errors.New("authenticated user is not a member of the submitted team")
 		}
 		if len(transcripts) > 0 {
@@ -117,11 +113,11 @@ func SubmitTranscripts(
 
 		sidesReady := make(map[string]bool, 2)
 		for _, sideRole := range []string{"for", "against"} {
-			members, err := teamMembersForRole(teamDebate, sideRole)
+			memberEmails, err := teamDebateSubmitters(teamDebate, sideRole)
 			if err != nil {
 				return nil, err
 			}
-			sideTranscripts, ready, err := collectTeamTranscripts(ctx, roomID, sideRole, members)
+			sideTranscripts, ready, err := collectTeamTranscripts(ctx, roomID, sideRole, memberEmails)
 			if err != nil {
 				return nil, err
 			}
@@ -130,8 +126,8 @@ func SubmitTranscripts(
 				continue
 			}
 			sideEmail := ""
-			if len(members) > 0 {
-				sideEmail = members[0].Email
+			if len(memberEmails) > 0 {
+				sideEmail = memberEmails[0]
 			}
 			if err := upsertTranscript(ctx, transcriptCollection, roomID, sideRole, sideEmail, sideTranscripts); err != nil {
 				return nil, err
@@ -412,6 +408,10 @@ func loadTeamDebate(ctx context.Context, roomID string) (*models.TeamDebate, err
 	return &debate, nil
 }
 
+func GetTeamDebateByID(ctx context.Context, roomID string) (*models.TeamDebate, error) {
+	return loadTeamDebate(ctx, roomID)
+}
+
 func teamMembersForRole(debate *models.TeamDebate, role string) ([]models.TeamMember, error) {
 	role = strings.ToLower(strings.TrimSpace(role))
 	if role != "for" && role != "against" {
@@ -433,6 +433,64 @@ func teamMembersForRole(debate *models.TeamDebate, role string) ([]models.TeamMe
 		}
 	}
 	return nil, fmt.Errorf("team debate does not define a %s side", role)
+}
+
+func teamDebateSubmitters(debate *models.TeamDebate, role string) ([]string, error) {
+	role = strings.ToLower(strings.TrimSpace(role))
+	if role != "for" && role != "against" {
+		return nil, fmt.Errorf("invalid team debate role %q", role)
+	}
+
+	if len(debate.Participants) == 0 {
+		members, err := teamMembersForRole(debate, role)
+		if err != nil {
+			return nil, err
+		}
+		emails := make([]string, 0, len(members))
+		for _, member := range members {
+			emails = append(emails, member.Email)
+		}
+		return emails, nil
+	}
+
+	emails := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, participant := range debate.Participants {
+		if !strings.EqualFold(strings.TrimSpace(participant.Role), role) {
+			continue
+		}
+		email := strings.ToLower(strings.TrimSpace(participant.Email))
+		if email == "" {
+			return nil, fmt.Errorf("team debate %s side contains a participant without an email", role)
+		}
+		if _, exists := seen[email]; exists {
+			continue
+		}
+		seen[email] = struct{}{}
+		emails = append(emails, email)
+	}
+	if len(emails) == 0 {
+		return nil, fmt.Errorf("team debate %s side has no recorded participants", role)
+	}
+	return emails, nil
+}
+
+func teamDebateHasSubmitter(debate *models.TeamDebate, role, email string) bool {
+	if len(debate.Participants) == 0 {
+		members, err := teamMembersForRole(debate, role)
+		if err != nil {
+			return false
+		}
+		return teamContainsMember(members, email)
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	for _, participant := range debate.Participants {
+		if strings.EqualFold(strings.TrimSpace(participant.Role), role) &&
+			strings.EqualFold(strings.TrimSpace(participant.Email), email) {
+			return email != ""
+		}
+	}
+	return false
 }
 
 func teamContainsMember(members []models.TeamMember, email string) bool {
@@ -484,10 +542,10 @@ func collectTeamTranscripts(
 	ctx context.Context,
 	roomID string,
 	role string,
-	members []models.TeamMember,
+	memberEmails []string,
 ) (map[string]string, bool, error) {
-	if len(members) == 0 {
-		return nil, false, fmt.Errorf("team debate %s side has no members", role)
+	if len(memberEmails) == 0 {
+		return nil, false, fmt.Errorf("team debate %s side has no participants", role)
 	}
 
 	cursor, err := db.MongoDatabase.Collection("team_debate_transcript_submissions").Find(
@@ -508,11 +566,11 @@ func collectTeamTranscripts(
 		byEmail[strings.ToLower(strings.TrimSpace(submission.Email))] = submission.Transcripts
 	}
 
-	teamSubmissions := make([]map[string]string, 0, len(members))
-	for _, member := range members {
-		email := strings.ToLower(strings.TrimSpace(member.Email))
+	teamSubmissions := make([]map[string]string, 0, len(memberEmails))
+	for _, memberEmail := range memberEmails {
+		email := strings.ToLower(strings.TrimSpace(memberEmail))
 		if email == "" {
-			return nil, false, fmt.Errorf("team debate %s side contains a member without an email", role)
+			return nil, false, fmt.Errorf("team debate %s side contains a participant without an email", role)
 		}
 		transcript, submitted := byEmail[email]
 		if !submitted {

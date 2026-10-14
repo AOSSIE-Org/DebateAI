@@ -59,26 +59,32 @@ func (tm TeamMember) MarshalJSON() ([]byte, error) {
 
 // TeamDebate represents a debate between two teams
 type TeamDebate struct {
-	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	Team1ID       primitive.ObjectID `bson:"team1Id" json:"team1Id"`
-	Team2ID       primitive.ObjectID `bson:"team2Id" json:"team2Id"`
-	Team1Name     string             `bson:"team1Name" json:"team1Name"`
-	Team2Name     string             `bson:"team2Name" json:"team2Name"`
-	Team1Members  []TeamMember       `bson:"team1Members" json:"team1Members"`
-	Team2Members  []TeamMember       `bson:"team2Members" json:"team2Members"`
-	Topic         string             `bson:"topic" json:"topic"`
-	Team1Stance   string             `bson:"team1Stance" json:"team1Stance"` // "for" or "against"
-	Team2Stance   string             `bson:"team2Stance" json:"team2Stance"` // "for" or "against"
-	Status        string             `bson:"status" json:"status"`           // "waiting", "active", "finished"
-	CurrentPhase  string             `bson:"currentPhase,omitempty" json:"currentPhase,omitempty"`
-	CurrentTurn   string             `bson:"currentTurn" json:"currentTurn"` // "team1" or "team2"
-	CurrentUserID primitive.ObjectID `bson:"currentUserId,omitempty" json:"currentUserId,omitempty"`
-	TurnCount     int                `bson:"turnCount" json:"turnCount"`
-	MaxTurns      int                `bson:"maxTurns" json:"maxTurns"`
-	Team1Elo      float64            `bson:"team1Elo" json:"team1Elo"`
-	Team2Elo      float64            `bson:"team2Elo" json:"team2Elo"`
-	CreatedAt     time.Time          `bson:"createdAt" json:"createdAt"`
-	UpdatedAt     time.Time          `bson:"updatedAt" json:"updatedAt"`
+	ID            primitive.ObjectID      `bson:"_id,omitempty" json:"id,omitempty"`
+	Team1ID       primitive.ObjectID      `bson:"team1Id" json:"team1Id"`
+	Team2ID       primitive.ObjectID      `bson:"team2Id" json:"team2Id"`
+	Team1Name     string                  `bson:"team1Name" json:"team1Name"`
+	Team2Name     string                  `bson:"team2Name" json:"team2Name"`
+	Team1Members  []TeamMember            `bson:"team1Members" json:"team1Members"`
+	Team2Members  []TeamMember            `bson:"team2Members" json:"team2Members"`
+	Participants  []TeamDebateParticipant `bson:"participants,omitempty" json:"participants,omitempty"`
+	Topic         string                  `bson:"topic" json:"topic"`
+	Team1Stance   string                  `bson:"team1Stance" json:"team1Stance"` // "for" or "against"
+	Team2Stance   string                  `bson:"team2Stance" json:"team2Stance"` // "for" or "against"
+	Status        string                  `bson:"status" json:"status"`           // "waiting", "active", "finished"
+	CurrentPhase  string                  `bson:"currentPhase,omitempty" json:"currentPhase,omitempty"`
+	CurrentTurn   string                  `bson:"currentTurn" json:"currentTurn"` // "team1" or "team2"
+	CurrentUserID primitive.ObjectID      `bson:"currentUserId,omitempty" json:"currentUserId,omitempty"`
+	TurnCount     int                     `bson:"turnCount" json:"turnCount"`
+	MaxTurns      int                     `bson:"maxTurns" json:"maxTurns"`
+	Team1Elo      float64                 `bson:"team1Elo" json:"team1Elo"`
+	Team2Elo      float64                 `bson:"team2Elo" json:"team2Elo"`
+	CreatedAt     time.Time               `bson:"createdAt" json:"createdAt"`
+	UpdatedAt     time.Time               `bson:"updatedAt" json:"updatedAt"`
+}
+
+type TeamDebateParticipant struct {
+	Email string `bson:"email" json:"email"`
+	Role  string `bson:"role" json:"role"`
 }
 
 // TeamDebateMessage represents a message in a team debate

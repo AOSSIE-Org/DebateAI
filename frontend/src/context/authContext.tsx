@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -48,6 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const setUser = useSetAtom(userAtom);
+  const currentRequest = useRef(0);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -63,9 +65,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(message);
   }, []);
 
-let currentRequest = 0;
+  const logout = useCallback(() => {
+    ++currentRequest.current;
+    setError(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem(USER_CACHE_KEY);
+    setUser(null);
+    navigate('/auth');
+  }, [navigate, setUser]);
+
 const verifyToken = useCallback(async () => {
-  const requestId = ++currentRequest;
+  const requestId = ++currentRequest.current;
 
   const storedToken = localStorage.getItem('token');
   if (!storedToken) return;
@@ -77,13 +88,13 @@ const verifyToken = useCallback(async () => {
     });
 
     // ignore if outdated
-    if (requestId !== currentRequest) return;
+    if (requestId !== currentRequest.current) return;
 
     if (!response.ok) {
       localStorage.removeItem('token');
       setToken(null);
       setUser(null);
-      navigate('/login');
+      navigate('/auth');
       return;
     }
 
@@ -95,13 +106,13 @@ const verifyToken = useCallback(async () => {
     });
 
     // ignore if outdated
-    if (requestId !== currentRequest) return;
+    if (requestId !== currentRequest.current) return;
 
     if (userResponse.ok) {
       const responseData = await userResponse.json();
 
       // ignore if outdated
-      if (requestId !== currentRequest) return;
+      if (requestId !== currentRequest.current) return;
 
       const userData = responseData.profile;
 
@@ -129,7 +140,7 @@ const verifyToken = useCallback(async () => {
       };
 
       // final safety check
-      if (requestId !== currentRequest) return;
+      if (requestId !== currentRequest.current) return;
 
       setUser(normalizedUser);
       localStorage.setItem(USER_CACHE_KEY, JSON.stringify(normalizedUser));
@@ -138,7 +149,7 @@ const verifyToken = useCallback(async () => {
     console.log('error', error);
     logout();
   }
-}, [setUser]);
+}, [logout, navigate, setUser]);
   
   useEffect(() => {
     verifyToken();
@@ -402,15 +413,6 @@ const verifyToken = useCallback(async () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    setError(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem(USER_CACHE_KEY);
-    setUser(null); // Clear userAtom on logout
-    navigate('/auth');
   };
 
   return (

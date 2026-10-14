@@ -825,16 +825,61 @@ func teamCanAdvanceDebatePhase(phase, teamRole string) bool {
 }
 
 func persistTeamDebatePhase(debateID primitive.ObjectID, phase string) error {
+	return persistTeamDebateState(debateID, phase, nil)
+}
+
+func persistTeamDebateStart(room *TeamRoom) error {
+	participants := make([]models.TeamDebateParticipant, 0, len(room.Clients))
+	seen := make(map[string]struct{}, len(room.Clients))
+	for _, client := range room.Clients {
+		role := ""
+		switch client.TeamID {
+		case room.Team1ID:
+			role = room.Team1Role
+		case room.Team2ID:
+			role = room.Team2Role
+		default:
+			return fmt.Errorf("connected user %s does not belong to either debate team", client.UserID.Hex())
+		}
+		email := strings.ToLower(strings.TrimSpace(client.Email))
+		if email == "" {
+			return fmt.Errorf("connected user %s has no email", client.UserID.Hex())
+		}
+		key := role + "|" + email
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		participants = append(participants, models.TeamDebateParticipant{
+			Email: email,
+			Role:  role,
+		})
+	}
+	if len(participants) == 0 {
+		return errors.New("cannot start a debate without connected participants")
+	}
+	return persistTeamDebateState(room.DebateID, "openingFor", participants)
+}
+
+func persistTeamDebateState(
+	debateID primitive.ObjectID,
+	phase string,
+	participants []models.TeamDebateParticipant,
+) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	status := "active"
 	if phase == "finished" {
 		status = "finished"
 	}
+	fields := bson.M{"currentPhase": phase, "status": status, "updatedAt": time.Now()}
+	if participants != nil {
+		fields["participants"] = participants
+	}
 	result, err := db.MongoDatabase.Collection("team_debates").UpdateOne(
 		ctx,
 		bson.M{"_id": debateID},
-		bson.M{"$set": bson.M{"currentPhase": phase, "status": status, "updatedAt": time.Now()}},
+		bson.M{"$set": fields},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save debate phase: %w", err)
@@ -1145,8 +1190,8 @@ func handleTeamReadyStatus(room *TeamRoom, conn *websocket.Conn, message TeamMes
 			room.Mutex.Lock()
 			if room.CurrentPhase == "countdown" || room.CurrentPhase == "setup" {
 				room.CurrentPhase = "openingFor"
-				if err := persistTeamDebatePhase(room.DebateID, "openingFor"); err != nil {
-					room.CurrentPhase = "countdown"
+				if err := persistTeamDebateStart(room); err != nil {
+					room.CurrentPhase = "setup"
 					room.Mutex.Unlock()
 					log.Printf("failed to persist debate start for room %s: %v", roomKey, err)
 					broadcastAll(room, map[string]any{
@@ -1347,8 +1392,8 @@ func handleCheckStart(room *TeamRoom, conn *websocket.Conn, roomKey string) {
 			room.Mutex.Lock()
 			if room.CurrentPhase == "countdown" || room.CurrentPhase == "setup" {
 				room.CurrentPhase = "openingFor"
-				if err := persistTeamDebatePhase(room.DebateID, "openingFor"); err != nil {
-					room.CurrentPhase = "countdown"
+				if err := persistTeamDebateStart(room); err != nil {
+					room.CurrentPhase = "setup"
 					room.Mutex.Unlock()
 					log.Printf("failed to persist debate start for room %s: %v", roomKey, err)
 					broadcastAll(room, map[string]any{
