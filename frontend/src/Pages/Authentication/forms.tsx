@@ -41,10 +41,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     setLocalError(null);
     try {
       await login(email, password);
-    } catch (err) {
+    } catch (err: any) {
       const code = (err as Error & { code?: string }).code;
       if (code === 'EMAIL_NOT_VERIFIED') {
         startOtpVerification(email);
+      } else {
+        const msg = err?.userMessage ?? err?.message;
+        if (msg) authContext.handleError(msg);
       }
     }
   };
@@ -173,8 +176,9 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     try {
       await signup(email, password);
       startOtpVerification(email);
-    } catch {
-      // Handled by authContext error state
+    } catch (err: any) {
+      const msg = err?.userMessage ?? err?.message;
+      if (msg) authContext.handleError(msg);
     }
   };
 
@@ -323,7 +327,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
   };
 
   return (
-        <div className="w-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       <h3 className="text-2xl font-medium my-4">Verify Your Email</h3>
       <p className="mb-4">Enter the OTP sent to your email to complete the sign-up process.</p>
       <form onSubmit={handleSubmit} className="w-full">
@@ -365,31 +369,43 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const baseURL = config.baseUrl;
+  const authContext = useContext(AuthContext);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+
+    const baseURL = config.baseUrl;
+    if (!baseURL) {
+      setError('The server URL is invalid. Fix it, or switch to the official server.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${baseURL}/forgotPassword`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      if (authContext) {
+        await authContext.forgotPassword(email);
+      } else {
+        const cleanBase = baseURL.replace(/\/+$/, '');
+        const response = await fetch(`${cleanBase}/forgotPassword`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setError(data.error || data.message || 'Failed to send reset password code. Please try again.');
-        return;
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          setError(data.error || data.message || 'Failed to send reset password code. Please try again.');
+          return;
+        }
       }
 
       startResetPassword(email);
-    } catch {
-      setError('An unexpected error occurred. Please try again later.');
+    } catch (err: any) {
+      const msg = err?.userMessage ?? err?.message;
+      setError(msg || 'An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }

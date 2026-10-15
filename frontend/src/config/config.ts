@@ -1,5 +1,13 @@
+import { getServer } from "@/lib/server";
+
 const config = {
-  baseUrl: import.meta.env.VITE_BASE_URL,
+  get baseUrl(): string | null {
+    try {
+      return getServer();
+    } catch {
+      return null;
+    }
+  },
 };
 
 export default config;
