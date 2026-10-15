@@ -76,6 +76,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [navigate, setUser]);
 
   const setAuthenticatedSession = useCallback((accessToken: string) => {
+    // Guard against a missing/invalid token: if a successful response fails to
+    // parse, accessToken can be undefined, which would persist "undefined" and
+    // later send `Bearer undefined`. Reject it here, covering all callers.
+    if (!accessToken) return;
     ++currentRequest.current;
     setToken(accessToken);
     localStorage.setItem('token', accessToken);
