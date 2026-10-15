@@ -187,6 +187,9 @@ func SubmitTranscripts(
 		}
 
 		result := JudgeDebateHumanVsHuman(merged)
+		if strings.HasPrefix(result, "Unable to judge") {
+			return nil, fmt.Errorf("AI judge unavailable: %s", result)
+		}
 		result, err = normalizeJudgeResult(result)
 		if err != nil {
 			return nil, fmt.Errorf("AI judge returned an invalid judgment: %w", err)
