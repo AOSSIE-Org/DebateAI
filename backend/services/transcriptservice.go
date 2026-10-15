@@ -940,6 +940,19 @@ Provide integer scores from 0 to 10 for each section, totals equal to the sum of
 	return text
 }
 
+// extractJSONObject returns the substring from the first "{" to the last "}"
+// in s, stripping any prose or markdown fences a model may wrap around the
+// JSON. If no braces are found it returns the trimmed input unchanged so the
+// caller still produces a clear "not valid JSON" error.
+func extractJSONObject(s string) string {
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start >= 0 && end > start {
+		return s[start : end+1]
+	}
+	return strings.TrimSpace(s)
+}
+
 func normalizeJudgeResult(response string) (string, error) {
 	type scoreDetail struct {
 		Score  int    `json:"score"`
@@ -971,14 +984,10 @@ func normalizeJudgeResult(response string) (string, error) {
 		Verdict                   verdict `json:"verdict"`
 	}
 
-	trimmed := strings.TrimSpace(response)
-	if strings.HasPrefix(trimmed, "```") {
-		trimmed = strings.TrimPrefix(trimmed, "```json")
-		trimmed = strings.TrimPrefix(trimmed, "```JSON")
-		trimmed = strings.TrimPrefix(trimmed, "```")
-		trimmed = strings.TrimSuffix(strings.TrimSpace(trimmed), "```")
-		trimmed = strings.TrimSpace(trimmed)
-	}
+	// Gemini sometimes wraps the JSON in markdown fences or prose
+	// (e.g. "Here is the judgment: {...}"). Extract the JSON object
+	// spanning the first "{" to the last "}" before parsing.
+	trimmed := extractJSONObject(response)
 	var result judgment
 	if err := json.Unmarshal([]byte(trimmed), &result); err != nil {
 		return "", fmt.Errorf("response is not valid JSON: %w", err)
