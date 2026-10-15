@@ -1,4 +1,5 @@
 import config from "../config/config";
+import { getIceServers } from "@/utils/iceServers";
 import React, {
   useCallback,
   useEffect,
@@ -349,7 +350,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       }
 
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        iceServers: getIceServers(),
       });
       spectatorPCsRef.current.set(connectionId, pc);
       spectatorPendingCandidatesRef.current.set(connectionId, []);
@@ -1462,7 +1463,7 @@ const OnlineDebateRoom = (): JSX.Element => {
     };
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: getIceServers(),
     });
     pcRef.current = pc;
 
