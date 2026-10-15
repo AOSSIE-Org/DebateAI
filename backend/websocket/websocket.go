@@ -825,6 +825,14 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 		room.Mutex.Unlock()
 		return
 	}
+	if role != "" {
+		for otherConn, otherClient := range room.Clients {
+			if otherConn != conn && !otherClient.IsSpectator && otherClient.Role == role {
+				room.Mutex.Unlock()
+				return
+			}
+		}
+	}
 	if client.Role != role {
 		client.Role = role
 		// A role change invalidates this debater's previous ready confirmation.
