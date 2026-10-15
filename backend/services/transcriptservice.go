@@ -650,17 +650,23 @@ func collectTeamTranscripts(
 		byEmail[strings.ToLower(strings.TrimSpace(submission.Email))] = submission.Transcripts
 	}
 
+	// Every client receives the whole side's speech over the WebSocket, so one
+	// participant's submission already covers the side. Requiring every
+	// participant let a single member who disconnected or never reached the
+	// finished phase block the judgment forever. Mark the side ready once any
+	// recorded participant has submitted, merging all submissions received.
 	teamSubmissions := make([]map[string]string, 0, len(memberEmails))
 	for _, memberEmail := range memberEmails {
 		email := strings.ToLower(strings.TrimSpace(memberEmail))
 		if email == "" {
 			return nil, false, fmt.Errorf("team debate %s side contains a participant without an email", role)
 		}
-		transcript, submitted := byEmail[email]
-		if !submitted {
-			return nil, false, nil
+		if transcript, submitted := byEmail[email]; submitted {
+			teamSubmissions = append(teamSubmissions, transcript)
 		}
-		teamSubmissions = append(teamSubmissions, transcript)
+	}
+	if len(teamSubmissions) == 0 {
+		return nil, false, nil
 	}
 	return mergeTeamTranscripts(teamSubmissions...), true, nil
 }
