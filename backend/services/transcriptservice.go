@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -939,11 +940,14 @@ Provide integer scores from 0 to 10 for each section, totals equal to the sum of
 	defer cancel()
 	text, err := generateDefaultModelText(ctx, prompt)
 	if err != nil {
+		log.Printf("AI judge: Gemini call failed: %v", err)
 		return "Unable to judge."
 	}
 	if text == "" {
+		log.Printf("AI judge: Gemini returned an empty response")
 		return "Unable to judge."
 	}
+	log.Printf("AI judge: Gemini returned %d chars", len(text))
 	return text
 }
 
