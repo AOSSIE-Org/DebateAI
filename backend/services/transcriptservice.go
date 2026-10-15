@@ -197,10 +197,10 @@ func SubmitTranscripts(
 			Result:    result,
 			CreatedAt: time.Now(),
 		}
-		_, err = resultCollection.InsertOne(ctx, resultDoc)
-		if err != nil {
-			return nil, errors.New("failed to store debate result: " + err.Error())
-		}
+		// NOTE: the judgment result is inserted only AFTER all transcript and
+		// rating writes below succeed. Inserting it here would let the early
+		// "result already exists" guard short-circuit a retry and leave the
+		// debate partly saved if any write below failed transiently.
 
 		// Save the debate transcript for both users
 		// First, get user IDs for both participants
@@ -327,6 +327,13 @@ func SubmitTranscripts(
 			} else if err != nil {
 				return nil, fmt.Errorf("failed to check for previously saved debate transcript: %w", err)
 			}
+		}
+
+		// All transcript and rating writes have succeeded; persist the result
+		// now so a transient failure above leaves no result behind and the next
+		// submission can safely retry the whole flow.
+		if _, err = resultCollection.InsertOne(ctx, resultDoc); err != nil {
+			return nil, errors.New("failed to store debate result: " + err.Error())
 		}
 
 		// Clean up submissions after judgment completes.
