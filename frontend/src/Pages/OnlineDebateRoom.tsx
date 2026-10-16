@@ -2132,6 +2132,11 @@ const OnlineDebateRoom = (): JSX.Element => {
     }
 
     const newReadyState = !localReady;
+    // A debater must pick a side before readying up; cancelling is always allowed.
+    if (newReadyState && !localRoleRef.current) {
+      window.alert("Please select a stance (For or Against) before marking ready.");
+      return;
+    }
     socket.send(JSON.stringify({ type: "ready", ready: newReadyState }));
     setLocalReady(newReadyState);
   };
@@ -2486,7 +2491,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                 <div>
                   <Button
                     onClick={toggleReady}
-                    disabled={!isWsConnected}
+                    disabled={!isWsConnected || (!localReady && !localRole)}
                     className={`w-full py-2 rounded-lg transition ${
                       localReady
                         ? "bg-destructive text-destructive-foreground"
@@ -2497,6 +2502,8 @@ const OnlineDebateRoom = (): JSX.Element => {
                       ? "Connecting..."
                       : localReady
                       ? "Cancel Ready"
+                      : !localRole
+                      ? "Select a stance first"
                       : "I'm Ready"}
                   </Button>
                 </div>
