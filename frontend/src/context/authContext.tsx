@@ -1,4 +1,3 @@
-import config from "../config/config";
 import { getServer, isOfficial } from "@/lib/server";
 import {
   createContext,
