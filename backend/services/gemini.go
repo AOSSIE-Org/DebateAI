@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -33,11 +35,42 @@ func generateModelTextWithConfig(ctx context.Context, modelName, prompt string, 
 		return "", errors.New("gemini client not initialized")
 	}
 
-	resp, err := geminiClient.Models.GenerateContent(ctx, modelName, genai.Text(prompt), config)
-	if err != nil {
-		return "", err
+	// Gemini returns transient 503/429/500 errors when a model is overloaded.
+	// Retry those with a short backoff instead of failing the whole request.
+	backoff := 2 * time.Second
+	var lastErr error
+	for attempt := 1; attempt <= geminiMaxAttempts; attempt++ {
+		resp, err := geminiClient.Models.GenerateContent(ctx, modelName, genai.Text(prompt), config)
+		if err == nil {
+			return cleanModelOutput(resp.Text()), nil
+		}
+		lastErr = err
+		if !isTransientGeminiError(err) || attempt == geminiMaxAttempts {
+			break
+		}
+		log.Printf("Gemini attempt %d/%d failed with a transient error, retrying in %s: %v", attempt, geminiMaxAttempts, backoff, err)
+		select {
+		case <-ctx.Done():
+			return "", lastErr
+		case <-time.After(backoff):
+		}
+		backoff *= 2
 	}
-	return cleanModelOutput(resp.Text()), nil
+	return "", lastErr
+}
+
+const geminiMaxAttempts = 4
+
+// isTransientGeminiError reports whether a Gemini error is temporary
+// (overloaded, rate limited, or an internal server error) and worth retrying.
+func isTransientGeminiError(err error) bool {
+	msg := err.Error()
+	for _, marker := range []string{"Error 503", "Error 429", "Error 500", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "INTERNAL"} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func defaultGenerateContentConfig() *genai.GenerateContentConfig {

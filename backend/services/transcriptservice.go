@@ -945,7 +945,7 @@ Provide integer scores from 0 to 10 for each section, totals equal to the sum of
 		transcript.String(),
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	text, err := generateDefaultModelJSONText(ctx, prompt)
 	if err != nil {
