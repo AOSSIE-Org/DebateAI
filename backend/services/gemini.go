@@ -35,7 +35,7 @@ func generateModelTextWithConfig(ctx context.Context, modelName, prompt string, 
 		return "", errors.New("gemini client not initialized")
 	}
 
-	// Gemini returns transient 503/429/500 errors when a model is overloaded.
+	// Gemini returns transient 503/500 errors when a model is overloaded.
 	// Retry those with a short backoff instead of failing the whole request.
 	backoff := 2 * time.Second
 	var lastErr error
@@ -61,11 +61,13 @@ func generateModelTextWithConfig(ctx context.Context, modelName, prompt string, 
 
 const geminiMaxAttempts = 4
 
-// isTransientGeminiError reports whether a Gemini error is temporary
-// (overloaded, rate limited, or an internal server error) and worth retrying.
+// isTransientGeminiError reports whether a Gemini error is a temporary
+// overload or internal error worth retrying. Quota errors (429
+// RESOURCE_EXHAUSTED) are not retried: Google asks callers to wait minutes,
+// and retrying within seconds only consumes more of the quota.
 func isTransientGeminiError(err error) bool {
 	msg := err.Error()
-	for _, marker := range []string{"Error 503", "Error 429", "Error 500", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "INTERNAL"} {
+	for _, marker := range []string{"Error 503", "Error 500", "UNAVAILABLE", "INTERNAL"} {
 		if strings.Contains(msg, marker) {
 			return true
 		}
