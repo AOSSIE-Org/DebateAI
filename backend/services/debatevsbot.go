@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -377,9 +378,9 @@ func personalityClarificationRequest(botName string) string {
 }
 
 // JudgeDebate evaluates the debate, factoring in the bot’s personality adherence
-func JudgeDebate(history []models.Message) string {
+func JudgeDebateWithError(history []models.Message) (string, error) {
 	if geminiClient == nil {
-		return "Unable to judge."
+		return "", errors.New("Gemini client is not initialized")
 	}
 
 	// Extract bot name from history (assume bot is the non-user sender)
@@ -416,6 +417,24 @@ Judgment Criteria:
    - Effective reiteration of stance
    - Persuasiveness of final argument, embodying bot’s philosophical tenets (%s)
 
+
+IMPORTANT SCORING RULES:
+- Each section score must be a number from 0 to 10. Decimal scores are allowed.
+- The user's total must equal the sum of the user's four section scores.
+- The bot's total must equal the sum of the bot's four section scores.
+- Calculate both totals from the final section scores immediately before returning the JSON.
+- Return only valid JSON. Do not include markdown fences or additional text.
+
+
+STRICT OUTPUT REQUIREMENTS:
+1. Return one valid JSON object only. Do not use Markdown fences.
+2. Never include trailing commas.
+3. Every section must contain user and bot scores from 0 to 10, each with a non-empty reason.
+4. The user's total must equal opening_statement.user.score + cross_examination.user.score + answers.user.score + closing.user.score.
+5. The bot's total must equal opening_statement.bot.score + cross_examination.bot.score + answers.bot.score + closing.bot.score.
+6. The verdict winner must be exactly "User", "Bot", or "Draw".
+7. Check the JSON syntax and both totals before returning the result.
+
 Required Output Format:
 {
   "opening_statement": {
@@ -439,7 +458,7 @@ Required Output Format:
     "bot": Y
   },
   "verdict": {
-    "winner": "User/Bot",
+    "winner": "User, Bot, or Draw",
     "reason": "text",
     "congratulations": "text",
     "opponent_analysis": "text"
@@ -453,15 +472,31 @@ Provide ONLY the JSON output without any additional text.`,
 		bot.Name, bot.Tone, bot.RhetoricalStyle, strings.Join(bot.Catchphrases, ", "), strings.Join(bot.UniverseTies, ", "),
 		bot.DebateStrategy, strings.Join(bot.SignatureMoves, ", "), strings.Join(bot.PhilosophicalTenets, ", "), FormatHistory(history))
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 85*time.Second)
+	defer cancel()
+
 	text, err := generateDefaultModelText(ctx, prompt)
-	if err != nil || text == "" {
-		if err != nil {
-			log.Printf("Gemini error: %v", err)
-		}
-		return "Unable to judge."
+	if err != nil {
+		log.Printf("Gemini judgment failed: %v", err)
+		return "", fmt.Errorf("generate debate judgment: %w", err)
 	}
-	return text
+
+	if strings.TrimSpace(text) == "" {
+		return "", errors.New("Gemini returned an empty judgment")
+	}
+
+	return text, nil
+}
+
+// JudgeDebate preserves compatibility with existing callers.
+func JudgeDebate(history []models.Message) string {
+	result, err := JudgeDebateWithError(history)
+	if err != nil {
+		log.Printf("JudgeDebate failed: %v", err)
+		return ""
+	}
+
+	return result
 }
 
 // CreateDebateService creates a new debate in MongoDB, ensuring bot personality is logged
