@@ -854,6 +854,29 @@ const DebateRoom: React.FC = () => {
 
   if (judgmentData) {
     return (
+
+    <div className="fixed inset-0 z-[9999] bg-black">
+      <JudgmentPopup
+        judgment={judgmentData}
+        userAvatar={userAvatar}
+        botAvatar={bot.avatar}
+        botName={debateData.botName}
+        userStance={state.userStance}
+        botStance={state.botStance}
+        botDesc={bot.desc}
+        debateId={debateData.debateId}
+        topic={debateData.topic}
+        messages={state.messages}
+        debateType="user_vs_bot"
+        onClose={() => {
+          setJudgmentData(null);
+          navigate("/game");
+        }}
+      />
+    </div>
+  );
+}
+
       <div className="fixed inset-0 z-[9999] bg-black">
         <JudgmentPopup
           judgment={judgmentData}
@@ -879,6 +902,7 @@ const DebateRoom: React.FC = () => {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-background p-4 transition-colors duration-300">
