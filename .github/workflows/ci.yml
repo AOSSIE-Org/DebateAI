@@ -1,5 +1,4 @@
-
-name: CI
+﻿name: CI
 
 on:
   pull_request:
@@ -13,11 +12,9 @@ jobs:
   backend:
     name: Backend CI
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: backend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,3 +37,53 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+  docker-build:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: debateai-backend:test
+
+  publish:
+    name: Publish image to GHCR
+    if: github.repository == 'AOSSIE-Org/DebateAI' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, docker-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/aossie-org/debateai-backend:latest
+            ghcr.io/aossie-org/debateai-backend:sha-${{ github.sha }}

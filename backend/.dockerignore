@@ -1,9 +1,23 @@
-node_modules
-dist
+
+# Git and local files
 .git
+.gitignore
 .DS_Store
-backend/tmp
-frontend/dist
+
+# Secrets and local configuration
 .env
-backend/.env
-frontend/.env
+.env.*
+!.env.example
+config/config.prod.yml
+config/*.local.yml
+
+# Development-only files
+Dockerfile.dev
+tmp/
+coverage.out
+*.test
+
+# Local uploads and generated assets
+uploads/
+node_modules/
+dist/
