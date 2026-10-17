@@ -844,6 +844,15 @@ func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID
 		room.Mutex.Unlock()
 		return
 	}
+	// A debater cannot ready up without choosing a side; un-readying is always allowed.
+	if *message.Ready && client.Role != "for" && client.Role != "against" {
+		room.Mutex.Unlock()
+		_ = client.SafeWriteJSON(map[string]any{
+			"type":    "error",
+			"message": "Select a stance (For or Against) before marking ready.",
+		})
+		return
+	}
 	client.Ready = *message.Ready
 	message.UserID = client.UserID
 	room.Mutex.Unlock()
