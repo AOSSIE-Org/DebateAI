@@ -41,10 +41,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     setLocalError(null);
     try {
       await login(email, password);
-    } catch (err) {
+    } catch (err: any) {
       const code = (err as Error & { code?: string }).code;
       if (code === 'EMAIL_NOT_VERIFIED') {
         startOtpVerification(email);
+      } else {
+        const msg = err?.userMessage ?? err?.message;
+        if (msg) authContext.handleError(msg);
       }
     }
   };
@@ -173,8 +176,9 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     try {
       await signup(email, password);
       startOtpVerification(email);
-    } catch {
-      // Handled by authContext error state
+    } catch (err: any) {
+      const msg = err?.userMessage ?? err?.message;
+      if (msg) authContext.handleError(msg);
     }
   };
 
@@ -323,7 +327,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
   };
 
   return (
-        <div className="w-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       <h3 className="text-2xl font-medium my-4">Verify Your Email</h3>
       <p className="mb-4">Enter the OTP sent to your email to complete the sign-up process.</p>
       <form onSubmit={handleSubmit} className="w-full">

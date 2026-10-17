@@ -655,7 +655,7 @@ const TeamDebateRoom: React.FC = () => {
   }, [timer, debatePhase, isMyTurn, speechTranscripts, localRole, debateId]);
 
   useEffect(() => {
-  currentUserIdRef.current = currentUser?.id;
+  currentUserIdRef.current = currentUser?.id ?? null;
   myTeamIdRef.current = myTeamId;
   isTeam1Ref.current = isTeam1;
   debatePhaseRef.current = debatePhase;
@@ -740,7 +740,6 @@ const TeamDebateRoom: React.FC = () => {
       const amTeam1 = isTeam1Ref.current;
       const currentMyTeamId = myTeamIdRef.current;
       const currentUserId = currentUserIdRef.current;
-      const currentPhase = debatePhaseRef.current;
 
       switch (data.type) {
         case "stateSync": {
@@ -2245,3 +2244,4 @@ const TeamDebateRoom: React.FC = () => {
 };
 
 export default TeamDebateRoom;
+

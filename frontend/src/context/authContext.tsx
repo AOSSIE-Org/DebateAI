@@ -1,4 +1,4 @@
-import config from "../config/config";
+import { getServer, isOfficial } from "@/lib/server";
 import {
   createContext,
   useState,
@@ -13,8 +13,29 @@ import { userAtom } from '@/state/userAtom';
 import type { User } from '@/types/user';
 import { DEFAULT_AVATAR_URL } from '@/constants/avatar';
 
-const baseURL = config.baseUrl;
 const USER_CACHE_KEY = 'userProfile';
+
+const safeAuthFetch = async (endpoint: string, init?: RequestInit): Promise<Response> => {
+  const base = getServer();
+  if (!base) {
+    const msg = 'The custom server URL is invalid. Fix it, or switch to the official server.';
+    throw Object.assign(new Error(msg), { userMessage: msg });
+  }
+  const cleanBase = base.replace(/\/+$/, '');
+  const cleanEndpoint = endpoint.replace(/^\/+/, '');
+  try {
+    return await fetch(`${cleanBase}/${cleanEndpoint}`, init);
+  } catch (err: any) {
+    if (!isOfficial() && base) {
+      try {
+        err.userMessage = `Couldn't reach ${new URL(base).host}. Check the server URL and try again.`;
+      } catch {
+        // ignore
+      }
+    }
+    throw err;
+  }
+};
 
 interface AuthContextType {
   token: string | null;
@@ -58,9 +79,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const message =
       typeof error === 'string'
         ? error
-        : error instanceof Error
-        ? error.message
-        : 'An unexpected error occurred';
+        : (error as any)?.userMessage ??
+          (error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred');
     setError(message);
   }, []);
 
@@ -72,7 +94,7 @@ const verifyToken = useCallback(async () => {
   if (!storedToken) return;
 
   try {
-    const response = await fetch(`${baseURL}/verifyToken`, {
+    const response = await safeAuthFetch('/verifyToken', {
       method: 'POST',
       headers: { Authorization: `Bearer ${storedToken}` },
     });
@@ -90,7 +112,7 @@ const verifyToken = useCallback(async () => {
 
     setToken(storedToken);
 
-    const userResponse = await fetch(`${baseURL}/user/fetchprofile`, {
+    const userResponse = await safeAuthFetch('/user/fetchprofile', {
       method: 'GET',
       headers: { Authorization: `Bearer ${storedToken}` },
     });
@@ -151,7 +173,7 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${baseURL}/login`, {
+      const response = await safeAuthFetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -208,7 +230,7 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${baseURL}/signup`, {
+      const response = await safeAuthFetch('/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -230,7 +252,7 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${baseURL}/verifyEmail`, {
+      const response = await safeAuthFetch('/verifyEmail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, confirmationCode: code }),
@@ -284,7 +306,7 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${baseURL}/forgotPassword`, {
+      const response = await safeAuthFetch('/forgotPassword', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -305,7 +327,7 @@ const verifyToken = useCallback(async () => {
   const resendVerification = async (email: string): Promise<string> => {
     setLoading(true);
     try {
-      const response = await fetch(`${baseURL}/resendVerification`, {
+      const response = await safeAuthFetch('/resendVerification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -338,7 +360,7 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${baseURL}/confirmForgotPassword`, {
+      const response = await safeAuthFetch('/confirmForgotPassword', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code, newPassword }),
@@ -360,7 +382,7 @@ const verifyToken = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${baseURL}/googleLogin`, {
+      const response = await safeAuthFetch('/googleLogin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
