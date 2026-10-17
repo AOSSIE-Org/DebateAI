@@ -2,8 +2,10 @@ import { CreateTournamentForm } from "@/components/tournament/CreateTournamentFo
 
 const CreateTournament = () => {
   return (
-    <div className="p-6">
-      <CreateTournamentForm />
+    <div className="min-h-full flex items-center justify-center">
+      <div className="w-full max-w-[630px]">
+        <CreateTournamentForm />
+      </div>
     </div>
   );
 };
