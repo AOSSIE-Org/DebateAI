@@ -96,13 +96,13 @@ const coachSkills: CoachSkill[] = [
     title: 'Strengthen Argument',
     description:
       'Master the art of crafting compelling, persuasive arguments that win debates.',
-    url: 'http://localhost:5173/coach/strengthen-argument',
+    url: '/coach/strengthen-argument',
   },
   {
     title: 'Pros and Cons Challenge',
     description:
       'Test your critical thinking by crafting up to 5 pros and cons for engaging debate topics.',
-    url: 'http://localhost:5173/coach/pros-cons',
+    url: '/coach/pros-cons',
   },
 ];
 
