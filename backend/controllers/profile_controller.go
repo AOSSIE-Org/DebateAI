@@ -120,6 +120,10 @@ func GetProfile(c *gin.Context) {
 				"currentStreak":  user.CurrentStreak,
 				"avatarUrl":      avatar,
 				"lastActivityAt": user.LastActivityDate,
+				"twitter":        user.Twitter,
+				"instagram":      user.Instagram,
+				"linkedin":       user.LinkedIn,
+				"github":         user.GitHub,
 			},
 		})
 		return
@@ -275,6 +279,7 @@ func GetProfile(c *gin.Context) {
 			"twitter":       user.Twitter,
 			"instagram":     user.Instagram,
 			"linkedin":      user.LinkedIn,
+			"github":        user.GitHub,
 			"avatarUrl":     avatar,
 		},
 		"leaderboard": leaderboard,
@@ -291,6 +296,102 @@ func GetProfile(c *gin.Context) {
 	})
 }
 
+func sanitizeAndValidateSocial(platform, rawInput string) (string, error) {
+	input := strings.TrimSpace(rawInput)
+	if input == "" {
+		return "", nil
+	}
+
+	candidate := input
+	if strings.HasPrefix(strings.ToLower(input), "http://") ||
+		strings.HasPrefix(strings.ToLower(input), "https://") ||
+		strings.HasPrefix(input, "//") ||
+		strings.Contains(input, ".com") {
+		urlStr := input
+		if !strings.HasPrefix(strings.ToLower(urlStr), "http://") && !strings.HasPrefix(strings.ToLower(urlStr), "https://") {
+			urlStr = "https://" + strings.TrimPrefix(urlStr, "//")
+		}
+		parsedURL, err := url.Parse(urlStr)
+		if err != nil {
+			return "", fmt.Errorf("invalid URL structure for %s", platform)
+		}
+
+		hostname := strings.ToLower(parsedURL.Hostname())
+		hostname = strings.TrimPrefix(hostname, "www.")
+
+		switch platform {
+		case "twitter":
+			if hostname != "x.com" && hostname != "twitter.com" && hostname != "mobile.twitter.com" {
+				return "", fmt.Errorf("untrusted domain: only official X/Twitter links are allowed")
+			}
+		case "instagram":
+			if hostname != "instagram.com" {
+				return "", fmt.Errorf("untrusted domain: only official Instagram links are allowed")
+			}
+		case "linkedin":
+			if hostname != "linkedin.com" {
+				return "", fmt.Errorf("untrusted domain: only official LinkedIn links are allowed")
+			}
+		case "github":
+			if hostname != "github.com" {
+				return "", fmt.Errorf("untrusted domain: only official GitHub links are allowed")
+			}
+		default:
+			return "", fmt.Errorf("unsupported platform: %s", platform)
+		}
+
+		segments := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+		if len(segments) == 0 || segments[0] == "" {
+			return "", fmt.Errorf("URL must include a profile handle")
+		}
+
+		if platform == "linkedin" && segments[0] == "in" && len(segments) > 1 {
+			candidate = segments[1]
+		} else {
+			candidate = segments[0]
+		}
+	}
+
+	candidate = strings.TrimPrefix(candidate, "@")
+	if platform == "linkedin" {
+		candidate = strings.TrimPrefix(candidate, "in/")
+	}
+	candidate = strings.Trim(candidate, "/")
+	if idx := strings.IndexAny(candidate, "?#"); idx != -1 {
+		candidate = candidate[:idx]
+	}
+
+	switch platform {
+	case "twitter":
+		twitterPattern := regexp.MustCompile(`^[a-zA-Z0-9_]{1,15}$`)
+		if !twitterPattern.MatchString(candidate) {
+			return "", fmt.Errorf("invalid Twitter handle: 1-15 letters, numbers, and underscores allowed")
+		}
+	case "instagram":
+		instagramPattern := regexp.MustCompile(`^[a-zA-Z0-9._]{1,30}$`)
+		if !instagramPattern.MatchString(candidate) ||
+			strings.HasPrefix(candidate, ".") ||
+			strings.HasSuffix(candidate, ".") ||
+			strings.Contains(candidate, "..") {
+			return "", fmt.Errorf("invalid Instagram handle: 1-30 letters, numbers, periods, and underscores allowed")
+		}
+	case "linkedin":
+		linkedinPattern := regexp.MustCompile(`^[a-zA-Z0-9-]{3,100}$`)
+		if !linkedinPattern.MatchString(candidate) {
+			return "", fmt.Errorf("invalid LinkedIn handle: 3-100 alphanumeric and hyphen characters allowed")
+		}
+	case "github":
+		githubPattern := regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$`)
+		if !githubPattern.MatchString(candidate) {
+			return "", fmt.Errorf("invalid GitHub username: 1-39 alphanumeric characters, hyphens allowed")
+		}
+	default:
+		return "", fmt.Errorf("unsupported platform: %s", platform)
+	}
+
+	return candidate, nil
+}
+
 func UpdateProfile(ctx *gin.Context) {
 	email := ctx.GetString("email")
 	if email == "" {
@@ -304,6 +405,7 @@ func UpdateProfile(ctx *gin.Context) {
 		Twitter     string `json:"twitter"`
 		Instagram   string `json:"instagram"`
 		LinkedIn    string `json:"linkedin"`
+		GitHub      string `json:"github"`
 		AvatarURL   string `json:"avatarUrl"`
 	}
 	if err := ctx.ShouldBindJSON(&updateData); err != nil {
@@ -312,31 +414,32 @@ func UpdateProfile(ctx *gin.Context) {
 	}
 
 	bio := strings.TrimSpace(updateData.Bio)
-	twitter := strings.TrimSpace(updateData.Twitter)
-	instagram := strings.TrimSpace(updateData.Instagram)
-	linkedin := strings.TrimSpace(updateData.LinkedIn)
-
 	if len([]rune(bio)) > 300 {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Bio cannot exceed 300 characters"})
 		return
 	}
 
-	twitterPattern := regexp.MustCompile(`^[a-zA-Z0-9_]*$`)
-	instagramPattern := regexp.MustCompile(`^[a-zA-Z0-9_.]*$`)
-	linkedinPattern := regexp.MustCompile(`^[a-z0-9-]*$`)
-
-	if len(twitter) > 15 || !twitterPattern.MatchString(twitter) {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Twitter username"})
+	cleanTwitter, err := sanitizeAndValidateSocial("twitter", updateData.Twitter)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if len(instagram) > 30 || !instagramPattern.MatchString(instagram) {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Instagram username"})
+	cleanInstagram, err := sanitizeAndValidateSocial("instagram", updateData.Instagram)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if len(linkedin) > 100 || !linkedinPattern.MatchString(linkedin) {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid LinkedIn username"})
+	cleanLinkedIn, err := sanitizeAndValidateSocial("linkedin", updateData.LinkedIn)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cleanGitHub, err := sanitizeAndValidateSocial("github", updateData.GitHub)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -357,9 +460,10 @@ func UpdateProfile(ctx *gin.Context) {
 	setFields := bson.M{
 		"displayName": newDisplayName,
 		"bio":         bio,
-		"twitter":     twitter,
-		"instagram":   instagram,
-		"linkedin":    linkedin,
+		"twitter":     cleanTwitter,
+		"instagram":   cleanInstagram,
+		"linkedin":    cleanLinkedIn,
+		"github":      cleanGitHub,
 		"avatarUrl":   strings.TrimSpace(updateData.AvatarURL),
 		"updatedAt":   time.Now(),
 	}
