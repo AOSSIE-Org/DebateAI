@@ -1093,6 +1093,7 @@ const TeamDebateRoom: React.FC = () => {
       const amTeam1 = isTeam1Ref.current;
       const currentMyTeamId = myTeamIdRef.current;
       const currentUserId = currentUserIdRef.current;
+
       switch (data.type) {
         case "stateSync": {
           // Sync all state when joining or receiving state update
@@ -2941,3 +2942,4 @@ const TeamDebateRoom: React.FC = () => {
 };
 
 export default TeamDebateRoom;
+

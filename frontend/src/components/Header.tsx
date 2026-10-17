@@ -37,6 +37,7 @@ import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
 import { ThemeToggle } from "./ThemeToggle";
+import ServerBadge from "./ServerBadge";
 
 const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) => {
   const image = event.currentTarget;
@@ -170,6 +171,7 @@ function Header() {
       <header className="flex items-center justify-between h-16 px-2 sm:px-4 border-b border-border bg-background">
         <div className="hidden xs:flex flex-1 min-w-0 overflow-hidden text-sm sm:text-lg font-semibold mr-2">{getBreadcrumbs()}</div>
         <div className="flex-shrink-0 flex items-center gap-2 sm:gap-4">
+          <ServerBadge />
           <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
             <PopoverTrigger asChild>
               <button

@@ -51,7 +51,7 @@ func GetLeaderboard(c *gin.Context) {
 
 	// Query users sorted by Rating (descending)
 	collection := db.MongoDatabase.Collection("users")
-	findOptions := options.Find().SetSort(bson.D{{"rating", -1}}).SetLimit(100)
+	findOptions := options.Find().SetSort(bson.D{{Key : "rating", Value : -1}}).SetLimit(100)
 	cursor, err := collection.Find(c, bson.M{}, findOptions)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard data"})
