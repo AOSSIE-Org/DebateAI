@@ -1186,6 +1186,9 @@ const OnlineDebateRoom = (): JSX.Element => {
     rws.onopen = () => {
       setIsWsConnected(true);
       rws.send(JSON.stringify({ type: "join", room: roomId }));
+      if (manualRecordingRef.current) {
+        rws.send(JSON.stringify({ type: "speaking", isSpeaking: true }));
+      }
       // Wait a bit before fetching participants to ensure room is fully created
       participantFetchTimeout = window.setTimeout(() => {
         void fetchRoomParticipantsRef.current?.();
@@ -2561,6 +2564,14 @@ const OnlineDebateRoom = (): JSX.Element => {
                 <p className="text-gray-700 text-center text-sm">
                   {popup.message}
                 </p>
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    onClick={() => setPopup({ show: false, message: "" })}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
               </>
             )}
           </div>
