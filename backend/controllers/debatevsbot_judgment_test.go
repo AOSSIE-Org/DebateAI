@@ -131,6 +131,46 @@ func TestIsValidJudgmentResult(t *testing.T) {
 			),
 			want: false,
 		},
+		{
+			name:   "accepts User winner",
+			result: valid,
+			want:   true,
+		},
+		{
+			name:   "accepts Bot winner",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":"Bot"`, 1),
+			want:   true,
+		},
+		{
+			name:   "accepts Draw winner",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":"Draw"`, 1),
+			want:   true,
+		},
+		{
+			name:   "rejects lowercase user",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":"user"`, 1),
+			want:   false,
+		},
+		{
+			name:   "rejects uppercase BOT",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":"BOT"`, 1),
+			want:   false,
+		},
+		{
+			name:   "rejects winner with whitespace",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":" Draw "`, 1),
+			want:   false,
+		},
+		{
+			name:   "rejects empty winner",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":""`, 1),
+			want:   false,
+		},
+		{
+			name:   "rejects unknown winner",
+			result: strings.Replace(valid, `"winner":"User"`, `"winner":"Unknown"`, 1),
+			want:   false,
+		},
 	}
 
 	for _, tt := range tests {

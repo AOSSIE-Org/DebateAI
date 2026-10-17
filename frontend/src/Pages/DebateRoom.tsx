@@ -572,6 +572,7 @@ const DebateRoom: React.FC = () => {
               setPopup({
                 show: true,
                 message: "Time's up! Moving to the next turn.",
+                type: "info",
               });
               setTimeout(() => setPopup({ show: false, message: "" }), 2000);
               const updatedState = { ...prev, timer: 0 };
@@ -948,9 +949,11 @@ const retryJudgment = () => {
           <h3 className="text-xl font-bold text-primary">
             {popup.type === "transition"
               ? "Phase Completed"
-              : popup.type === "info"
-                ? "Time's Up"
-                : "Judgment Unavailable"}
+              : popup.type === "error"
+                ? "Judgment Unavailable"
+                : popup.type === "info"
+                  ? "Time's Up"
+                  : "Notice"}
           </h3>
 
           <p className="text-muted-foreground text-center text-sm">

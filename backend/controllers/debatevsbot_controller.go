@@ -265,11 +265,12 @@ func isValidJudgmentResult(result string) bool {
 		math.Abs(botTotal-calculatedBotTotal) > scoreTolerance {
 		return false
 	}
-	winner := strings.TrimSpace(judgment.Verdict.Winner)
-
-	return strings.EqualFold(winner, "User") ||
-		strings.EqualFold(winner, "Bot") ||
-		strings.EqualFold(winner, "Draw")
+	switch judgment.Verdict.Winner {
+	case "User", "Bot", "Draw":
+		return true
+	default:
+		return false
+	}
 }
 
 func validJudgmentScore(score *judgmentScore) bool {
@@ -343,12 +344,12 @@ func JudgeDebate(c *gin.Context) {
 
 	resultStatus := "pending"
 
-	switch {
-	case strings.EqualFold(judgment.Verdict.Winner, "User"):
+	switch judgment.Verdict.Winner {
+	case "User":
 		resultStatus = "win"
-	case strings.EqualFold(judgment.Verdict.Winner, "Bot"):
+	case "Bot":
 		resultStatus = "loss"
-	case strings.EqualFold(judgment.Verdict.Winner, "Draw"):
+	case "Draw":
 		resultStatus = "draw"
 	}
 
