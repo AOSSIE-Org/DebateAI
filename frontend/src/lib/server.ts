@@ -1,4 +1,5 @@
 const OFFICIAL = import.meta.env.VITE_BASE_URL;
+const LOCAL_BACKEND = 'http://localhost:1313';
 const KEY = 'debateai:server';
 
 // Clean origin, or null if invalid. https only (http allowed for localhost).
@@ -18,11 +19,24 @@ export const isOfficial = (): boolean => localStorage.getItem(KEY) === null;
 
 // Active backend origin, or null when a custom URL is stored but invalid.
 // NEVER falls back to OFFICIAL once a custom value is stored.
+
 export function getServer(): string | null {
   const stored = localStorage.getItem(KEY);
-  if (stored === null) return OFFICIAL ?? null;
-  return normalize(stored);
+
+  // If a custom server is selected, use it without falling back.
+  if (stored !== null) return normalize(stored);
+
+  // Use the configured official backend if valid.
+  const official = normalize(OFFICIAL);
+  if (official) return official;
+
+  // Fall back to localhost during development.
+  if (import.meta.env.DEV) return LOCAL_BACKEND;
+
+  // No backend configured in production.
+  return null;
 }
+
 
 export function serverLabel(): string {
   if (isOfficial()) return 'Official';
