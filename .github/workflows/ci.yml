@@ -51,8 +51,8 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: .
+          file: ./deployment/backend/Dockerfile
           push: false
           tags: debateai-backend:test
 
@@ -81,8 +81,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: .
+          file: ./deployment/backend/Dockerfile
           push: true
           tags: |
             ghcr.io/aossie-org/debateai-backend:latest

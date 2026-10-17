@@ -5,11 +5,12 @@ WORKDIR /src
 
 RUN apk add --no-cache ca-certificates
 
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 RUN go mod verify
 
-COPY . .
+COPY backend/ ./
+COPY deployment/backend/config.prod.sample.yml ./config/config.prod.sample.yml
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
