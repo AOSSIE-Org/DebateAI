@@ -124,8 +124,12 @@ export const concedeDebate = async (debateId: string, history: DebateMessage[] =
 };
 
 // Function to judge a debate
-export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> => {
+
+export const judgeDebate = async (
+  data: JudgeRequest
+): Promise<JudgeResponse> => {
   const token = getAuthToken();
+
   const response = await fetch(`${baseURL}/vsbot/judge`, {
     method: "POST",
     headers: {
@@ -137,7 +141,27 @@ export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> =>
   });
 
   if (!response.ok) {
-    throw new Error("Failed to judge debate");
+    let message = "Unable to generate your debate judgment.";
+
+    try {
+      const errorData = await response.json();
+
+      if (typeof errorData.error === "string" && errorData.error.trim()) {
+        message = errorData.error;
+      }
+    } catch {
+      // Keep the fallback message if the response isn't JSON.
+    }
+
+    if (response.status === 429) {
+      message = "The AI service is rate-limited. Please try again later.";
+    } else if (response.status === 502) {
+      message = "The AI couldn't generate a valid judgment. Please try again.";
+    } else if (response.status >= 500 && response.status !== 502) {
+      message = "The AI service is temporarily unavailable. Please try again.";
+    }
+
+    throw new Error(message);
   }
 
   return response.json();

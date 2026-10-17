@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math"
+	"net/http"
 	"strings"
 	"time"
 
@@ -58,6 +60,14 @@ type DebateMessageResponse struct {
 type JudgeResponse struct {
 	Result string `json:"result"`
 }
+
+var judgeDebateFunc = services.JudgeDebateWithError
+var validateDebateTokenFunc = utils.ValidateTokenAndFetchEmail
+var getDebateUserIDFunc = utils.GetUserIDFromEmail
+var updateBotDebateGamificationFunc = updateGamificationAfterBotDebate
+var updateBotDebateOutcomeFunc = db.UpdateDebateVsBotOutcome
+var getLatestBotDebateFunc = db.GetLatestDebateVsBot
+var saveBotDebateTranscriptFunc = services.SaveDebateTranscript
 
 func CreateDebate(c *gin.Context) {
 	// Extract token from request header
@@ -177,6 +187,99 @@ func SendDebateMessage(c *gin.Context) {
 	c.JSON(200, response)
 }
 
+type judgmentScore struct {
+	Score  *float64 `json:"score"`
+	Reason string   `json:"reason"`
+}
+
+type judgmentSection struct {
+	User *judgmentScore `json:"user"`
+	Bot  *judgmentScore `json:"bot"`
+}
+
+type judgmentTotal struct {
+	User *float64 `json:"user"`
+	Bot  *float64 `json:"bot"`
+}
+
+type judgmentVerdict struct {
+	Winner string `json:"winner"`
+}
+
+type judgmentResult struct {
+	OpeningStatement *judgmentSection `json:"opening_statement"`
+	CrossExamination *judgmentSection `json:"cross_examination"`
+	Answers          *judgmentSection `json:"answers"`
+	Closing          *judgmentSection `json:"closing"`
+	Total            *judgmentTotal   `json:"total"`
+	Verdict          *judgmentVerdict `json:"verdict"`
+}
+
+func isValidJudgmentResult(result string) bool {
+	if strings.TrimSpace(result) == "" {
+		return false
+	}
+
+	var judgment judgmentResult
+	if err := json.Unmarshal([]byte(result), &judgment); err != nil {
+		return false
+	}
+
+	sections := []*judgmentSection{
+		judgment.OpeningStatement,
+		judgment.CrossExamination,
+		judgment.Answers,
+		judgment.Closing,
+	}
+
+	for _, section := range sections {
+		if section == nil ||
+			!validJudgmentScore(section.User) ||
+			!validJudgmentScore(section.Bot) {
+			return false
+		}
+	}
+
+	if judgment.Total == nil ||
+		judgment.Total.User == nil ||
+		judgment.Total.Bot == nil ||
+		judgment.Verdict == nil {
+		return false
+	}
+	userTotal := *judgment.Total.User
+	botTotal := *judgment.Total.Bot
+
+	var calculatedUserTotal float64
+	var calculatedBotTotal float64
+
+	for _, section := range sections {
+		calculatedUserTotal += *section.User.Score
+		calculatedBotTotal += *section.Bot.Score
+	}
+
+	const scoreTolerance = 1e-9
+
+	if userTotal < 0 || userTotal > 40 ||
+		botTotal < 0 || botTotal > 40 ||
+		math.Abs(userTotal-calculatedUserTotal) > scoreTolerance ||
+		math.Abs(botTotal-calculatedBotTotal) > scoreTolerance {
+		return false
+	}
+	winner := strings.TrimSpace(judgment.Verdict.Winner)
+
+	return strings.EqualFold(winner, "User") ||
+		strings.EqualFold(winner, "Bot") ||
+		strings.EqualFold(winner, "Draw")
+}
+
+func validJudgmentScore(score *judgmentScore) bool {
+	return score != nil &&
+		score.Score != nil &&
+		*score.Score >= 0 &&
+		*score.Score <= 10 &&
+		strings.TrimSpace(score.Reason) != ""
+}
+
 func JudgeDebate(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
@@ -185,14 +288,17 @@ func JudgeDebate(c *gin.Context) {
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
-	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	valid, email, err := validateDebateTokenFunc(
+		"./config/config.prod.yml",
+		token,
+		c,
+	)
 	if err != nil || !valid {
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 
-	// Get user ID from database using email
-	userID, err := utils.GetUserIDFromEmail(email)
+	userID, err := getDebateUserIDFunc(email)
 	if err != nil {
 		c.JSON(401, gin.H{"error": "Failed to get user ID"})
 		return
@@ -200,74 +306,74 @@ func JudgeDebate(c *gin.Context) {
 
 	var req JudgeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request payload: " + err.Error()})
+		c.JSON(400, gin.H{
+			"error": "Invalid request payload: " + err.Error(),
+		})
+		return
+	}
+	result, err := judgeDebateFunc(req.History)
+	if err != nil {
+		log.Printf("Debate judgment failed: %v", err)
+
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error": "Unable to generate a debate judgment. Please try again later.",
+		})
 		return
 	}
 
-	// Judge the debate
-	result := services.JudgeDebate(req.History)
+	log.Printf("JudgeDebate returned %d characters", len(result))
 
-	// Update debate outcome
-	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
+	// Validate the complete judgment before performing side effects.
+	if !isValidJudgmentResult(result) {
+		c.JSON(502, gin.H{
+			"error": "Unable to generate a valid debate judgment. Please try again.",
+		})
+		return
 	}
 
-	// Get the latest debate information to extract proper details
-	latestDebate, err := db.GetLatestDebateVsBot(email)
-	if err != nil {
-		// Use defaults if we can't get the debate info
+	// Determine the result from the validated judgment.
+	var judgment judgmentResult
+	if err := json.Unmarshal([]byte(result), &judgment); err != nil {
+		// Defensive check; validation above should already guarantee this.
+		c.JSON(502, gin.H{
+			"error": "Unable to generate a valid debate judgment. Please try again.",
+		})
+		return
+	}
+
+	resultStatus := "pending"
+
+	switch {
+	case strings.EqualFold(judgment.Verdict.Winner, "User"):
+		resultStatus = "win"
+	case strings.EqualFold(judgment.Verdict.Winner, "Bot"):
+		resultStatus = "loss"
+	case strings.EqualFold(judgment.Verdict.Winner, "Draw"):
+		resultStatus = "draw"
+	}
+
+	// Persist the judgment before saving the transcript or awarding points.
+	if err := updateBotDebateOutcomeFunc(email, result); err != nil {
+		log.Printf("Failed to update debate outcome: %v", err)
+		c.JSON(500, gin.H{
+			"error": "Failed to save debate judgment",
+		})
+		return
+	}
+
+	// Get the latest debate information.
+	latestDebate, err := getLatestBotDebateFunc(email)
+	if err != nil || latestDebate == nil {
+		log.Printf("Failed to get latest debate information for %s: %v", email, err)
+
 		latestDebate = &models.DebateVsBot{
 			Topic:   "Debate vs Bot",
 			BotName: "AI Bot",
 		}
 	}
 
-	// Determine result from judge's response
-	resultStatus := "pending"
-
-	// Try to parse JSON response first
-	var judgeResponse map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &judgeResponse); err == nil {
-		// If JSON parsing succeeds, extract winner from verdict
-		if verdict, ok := judgeResponse["verdict"].(map[string]interface{}); ok {
-			if winner, ok := verdict["winner"].(string); ok {
-				if strings.EqualFold(winner, "User") {
-					resultStatus = "win"
-				} else if strings.EqualFold(winner, "Bot") {
-					resultStatus = "loss"
-				} else if strings.EqualFold(winner, "Draw") {
-					resultStatus = "draw"
-				} else {
-					// If winner is not clearly "User", "Bot", or "Draw", default to loss
-					resultStatus = "loss"
-				}
-			} else {
-				// Default to loss if we can't determine winner
-				resultStatus = "loss"
-			}
-		} else {
-			// Default to loss if we can't determine winner
-			resultStatus = "loss"
-		}
-	} else {
-		// Fallback to string matching if JSON parsing fails
-		resultLower := strings.ToLower(result)
-		if strings.Contains(resultLower, "user win") || strings.Contains(resultLower, "user wins") ||
-			strings.Contains(resultLower, "user") && strings.Contains(resultLower, "win") {
-			resultStatus = "win"
-		} else if strings.Contains(resultLower, "bot win") || strings.Contains(resultLower, "bot wins") ||
-			strings.Contains(resultLower, "lose") || strings.Contains(resultLower, "loss") ||
-			strings.Contains(resultLower, "bot") && strings.Contains(resultLower, "win") {
-			resultStatus = "loss"
-		} else if strings.Contains(resultLower, "draw") {
-			resultStatus = "draw"
-		} else {
-			// If no clear pattern is found, default to loss
-			resultStatus = "loss"
-		}
-	}
-
-	// Save transcript with proper debate information
-	_ = services.SaveDebateTranscript(
+	// Save the transcript and report failures instead of silently ignoring them.
+	if err := saveBotDebateTranscriptFunc(
 		userID,
 		email,
 		"user_vs_bot",
@@ -276,20 +382,30 @@ func JudgeDebate(c *gin.Context) {
 		resultStatus,
 		req.History,
 		nil,
+	); err != nil {
+		log.Printf("Failed to save debate transcript: %v", err)
+	}
+
+	// Update gamification after a valid judgment.
+	log.Printf(
+		"About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",
+		userID.Hex(),
+		resultStatus,
+		latestDebate.Topic,
 	)
 
-	// Update gamification (score, badges, streaks) after bot debate
-	log.Printf("About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",
-		userID.Hex(), resultStatus, latestDebate.Topic)
-
-	// Call synchronously but with recover to prevent panics from crashing the request
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("Panic in updateGamificationAfterBotDebate: %v", r)
 			}
 		}()
-		updateGamificationAfterBotDebate(userID, resultStatus, latestDebate.Topic)
+
+		updateBotDebateGamificationFunc(
+			userID,
+			resultStatus,
+			latestDebate.Topic,
+		)
 	}()
 
 	c.JSON(200, JudgeResponse{

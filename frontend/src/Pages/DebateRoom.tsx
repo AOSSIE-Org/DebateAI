@@ -379,8 +379,10 @@ const DebateRoom: React.FC = () => {
     show: boolean;
     message: string;
     isJudging?: boolean;
+    type?: "transition" | "judging" | "error" | "info";
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
+  const [failedJudgmentMessages, setFailedJudgmentMessages] = useState<Message[] | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -405,6 +407,40 @@ const DebateRoom: React.FC = () => {
       navigate("/start-debate", { replace: true });
     }
   }, [debateData, navigate, toast]);
+
+  const handleExitDebate = () => {
+    if (!window.confirm("Are you sure you want to exit this debate?")) {
+      return;
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    try {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    } catch (err) {
+      console.warn("Speech recognition already stopped:", err);
+    }
+
+    setIsRecognizing(false);
+    setPopup({ show: false, message: "" });
+
+    try {
+      if (debateKey) {
+        localStorage.removeItem(debateKey);
+      }
+
+      sessionStorage.removeItem(`debateData_${location.pathname}`);
+    } catch (err) {
+      console.error("Failed to clear debate session data:", err);
+    }
+
+    navigate("/startDebate", { replace: true });
+  };
 
   const handleConcede = async () => {
     if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
@@ -602,8 +638,10 @@ const DebateRoom: React.FC = () => {
       const newPhase = currentState.currentPhase + 1;
       setPopup({
         show: true,
-        message: `${phases[currentState.currentPhase].name} completed. Next: ${phases[newPhase].name
-          } - ${getPhaseInstructions(newPhase)}`,
+        message: `${phases[currentState.currentPhase].name} completed. Next: ${
+          phases[newPhase].name
+        } - ${getPhaseInstructions(newPhase)}`,
+        type: "transition",
       });
       setTimeout(() => {
         setPopup({ show: false, message: "" });
@@ -729,82 +767,71 @@ const DebateRoom: React.FC = () => {
     }
   };
 
-  const judgeDebateResult = async (messages: Message[]) => {
-    if (!debateData) {
-      console.error("Cannot judge debate without debate data.");
-      return;
+
+const judgeDebateResult = async (messages: Message[]) => {
+  if (!debateData) {
+    console.error("Cannot judge debate without debate data.");
+    return;
+  }
+
+  try {
+    setPopup({
+      show: true,
+      message: "Calculating scores and judging results...",
+      isJudging: true,
+    });
+
+    const { result } = await judgeDebate({
+      history: messages,
+      userId: debateData.userId,
+    });
+
+    let judgment: JudgmentData;
+
+    if (typeof result === "string") {
+      const jsonString = extractJSON(result);
+      judgment = JSON.parse(jsonString);
+    } else {
+      judgment = result as JudgmentData;
     }
 
-    try {
-      console.log("Starting judgment with messages:", messages);
-      const { result } = await judgeDebate({
-        history: messages,
-        userId: debateData.userId,
-      });
-      console.log("Raw judge result:", result);
-
-
-      let judgment: JudgmentData;
-
-      if (typeof result === "string") {
-        const jsonString = extractJSON(result);
-        console.log("Extracted JSON:", jsonString);
-        judgment = JSON.parse(jsonString);
-      } else {
-        const res: any = result;
-
-        if (res?.opening_statement && res?.verdict) {
-          judgment = res as JudgmentData;
-        } else {
-          console.error("Invalid judgment structure:", result);
-          return;
-        }
-      }
-
-      console.log("FINAL PARSED:", judgment);
-      setJudgmentData(judgment);
-      setPopup({ show: false, message: "" });
-
-    } catch (error) {
-      console.error("Judging error:", error);
-      // Show error to user
-      setPopup({
-        show: true,
-        message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
-        isJudging: false,
-      });
-
-      // Set default judgment data
-      setJudgmentData({
-        opening_statement: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        cross_examination: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        answers: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        closing: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        total: { user: 0, bot: 0 },
-        verdict: {
-          winner: "None",
-          reason: error instanceof Error ? error.message : "Judgment failed",
-          congratulations: "",
-          opponent_analysis: "",
-        },
-      });
-      setTimeout(() => {
-        setPopup({ show: false, message: "" });
-      }, 3000);
+    // Validate the structure before displaying the result.
+    if (
+      !judgment?.opening_statement ||
+      !judgment?.cross_examination ||
+      !judgment?.answers ||
+      !judgment?.closing ||
+      !judgment?.total ||
+      !["User", "Bot", "Draw"].includes(judgment?.verdict?.winner)
+    ) {
+      throw new Error("The AI returned an incomplete judgment.");
     }
-  };
+
+    setJudgmentData(judgment);
+    setFailedJudgmentMessages(null);
+    setPopup({ show: false, message: "" });
+  } catch (error) {
+    console.error("Judging error:", error);
+
+    // Keep the original messages so the user can retry.
+    setFailedJudgmentMessages(messages);
+    setJudgmentData(null);
+
+    setPopup({
+      show: true,
+      message:
+        "We couldn't generate your debate judgment. The AI service may be temporarily unavailable. Please try again.",
+      isJudging: false,
+      type: "error",
+    });
+  }
+};
+
+const retryJudgment = () => {
+  if (!failedJudgmentMessages) return;
+
+  void judgeDebateResult(failedJudgmentMessages);
+};
 
   const formatTime = (seconds: number) => {
     const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60)
@@ -897,30 +924,57 @@ const DebateRoom: React.FC = () => {
         </div>
       </div>
 
-      {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105">
-            {popup.isJudging ? (
-              <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  {popup.message}
-                </h2>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-xl font-bold text-primary mb-2">
-                  Phase Transition
-                </h3>
-                <p className="text-muted-foreground text-center text-sm">
-                  {popup.message}
-                </p>
-              </>
-            )}
-          </div>
+        <div className="w-full max-w-5xl mx-auto flex justify-end py-3">
+          <Button
+            variant="outline"
+            onClick={handleExitDebate}
+            className="border-border"
+          >
+            Exit Debate
+          </Button>
+        </div>
+{popup.show && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full">
+      {popup.isJudging ? (
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4" />
+          <h2 className="text-xl font-semibold text-foreground text-center">
+            {popup.message}
+          </h2>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4">
+          <h3 className="text-xl font-bold text-primary">
+            {popup.type === "transition"
+              ? "Phase Completed"
+              : popup.type === "info"
+                ? "Time's Up"
+                : "Judgment Unavailable"}
+          </h3>
+
+          <p className="text-muted-foreground text-center text-sm">
+            {popup.message}
+          </p>
+
+          {popup.type === "error" && failedJudgmentMessages && (
+            <Button onClick={retryJudgment} className="w-full">
+              Retry Judgment
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() => setPopup({ show: false, message: "" })}
+            className="w-full"
+          >
+            Close
+          </Button>
         </div>
       )}
-
+    </div>
+  </div>
+)}
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
         <div
