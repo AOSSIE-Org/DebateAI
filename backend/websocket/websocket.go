@@ -146,10 +146,10 @@ type Message struct {
 	Timestamp   int64  `json:"timestamp,omitempty"`
 	Mode        string `json:"mode,omitempty"` // 'type' or 'speak'
 	// Debate-specific fields
-	Phase string `json:"phase,omitempty"`
-	Topic string `json:"topic,omitempty"`
-	Role  string `json:"role,omitempty"`
-	Ready *bool  `json:"ready,omitempty"`
+	Phase string  `json:"phase,omitempty"`
+	Topic string  `json:"topic,omitempty"`
+	Role  *string `json:"role,omitempty"`
+	Ready *bool   `json:"ready,omitempty"`
 	// New fields for automatic muting
 	IsMuted        bool   `json:"isMuted,omitempty"`
 	CurrentTurn    string `json:"currentTurn,omitempty"`    // "for" or "against"
@@ -815,16 +815,37 @@ func handleTopicChange(room *Room, conn *websocket.Conn, message Message, roomID
 func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, roomID string) {
 	room.Mutex.Lock()
 	client, exists := room.Clients[conn]
-	if !exists || client.IsSpectator || (room.Phase != "" && room.Phase != setupPhase) || (message.Role != "for" && message.Role != "against") {
+	if !exists || client.IsSpectator || (room.Phase != "" && room.Phase != setupPhase) || message.Role == nil {
 		room.Mutex.Unlock()
 		return
 	}
-	client.Role = message.Role
+
+	role := *message.Role
+	if role != "" && role != "for" && role != "against" {
+		room.Mutex.Unlock()
+		return
+	}
+	if role != "" {
+		for otherConn, otherClient := range room.Clients {
+			if otherConn != conn && !otherClient.IsSpectator && otherClient.Role == role {
+				room.Mutex.Unlock()
+				return
+			}
+		}
+	}
+	if client.Role != role {
+		client.Role = role
+		// A role change invalidates this debater's previous ready confirmation.
+		client.Ready = false
+	}
 	room.Mutex.Unlock()
 
-	// Broadcast role selection to other clients
+	roleMessage := map[string]interface{}{
+		"type": "roleSelection",
+		"role": role,
+	}
 	for _, r := range snapshotRecipients(room, conn) {
-		if err := r.SafeWriteJSON(message); err != nil {
+		if err := r.SafeWriteJSON(roleMessage); err != nil {
 		}
 	}
 

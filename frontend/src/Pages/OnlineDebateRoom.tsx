@@ -41,6 +41,9 @@ enum DebatePhase {
 // Define debate roles
 type DebateRole = "for" | "against";
 
+const toDebateRole = (role?: DebateRole | ""): DebateRole | null =>
+  role === "for" || role === "against" ? role : null;
+
 type JudgmentData = {
   opening_statement: {
     for: { score: number; reason: string };
@@ -80,7 +83,7 @@ interface UserDetails {
   avatarUrl?: string;
   displayName?: string;
   email?: string;
-  role?: DebateRole;
+  role?: DebateRole | "";
   ready?: boolean;
 }
 
@@ -88,7 +91,7 @@ interface UserDetails {
 interface WSMessage {
   type: string;
   topic?: string;
-  role?: DebateRole;
+  role?: DebateRole | "";
   ready?: boolean;
   phase?: DebatePhase;
   offer?: RTCSessionDescriptionInit;
@@ -1203,7 +1206,9 @@ const OnlineDebateRoom = (): JSX.Element => {
           if (data.topic !== undefined) setTopic(data.topic);
           break;
         case "roleSelection":
-          if (data.role) setPeerRole(data.role);
+          if (data.role !== undefined) {
+            setPeerRole(toDebateRole(data.role));
+          }
           break;
         case "ready":
           if (data.ready !== undefined) setPeerReady(data.ready);
@@ -1310,9 +1315,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                 if (localParticipant.ready !== undefined) {
                   setLocalReady(localParticipant.ready);
                 }
-                if (localParticipant.role) {
-                  setLocalRole(localParticipant.role);
-                }
+                setLocalRole(toDebateRole(localParticipant.role));
               } else {
                 // Fallback to current user data
                 setLocalUser({
@@ -1336,9 +1339,7 @@ const OnlineDebateRoom = (): JSX.Element => {
                 if (opponentParticipant.ready !== undefined) {
                   setPeerReady(opponentParticipant.ready);
                 }
-                if (opponentParticipant.role) {
-                  setPeerRole(opponentParticipant.role);
-                }
+                setPeerRole(toDebateRole(opponentParticipant.role));
               } else {
                 setOpponentUser(null);
                 setPeerReady(false);
@@ -2111,15 +2112,27 @@ const OnlineDebateRoom = (): JSX.Element => {
   };
 
   const handleRoleSelection = (role: DebateRole) => {
-    if (peerRole === role) {
-      alert(
-        `Your opponent already chose "${role}". Please select the other side.`
+    if (debatePhase !== DebatePhase.Setup) return;
+
+    const socket = wsRef.current;
+    if (!isWsConnected || !socket || socket.readyState !== WebSocket.OPEN) {
+      window.alert(
+        "The room connection is still reconnecting. Please try again."
       );
       return;
     }
-    setLocalRole(role);
-    const message = JSON.stringify({ type: "roleSelection", role });
-    wsRef.current?.send(message);
+
+    const nextRole = localRole === role ? null : role;
+    if (nextRole && peerRole === nextRole) {
+      alert(
+        `Your opponent already chose "${nextRole}". Please select the other side.`
+      );
+      return;
+    }
+
+    socket.send(
+      JSON.stringify({ type: "roleSelection", role: nextRole ?? "" })
+    );
   };
 
   const toggleReady = () => {
@@ -2409,6 +2422,16 @@ const OnlineDebateRoom = (): JSX.Element => {
                     <div className="mt-2 flex space-x-2">
                       <button
                         onClick={() => handleRoleSelection("for")}
+                        type="button"
+                        aria-pressed={localRole === "for"}
+                        disabled={
+                          !isWsConnected || debatePhase !== DebatePhase.Setup
+                        }
+                        title={
+                          localRole === "for"
+                            ? "Click to clear your For side"
+                            : "Choose the For side"
+                        }
                         className={`px-2 py-1 rounded text-xs border transition ${
                           localRole === "for"
                             ? "bg-primary text-primary-foreground border-transparent"
@@ -2419,6 +2442,16 @@ const OnlineDebateRoom = (): JSX.Element => {
                       </button>
                       <button
                         onClick={() => handleRoleSelection("against")}
+                        type="button"
+                        aria-pressed={localRole === "against"}
+                        disabled={
+                          !isWsConnected || debatePhase !== DebatePhase.Setup
+                        }
+                        title={
+                          localRole === "against"
+                            ? "Click to clear your Against side"
+                            : "Choose the Against side"
+                        }
                         className={`px-2 py-1 rounded text-xs border transition ${
                           localRole === "against"
                             ? "bg-primary text-primary-foreground border-transparent"
