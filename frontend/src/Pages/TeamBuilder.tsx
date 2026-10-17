@@ -103,7 +103,7 @@ const TeamBuilder: React.FC = () => {
     null
   );
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
-  const [editingSize, setEditingSize] = useState(false);
+  const [editingSizeTeamId, setEditingSizeTeamId] = useState<string | null>(null);
   const [editTeamName, setEditTeamName] = useState<string>("");
   const [searchCode, setSearchCode] = useState<string>("");
   const [joiningByCode, setJoiningByCode] = useState(false);
@@ -313,7 +313,7 @@ const TeamBuilder: React.FC = () => {
     try {
       await updateTeamSize(teamId, newSize);
       setSuccess("Team size updated successfully!");
-      setEditingSize(false);
+      setEditingSizeTeamId(null);
       fetchUserTeams();
       setTimeout(() => setSuccess(""), 3000);
     } catch (error: unknown) {
@@ -722,7 +722,7 @@ const TeamBuilder: React.FC = () => {
                           <span className="font-medium">
                             <FaUsers className="inline mr-1" /> Members:
                           </span>
-                          {editingSize && isCaptain(team) ? (
+                          {editingSizeTeamId === team.id && isCaptain(team) ? (
                             <div className="flex items-center gap-2">
                               <div className="flex gap-1">
                                 <Button
@@ -733,7 +733,7 @@ const TeamBuilder: React.FC = () => {
                                   onClick={() =>
                                     handleUpdateTeamSize(team.id, 2)
                                   }
-                                  disabled={team.members.length > 2}
+                                  disabled={(team.members?.length || 0) > 2}
                                 >
                                   2
                                 </Button>
@@ -745,7 +745,7 @@ const TeamBuilder: React.FC = () => {
                                   onClick={() =>
                                     handleUpdateTeamSize(team.id, 4)
                                   }
-                                  disabled={team.members.length > 4}
+                                  disabled={(team.members?.length || 0) > 4}
                                 >
                                   4
                                 </Button>
@@ -753,7 +753,7 @@ const TeamBuilder: React.FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setEditingSize(false)}
+                                onClick={() => setEditingSizeTeamId(null)}
                               >
                                 Cancel
                               </Button>
@@ -764,9 +764,9 @@ const TeamBuilder: React.FC = () => {
                                 {team.members?.length || 0} /{" "}
                                 {team.maxSize || 4}
                               </Badge>
-                              {isCaptain(team) && team.members.length === 0 && (
+                              {isCaptain(team) && (
                                 <button
-                                  onClick={() => setEditingSize(true)}
+                                  onClick={() => setEditingSizeTeamId(team.id)}
                                   className="p-1 hover:bg-gray-100 rounded transition-colors"
                                   title="Edit team size"
                                 >
