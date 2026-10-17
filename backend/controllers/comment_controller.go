@@ -209,7 +209,15 @@ func DeleteCommentHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := db.MongoDatabase.Collection("comments").DeleteOne(ctx, bson.M{"_id": commentObjectID, "userId": userID})
+	commentsCol := db.MongoDatabase.Collection("comments")
+	var comment models.Comment
+	err = commentsCol.FindOne(ctx, bson.M{"_id": commentObjectID, "userId": userID}).Decode(&comment)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Comment not found or you don't have permission"})
+		return
+	}
+
+	result, err := commentsCol.DeleteOne(ctx, bson.M{"_id": commentObjectID, "userId": userID})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
 		return
@@ -219,6 +227,12 @@ func DeleteCommentHandler(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Comment not found or you don't have permission"})
 		return
 	}
+
+	// Decrement commentCount on associated debate post
+	db.MongoDatabase.Collection("debate_posts").UpdateOne(ctx,
+		bson.M{"transcriptId": comment.TranscriptID, "commentCount": bson.M{"$gt": 0}},
+		bson.M{"$inc": bson.M{"commentCount": -1}},
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
 }
