@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAtom } from 'jotai';
 import { useUser } from '../hooks/useUser';
@@ -21,7 +22,7 @@ const CommentAuthorAvatar: React.FC<CommentAuthorAvatarProps> = ({ userId }) => 
   const [profile, setProfile] = useState<{ displayName?: string; avatarUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const userIdRef = useRef<string>(userId);
-  const baseURL = useMemo(() => import.meta.env.VITE_BASE_URL || 'http://localhost:1313', []);
+  const baseURL = useMemo(() => config.baseUrl || 'http://localhost:1313', []);
 
   // Reset profile when userId changes
   useEffect(() => {
@@ -132,7 +133,7 @@ const CommentAuthorName: React.FC<CommentAuthorNameProps> = ({ userId, onClick }
   const [profile, setProfile] = useState<{ displayName?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const userIdRef = useRef<string>(userId);
-  const baseURL = useMemo(() => import.meta.env.VITE_BASE_URL || 'http://localhost:1313', []);
+  const baseURL = useMemo(() => config.baseUrl || 'http://localhost:1313', []);
 
   // Reset profile when userId changes
   useEffect(() => {
@@ -241,7 +242,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
-  const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+  const baseURL = config.baseUrl || 'http://localhost:1313';
 
   // Sync atom comments to local state for tree building
   useEffect(() => {
@@ -488,7 +489,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                       setReplyContent('');
                     }
                   }}
-                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors [.contrast_&]:text-black [.contrast_&]:hover:text-black"
                 >
                   {replyingTo === comment.id ? 'Cancel' : 'Reply'}
                 </button>

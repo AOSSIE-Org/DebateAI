@@ -1,8 +1,9 @@
+import config from "../config/config";
 import { getAuthToken } from "@/utils/auth";
 
 // Team service for API calls
 const API_BASE_URL =
-  import.meta.env.VITE_BASE_URL?.replace(/\/+$/, "") ?? "http://localhost:1313";
+  config.baseUrl?.replace(/\/+$/, "") ?? "http://localhost:1313";
 
 export interface Team {
   id: string;
@@ -370,3 +371,36 @@ export const updateTeamSize = async (teamId: string, maxSize: number): Promise<v
   }
 };
 
+export const transferTeamCaptain = async (
+  teamId: string,
+  newCaptainId: string
+): Promise<void> => {
+  const token = getAuthToken();
+
+  const response = await fetch(
+    `${API_BASE_URL}/teams/${teamId}/captain`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ newCaptainId }),
+    }
+  );
+
+  if (!response.ok) {
+    let message = "Failed to transfer captaincy. Please try again.";
+
+    try {
+      const error: { error?: string } = await response.json();
+      if (error.error) {
+        message = error.error;
+      }
+    } catch {
+      // The server may return an empty body or non-JSON response.
+    }
+
+    throw new Error(message);
+  }
+};
