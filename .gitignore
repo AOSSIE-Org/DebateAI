@@ -1,7 +1,6 @@
 *.local
 *.log
 *.env
-config.prod.yml
 vite.config.ts.timestamp-*.mjs
 .vscode/*.exe
 backend/main
