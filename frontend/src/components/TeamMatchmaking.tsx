@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [matchedTeam, setMatchedTeam] = useState<Team | null>(null);
+  const matchmakingVersion = useRef(0);
   const [activeDebateId, setActiveDebateId] = useState<string | null>(null);
   const [showDebateNotification, setShowDebateNotification] = useState(false);
 
@@ -107,17 +108,21 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   // Poll for matchmaking status - ONLY WHEN IN MATCHMAKING
   useEffect(() => {
     if (hasJoined) {
+      const version = matchmakingVersion.current;
       const interval = setInterval(async () => {
         try {
           const status = await getMatchmakingStatus(team.id);
-          if (status.matched) {
+          if (version === matchmakingVersion.current && status.matched) {
             setMatchedTeam(status.team ?? null);
           }
         } catch (error) {
         }
       }, 3000); // Check every 3 seconds
 
-      return () => clearInterval(interval);
+      return () => {
+        matchmakingVersion.current += 1;
+        clearInterval(interval);
+      };
     }
   }, [hasJoined, team.id]);
 
@@ -142,6 +147,8 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   const handleLeaveMatchmaking = async () => {
     try {
       await leaveMatchmaking(team.id);
+      matchmakingVersion.current += 1;
+      setIsSearching(false);
       setHasJoined(false);
       setMatchedTeam(null);
     } catch (error: unknown) {
