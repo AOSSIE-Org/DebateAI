@@ -54,38 +54,46 @@ func NewDebateHub() *DebateHub {
 
 // Register registers a new WebSocket connection for a debate
 func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHash string) *SpectatorClient {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	// Register the client while holding h.mu, then release it before broadcasting.
+	// BroadcastPresence acquires h.mu.RLock(), so it must not be called while h.mu
+	// is still write-locked: a non-reentrant sync.RWMutex would self-deadlock. The
+	// lock is scoped to this closure so it is always released exactly once.
+	client, clientCount := func() (*SpectatorClient, int) {
+		h.mu.Lock()
+		defer h.mu.Unlock()
 
-	// Get or create debate room
-	room, exists := h.debates[debateID]
-	if !exists {
-		room = &DebateRoom{
-			debateID: debateID,
-			clients:  make(map[*websocket.Conn]*SpectatorClient),
-			consumer: debate.NewStreamConsumer(h),
+		// Get or create debate room
+		room, exists := h.debates[debateID]
+		if !exists {
+			room = &DebateRoom{
+				debateID: debateID,
+				clients:  make(map[*websocket.Conn]*SpectatorClient),
+				consumer: debate.NewStreamConsumer(h),
+			}
+			h.debates[debateID] = room
+
+			// Start consumer group for this debate (only if Redis is available)
+			if room.consumer != nil {
+				go room.consumer.StartConsumerGroup(debateID)
+			}
 		}
-		h.debates[debateID] = room
 
-		// Start consumer group for this debate (only if Redis is available)
-		if room.consumer != nil {
-			go room.consumer.StartConsumerGroup(debateID)
+		// Create client
+		client := &SpectatorClient{
+			conn:          conn,
+			spectatorHash: spectatorHash,
+			debateID:      debateID,
 		}
-	}
 
-	// Create client
-	client := &SpectatorClient{
-		conn:          conn,
-		spectatorHash: spectatorHash,
-		debateID:      debateID,
-	}
+		room.mu.Lock()
+		room.clients[conn] = client
+		count := len(room.clients)
+		room.mu.Unlock()
 
-	room.mu.Lock()
-	room.clients[conn] = client
-	clientCount := len(room.clients)
-	room.mu.Unlock()
+		return client, count
+	}()
 
-	// Broadcast presence update
+	// Broadcast presence update (h.mu is released by now)
 	presenceEvent := map[string]interface{}{
 		"type": "presence",
 		"payload": map[string]interface{}{
