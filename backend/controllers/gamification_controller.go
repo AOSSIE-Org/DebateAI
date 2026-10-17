@@ -394,7 +394,7 @@ func GetGamificationLeaderboard(c *gin.Context) {
 
 	// Query users sorted by Score (descending)
 	collection := db.MongoDatabase.Collection("users")
-	findOptions := options.Find().SetSort(bson.D{{Key : "score", Value : -1}}).SetLimit(int64(limit))
+	findOptions := options.Find().SetSort(bson.D{{"score", -1}}).SetLimit(int64(limit))
 	cursor, err := collection.Find(ctx, bson.M{}, findOptions)
 	if err != nil {
 		log.Printf("Failed to fetch users: %v", err)
