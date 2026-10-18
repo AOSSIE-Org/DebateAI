@@ -10,7 +10,7 @@ import { Link, useLocation } from 'react-router-dom';
 import DebateCoverIllustration from '../components/DebateCoverIllustration';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuthContext } from '../context/authContext';
-import debateAiLogo from '@/assets/aossie.png';
+import debateAiLogo from '@/assets/debateai-logo.svg';
 
 const LeftSection = () => (
   <div className="hidden xl:flex flex-col justify-between bg-muted p-6 sm:p-8 xl:p-10 text-black dark:text-white w-full xl:w-1/2 xl:h-full min-h-[50vh] [.contrast_&]:text-white overflow-hidden">
