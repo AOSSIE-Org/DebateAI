@@ -21,13 +21,7 @@ export const commentsByTranscriptAtom = atom<Record<string, Comment[]>>({});
 // Keep uncached reads stable when another transcript's comments change.
 const emptyComments: Comment[] = [];
 
-/**
- * Creates a read atom for one transcript's cached comments.
- * Uncached reads share a stable empty array, including after unrelated cache writes.
- *
- * @param transcriptId - Transcript whose comments the atom reads.
- * @returns A read-only comments atom; memoize it when creating it inside a component.
- */
+/** Creates a transcript read atom with a stable fallback; memoize it in components. */
 export const getCommentsForTranscriptAtom = (transcriptId: string) =>
   atom((get) => get(commentsByTranscriptAtom)[transcriptId] || emptyComments);
 

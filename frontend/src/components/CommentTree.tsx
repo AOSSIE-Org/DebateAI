@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useUser } from '../hooks/useUser';
@@ -19,7 +20,7 @@ const CommentAuthorAvatar: React.FC<CommentAuthorAvatarProps> = ({ userId }) => 
   const [profile, setProfile] = useState<{ displayName?: string; avatarUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const userIdRef = useRef<string>(userId);
-  const baseURL = useMemo(() => import.meta.env.VITE_BASE_URL || 'http://localhost:1313', []);
+  const baseURL = useMemo(() => config.baseUrl || 'http://localhost:1313', []);
 
   // Reset profile when userId changes
   useEffect(() => {
@@ -130,7 +131,7 @@ const CommentAuthorName: React.FC<CommentAuthorNameProps> = ({ userId, onClick }
   const [profile, setProfile] = useState<{ displayName?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const userIdRef = useRef<string>(userId);
-  const baseURL = useMemo(() => import.meta.env.VITE_BASE_URL || 'http://localhost:1313', []);
+  const baseURL = useMemo(() => config.baseUrl || 'http://localhost:1313', []);
 
   // Reset profile when userId changes
   useEffect(() => {
@@ -219,13 +220,7 @@ interface CommentTreeProps {
   className?: string;
 }
 
-/**
- * Renders a transcript's threaded comments and its posting, reply, and delete controls.
- * Transcript-specific atoms remain stable across renders and change when the ID changes.
- *
- * @param props - Transcript ID, optional post-success callback, and CSS classes.
- * @returns The loading, error, or comments view for the selected transcript.
- */
+/** Renders threaded comments with stable atoms for the selected transcript. */
 const CommentTree: React.FC<CommentTreeProps> = ({
   transcriptId,
   onCommentAdded,
@@ -258,7 +253,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
-  const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+  const baseURL = config.baseUrl || 'http://localhost:1313';
 
   // Sync atom comments to local state for tree building
   useEffect(() => {
@@ -407,9 +402,6 @@ const CommentTree: React.FC<CommentTreeProps> = ({
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to post comment');
       }
-
-      const result = await response.json();
-      const newComment: Comment = result.comment;
       
       // Fetch updated comments (including the new one) and update atom
       await fetchComments();

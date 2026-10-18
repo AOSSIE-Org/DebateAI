@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
@@ -8,7 +9,7 @@ interface DebatePopupProps {
   onClose: () => void;
 }
 
-const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+const baseURL = config.baseUrl || 'http://localhost:1313';
 
 const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   const navigate = useNavigate();

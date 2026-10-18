@@ -1,3 +1,4 @@
+import config from "../config/config";
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -53,7 +54,6 @@ import {
 import { FaTrophy, FaMedal, FaAward } from "react-icons/fa";
 import { format, isSameDay, subDays } from "date-fns";
 import defaultAvatar from "@/assets/avatar2.jpg";
-import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import {
   PieChart,
   Pie,
@@ -87,20 +87,6 @@ import {
   SavedDebateTranscript,
 } from "@/services/transcriptService";
 import LoadingSpinner from "@/components/LoadingSpinner";
-
-const handleProfileAvatarLoadError = (
-  event: React.SyntheticEvent<HTMLImageElement>
-) => {
-  const image = event.currentTarget;
-
-  if (image.src !== DEFAULT_AVATAR_URL) {
-    image.src = DEFAULT_AVATAR_URL;
-    return;
-  }
-
-  image.onerror = null;
-  image.src = defaultAvatar;
-};
 
 interface ProfileData {
   displayName: string;
@@ -490,7 +476,7 @@ const Profile: React.FC = () => {
         onSubmit={(e) => handleSubmit(e, "bio")}
         className="space-y-2 mb-2 w-full min-w-0 max-w-full"
       >
-        <Label htmlFor="bio" className="text-sm">Bio</Label>
+        <Label htmlFor="bio" className="sr-only">Bio</Label>
         <Textarea
           maxLength={BIO_MAX_LENGTH}
           id="bio"
@@ -501,7 +487,7 @@ const Profile: React.FC = () => {
             e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
           }}
           placeholder="Share your story"
-          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words"
+          className="text-sm box-border w-full min-w-0 max-w-full min-h-20 max-h-60 resize-y overflow-y-auto break-words border [.contrast_&]:border-border"
         />
         <p className={`text-xs text-right ${draftValue.length >= BIO_MAX_LENGTH
           ? "text-red-500"
@@ -632,7 +618,7 @@ const Profile: React.FC = () => {
     const [following, setFollowing] = useState<FollowUser[]>([]);
     const [loadingFollowers, setLoadingFollowers] = useState(false);
     const [loadingFollowing, setLoadingFollowing] = useState(false);
-    const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+    const baseURL = config.baseUrl || "http://localhost:1313";
 
     useEffect(() => {
       if (user?.id) {
@@ -830,13 +816,13 @@ const Profile: React.FC = () => {
               </div>
             </form>
           ) : (
-            <div className="flex items-center space-x-2">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground truncate">
+            <div className="flex items-center justify-center space-x-2 w-full">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground text-center break-words min-w-0">
                 {profile.displayName || "Set your name"}
               </h2>
               <button
                 onClick={() => handleStartEdit("displayName", profile.displayName || "")}
-                className="p-1 hover:bg-muted rounded-full"
+                className="p-1 hover:bg-muted rounded-full flex-shrink-0"
                 title="Edit Display Name"
               >
                 <Pen className={`w-4 h-4 ${profile.displayName ? "text-primary" : "text-muted-foreground"}`} />
@@ -861,9 +847,9 @@ const Profile: React.FC = () => {
         </div>
 
         <Separator className="my-2" />
-        <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
+        <div className="text-xs sm:text-sm text-muted-foreground mb-2 overflow-x-auto whitespace-nowrap pb-0.5">
           Email: {profile.email}
-        </p>
+        </div>
 
         <div className="space-y-2 mb-4">
           <h3 className="text-xs sm:text-sm font-semibold text-foreground">Socials</h3>
@@ -1135,7 +1121,7 @@ const Profile: React.FC = () => {
       </div>
 
       <Dialog open={isDebateDialogOpen} onOpenChange={setIsDebateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:w-full max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="w-5 h-5" />
@@ -1144,7 +1130,7 @@ const Profile: React.FC = () => {
           </DialogHeader>
           {selectedDebate && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
                 <div>
                   <span className="font-semibold">Topic:</span>
                   <p className="text-muted-foreground">{selectedDebate.topic}</p>
@@ -1191,7 +1177,7 @@ const Profile: React.FC = () => {
               <Separator />
               <div>
                 <h4 className="font-semibold mb-3">Your Performance</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 text-sm">
                   <div className="text-center p-3 bg-muted/50 rounded-lg">
                     <div className="text-2xl font-bold text-primary">{dashboard?.stats?.totalDebates || 0}</div>
                     <div className="text-xs text-muted-foreground">Total Debates</div>

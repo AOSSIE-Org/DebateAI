@@ -1,8 +1,9 @@
+import config from "../config/config";
 import { Team } from "./teamService";
 
 // Team debate service for API calls
 const API_BASE_URL =
-  (import.meta.env.VITE_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
+  (config.baseUrl as string | undefined)?.replace(/\/$/, "") ??
   window.location.origin;
 
 function getAuthToken(): string {
@@ -169,7 +170,7 @@ export const getMatchmakingPool = async (): Promise<TeamMatchmakingPoolResponse>
     throw new Error("Failed to get matchmaking pool");
   }
 
-  const data: MatchmakingPoolResponse = await response.json();
+  const data: TeamMatchmakingPoolResponse = await response.json();
   return data;
 };
 
@@ -190,4 +191,5 @@ export const getMatchmakingStatus = async (
   const data: MatchmakingStatusResponse = await response.json();
   return data;
 };
+
 

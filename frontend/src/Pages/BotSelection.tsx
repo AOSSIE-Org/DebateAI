@@ -507,7 +507,7 @@ const BotSelection: React.FC = () => {
                   </div>
 
                   {expandedLevel === level.name && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-card border-t border-border">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-card border-t border-border">
                       {allBots
                         .filter((bot) => bot.level === level.name)
                         .map((bot) => (

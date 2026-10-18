@@ -5,7 +5,7 @@ import { AuthContext } from "@/context/authContext";
 import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
-import AOSSIELogo from "@/assets/aossie.png";
+import debateAiLogo from "@/assets/debateai-logo.svg";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -42,19 +42,24 @@ const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4">
           <a
-            href="https://aossie.org"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/"
             className="p-1 hover:opacity-80 transition-opacity"
           >
-            <img src={AOSSIELogo} alt="AOSSIE Logo" className="h-8 w-auto object-contain" />
+            <img src={debateAiLogo} alt="DebateAI Logo" className="h-8 w-auto object-contain" />
           </a>
           <div className="flex flex-col">
             <span className="text-2xl font-black tracking-tight text-primary leading-none">DebateAI</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">by AOSSIE</span>
+            <a
+              href="https://aossie.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold hover:text-foreground transition-colors"
+            >
+              by AOSSIE
+            </a>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -81,17 +86,17 @@ const Home: React.FC = () => {
         </div>
       </nav>
 
-      <div className="flex items-center justify-center">
-        <div className="flex flex-wrap items-center justify-center w-full px-2 md:px-16">
-          <div className="w-full md:w-2/3 p-4 md:p-16">
+      <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-col-reverse items-center justify-center w-full px-4 lg:flex-row lg:px-8">
+          <div className="w-full lg:w-2/3 p-4 lg:p-12">
             <DebateCoverIllustration
               className="w-full h-auto object-cover"
               role="img"
               aria-label="Debate Cover"
             />
           </div>
-          <div className="flex w-full md:w-1/3 flex-col items-center justify-center space-y-4 p-4">
-            <h3 className="text-xl md:text-4xl font-bold text-center">
+          <div className="flex w-full lg:w-1/3 flex-col items-center justify-center space-y-4 p-4">
+            <h3 className="text-2xl md:text-4xl font-bold text-center">
               Play Debate Online on the <span className="text-primary">#1</span> Site!
             </h3>
             <div className="flex flex-col w-full">

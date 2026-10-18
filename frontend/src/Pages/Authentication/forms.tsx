@@ -1,3 +1,4 @@
+import config from "../../config/config";
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,10 +41,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     setLocalError(null);
     try {
       await login(email, password);
-    } catch (err) {
+    } catch (err: any) {
       const code = (err as Error & { code?: string }).code;
       if (code === 'EMAIL_NOT_VERIFIED') {
         startOtpVerification(email);
+      } else {
+        const msg = err?.userMessage ?? err?.message;
+        if (msg) authContext.handleError(msg);
       }
     }
   };
@@ -96,7 +100,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
           setEmail(e.target.value);
           if (error) clearError();
         }}
-        className="mb-2 dark:border-white"
+        className="mb-2 border dark:border-white [.contrast_&]:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
@@ -107,7 +111,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
           if (error) clearError();
           if (localError) setLocalError(null);
         }}
-        className="mb-1 dark:border-white"
+        className="mb-1 border dark:border-white [.contrast_&]:border-white"
       />
       {localError && (
         <p className="text-red-500 text-sm mt-2">
@@ -172,8 +176,9 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     try {
       await signup(email, password);
       startOtpVerification(email);
-    } catch {
-      // Handled by authContext error state
+    } catch (err: any) {
+      const msg = err?.userMessage ?? err?.message;
+      if (msg) authContext.handleError(msg);
     }
   };
 
@@ -226,7 +231,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
           setEmail(e.target.value);
           if (error) clearError();
         }}
-        className="mb-2 dark:border-white"
+        className="mb-2 border dark:border-white [.contrast_&]:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
@@ -236,7 +241,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
           setPassword(e.target.value);
           if (error) clearError();
         }}
-        className="mb-2 dark:border-white"
+        className="mb-2 border dark:border-white [.contrast_&]:border-white"
       />
       <Input
         type={passwordVisible ? "text" : "password"}
@@ -246,7 +251,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
           setConfirmPassword(e.target.value);
           if (error) clearError();
         }}
-        className="mb-4 dark:border-white"
+        className="mb-4 border dark:border-white [.contrast_&]:border-white"
       />
       <div className='w-full flex justify-start items-center pl-1'>
         <div className='w-4'>
@@ -322,7 +327,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
   };
 
   return (
-        <div className="w-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center">
       <h3 className="text-2xl font-medium my-4">Verify Your Email</h3>
       <p className="mb-4">Enter the OTP sent to your email to complete the sign-up process.</p>
       <form onSubmit={handleSubmit} className="w-full">
@@ -334,7 +339,7 @@ export const OTPVerificationForm: React.FC<OTPVerificationFormProps> = ({ email,
             if (error) clearError();
           }}
           placeholder="Enter OTP"
-          className="w-full mb-4 dark:border-white"
+          className="w-full mb-4 border dark:border-white [.contrast_&]:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
         {resendMessage && <p className="text-sm text-green-500 mb-2">{resendMessage}</p>}
@@ -363,11 +368,14 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const baseURL = import.meta.env.VITE_BASE_URL;
+  const baseURL = config.baseUrl;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    setLoading(true);
     setError('');
 
     try {
@@ -386,6 +394,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
       startResetPassword(email);
     } catch {
       setError('An unexpected error occurred. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -405,8 +415,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           className="w-full mb-4 border-border dark:border-white"
         />
         {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
-        <Button type="submit" className="w-full border dark:border-white">
-          Send Reset Code
+        <Button type="submit" className="w-full border dark:border-white" disabled={loading}>
+          {loading ? 'Sending...' : 'Send Reset Code'}
         </Button>
       </form>
     </div>

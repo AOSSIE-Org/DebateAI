@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 // Match the CommonJS bundle so Provider and hooks share one Jotai context.
 const { Provider, createStore } = require('jotai');
 
-// Compile the real component and atoms together; only unrelated profile UI
+// Compile the real component and atoms together; configuration, profile UI,
 // and authentication are stubbed. React and Jotai use the test's own instances.
 const result = await build({
   stdin: {
@@ -25,15 +25,12 @@ const result = await build({
   platform: 'node',
   format: 'cjs',
   external: ['react', 'react-dom', 'jotai'],
-  define: { 'import.meta.env.VITE_BASE_URL': '"http://comments.test"' },
   plugins: [{
     name: 'profile-stubs',
-    /**
-     * Stubs authentication and profile UI while bundling the real comment component.
-     * @param {import('esbuild').PluginBuild} builder - Build hooks for this test bundle.
-     */
+    /** Stubs configuration, authentication, and profile UI around the real component. */
     setup(builder) {
       const stubs = {
+        '../config/config': 'export default { baseUrl: "http://comments.test" };',
         '../hooks/useUser': 'export const useUser = () => ({ user: null });',
         './ProfileHover': 'export default function ProfileHover({ children }) { return children; }',
         './UserProfileModal': 'export default function UserProfileModal() { return null; }',
@@ -57,14 +54,7 @@ const {
   removeCommentFromTranscriptAtom,
 } = compiled.exports;
 
-/**
- * Creates a flat comment fixture with predictable content and timestamps.
- * @param {string} id - Comment ID, also used as the rendered content.
- * @param {string} transcriptId - Transcript containing this comment.
- * @param {string|null} parentId - Parent comment ID, or null for a root comment.
- * @param {string} createdAt - ISO timestamp used to verify comment ordering.
- * @returns {object} A comment fixture suitable for the cache and mocked API.
- */
+/** Creates a flat comment fixture with predictable content and timestamps. */
 function comment(id, transcriptId, parentId = null, createdAt = '2026-01-01T00:00:00Z') {
   return {
     id, transcriptId, parentId, path: [], content: id,
@@ -73,23 +63,14 @@ function comment(id, transcriptId, parentId = null, createdAt = '2026-01-01T00:0
   };
 }
 
-/**
- * Creates an externally resolvable promise for controlling a delayed API response.
- * @returns {object} The pending promise and its resolve function.
- */
+/** Creates an externally resolvable promise for a delayed API response. */
 function deferred() {
   let resolve;
   const promise = new Promise((done) => { resolve = done; });
   return { promise, resolve };
 }
 
-/**
- * Mounts CommentTree in an isolated Jotai store with mocked networking and cleanup.
- * A profiler guard stops infinite render loops before they can hang the test runner.
- * @param {import('node:test').TestContext} t - Test context owning mocks and cleanup.
- * @param {object} options - Transcript ID, initial cache, and optional API response factory.
- * @returns {Promise<object>} Renderer, store, request log, and render-settling helpers.
- */
+/** Mounts CommentTree with isolated state, mocked networking, and a render-loop guard. */
 async function mount(t, { transcriptId = 'a', cached = {}, fetchComments } = {}) {
   const store = createStore();
   store.set(commentsByTranscriptAtom, cached);
@@ -111,11 +92,7 @@ async function mount(t, { transcriptId = 'a', cached = {}, fetchComments } = {})
   });
   let commits = 0;
   let tree;
-  /**
-   * Builds the profiled comments view while keeping the test's store unchanged.
-   * @param {string} id - Transcript to render or switch to.
-   * @returns {React.ReactElement} The comments component inside its test providers.
-   */
+  /** Builds the profiled comments view while keeping the test's store unchanged. */
   const render = (id) => React.createElement(React.StrictMode, {},
     React.createElement(Provider, { store },
       React.createElement(React.Profiler, {
@@ -137,10 +114,7 @@ async function mount(t, { transcriptId = 'a', cached = {}, fetchComments } = {})
     store, requests, tree,
     text: () => JSON.stringify(tree.toJSON()),
     update: async (id) => act(async () => tree.update(render(id))),
-    /**
-     * Verifies that idle event-loop turns produce no commits or render-loop warnings.
-     * @returns {Promise<void>} Resolves when the idle-render assertions pass.
-     */
+    /** Verifies that idle event-loop turns produce no commits or render-loop warnings. */
     async assertSettled() {
       const previousCommits = commits;
       for (let i = 0; i < 3; i++) await act(async () => { await setImmediate(); });
