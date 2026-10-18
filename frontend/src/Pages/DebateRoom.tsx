@@ -721,6 +721,7 @@ const DebateRoom: React.FC = () => {
       }
 
       const { response } = await sendDebateMessage({
+        debateId: debateData.debateId,
         botLevel: debateData.botLevel,
         topic: debateData.topic,
         history: state.messages,
@@ -783,8 +784,8 @@ const judgeDebateResult = async (messages: Message[]) => {
     });
 
     const { result } = await judgeDebate({
+      debateId: debateData.debateId,
       history: messages,
-      userId: debateData.userId,
     });
 
     let judgment: JudgmentData;

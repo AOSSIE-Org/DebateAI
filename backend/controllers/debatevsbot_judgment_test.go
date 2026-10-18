@@ -1,8 +1,11 @@
 package controllers
 
 import (
+	"arguehub/db"
 	"arguehub/models"
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -263,7 +266,7 @@ func TestJudgeDebate_InvalidJudgmentReturns502(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/vsbot/judge",
-		bytes.NewBufferString(`{"history":[]}`),
+		bytes.NewBufferString(`{"debateId":"507f1f77bcf86cd799439011","history":[]}`),
 	)
 	req.Header.Set("Authorization", "Bearer test-token")
 	req.Header.Set("Content-Type", "application/json")
@@ -314,7 +317,7 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 	originalLatestDebate := getLatestBotDebateFunc
 	originalTranscript := saveBotDebateTranscriptFunc
 	originalGamification := updateBotDebateGamificationFunc
-
+	originalSettle := settleBotDebateFunc
 	defer func() {
 		validateDebateTokenFunc = originalValidate
 		getDebateUserIDFunc = originalGetUserID
@@ -323,6 +326,7 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 		getLatestBotDebateFunc = originalLatestDebate
 		saveBotDebateTranscriptFunc = originalTranscript
 		updateBotDebateGamificationFunc = originalGamification
+		settleBotDebateFunc = originalSettle
 	}()
 
 	testUserID := primitive.NewObjectID()
@@ -341,10 +345,25 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 	judgeDebateFunc = func(_ []models.Message) (string, error) {
 		return validJudgmentJSON(), nil
 	}
-	outcomeCalled := false
-	updateBotDebateOutcomeFunc = func(_, _ string) error {
-		outcomeCalled = true
-		return nil
+	settlementCalled := false
+
+	settleBotDebateFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		email, outcome, judgment string,
+	) (*db.BotDebateSettlement, error) {
+		settlementCalled = true
+
+		return &db.BotDebateSettlement{
+			Debate: models.DebateVsBot{
+				Email:    email,
+				Topic:    "Test topic",
+				BotName:  "Test bot",
+				Outcome:  outcome,
+				Judgment: judgment,
+			},
+			ResultStatus: outcome,
+		}, nil
 	}
 
 	getLatestBotDebateFunc = func(string) (*models.DebateVsBot, error) {
@@ -376,7 +395,7 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/vsbot/judge",
-		bytes.NewBufferString(`{"history":[]}`),
+		bytes.NewBufferString(`{"debateId":"507f1f77bcf86cd799439011","history":[]}`),
 	)
 	req.Header.Set("Authorization", "Bearer test-token")
 	req.Header.Set("Content-Type", "application/json")
@@ -396,8 +415,8 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 		)
 	}
 
-	if !outcomeCalled {
-		t.Error("expected judgment outcome to be persisted")
+	if !settlementCalled {
+		t.Error("expected debate settlement to be attempted")
 	}
 	if !transcriptCalled {
 		t.Error("expected transcript to be saved")
@@ -417,7 +436,7 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 	originalLatestDebate := getLatestBotDebateFunc
 	originalTranscript := saveBotDebateTranscriptFunc
 	originalGamification := updateBotDebateGamificationFunc
-
+	originalSettle := settleBotDebateFunc
 	defer func() {
 		validateDebateTokenFunc = originalValidate
 		getDebateUserIDFunc = originalGetUserID
@@ -426,6 +445,7 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 		getLatestBotDebateFunc = originalLatestDebate
 		saveBotDebateTranscriptFunc = originalTranscript
 		updateBotDebateGamificationFunc = originalGamification
+		settleBotDebateFunc = originalSettle
 	}()
 
 	testUserID := primitive.NewObjectID()
@@ -445,10 +465,15 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 		return validJudgmentJSON(), nil
 	}
 
-	outcomeCalled := false
-	updateBotDebateOutcomeFunc = func(_, _ string) error {
-		outcomeCalled = true
-		return fmt.Errorf("simulated database failure")
+	settlementCalled := false
+
+	settleBotDebateFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		_, _, _ string,
+	) (*db.BotDebateSettlement, error) {
+		settlementCalled = true
+		return nil, fmt.Errorf("simulated database failure")
 	}
 
 	latestDebateCalled := false
@@ -484,7 +509,7 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/vsbot/judge",
-		bytes.NewBufferString(`{"history":[]}`),
+		bytes.NewBufferString(`{"debateId":"507f1f77bcf86cd799439011","history":[]}`),
 	)
 	req.Header.Set("Authorization", "Bearer test-token")
 	req.Header.Set("Content-Type", "application/json")
@@ -504,8 +529,8 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 		)
 	}
 
-	if !outcomeCalled {
-		t.Error("expected outcome persistence to be attempted")
+	if !settlementCalled {
+		t.Error("expected debate settlement to be attempted")
 	}
 	if latestDebateCalled {
 		t.Error("latest debate should not be fetched after outcome persistence fails")
@@ -515,5 +540,124 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 	}
 	if gamificationCalled {
 		t.Error("gamification must not run after outcome persistence fails")
+	}
+}
+
+func TestJudgeDebate_AlreadySettledReturnsStoredJudgment(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	originalValidate := validateDebateTokenFunc
+	originalGetUserID := getDebateUserIDFunc
+	originalJudge := judgeDebateFunc
+	originalSettle := settleBotDebateFunc
+	originalTranscript := saveBotDebateTranscriptFunc
+	originalGamification := updateBotDebateGamificationFunc
+
+	defer func() {
+		validateDebateTokenFunc = originalValidate
+		getDebateUserIDFunc = originalGetUserID
+		judgeDebateFunc = originalJudge
+		settleBotDebateFunc = originalSettle
+		saveBotDebateTranscriptFunc = originalTranscript
+		updateBotDebateGamificationFunc = originalGamification
+	}()
+
+	storedJudgment := validJudgmentJSON()
+	testUserID := primitive.NewObjectID()
+
+	validateDebateTokenFunc = func(
+		_, _ string,
+		_ *gin.Context,
+	) (bool, string, error) {
+		return true, "test@example.com", nil
+	}
+
+	getDebateUserIDFunc = func(string) (primitive.ObjectID, error) {
+		return testUserID, nil
+	}
+
+	// The AI may produce a different result on a retry.
+	judgeDebateFunc = func(_ []models.Message) (string, error) {
+		return strings.Replace(
+			storedJudgment,
+			`"winner":"User"`,
+			`"winner":"Bot"`,
+			1,
+		), nil
+	}
+
+	settleBotDebateFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		_, _, _ string,
+	) (*db.BotDebateSettlement, error) {
+		return &db.BotDebateSettlement{
+			Debate: models.DebateVsBot{
+				Email:    "test@example.com",
+				Topic:    "Test topic",
+				BotName:  "Test bot",
+				Outcome:  "win",
+				Judgment: storedJudgment,
+			},
+			ResultStatus:   "win",
+			AlreadySettled: true,
+		}, nil
+	}
+
+	transcriptCalled := false
+	saveBotDebateTranscriptFunc = func(
+		_ primitive.ObjectID,
+		_, _, _, _, _ string,
+		_ []models.Message,
+		_ map[string]string,
+	) error {
+		transcriptCalled = true
+		return nil
+	}
+
+	gamificationCalled := false
+	updateBotDebateGamificationFunc = func(
+		_ primitive.ObjectID,
+		_, _ string,
+	) {
+		gamificationCalled = true
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/vsbot/judge",
+		bytes.NewBufferString(
+			`{"debateId":"507f1f77bcf86cd799439011","history":[]}`,
+		),
+	)
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = req
+
+	JudgeDebate(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected HTTP 200, got %d; body: %s",
+			recorder.Code, recorder.Body.String())
+	}
+
+	var response JudgeResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Result != storedJudgment {
+		t.Errorf("expected original stored judgment to be returned")
+	}
+
+	if transcriptCalled {
+		t.Error("transcript must not be saved again for an already-settled debate")
+	}
+
+	if gamificationCalled {
+		t.Error("gamification must not run again for an already-settled debate")
 	}
 }

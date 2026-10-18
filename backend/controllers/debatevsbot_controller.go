@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"math"
 	"net/http"
@@ -18,9 +19,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type DebateRequest struct {
+	DebateId     string           `json:"debateId"`
 	BotName      string           `json:"botName" binding:"required"`
 	BotLevel     string           `json:"botLevel" binding:"required"`
 	Topic        string           `json:"topic" binding:"required"`
@@ -36,7 +39,8 @@ type PhaseTiming struct {
 }
 
 type JudgeRequest struct {
-	History []models.Message `json:"history" binding:"required"`
+	DebateId string           `json:"debateId" binding:"required"`
+	History  []models.Message `json:"history" binding:"required"`
 }
 
 type DebateResponse struct {
@@ -61,6 +65,12 @@ type JudgeResponse struct {
 	Result string `json:"result"`
 }
 
+type BotDebateSettlement struct {
+	Debate         models.DebateVsBot
+	ResultStatus   string
+	AlreadySettled bool
+}
+
 var judgeDebateFunc = services.JudgeDebateWithError
 var validateDebateTokenFunc = utils.ValidateTokenAndFetchEmail
 var getDebateUserIDFunc = utils.GetUserIDFromEmail
@@ -68,6 +78,7 @@ var updateBotDebateGamificationFunc = updateGamificationAfterBotDebate
 var updateBotDebateOutcomeFunc = db.UpdateDebateVsBotOutcome
 var getLatestBotDebateFunc = db.GetLatestDebateVsBot
 var saveBotDebateTranscriptFunc = services.SaveDebateTranscript
+var settleBotDebateFunc = db.SettleBotDebate
 
 func CreateDebate(c *gin.Context) {
 	// Extract token from request header
@@ -132,59 +143,148 @@ func CreateDebate(c *gin.Context) {
 func SendDebateMessage(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
-		c.JSON(401, gin.H{"error": "Authorization token required"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Authorization token required",
+		})
 		return
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
-	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	valid, email, err := utils.ValidateTokenAndFetchEmail(
+		"./config/config.prod.yml",
+		token,
+		c,
+	)
 	if err != nil || !valid {
-		c.JSON(401, gin.H{"error": "Invalid or expired token"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Invalid or expired token",
+		})
 		return
 	}
 
 	var req DebateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request payload: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request payload: " + err.Error(),
+		})
 		return
 	}
 
-	// Generate bot response with the additional context field.
-	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
-
-	// Update debate history with the bot's response.
-	updatedHistory := append(req.History, models.Message{
-		Sender: "Bot",
-		Text:   botResponse,
-		// You can also store the phase if needed.
-	})
-
-	debate := models.DebateVsBot{
-		Email:     email,
-		BotName:   req.BotName,
-		BotLevel:  req.BotLevel,
-		Topic:     req.Topic,
-		Stance:    req.Stance,
-		History:   updatedHistory,
-		CreatedAt: time.Now().Unix(),
+	// Validate the existing debate ID.
+	debateID, err := primitive.ObjectIDFromHex(req.DebateId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid or missing debate ID",
+		})
+		return
 	}
 
-	// Save to database (assuming ID is generated in service or here)
-	if debate.ID.IsZero() {
-		debate.ID = primitive.NewObjectID()
-	}
-	if err := db.SaveDebateVsBot(debate); err != nil {
+	// Verify ownership and ensure the debate is unsettled.
+	var debate models.DebateVsBot
+
+	lookupCtx, lookupCancel := context.WithTimeout(
+		c.Request.Context(),
+		10*time.Second,
+	)
+
+	err = db.DebateVsBotCollection.FindOne(
+		lookupCtx,
+		bson.M{
+			"_id":     debateID,
+			"email":   email,
+			"outcome": bson.M{"$in": []string{"", "pending"}},
+		},
+	).Decode(&debate)
+
+	lookupCancel()
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Debate not found, not owned by you, or already settled",
+			})
+			return
+		}
+
+		log.Printf("Failed to fetch debate: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to load debate",
+		})
+		return
 	}
 
-	response := DebateMessageResponse{
-		DebateId: debate.ID.Hex(),
-		BotName:  req.BotName,
-		BotLevel: req.BotLevel,
-		Topic:    req.Topic,
-		Stance:   req.Stance,
+	// Generate the bot response without holding a database timeout open.
+	botResponse := services.GenerateBotResponse(
+		debate.BotName,
+		debate.BotLevel,
+		debate.Topic,
+		req.History,
+		debate.Stance,
+		req.Context,
+		150,
+	)
+
+	// Do not persist a failed or empty bot response.
+	if strings.TrimSpace(botResponse) == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "The bot could not generate a response. Please try again.",
+		})
+		return
+	}
+
+	updatedHistory := append(
+		append([]models.Message(nil), req.History...),
+		models.Message{
+			Sender: "Bot",
+			Text:   botResponse,
+		},
+	)
+
+	// Use a fresh context for the database update.
+	updateCtx, updateCancel := context.WithTimeout(
+		c.Request.Context(),
+		10*time.Second,
+	)
+
+	result, err := db.DebateVsBotCollection.UpdateOne(
+		updateCtx,
+		bson.M{
+			"_id":     debateID,
+			"email":   email,
+			"outcome": bson.M{"$in": []string{"", "pending"}},
+		},
+		bson.M{
+			"$set": bson.M{
+				"history": updatedHistory,
+			},
+		},
+	)
+
+	updateCancel()
+
+	if err != nil {
+		log.Printf("Failed to update debate history: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to save debate message",
+		})
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "Debate has already been settled",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, DebateMessageResponse{
+		DebateId: debateID.Hex(),
+		BotName:  debate.BotName,
+		BotLevel: debate.BotLevel,
+		Topic:    debate.Topic,
+		Stance:   debate.Stance,
 		Response: botResponse,
-	}
-	c.JSON(200, response)
+	})
 }
 
 type judgmentScore struct {
@@ -284,7 +384,7 @@ func validJudgmentScore(score *judgmentScore) bool {
 func JudgeDebate(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
-		c.JSON(401, gin.H{"error": "Authorization token required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token required"})
 		return
 	}
 
@@ -295,91 +395,114 @@ func JudgeDebate(c *gin.Context) {
 		c,
 	)
 	if err != nil || !valid {
-		c.JSON(401, gin.H{"error": "Invalid or expired token"})
-		return
-	}
-
-	userID, err := getDebateUserIDFunc(email)
-	if err != nil {
-		c.JSON(401, gin.H{"error": "Failed to get user ID"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 
 	var req JudgeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request payload: " + err.Error(),
 		})
 		return
 	}
+
+	debateID, err := primitive.ObjectIDFromHex(req.DebateId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid debate ID"})
+		return
+	}
+
+	userID, err := getDebateUserIDFunc(email)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to get user ID"})
+		return
+	}
+
 	result, err := judgeDebateFunc(req.History)
 	if err != nil {
 		log.Printf("Debate judgment failed: %v", err)
-
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error": "Unable to generate a debate judgment. Please try again later.",
 		})
 		return
 	}
 
-	log.Printf("JudgeDebate returned %d characters", len(result))
-
-	// Validate the complete judgment before performing side effects.
 	if !isValidJudgmentResult(result) {
-		c.JSON(502, gin.H{
+		c.JSON(http.StatusBadGateway, gin.H{
 			"error": "Unable to generate a valid debate judgment. Please try again.",
 		})
 		return
 	}
 
-	// Determine the result from the validated judgment.
 	var judgment judgmentResult
-	if err := json.Unmarshal([]byte(result), &judgment); err != nil {
-		// Defensive check; validation above should already guarantee this.
-		c.JSON(502, gin.H{
+	if err := json.Unmarshal([]byte(result), &judgment); err != nil ||
+		judgment.Verdict == nil {
+		c.JSON(http.StatusBadGateway, gin.H{
 			"error": "Unable to generate a valid debate judgment. Please try again.",
 		})
 		return
 	}
 
-	resultStatus := "pending"
-
-	switch judgment.Verdict.Winner {
-	case "User":
+	var resultStatus string
+	switch strings.ToLower(strings.TrimSpace(judgment.Verdict.Winner)) {
+	case "user":
 		resultStatus = "win"
-	case "Bot":
+	case "bot":
 		resultStatus = "loss"
-	case "Draw":
+	case "draw":
 		resultStatus = "draw"
-	}
-
-	// Persist the judgment before saving the transcript or awarding points.
-	if err := updateBotDebateOutcomeFunc(email, result); err != nil {
-		log.Printf("Failed to update debate outcome: %v", err)
-		c.JSON(500, gin.H{
-			"error": "Failed to save debate judgment",
+	default:
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error": "The judgment contains an invalid winner.",
 		})
 		return
 	}
 
-	// Get the latest debate information.
-	latestDebate, err := getLatestBotDebateFunc(email)
-	if err != nil || latestDebate == nil {
-		log.Printf("Failed to get latest debate information for %s: %v", email, err)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
 
-		latestDebate = &models.DebateVsBot{
-			Topic:   "Debate vs Bot",
-			BotName: "AI Bot",
+	settlement, err := settleBotDebateFunc(
+		ctx,
+		debateID,
+		email,
+		resultStatus,
+		result,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, db.ErrDebateNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Debate not found"})
+		case errors.Is(err, db.ErrDebateAlreadySettled):
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "This debate has already been settled with a different result",
+			})
+		default:
+			log.Printf("Failed to settle debate %s: %v", debateID.Hex(), err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to save debate judgment",
+			})
 		}
+		return
 	}
 
-	// Save the transcript and report failures instead of silently ignoring them.
+	// A retry of the same judgment returns the stored result without
+	// awarding points or repeating gamification side effects.
+	if settlement.AlreadySettled {
+		c.JSON(http.StatusOK, JudgeResponse{
+			Result: settlement.Debate.Judgment,
+		})
+		return
+	}
+
+	debate := settlement.Debate
+
 	if err := saveBotDebateTranscriptFunc(
 		userID,
 		email,
 		"user_vs_bot",
-		latestDebate.Topic,
-		latestDebate.BotName,
+		debate.Topic,
+		debate.BotName,
 		resultStatus,
 		req.History,
 		nil,
@@ -387,31 +510,17 @@ func JudgeDebate(c *gin.Context) {
 		log.Printf("Failed to save debate transcript: %v", err)
 	}
 
-	// Update gamification after a valid judgment.
-	log.Printf(
-		"About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",
-		userID.Hex(),
-		resultStatus,
-		latestDebate.Topic,
-	)
-
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("Panic in updateGamificationAfterBotDebate: %v", r)
+				log.Printf("Panic in post-settlement gamification: %v", r)
 			}
 		}()
 
-		updateBotDebateGamificationFunc(
-			userID,
-			resultStatus,
-			latestDebate.Topic,
-		)
+		updateBotDebateGamificationFunc(userID, resultStatus, debate.Topic)
 	}()
 
-	c.JSON(200, JudgeResponse{
-		Result: result,
-	})
+	c.JSON(http.StatusOK, JudgeResponse{Result: result})
 }
 
 // updateGamificationAfterBotDebate updates user score, checks for badges, and updates streaks after a bot debate
@@ -437,11 +546,13 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	userCollection := db.MongoDatabase.Collection("users")
 	log.Printf("User collection retrieved, attempting to find user %s", userID.Hex())
 
+	log.Println("[DEBUG] Fetching debate before generating bot response")
 	// Get current user to check existing badges and score
 	var user models.User
 	err := userCollection.FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
 		log.Printf("ERROR: Failed to get user for gamification update: %v (userID: %s)", err, userID.Hex())
+		log.Printf("[DEBUG] Debate lookup failed: %v", err)
 		return
 	}
 
@@ -450,81 +561,36 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	log.Printf("Current user score: %d, badges: %v", user.Score, user.Badges)
 
 	// Ensure score field exists - if it's 0 or not set, initialize it
-	// Note: MongoDB's $inc will create the field if it doesn't exist, but we'll ensure it's set
-	if user.Score < 0 {
-		// If score is negative (shouldn't happen), reset it to 0
-		user.Score = 0
-	}
-
-	// Calculate points based on result
+	// Points were already awarded atomically by db.SettleBotDebate.
+	// This function now handles only post-settlement gamification effects.
 	var pointsToAdd int
 	var action string
+
 	switch resultStatus {
 	case "win":
-		pointsToAdd = 50 // Points for winning against bot
+		pointsToAdd = 50
 		action = "debate_win"
 	case "loss":
-		pointsToAdd = 10 // Participation points
+		pointsToAdd = 10
 		action = "debate_loss"
 	case "draw":
-		pointsToAdd = 25 // Points for draw
+		pointsToAdd = 25
 		action = "debate_complete"
 	default:
-		pointsToAdd = 10 // Default participation points
-		action = "debate_complete"
-	}
-
-	log.Printf("Adding %d points for result: %s", pointsToAdd, resultStatus)
-
-	// Update user score atomically - $inc will create the field if it doesn't exist
-	update := bson.M{
-		"$inc": bson.M{"score": pointsToAdd},
-		"$set": bson.M{"updatedAt": time.Now()},
-	}
-
-	// Use UpdateOne first to ensure the update happens
-	updateResult, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
-	if err != nil {
-		log.Printf("Error updating score with UpdateOne: %v", err)
+		log.Printf("Invalid result status for gamification: %s", resultStatus)
 		return
 	}
 
-	if updateResult.MatchedCount == 0 {
-		log.Printf("User not found for score update: %s", userID.Hex())
-		return
-	}
+	// The score was committed by the settlement transaction.
+	// Do not increment it or insert another score_updates record here.
+	updatedUser := user
 
-	// Now fetch the updated user
-	var updatedUser models.User
-	err = userCollection.FindOne(ctx, bson.M{"_id": userID}).Decode(&updatedUser)
-	if err != nil {
-		log.Printf("Error fetching updated user: %v", err)
-		return
-	}
-
-	log.Printf("Successfully updated score. New score: %d (was %d, added %d)",
-		updatedUser.Score, user.Score, pointsToAdd)
-
-	// Save score update record
-	scoreCollection := db.MongoDatabase.Collection("score_updates")
-	scoreUpdate := models.ScoreUpdate{
-		ID:        primitive.NewObjectID(),
-		UserID:    userID,
-		Points:    pointsToAdd,
-		Action:    action,
-		CreatedAt: time.Now(),
-		Metadata: map[string]interface{}{
-			"debateType": "user_vs_bot",
-			"topic":      topic,
-			"result":     resultStatus,
-		},
-	}
-	_, err = scoreCollection.InsertOne(ctx, scoreUpdate)
-	if err != nil {
-		log.Printf("Error saving score update record: %v", err)
-		// Don't fail, continue with badge checks
-	}
-
+	log.Printf(
+		"Running post-settlement gamification for user %s: result=%s, score=%d",
+		userID.Hex(),
+		resultStatus,
+		updatedUser.Score,
+	)
 	// Update streak/activity on this verified debate completion before badge checks.
 	if err := updateStreakAndActivity(ctx, userID, &updatedUser); err != nil {
 		log.Printf("Error updating streak/activity for user %s: %v", userID.Hex(), err)
@@ -540,6 +606,7 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 	// Check for FirstWin badge (first win against bot)
 	if resultStatus == "win" && !hasBadge["FirstWin"] {
 		badgeUpdate := bson.M{"$addToSet": bson.M{"badges": "FirstWin"}}
+		log.Println("[DEBUG] Saving updated debate history")
 		userCollection.UpdateOne(ctx, bson.M{"_id": userID}, badgeUpdate)
 
 		// Update the updatedUser object to include the new badge
@@ -646,87 +713,114 @@ type ConcedeRequest struct {
 func ConcedeDebate(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
-		c.JSON(401, gin.H{"error": "Authorization token required"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Authorization token required",
+		})
 		return
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
-	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
+	valid, email, err := validateDebateTokenFunc(
+		"./config/config.prod.yml",
+		token,
+		c,
+	)
 	if err != nil || !valid {
-		c.JSON(401, gin.H{"error": "Invalid or expired token"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Invalid or expired token",
+		})
 		return
 	}
 
 	var req ConcedeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request payload: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request payload: " + err.Error(),
+		})
 		return
 	}
 
-	objID, err := primitive.ObjectIDFromHex(req.DebateId)
+	debateID, err := primitive.ObjectIDFromHex(req.DebateId)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid debate ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid debate ID",
+		})
 		return
 	}
 
-	// Fetch the debate to get details
-	var debate models.DebateVsBot
-	err = db.DebateVsBotCollection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&debate)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	settlement, err := settleBotDebateFunc(
+		ctx,
+		debateID,
+		email,
+		"loss",
+		"", // Empty judgment means concession.
+	)
 	if err != nil {
-		c.JSON(404, gin.H{"error": "Debate not found"})
+		switch {
+		case errors.Is(err, db.ErrDebateNotFound):
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Debate not found",
+			})
+		case errors.Is(err, db.ErrDebateAlreadySettled):
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "This debate has already been settled",
+			})
+		default:
+			log.Printf("Failed to settle conceded debate %s: %v", debateID.Hex(), err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to settle debate",
+			})
+		}
 		return
 	}
 
-	// Update debate outcome
-	filter := bson.M{"_id": objID}
-	update := bson.M{"$set": bson.M{"outcome": "User conceded"}}
-
-	_, err = db.DebateVsBotCollection.UpdateOne(context.Background(), filter, update)
-	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to update debate: " + err.Error()})
+	// A repeated concession is successful, but must not repeat side effects.
+	if settlement.AlreadySettled {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Debate conceded successfully",
+		})
 		return
 	}
 
-	// Get user ID from email
-	userCollection := db.GetCollection("users")
-	var user models.User
-	err = userCollection.FindOne(context.Background(), bson.M{"email": email}).Decode(&user)
-	if err != nil {
-		// Log error but don't fail the request as the main action succeeded
-		log.Printf("Error finding user for concede updates: %v", err)
-		c.JSON(200, gin.H{"message": "Debate conceded successfully"})
-		return
-	}
+	debate := settlement.Debate
 
-	// Save transcript to history
-	// We treat concession as a loss
-	// Use history from request if available, otherwise fall back to debate record history
 	historyToSave := debate.History
 	if len(req.History) > 0 {
 		historyToSave = req.History
 	}
 
-	_ = services.SaveDebateTranscript(
-		user.ID,
-		email,
-		"user_vs_bot",
-		debate.Topic,
-		debate.BotName,
-		"loss",
-		historyToSave,
-		nil,
-	)
+	userID, err := getDebateUserIDFunc(email)
+	if err != nil {
+		log.Printf("Could not get user ID for concession transcript: %v", err)
+	} else {
+		if err := saveBotDebateTranscriptFunc(
+			userID,
+			email,
+			"user_vs_bot",
+			debate.Topic,
+			debate.BotName,
+			"loss",
+			historyToSave,
+			nil,
+		); err != nil {
+			log.Printf("Failed to save concession transcript: %v", err)
+		}
 
-	// Update gamification (score, badges, streaks)
-	// Call synchronously but with recover to prevent panics
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("Panic in updateGamificationAfterBotDebate (concede): %v", r)
-			}
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("Panic in post-settlement gamification (concede): %v", r)
+				}
+			}()
+
+			updateBotDebateGamificationFunc(userID, "loss", debate.Topic)
 		}()
-		updateGamificationAfterBotDebate(user.ID, "loss", debate.Topic)
-	}()
+	}
 
-	c.JSON(200, gin.H{"message": "Debate conceded successfully"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Debate conceded successfully",
+	})
 }

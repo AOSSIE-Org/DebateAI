@@ -20,6 +20,7 @@ export type PhaseTiming = {
 };
 
 export type DebateRequest = {
+  debateId?: string; // Optional for createDebate, required for message requests
   botLevel: string;
   topic: string;
   history: DebateMessage[];
@@ -39,8 +40,8 @@ export type DebateResponse = {
 };
 
 export type JudgeRequest = {
+  debateId: string;
   history: DebateMessage[];
-  userId: string;
 };
 
 export type JudgeResponse = {
