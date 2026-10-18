@@ -5,6 +5,7 @@ import svgr from "@svgr/rollup"; // Import the plugin
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/',
   plugins: [react(),  svgr(), ],
 
   //shadcn
