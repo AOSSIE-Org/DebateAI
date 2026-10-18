@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -200,6 +201,7 @@ func TestJudgeDebate_InvalidJudgmentReturns502(t *testing.T) {
 	originalOutcome := updateBotDebateOutcomeFunc
 	originalLatestDebate := getLatestBotDebateFunc
 	originalTranscript := saveBotDebateTranscriptFunc
+	originalLoad := loadBotDebateForJudgmentFunc
 
 	defer func() {
 		validateDebateTokenFunc = originalValidate
@@ -209,6 +211,7 @@ func TestJudgeDebate_InvalidJudgmentReturns502(t *testing.T) {
 		updateBotDebateOutcomeFunc = originalOutcome
 		getLatestBotDebateFunc = originalLatestDebate
 		saveBotDebateTranscriptFunc = originalTranscript
+		loadBotDebateForJudgmentFunc = originalLoad
 	}()
 
 	validateDebateTokenFunc = func(
@@ -254,7 +257,15 @@ func TestJudgeDebate_InvalidJudgmentReturns502(t *testing.T) {
 		transcriptCalled = true
 		return nil
 	}
-
+	loadBotDebateForJudgmentFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		_ string,
+	) (*models.DebateVsBot, error) {
+		return &models.DebateVsBot{
+			Outcome: "pending",
+		}, nil
+	}
 	gamificationCalled := false
 	updateBotDebateGamificationFunc = func(
 		_ primitive.ObjectID,
@@ -318,6 +329,7 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 	originalTranscript := saveBotDebateTranscriptFunc
 	originalGamification := updateBotDebateGamificationFunc
 	originalSettle := settleBotDebateFunc
+	originalLoad := loadBotDebateForJudgmentFunc
 	defer func() {
 		validateDebateTokenFunc = originalValidate
 		getDebateUserIDFunc = originalGetUserID
@@ -327,6 +339,7 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 		saveBotDebateTranscriptFunc = originalTranscript
 		updateBotDebateGamificationFunc = originalGamification
 		settleBotDebateFunc = originalSettle
+		loadBotDebateForJudgmentFunc = originalLoad
 	}()
 
 	testUserID := primitive.NewObjectID()
@@ -383,6 +396,15 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 		transcriptCalled = true
 		return nil
 	}
+	loadBotDebateForJudgmentFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		_ string,
+	) (*models.DebateVsBot, error) {
+		return &models.DebateVsBot{
+			Outcome: "pending",
+		}, nil
+	}
 
 	gamificationCalled := false
 	updateBotDebateGamificationFunc = func(
@@ -437,6 +459,7 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 	originalTranscript := saveBotDebateTranscriptFunc
 	originalGamification := updateBotDebateGamificationFunc
 	originalSettle := settleBotDebateFunc
+	originalLoad := loadBotDebateForJudgmentFunc
 	defer func() {
 		validateDebateTokenFunc = originalValidate
 		getDebateUserIDFunc = originalGetUserID
@@ -446,6 +469,7 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 		saveBotDebateTranscriptFunc = originalTranscript
 		updateBotDebateGamificationFunc = originalGamification
 		settleBotDebateFunc = originalSettle
+		loadBotDebateForJudgmentFunc = originalLoad
 	}()
 
 	testUserID := primitive.NewObjectID()
@@ -497,7 +521,15 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 		transcriptCalled = true
 		return nil
 	}
-
+	loadBotDebateForJudgmentFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		_ string,
+	) (*models.DebateVsBot, error) {
+		return &models.DebateVsBot{
+			Outcome: "pending",
+		}, nil
+	}
 	gamificationCalled := false
 	updateBotDebateGamificationFunc = func(
 		_ primitive.ObjectID,
@@ -552,7 +584,7 @@ func TestJudgeDebate_AlreadySettledReturnsStoredJudgment(t *testing.T) {
 	originalSettle := settleBotDebateFunc
 	originalTranscript := saveBotDebateTranscriptFunc
 	originalGamification := updateBotDebateGamificationFunc
-
+	originalLoad := loadBotDebateForJudgmentFunc
 	defer func() {
 		validateDebateTokenFunc = originalValidate
 		getDebateUserIDFunc = originalGetUserID
@@ -560,10 +592,22 @@ func TestJudgeDebate_AlreadySettledReturnsStoredJudgment(t *testing.T) {
 		settleBotDebateFunc = originalSettle
 		saveBotDebateTranscriptFunc = originalTranscript
 		updateBotDebateGamificationFunc = originalGamification
+		loadBotDebateForJudgmentFunc = originalLoad
 	}()
 
 	storedJudgment := validJudgmentJSON()
 	testUserID := primitive.NewObjectID()
+	loadBotDebateForJudgmentFunc = func(
+		_ context.Context,
+		_ primitive.ObjectID,
+		_ string,
+	) (*models.DebateVsBot, error) {
+		return &models.DebateVsBot{
+			Judgment:  storedJudgment,
+			Outcome:   "win",
+			SettledAt: time.Now(),
+		}, nil
+	}
 
 	validateDebateTokenFunc = func(
 		_, _ string,
@@ -576,8 +620,10 @@ func TestJudgeDebate_AlreadySettledReturnsStoredJudgment(t *testing.T) {
 		return testUserID, nil
 	}
 
-	// The AI may produce a different result on a retry.
+	judgeCalled := false
+
 	judgeDebateFunc = func(_ []models.Message) (string, error) {
+		judgeCalled = true
 		return strings.Replace(
 			storedJudgment,
 			`"winner":"User"`,
@@ -659,5 +705,8 @@ func TestJudgeDebate_AlreadySettledReturnsStoredJudgment(t *testing.T) {
 
 	if gamificationCalled {
 		t.Error("gamification must not run again for an already-settled debate")
+	}
+	if judgeCalled {
+		t.Error("Gemini judgment must not run for an already-settled debate")
 	}
 }

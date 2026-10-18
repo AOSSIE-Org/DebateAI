@@ -79,6 +79,27 @@ var updateBotDebateOutcomeFunc = db.UpdateDebateVsBotOutcome
 var getLatestBotDebateFunc = db.GetLatestDebateVsBot
 var saveBotDebateTranscriptFunc = services.SaveDebateTranscript
 var settleBotDebateFunc = db.SettleBotDebate
+var loadBotDebateForJudgmentFunc = func(
+	ctx context.Context,
+	debateID primitive.ObjectID,
+	email string,
+) (*models.DebateVsBot, error) {
+	var debate models.DebateVsBot
+
+	err := db.DebateVsBotCollection.FindOne(
+		ctx,
+		bson.M{
+			"_id":   debateID,
+			"email": email,
+		},
+	).Decode(&debate)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &debate, nil
+}
 
 func CreateDebate(c *gin.Context) {
 	// Extract token from request header
@@ -410,6 +431,49 @@ func JudgeDebate(c *gin.Context) {
 	debateID, err := primitive.ObjectIDFromHex(req.DebateId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid debate ID"})
+		return
+	}
+
+	// Load the debate before calling Gemini so retries return the
+	// previously stored judgment instead of generating a new one.
+	var existing *models.DebateVsBot
+
+	lookupCtx, lookupCancel := context.WithTimeout(
+		c.Request.Context(),
+		10*time.Second,
+	)
+
+	existing, err = loadBotDebateForJudgmentFunc(
+		lookupCtx,
+		debateID,
+		email,
+	)
+
+	lookupCancel()
+
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Debate not found"})
+			return
+		}
+
+		log.Printf("Failed to load debate %s: %v", debateID.Hex(), err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to load debate",
+		})
+		return
+	}
+
+	if strings.TrimSpace(existing.Judgment) != "" {
+		c.JSON(http.StatusOK, JudgeResponse{Result: existing.Judgment})
+		return
+	}
+
+	if !existing.SettledAt.IsZero() ||
+		(existing.Outcome != "" && existing.Outcome != "pending") {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "This debate has already been settled",
+		})
 		return
 	}
 
