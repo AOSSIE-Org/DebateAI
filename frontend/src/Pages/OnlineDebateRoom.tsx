@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
@@ -223,6 +224,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [localRole, setLocalRole] = useState<DebateRole | null>(null);
   const [peerRole, setPeerRole] = useState<DebateRole | null>(null);
   const [localReady, setLocalReady] = useState(false);
+  const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
   const [peerReady, setPeerReady] = useState(false);
   const [debatePhase, setDebatePhase] = useState<DebatePhase>(
     DebatePhase.Setup
@@ -818,11 +820,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   ]);
 
   const handleConcede = useCallback(() => {
-    if (
-      window.confirm(
-        "Are you sure you want to concede? This will count as a loss."
-      )
-    ) {
+    setIsConcedeDialogOpen(false);
       if (wsRef.current) {
         wsRef.current.send(
           JSON.stringify({
@@ -839,7 +837,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         message: "You have conceded the debate.",
         isJudging: false,
       });
-    }
   }, [roomId, currentUserId, currentUser, setDebatePhase, setPopup]);
 
   const handlePhaseDone = useCallback(() => {
@@ -2260,7 +2257,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             debatePhase !== DebatePhase.Setup && (
               <div className="mt-2">
                 <Button
-                  onClick={handleConcede}
+                  onClick={() => setIsConcedeDialogOpen(true)}
                   className="bg-red-500 hover:bg-red-600 text-white rounded-md px-3 text-sm"
                 >
                   Concede
@@ -2804,6 +2801,15 @@ const OnlineDebateRoom = (): JSX.Element => {
           animation: glow 2s infinite;
         }
       `}</style>
+      <ConfirmationDialog
+        open={isConcedeDialogOpen}
+        onOpenChange={setIsConcedeDialogOpen}
+        title="Concede debate?"
+        description="Are you sure you want to concede? This will count as a loss."
+        confirmLabel="Concede"
+        onConfirm={handleConcede}
+        destructive
+      />
     </div>
   );
 };
