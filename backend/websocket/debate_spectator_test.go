@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -96,5 +97,113 @@ func TestRegisterReleasesHubLock(t *testing.T) {
 	case <-register("debate-2", conn2):
 	case <-time.After(2 * time.Second):
 		t.Fatal("second Register did not return: hub lock left held after the first Register")
+	}
+}
+
+// newConnPair returns both ends of a WebSocket connection: the server side
+// (what Register writes to) and the client side (what a subscriber reads from).
+func newConnPair(t *testing.T) (*websocket.Conn, *websocket.Conn, func()) {
+	t.Helper()
+
+	connCh := make(chan *websocket.Conn, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := debateUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		connCh <- conn
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+
+	url := "ws" + strings.TrimPrefix(srv.URL, "http")
+	client, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		srv.Close()
+		t.Fatalf("failed to dial test websocket: %v", err)
+	}
+	server := <-connCh
+
+	return server, client, func() {
+		client.Close()
+		srv.Close()
+	}
+}
+
+// TestConcurrentRegistrationsPresenceOrdered asserts that presence updates are
+// published in order: a watcher must observe non-decreasing "connected" counts
+// that end at the total number of registered clients, even when many clients
+// register concurrently.
+func TestConcurrentRegistrationsPresenceOrdered(t *testing.T) {
+	watcherServer, watcherClient, cleanupWatcher := newConnPair(t)
+	defer cleanupWatcher()
+
+	hub := NewDebateHub()
+	hub.Register("debate-order", watcherServer, "watcher")
+
+	counts := make(chan int, 64)
+	go func() {
+		defer close(counts)
+		for {
+			var msg struct {
+				Type    string `json:"type"`
+				Payload struct {
+					Connected int `json:"connected"`
+				} `json:"payload"`
+			}
+			if err := watcherClient.ReadJSON(&msg); err != nil {
+				return
+			}
+			if msg.Type == "presence" {
+				counts <- msg.Payload.Connected
+			}
+		}
+	}()
+
+	const n = 20
+	servers := make([]*websocket.Conn, 0, n)
+	cleanups := make([]func(), 0, n)
+	for i := 0; i < n; i++ {
+		server, _, cleanup := newConnPair(t)
+		servers = append(servers, server)
+		cleanups = append(cleanups, cleanup)
+	}
+	defer func() {
+		for _, cleanup := range cleanups {
+			cleanup()
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(conn *websocket.Conn) {
+			defer wg.Done()
+			hub.Register("debate-order", conn, "spectator")
+		}(servers[i])
+	}
+	wg.Wait()
+
+	last := 0
+	for i := 0; i < n+1; i++ {
+		select {
+		case count, ok := <-counts:
+			if !ok {
+				t.Fatalf("presence stream closed early after %d of %d updates", i, n+1)
+			}
+			if count < last {
+				t.Fatalf("out-of-order presence count: got %d after %d", count, last)
+			}
+			last = count
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for presence update %d of %d", i+1, n+1)
+		}
+	}
+
+	if last != n+1 {
+		t.Fatalf("expected final presence count %d, got %d", n+1, last)
 	}
 }

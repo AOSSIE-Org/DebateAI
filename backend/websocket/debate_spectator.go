@@ -32,7 +32,10 @@ type DebateRoom struct {
 	debateID string
 	clients  map[*websocket.Conn]*SpectatorClient
 	mu       sync.RWMutex
-	consumer *debate.StreamConsumer
+	// presenceMu serializes the client-count read with the presence broadcast for
+	// this room, so concurrent joins/leaves publish counts in order.
+	presenceMu sync.Mutex
+	consumer   *debate.StreamConsumer
 }
 
 // SpectatorClient represents a connected spectator
@@ -54,54 +57,42 @@ func NewDebateHub() *DebateHub {
 
 // Register registers a new WebSocket connection for a debate
 func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHash string) *SpectatorClient {
-	// Register the client while holding h.mu, then release it before broadcasting.
+	// Create/look up the room under h.mu, then release it before broadcasting.
 	// BroadcastPresence acquires h.mu.RLock(), so it must not be called while h.mu
-	// is still write-locked: a non-reentrant sync.RWMutex would self-deadlock. The
-	// lock is scoped to this closure so it is always released exactly once.
-	client, clientCount := func() (*SpectatorClient, int) {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-
-		// Get or create debate room
-		room, exists := h.debates[debateID]
-		if !exists {
-			room = &DebateRoom{
-				debateID: debateID,
-				clients:  make(map[*websocket.Conn]*SpectatorClient),
-				consumer: debate.NewStreamConsumer(h),
-			}
-			h.debates[debateID] = room
-
-			// Start consumer group for this debate (only if Redis is available)
-			if room.consumer != nil {
-				go room.consumer.StartConsumerGroup(debateID)
-			}
+	// is still write-locked: a non-reentrant sync.RWMutex would self-deadlock.
+	h.mu.Lock()
+	room, exists := h.debates[debateID]
+	if !exists {
+		room = &DebateRoom{
+			debateID: debateID,
+			clients:  make(map[*websocket.Conn]*SpectatorClient),
+			consumer: debate.NewStreamConsumer(h),
 		}
+		h.debates[debateID] = room
 
-		// Create client
-		client := &SpectatorClient{
-			conn:          conn,
-			spectatorHash: spectatorHash,
-			debateID:      debateID,
+		// Start consumer group for this debate (only if Redis is available)
+		if room.consumer != nil {
+			go room.consumer.StartConsumerGroup(debateID)
 		}
-
-		room.mu.Lock()
-		room.clients[conn] = client
-		count := len(room.clients)
-		room.mu.Unlock()
-
-		return client, count
-	}()
-
-	// Broadcast presence update (h.mu is released by now)
-	presenceEvent := map[string]interface{}{
-		"type": "presence",
-		"payload": map[string]interface{}{
-			"connected": clientCount,
-		},
-		"timestamp": time.Now().Unix(),
 	}
-	h.BroadcastPresence(debateID, presenceEvent)
+	h.mu.Unlock()
+
+	client := &SpectatorClient{
+		conn:          conn,
+		spectatorHash: spectatorHash,
+		debateID:      debateID,
+	}
+
+	// Serialize the count read and the presence broadcast for this room so
+	// concurrent registrations cannot publish counts out of order.
+	room.presenceMu.Lock()
+	defer room.presenceMu.Unlock()
+
+	room.mu.Lock()
+	room.clients[conn] = client
+	clientCount := len(room.clients)
+	room.mu.Unlock()
+	h.broadcastPresence(debateID, clientCount)
 
 	return client
 }
@@ -116,12 +107,19 @@ func (h *DebateHub) Unregister(debateID string, conn *websocket.Conn) {
 		return
 	}
 
+	// Serialize with Register so counts are published in order.
+	room.presenceMu.Lock()
+	defer room.presenceMu.Unlock()
+
 	room.mu.Lock()
 	delete(room.clients, conn)
 	clientCount := len(room.clients)
 	room.mu.Unlock()
+	h.broadcastPresence(debateID, clientCount)
+}
 
-	// Broadcast presence update
+// broadcastPresence sends a presence update with the current client count.
+func (h *DebateHub) broadcastPresence(debateID string, clientCount int) {
 	presenceEvent := map[string]interface{}{
 		"type": "presence",
 		"payload": map[string]interface{}{
