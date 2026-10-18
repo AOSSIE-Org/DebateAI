@@ -191,10 +191,13 @@ func (h *DebateHub) BroadcastPresence(debateID string, presenceEvent map[string]
 	}
 }
 
-// WriteJSON safely writes JSON to the WebSocket connection
+// WriteJSON safely writes JSON to the WebSocket connection. A finite write
+// deadline bounds how long a stalled spectator can block the writer, so it
+// cannot hold up presence updates for the debate indefinitely.
 func (c *SpectatorClient) WriteJSON(v interface{}) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return c.conn.WriteJSON(v)
 }
 
