@@ -111,33 +111,6 @@ const CoachPage: React.FC = () => {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="py-8 bg-background text-center">
-        <div className="container mx-auto px-6">
-          <h3 className="text-xl font-semibold mb-2">Stay Updated</h3>
-          <p className="text-muted-foreground mb-4">
-            Subscribe to get the latest updates on new learning paths and features!
-          </p>
-          <div className="max-w-md mx-auto flex gap-2">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="flex-grow px-4 py-2 rounded-lg bg-input text-foreground border border-border"
-              disabled
-            />
-            <Button disabled className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Subscribe
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-4 italic font-medium">
-            Managed with ❤️ by <a href="https://aossie.org" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">AOSSIE</a>
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            © {new Date().getFullYear()} DebateAI. All rights reserved.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };
