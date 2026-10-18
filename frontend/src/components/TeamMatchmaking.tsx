@@ -41,6 +41,7 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   const [hasJoined, setHasJoined] = useState(false);
   const [matchedTeam, setMatchedTeam] = useState<Team | null>(null);
   const matchmakingVersion = useRef(0);
+  const leaveInFlight = useRef(false);
   const [activeDebateId, setActiveDebateId] = useState<string | null>(null);
   const [showDebateNotification, setShowDebateNotification] = useState(false);
 
@@ -145,6 +146,9 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
   };
 
   const handleLeaveMatchmaking = async () => {
+    if (leaveInFlight.current) return;
+    leaveInFlight.current = true;
+
     try {
       await leaveMatchmaking(team.id);
       matchmakingVersion.current += 1;
@@ -155,6 +159,8 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to leave matchmaking';
       alert(errorMessage);
+    } finally {
+      leaveInFlight.current = false;
     }
   };
 
