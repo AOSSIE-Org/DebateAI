@@ -5,7 +5,7 @@ import { AuthContext } from "@/context/authContext";
 import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
-import AOSSIELogo from "@/assets/aossie.png";
+import debateAiLogo from "@/assets/debateai-logo.svg";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ const Home: React.FC = () => {
             rel="noopener noreferrer"
             className="p-1 hover:opacity-80 transition-opacity"
           >
-            <img src={AOSSIELogo} alt="AOSSIE Logo" className="h-8 w-auto object-contain" />
+            <img src={debateAiLogo} alt="AOSSIE Logo" className="h-8 w-auto object-contain" />
           </a>
           <div className="flex flex-col">
             <span className="text-2xl font-black tracking-tight text-primary leading-none">DebateAI</span>
