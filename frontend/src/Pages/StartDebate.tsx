@@ -45,6 +45,7 @@ const StartDebate = () => {
             <div className="flex flex-col items-center mb-6">
               <img src={debateAiLogo} alt="DebateAI Logo" className="h-12 w-auto object-contain mb-2" />
               <div className="text-center">
+                <span className="text-2xl font-black tracking-tight text-primary leading-none block">DebateAI</span>
                 <a
                   href="https://aossie.org"
                   target="_blank"
