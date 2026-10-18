@@ -93,10 +93,10 @@ export default function TournamentBracket() {
         </div>
         {/* Match Labels */}
         <div className="w-full grid grid-cols-4 gap-2 mt-4">
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 1</div>
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 2</div>
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 3</div>
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 4</div>
+          <div className="text-center text-[10px] font-medium text-foreground">Match 1</div>
+          <div className="text-center text-[10px] font-medium text-foreground">Match 2</div>
+          <div className="text-center text-[10px] font-medium text-foreground">Match 3</div>
+          <div className="text-center text-[10px] font-medium text-foreground">Match 4</div>
         </div>
       </div>
     );
