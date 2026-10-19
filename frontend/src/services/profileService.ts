@@ -22,7 +22,8 @@ export const updateProfile = async (
   twitter?: string,
   instagram?: string,
   linkedin?: string,
-  avatarUrl?: string
+  avatarUrl?: string,
+  github?: string
 ) => {
   const response = await fetch(`${baseURL}/user/updateprofile`, {
     method: "PUT",
@@ -30,7 +31,7 @@ export const updateProfile = async (
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin, avatarUrl }),
+    body: JSON.stringify({ displayName, bio, twitter, instagram, linkedin, github, avatarUrl }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
