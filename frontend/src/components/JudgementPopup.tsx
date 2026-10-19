@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button'; // Adjust the path as needed
 import { useNavigate } from 'react-router-dom';
+import { PerformanceReport } from './PerformanceReport';
+import { Trophy, Sparkles } from 'lucide-react';
 
 // Define both possible JudgmentData types
 type JudgmentDataUserBot = {
@@ -81,6 +83,11 @@ type JudgmentPopupProps = {
   opponentDisplayName?: string | null;
   opponentAvatarUrl?: string | null;
   ratingSummary?: RatingSummary | null;
+  debateId?: string;
+  topic?: string;
+  messages?: Array<{ sender: string; text: string; phase?: string }>;
+  transcripts?: Record<string, string>;
+  debateType?: string;
   onClose: () => void;
 };
 
@@ -122,9 +129,15 @@ const JudgmentPopup: React.FC<JudgmentPopupProps> = ({
   opponentDisplayName,
   opponentAvatarUrl,
   ratingSummary,
+  debateId,
+  topic,
+  messages,
+  transcripts,
+  debateType,
   onClose,
 }) => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'verdict' | 'report'>('verdict');
   const userName = 'You';
 
   const localAvatar =
@@ -376,12 +389,54 @@ const player2RatingSummary =
           </div>
         </div>
 
-        {/* Phase Sections */}
-        <div className='space-y-10'>
-          <div className='bg-white p-6 rounded-lg shadow-md'>
-            <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
-              Opening Statement
-            </h3>
+        {/* Tab Switcher */}
+        <div className="flex border-b border-gray-200 mb-8 space-x-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab('verdict')}
+            className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-all ${
+              activeTab === 'verdict'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Trophy className="w-4 h-4" /> Match Overview & Verdict
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('report')}
+            className={`pb-3 px-4 font-bold text-sm flex items-center gap-2 border-b-2 transition-all ${
+              activeTab === 'report'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-orange-500 animate-pulse" /> AI Performance Report
+            <span className="bg-orange-100 text-orange-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide">
+              New
+            </span>
+          </button>
+        </div>
+
+        {activeTab === 'report' ? (
+          <PerformanceReport
+            request={{
+              debateId: debateId || `session_${Date.now()}`,
+              topic: topic || 'Debate Match',
+              stance: isUserBotFormat ? userStance : localRole === 'for' ? 'For' : 'Against',
+              messages,
+              transcripts,
+              debateType: isUserBotFormat ? 'user_vs_bot' : debateType || 'user_vs_user',
+            }}
+          />
+        ) : (
+          <>
+            {/* Phase Sections */}
+            <div className='space-y-10'>
+              <div className='bg-white p-6 rounded-lg shadow-md'>
+                <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
+                  Opening Statement
+                </h3>
             <div className='grid grid-cols-2 gap-6'>
               <div className='p-4 bg-gray-50 rounded-lg'>
                 <h4 className='text-lg font-semibold text-gray-700'>
@@ -696,6 +751,15 @@ const player2RatingSummary =
           <p className='mt-2 text-md leading-relaxed'>
             {judgment.verdict.opponent_analysis}
           </p>
+          <div className="mt-5">
+            <Button
+              type="button"
+              onClick={() => setActiveTab('report')}
+              className="bg-white text-orange-600 hover:bg-orange-50 font-bold px-6 py-2.5 rounded-full text-sm shadow-md transition-transform transform hover:scale-105"
+            >
+              <Sparkles className="w-4 h-4 mr-2" /> View Detailed AI Performance Report
+            </Button>
+          </div>
         </div>
 
         {/* Skills to Improve */}
@@ -731,6 +795,8 @@ const player2RatingSummary =
             ))}
           </div>
         </div>
+        </>
+        )}
 
         {/* Buttons */}
         <div className='text-center mt-8'>
