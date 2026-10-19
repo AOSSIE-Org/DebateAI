@@ -32,10 +32,15 @@ type DebateRoom struct {
 	debateID string
 	clients  map[*websocket.Conn]*SpectatorClient
 	mu       sync.RWMutex
-	// presenceMu serializes the client-count read with the presence broadcast for
-	// this room, so concurrent joins/leaves publish counts in order.
-	presenceMu sync.Mutex
-	consumer   *debate.StreamConsumer
+	consumer *debate.StreamConsumer
+
+	// presenceMu orders the client-count read with the enqueue below, so count
+	// changes are broadcast in the order they happened. It is only ever held for
+	// bookkeeping, never across a network write, so a stalled spectator cannot
+	// delay joins or departures. A per-room goroutine drains presenceQueue.
+	presenceMu    sync.Mutex
+	presenceQueue []int
+	presenceWake  chan struct{}
 }
 
 // SpectatorClient represents a connected spectator
@@ -57,16 +62,15 @@ func NewDebateHub() *DebateHub {
 
 // Register registers a new WebSocket connection for a debate
 func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHash string) *SpectatorClient {
-	// Create/look up the room under h.mu, then release it before broadcasting.
-	// BroadcastPresence acquires h.mu.RLock(), so it must not be called while h.mu
-	// is still write-locked: a non-reentrant sync.RWMutex would self-deadlock.
+	// Create/look up the room under h.mu, then release it before any broadcast.
 	h.mu.Lock()
 	room, exists := h.debates[debateID]
 	if !exists {
 		room = &DebateRoom{
-			debateID: debateID,
-			clients:  make(map[*websocket.Conn]*SpectatorClient),
-			consumer: debate.NewStreamConsumer(h),
+			debateID:     debateID,
+			clients:      make(map[*websocket.Conn]*SpectatorClient),
+			consumer:     debate.NewStreamConsumer(h),
+			presenceWake: make(chan struct{}, 1),
 		}
 		h.debates[debateID] = room
 
@@ -74,6 +78,9 @@ func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHas
 		if room.consumer != nil {
 			go room.consumer.StartConsumerGroup(debateID)
 		}
+
+		// Serialize presence broadcasts for this room off the request path.
+		go h.presenceBroadcaster(room)
 	}
 	h.mu.Unlock()
 
@@ -83,16 +90,16 @@ func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHas
 		debateID:      debateID,
 	}
 
-	// Serialize the count read and the presence broadcast for this room so
-	// concurrent registrations cannot publish counts out of order.
+	// Assign the count and enqueue it atomically (under presenceMu) so concurrent
+	// joins are broadcast in order, then release the lock before any network
+	// write happens on the room's broadcaster goroutine.
 	room.presenceMu.Lock()
-	defer room.presenceMu.Unlock()
-
 	room.mu.Lock()
 	room.clients[conn] = client
 	clientCount := len(room.clients)
 	room.mu.Unlock()
-	h.broadcastPresence(debateID, clientCount)
+	room.enqueuePresence(clientCount)
+	room.presenceMu.Unlock()
 
 	return client
 }
@@ -107,15 +114,52 @@ func (h *DebateHub) Unregister(debateID string, conn *websocket.Conn) {
 		return
 	}
 
-	// Serialize with Register so counts are published in order.
+	// Assign the count and enqueue it atomically (under presenceMu) so concurrent
+	// departures are broadcast in order, then release the lock before any network
+	// write happens on the room's broadcaster goroutine.
 	room.presenceMu.Lock()
-	defer room.presenceMu.Unlock()
-
 	room.mu.Lock()
 	delete(room.clients, conn)
 	clientCount := len(room.clients)
 	room.mu.Unlock()
-	h.broadcastPresence(debateID, clientCount)
+	room.enqueuePresence(clientCount)
+	room.presenceMu.Unlock()
+}
+
+// enqueuePresence appends a count to the room's broadcast queue. Callers must
+// hold presenceMu so counts are queued in the order they were computed. The wake
+// send is non-blocking: a pending wake already guarantees the broadcaster will
+// drain the queue.
+func (room *DebateRoom) enqueuePresence(count int) {
+	room.presenceQueue = append(room.presenceQueue, count)
+	select {
+	case room.presenceWake <- struct{}{}:
+	default:
+	}
+}
+
+// presenceBroadcaster drains queued counts for a room and broadcasts them in
+// order. It holds presenceMu only to dequeue, never during a network write, so a
+// stalled spectator cannot delay joins or departures for the debate.
+func (h *DebateHub) presenceBroadcaster(room *DebateRoom) {
+	for range room.presenceWake {
+		for {
+			room.presenceMu.Lock()
+			if len(room.presenceQueue) == 0 {
+				room.presenceMu.Unlock()
+				break
+			}
+			count := room.presenceQueue[0]
+			room.presenceQueue[0] = 0
+			room.presenceQueue = room.presenceQueue[1:]
+			if len(room.presenceQueue) == 0 {
+				room.presenceQueue = nil
+			}
+			room.presenceMu.Unlock()
+
+			h.broadcastPresence(room.debateID, count)
+		}
+	}
 }
 
 // broadcastPresence sends a presence update with the current client count.
@@ -239,26 +283,8 @@ func DebateWebsocketHandler(c *gin.Context) {
 	} else if err != nil {
 	}
 
-	// Send initial presence count - get it from the hub after registration
-	hub.mu.RLock()
-	room, exists := hub.debates[debateID]
-	clientCount := 0
-	if exists {
-		room.mu.RLock()
-		clientCount = len(room.clients)
-		room.mu.RUnlock()
-	}
-	hub.mu.RUnlock()
-
-	// Send presence event in format expected by frontend
-	presenceEvent := map[string]interface{}{
-		"type": "presence",
-		"payload": map[string]interface{}{
-			"connected": clientCount,
-		},
-		"timestamp": time.Now().Unix(),
-	}
-	client.WriteJSON(presenceEvent)
+	// Presence counts are delivered by the hub's per-room broadcaster (Register
+	// enqueues the initial count), so no separate presence send is needed here.
 
 	// Read pump
 	go readPump(client, hub)
