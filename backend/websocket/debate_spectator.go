@@ -130,14 +130,17 @@ func (h *DebateHub) broadcastPresence(debateID string, clientCount int) {
 	h.BroadcastPresence(debateID, presenceEvent)
 }
 
-// BroadcastToDebate broadcasts an event to all connected clients for a debate
-func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
+// clientsSnapshot returns a snapshot of the clients in a debate room. Callers
+// must write to the returned slice after releasing all locks, so a slow or
+// stalled spectator cannot block Register/Unregister, which take room.mu's
+// write lock.
+func (h *DebateHub) clientsSnapshot(debateID string) []*SpectatorClient {
 	h.mu.RLock()
 	room, exists := h.debates[debateID]
 	h.mu.RUnlock()
 
 	if !exists {
-		return
+		return nil
 	}
 
 	room.mu.RLock()
@@ -146,6 +149,13 @@ func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
 		clients = append(clients, client)
 	}
 	room.mu.RUnlock()
+
+	return clients
+}
+
+// BroadcastToDebate broadcasts an event to all connected clients for a debate
+func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
+	clients := h.clientsSnapshot(debateID)
 
 	// Convert event to frontend format - parse payload
 	var payload interface{}
@@ -169,23 +179,8 @@ func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
 
 // BroadcastPresence broadcasts a presence update directly
 func (h *DebateHub) BroadcastPresence(debateID string, presenceEvent map[string]interface{}) {
-	h.mu.RLock()
-	room, exists := h.debates[debateID]
-	h.mu.RUnlock()
-
-	if !exists {
-		return
-	}
-
-	room.mu.RLock()
-	clients := make([]*SpectatorClient, 0, len(room.clients))
-	for _, client := range room.clients {
-		clients = append(clients, client)
-	}
-	room.mu.RUnlock()
-
 	// Broadcast to all clients
-	for _, client := range clients {
+	for _, client := range h.clientsSnapshot(debateID) {
 		if err := client.WriteJSON(presenceEvent); err != nil {
 		}
 	}
@@ -240,7 +235,7 @@ func DebateWebsocketHandler(c *gin.Context) {
 	// Send initial poll snapshot
 	snapshot, err := loadPollSnapshot(debateID)
 	if err == nil && snapshot != nil {
-		conn.WriteJSON(snapshot)
+		client.WriteJSON(snapshot)
 	} else if err != nil {
 	}
 
@@ -263,7 +258,7 @@ func DebateWebsocketHandler(c *gin.Context) {
 		},
 		"timestamp": time.Now().Unix(),
 	}
-	conn.WriteJSON(presenceEvent)
+	client.WriteJSON(presenceEvent)
 
 	// Read pump
 	go readPump(client, hub)
@@ -350,16 +345,9 @@ func handleVote(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	// Broadcast directly to all connected clients
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			c.WriteJSON(voteEvent)
-		}
-		room.mu.RUnlock()
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		c.WriteJSON(voteEvent)
 	}
-	hub.mu.RUnlock()
 
 	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("vote", payload)
@@ -404,17 +392,10 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	// Broadcast directly to all connected clients
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			if err := c.WriteJSON(questionEvent); err != nil {
-			}
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		if err := c.WriteJSON(questionEvent); err != nil {
 		}
-		room.mu.RUnlock()
 	}
-	hub.mu.RUnlock()
 
 	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("question", payload)
@@ -456,16 +437,9 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	// Broadcast directly to all connected clients
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			c.WriteJSON(reactionEvent)
-		}
-		room.mu.RUnlock()
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		c.WriteJSON(reactionEvent)
 	}
-	hub.mu.RUnlock()
 
 	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("reaction", payload)
@@ -535,19 +509,12 @@ func handleCreatePoll(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	hub := GetDebateHub()
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			c.WriteJSON(createdEvent)
-			if snapshot != nil {
-				c.WriteJSON(snapshot)
-			}
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		c.WriteJSON(createdEvent)
+		if snapshot != nil {
+			c.WriteJSON(snapshot)
 		}
-		room.mu.RUnlock()
 	}
-	hub.mu.RUnlock()
 
 	// Publish event for persistence
 	eventPayload := debate.PollCreatedPayload{
