@@ -172,6 +172,8 @@ func UpdateTeamSize(c *gin.Context) {
 		},
 	}
 
+	services.RemoveFromMatchmaking(objectID)
+
 	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objectID}, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update team size"})
