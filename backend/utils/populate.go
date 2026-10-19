@@ -14,7 +14,7 @@ import (
 
 // PopulateTestUsers creates test users with Glicko-2 ratings
 func PopulateTestUsers() {
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	cfg, err := config.LoadConfig(configPath())
 	if err != nil {
 		panic("Failed to load config: " + err.Error())
 	}
