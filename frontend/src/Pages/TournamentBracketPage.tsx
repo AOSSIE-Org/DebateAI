@@ -52,6 +52,9 @@ const Participant = ({
   );
 };
 
+/**
+ * Displays participants for the tournament selected by the route ID.
+ */
 export default function TournamentBracket() {
   const { id } = useParams<{ id: string }>();
 
@@ -133,7 +136,8 @@ export default function TournamentBracket() {
     firstRoundMatches.push({
       player1: slots[index],
       player2: slots[index + 1],
-      isBye: index + 1 >= slots.length,
+      hasSecondSlot: index + 1 < slots.length,
+      isBye: index + 1 >= slots.length && Boolean(slots[index]),
       matchNumber: index / 2 + 1,
     });
   }
@@ -228,15 +232,17 @@ export default function TournamentBracket() {
                 <div className="flex items-center justify-around gap-4">
                   <Participant participant={match.player1} />
 
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    VS
-                  </span>
+                  {(match.hasSecondSlot || match.isBye) && (
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      VS
+                    </span>
+                  )}
 
                   {match.isBye ? (
                     <span className="text-xs text-muted-foreground">Bye</span>
-                  ) : (
+                  ) : match.hasSecondSlot ? (
                     <Participant participant={match.player2} />
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}

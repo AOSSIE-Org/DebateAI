@@ -23,6 +23,9 @@ const STATUS_LABELS: Record<ApiTournament["status"], string> = {
   completed: "Completed",
 };
 
+/**
+ * Displays backend-backed tournaments and join actions for the current user.
+ */
 export default function TournamentPage() {
   const [tournaments, setTournaments] = useState<ApiTournament[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,9 @@ export default function TournamentPage() {
   const pastTournaments = tournaments.filter(
     (t) => t.status === "completed"
   );
+
+  const canRenderTournamentContent =
+    !loading && (!error || tournaments.length > 0);
 
   const handleJoin = async (tournament: ApiTournament) => {
     try {
@@ -177,7 +183,8 @@ export default function TournamentPage() {
               {error}
             </p>
           )}
-          {loading || error ? null : visibleTournaments.length === 0 ? (
+          {!canRenderTournamentContent ? null : visibleTournaments.length ===
+            0 ? (
             <p className="text-center text-muted-foreground text-lg">
               {statusFilter === "all"
                 ? "No tournaments available yet."
@@ -250,12 +257,7 @@ export default function TournamentPage() {
                   <button
                     onClick={() => handleJoin(t)}
                     className="w-full bg-primary text-primary-foreground py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold disabled:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground mt-auto"
-                    disabled={
-                      isHost ||
-                      isParticipant ||
-                      isFull ||
-                      t.status !== "upcoming"
-                    }
+                    disabled={isHost || isParticipant || isFull}
                   >
                     {isHost
                       ? "Hosting"
@@ -263,9 +265,7 @@ export default function TournamentPage() {
                         ? "Joined"
                         : isFull
                           ? "Full"
-                          : t.status === "live"
-                            ? "In Progress"
-                            : "Join Tournament"}
+                          : "Join Tournament"}
                   </button>
                 </div>
               );
@@ -274,62 +274,64 @@ export default function TournamentPage() {
         )}
 
           {/* Past Tournaments */}
-          <section className="mt-12">
-            <div className="flex items-end justify-between gap-4 mb-5">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                  Past Tournaments
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Relive the battles and see who claimed the crown.
-                </p>
-              </div>
-              <span className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary">
-                {pastTournaments.length} completed
-              </span>
-            </div>
-            <div className="space-y-4">
-              {pastTournaments.map((t) => (
-                <div
-                  key={t.id}
-                  className="group relative overflow-hidden flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5 bg-card bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl border border-border shadow-lg hover:shadow-2xl hover:border-primary/60 transition-all duration-300 transform hover:-translate-y-1"
-                >
-                  <div className="absolute -top-6 -right-6 w-20 h-20 bg-primary/20 rounded-full"></div>
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 ring-2 ring-primary/40 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                      <Trophy className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-bold text-card-foreground tracking-tight truncate">
-                          {t.topic}
-                        </h3>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-muted text-muted-foreground">
-                          Completed
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4 text-primary" />
-                          {new Date(t.scheduleAt ?? t.createdAt).toLocaleDateString()}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="w-4 h-4 text-primary" />
-                          {t.participants.length} Participants
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="relative w-full sm:w-auto flex-shrink-0 bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm"
-                  >
-                    View Tournament
-                  </button>
+          {canRenderTournamentContent && (
+            <section className="mt-12">
+              <div className="flex items-end justify-between gap-4 mb-5">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+                    Past Tournaments
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Relive the battles and see who claimed the crown.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </section>
+                <span className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary">
+                  {pastTournaments.length} completed
+                </span>
+              </div>
+              <div className="space-y-4">
+                {pastTournaments.map((t) => (
+                  <div
+                    key={t.id}
+                    className="group relative overflow-hidden flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5 bg-card bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl border border-border shadow-lg hover:shadow-2xl hover:border-primary/60 transition-all duration-300 transform hover:-translate-y-1"
+                  >
+                    <div className="absolute -top-6 -right-6 w-20 h-20 bg-primary/20 rounded-full"></div>
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 ring-2 ring-primary/40 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                        <Trophy className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-bold text-card-foreground tracking-tight truncate">
+                            {t.topic}
+                          </h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-muted text-muted-foreground">
+                            Completed
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            {new Date(t.scheduleAt ?? t.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-4 h-4 text-primary" />
+                            {t.participants.length} Participants
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="relative w-full sm:w-auto flex-shrink-0 bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm"
+                    >
+                      View Tournament
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Right: Create Tournament Form */}

@@ -103,6 +103,7 @@ export const createTournament = async (
   return data as CreatedTournament;
 };
 
+/** Fetches tournaments visible to the authenticated user. */
 export const getTournaments = async (): Promise<Tournament[]> => {
   const token = getAuthToken();
 
@@ -131,6 +132,7 @@ export const getTournaments = async (): Promise<Tournament[]> => {
   }));
 };
 
+/** Fetches a tournament by its persisted backend ID. */
 export const getTournamentById = async (
   tournamentId: string
 ): Promise<Tournament> => {
@@ -164,6 +166,7 @@ export const getTournamentById = async (
   };
 };
 
+/** Joins the authenticated user to a public tournament. */
 export const joinPublicTournament = async (
   tournamentId: string
 ): Promise<JoinTournamentResponse> => {
