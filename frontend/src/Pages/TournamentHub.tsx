@@ -83,13 +83,12 @@ export default function TournamentPage() {
   };
 
   const renderAvatars = (
-    participants: ApiTournament["participants"],
-    max: number
+    participants: ApiTournament["participants"]
   ) => {
     const avatars = [];
     const MAX_VISIBLE = 6;
-    const visible = Math.min(max, MAX_VISIBLE);
-    const overflow = Math.max(max - MAX_VISIBLE, 0);
+    const visible = Math.min(participants.length, MAX_VISIBLE);
+    const overflow = Math.max(participants.length - MAX_VISIBLE, 0);
 
     for (let i = 0; i < visible; i++) {
       const participant = participants[i];
@@ -230,7 +229,7 @@ export default function TournamentPage() {
                       </span>
                     </div>
                     <div className="flex mt-2 px-4">
-                      {renderAvatars(t.participants, t.maxParticipants)}
+                      {renderAvatars(t.participants)}
                     </div>
                   </div>
                   <div className="mb-4">
