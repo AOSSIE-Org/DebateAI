@@ -1,103 +1,228 @@
-export default function TournamentBracket() {
-    const participants = [
-      { id: 1, name: "Rishit Tiwari", avatar: `https://i.pravatar.cc/32?u=1` },
-      { id: 2, name: "Aarav Singh", avatar: `https://i.pravatar.cc/32?u=2` },
-      { id: 3, name: "Ishaan Mehta", avatar: `https://i.pravatar.cc/32?u=3` },
-      { id: 4, name: "Vihaan Kapoor", avatar: `https://i.pravatar.cc/32?u=4` },
-      { id: 5, name: "Ayaan Khanna", avatar: `https://i.pravatar.cc/32?u=5` },
-      { id: 6, name: "Vivaan Sharma", avatar: `https://i.pravatar.cc/32?u=6` },
-      { id: 7, name: "Devansh Joshi", avatar: `https://i.pravatar.cc/32?u=7` },
-      { id: 8, name: "Kabir Malhotra", avatar: `https://i.pravatar.cc/32?u=8` },
-    ];
-    const round1Winners = [participants[0], participants[2], participants[4], participants[7]];
-    const semiFinalWinners = [round1Winners[0], round1Winners[3]];
-    const champion = semiFinalWinners[1];
-    const winnerHighlight = "ring-4 ring-yellow-400 shadow-lg transition-all duration-300";
-  
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import {
+  getTournamentById,
+  type Tournament,
+  type TournamentParticipant,
+} from "@/services/tournamentService";
+
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+const Participant = ({
+  participant,
+}: {
+  participant?: TournamentParticipant;
+}) => {
+  if (!participant) {
     return (
-      <div className="flex flex-col items-center w-full">
-        <h2 className="text-2xl font-bold mb-8 text-foreground">Tournament Bracket</h2>
-        {/* Champion */}
-        <div className="flex justify-center mb-12">
-          <div className="flex flex-col items-center relative">
-            <div className="text-xs font-bold text-yellow-400 mb-2">🏆 Champion</div>
-            <div className={`h-16 w-16 rounded-full bg-card flex items-center justify-center overflow-hidden ${winnerHighlight}`}>
-              <img src={champion.avatar} alt="Champion" className="w-full h-full object-cover" />
-            </div>
-            <div className="text-xs mt-2 font-medium text-foreground">{champion.name}</div>
-          </div>
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-10 h-10 rounded-full border-2 border-dashed border-border bg-muted flex items-center justify-center text-muted-foreground">
+          ?
         </div>
-        {/* Finalists */}
-        <div className="w-full flex justify-around mb-12 relative">
-          {semiFinalWinners.map((finalist, index) => (
-            <div key={index} className="flex flex-col items-center relative">
-              <div className={`w-12 h-12 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 dark:border-white ${finalist.id === champion.id ? winnerHighlight : 'border-border'}`}>
-                <img src={finalist.avatar} alt={finalist.name} className="w-full h-full object-cover" />
-              </div>
-              <div className="text-xs mt-1 text-muted-foreground">{finalist.name}</div>
-              <div className="absolute w-px h-6 bg-border dark:bg-white -top-6 left-1/2 transform -translate-x-1/2" />
-            </div>
-          ))}
-          <div className="absolute h-px bg-border dark:bg-white top-[-24px] left-[25%] w-[50%]" />
-          <div className="absolute w-px bg-border dark:bg-white left-1/2 transform -translate-x-1/2 -top-12 h-6" />
-        </div>
-        {/* Semifinals */}
-        <div className="w-full grid grid-cols-2 gap-2 mb-12 relative">
-          {[0, 1].map((matchIndex) => {
-            const player1 = round1Winners[matchIndex * 2];
-            const player2 = round1Winners[matchIndex * 2 + 1];
-            const winner = semiFinalWinners[matchIndex];
-            return (
-              <div key={matchIndex} className="relative">
-                <div className="flex justify-around">
-                  {[player1, player2].map((player) => (
-                    <div key={player.id} className="flex flex-col items-center relative">
-                      <div className={`w-10 h-10 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 dark:border-white ${player.id === winner.id ? winnerHighlight : 'border-border'}`}>
-                        <img src={player.avatar} alt={player.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="text-xs mt-1 text-accent-foreground">{player.name}</div>
-                      <div className="absolute w-px h-6 bg-border dark:bg-white -top-6 left-1/2 transform -translate-x-1/2" />
-                    </div>
-                  ))}
-                </div>
-                <div className="absolute h-px bg-border dark:bg-white top-[-24px] left-[25%] w-[50%]" />
-                <div className="absolute w-px bg-border dark:bg-white left-1/2 transform -translate-x-1/2 -top-20 h-14" />
-              </div>
-            );
-          })}
-        </div>
-        {/* First Round */}
-        <div className="w-full grid grid-cols-4 gap-2 relative">
-          {[0, 1, 2, 3].map((matchIndex) => {
-            const player1 = participants[matchIndex * 2];
-            const player2 = participants[matchIndex * 2 + 1];
-            const winner = round1Winners[matchIndex];
-            return (
-              <div key={matchIndex} className="relative">
-                <div className="flex justify-around">
-                  {[player1, player2].map((player) => (
-                    <div key={player.id} className="flex flex-col items-center relative">
-                      <div className={`w-8 h-8 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 dark:border-white ${player.id === winner.id ? winnerHighlight : 'border-border'}`}>
-                        <img src={player.avatar} alt={player.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="text-[10px] mt-1 text-foreground">{player.name}</div>
-                      <div className="absolute w-px h-6 bg-border dark:bg-white -top-6 left-1/2 transform -translate-x-1/2" />
-                    </div>
-                  ))}
-                </div>
-                <div className="absolute h-px bg-border dark:bg-white top-[-24px] left-[25%] w-[50%]" />
-                <div className="absolute w-px bg-border dark:bg-white left-1/2 transform -translate-x-1/2 -top-20 h-14" />
-              </div>
-            );
-          })}
-        </div>
-        {/* Match Labels */}
-        <div className="w-full grid grid-cols-4 gap-2 mt-4">
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 1</div>
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 2</div>
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 3</div>
-          <div className="text-center text-[10px] font-medium text-primary-foreground">Match 4</div>
-        </div>
+        <span className="text-xs text-muted-foreground">Open slot</span>
       </div>
     );
   }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        title={participant.name}
+        className="w-10 h-10 rounded-full border-2 border-primary bg-card flex items-center justify-center text-xs font-semibold text-foreground"
+      >
+        {getInitials(participant.name)}
+      </div>
+
+      <span className="text-xs text-foreground text-center">
+        {participant.name}
+      </span>
+
+      {participant.stance && (
+        <span className="text-[10px] text-muted-foreground capitalize">
+          {participant.stance}
+        </span>
+      )}
+    </div>
+  );
+};
+
+export default function TournamentBracket() {
+  const { id } = useParams<{ id: string }>();
+
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setError("Tournament ID is missing.");
+      setLoading(false);
+      return;
+    }
+
+    const loadTournament = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const data = await getTournamentById(id);
+        setTournament(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load tournament."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadTournament();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">
+        Loading tournament...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-destructive">{error}</p>
+      </div>
+    );
+  }
+
+  if (!tournament) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">
+        Tournament not found.
+      </div>
+    );
+  }
+
+  const slots = Array.from(
+    { length: tournament.maxParticipants },
+    (_, index) => tournament.participants[index]
+  );
+
+  const firstRoundMatches = [];
+
+  for (let index = 0; index < slots.length; index += 2) {
+    firstRoundMatches.push({
+      player1: slots[index],
+      player2: slots[index + 1],
+      matchNumber: index / 2 + 1,
+    });
+  }
+
+  return (
+    <div className="w-full max-w-6xl mx-auto px-4 py-6">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+          {tournament.topic}
+        </h2>
+
+        <p className="mt-2 text-sm text-muted-foreground">
+          {tournament.description}
+        </p>
+
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-sm">
+          <span className="px-3 py-1 rounded-full bg-primary/20 text-primary capitalize">
+            {tournament.status}
+          </span>
+
+          <span className="text-muted-foreground">
+            {tournament.participants.length}/{tournament.maxParticipants} participants
+          </span>
+
+          {tournament.scheduleAt && (
+            <span className="text-muted-foreground">
+              {new Date(tournament.scheduleAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {tournament.status === "upcoming" && (
+        <div className="mb-8 rounded-lg border border-border bg-card p-4 text-center">
+          <h3 className="font-semibold text-foreground">
+            Bracket has not started yet
+          </h3>
+
+          <p className="text-sm text-muted-foreground mt-1">
+            Participants will fill the available tournament slots as they join.
+          </p>
+        </div>
+      )}
+
+      {tournament.status === "live" && (
+        <div className="mb-8 rounded-lg border border-border bg-card p-4 text-center">
+          <h3 className="font-semibold text-foreground">
+            Tournament is live
+          </h3>
+
+          <p className="text-sm text-muted-foreground mt-1">
+            Showing the real registered participants for this tournament.
+          </p>
+        </div>
+      )}
+
+      {tournament.status === "completed" && (
+        <div className="mb-8 rounded-lg border border-border bg-card p-4 text-center">
+          <h3 className="font-semibold text-foreground">
+            Tournament completed
+          </h3>
+
+          <p className="text-sm text-muted-foreground mt-1">
+            The current tournament API does not yet provide persisted match winners
+            or champion data, so no winner is fabricated here.
+          </p>
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-xl font-bold text-foreground mb-6 text-center">
+          First Round
+        </h3>
+
+        {firstRoundMatches.length === 0 ? (
+          <p className="text-center text-muted-foreground">
+            No participants have joined this tournament yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {firstRoundMatches.map((match) => (
+              <div
+                key={match.matchNumber}
+                className="rounded-xl border border-border bg-card p-5"
+              >
+                <div className="text-center text-xs font-semibold text-muted-foreground mb-5">
+                  Match {match.matchNumber}
+                </div>
+
+                <div className="flex items-center justify-around gap-4">
+                  <Participant participant={match.player1} />
+
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    VS
+                  </span>
+
+                  <Participant participant={match.player2} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
