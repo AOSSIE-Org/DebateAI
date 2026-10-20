@@ -94,18 +94,20 @@ type CoachSkill = {
   url: string;
 };
 
+// Relative to Vite's base so the links keep working if the app is served
+// from a sub-path (BASE_URL is '/' by default).
 const coachSkills: CoachSkill[] = [
   {
     title: 'Strengthen Argument',
     description:
       'Master the art of crafting compelling, persuasive arguments that win debates.',
-    url: 'http://localhost:5173/coach/strengthen-argument',
+    url: `${import.meta.env.BASE_URL}coach/strengthen-argument`,
   },
   {
     title: 'Pros and Cons Challenge',
     description:
       'Test your critical thinking by crafting up to 5 pros and cons for engaging debate topics.',
-    url: 'http://localhost:5173/coach/pros-cons',
+    url: `${import.meta.env.BASE_URL}coach/pros-cons`,
   },
 ];
 
