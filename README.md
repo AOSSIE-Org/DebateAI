@@ -1,10 +1,10 @@
-<p align="left">
-  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRpPlI1P7SK3pemg67VMPbvNzxYyk0UtlmJiQ&s" alt="Aossie Logo" height="120"/>
+<p align="center">
+  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRpPlI1P7SK3pemg67VMPbvNzxYyk0UtlmJiQ&s" alt="Aossie Logo" height="100"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="./frontend/public/debateai-logo.svg" alt="DebateAI Logo" height="100"/>
 </p>
 
-<h1 align="right">
-  <b>AOSSIE | DebateAI</b>
-</h1>
+<h1 align="center">AOSSIE | DebateAI</h1>
 
 ---
 

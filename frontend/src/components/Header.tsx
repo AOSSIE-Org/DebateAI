@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import debateAiLogo from "@/assets/aossie.png";
+import debateAiLogo from "@/assets/debateai-logo.svg";
 import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
@@ -316,21 +316,24 @@ function Header() {
           <div className="relative w-64 h-full bg-background border-l border-border shadow-lg flex flex-col ml-auto">
             <div className="flex items-center justify-between h-16 px-4 border-b border-border">
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold">
-                  DebateAI
-                </span>
-                <a 
-                  href="https://aossie.org" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src={debateAiLogo}
-                    alt="DebateAI Logo"
-                    className="h-8 w-auto object-contain"
-                  />
-                </a>
+                <img
+                  src={debateAiLogo}
+                  alt="DebateAI Logo"
+                  className="h-8 w-auto object-contain"
+                />
+                <div className="flex flex-col">
+                  <span className="text-xl font-bold leading-none">
+                    DebateAI
+                  </span>
+                  <a 
+                    href="https://aossie.org" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold hover:text-foreground transition-colors"
+                  >
+                    by AOSSIE
+                  </a>
+                </div>
               </div>
               <button
                 onClick={toggleDrawer}
