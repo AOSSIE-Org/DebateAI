@@ -950,11 +950,6 @@ const judgeDebateResult = async (messages: Message[]) => {
   }
 
   judgmentInFlightRef.current = true;
-  if (!debateData) {
-    console.error("Cannot judge debate without debate data.");
-    return;
-  }
-
 
 try {
   setPopup({
@@ -1003,7 +998,7 @@ try {
 } finally {
   judgmentInFlightRef.current = false;
 }
-
+};
 const retryJudgment = () => {
   if (!failedJudgmentMessages) return;
 
