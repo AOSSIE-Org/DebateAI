@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestGlicko2RatingEngine validates rating adjustments, RD decay, and upset calculations for Glicko-2.
 func TestGlicko2RatingEngine(t *testing.T) {
 	g := rating.New(nil) // DefaultConfig
 	require.NotNil(t, g)
@@ -70,6 +71,7 @@ func TestGlicko2RatingEngine(t *testing.T) {
 	})
 }
 
+// TestRequestStructValidation validates Gin payload binding tags across auth request structs.
 func TestRequestStructValidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -164,6 +166,7 @@ func TestRequestStructValidation(t *testing.T) {
 	})
 }
 
+// TestUtilityFunctions validates random code generation constraints and email name extraction.
 func TestUtilityFunctions(t *testing.T) {
 	t.Run("GenerateRandomCode", func(t *testing.T) {
 		code := utils.GenerateRandomCode(6)
@@ -184,6 +187,7 @@ func TestUtilityFunctions(t *testing.T) {
 	})
 }
 
+// TestJWTClaimsAndValidation verifies JWT token creation, structural format, and claims expiration.
 func TestJWTClaimsAndValidation(t *testing.T) {
 	secret := "test-jwt-secret-key-12345"
 	email := "debater@debateai.org"

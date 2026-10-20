@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestAuthRouteIntegration verifies input validation failures and HTTP status codes for auth endpoints.
 func TestAuthRouteIntegration(t *testing.T) {
 	router := testutils.SetupTestRouter()
 
@@ -122,6 +123,7 @@ func TestAuthRouteIntegration(t *testing.T) {
 	})
 }
 
+// TestDebugMatchmakingPoolRoute verifies authorization restrictions and payload response for matchmaking debug.
 func TestDebugMatchmakingPoolRoute(t *testing.T) {
 	router := testutils.SetupTestRouter()
 
@@ -151,6 +153,7 @@ func TestDebugMatchmakingPoolRoute(t *testing.T) {
 	})
 }
 
+// TestNotFoundRoute asserts that unregistered endpoints return a 404 Not Found HTTP status.
 func TestNotFoundRoute(t *testing.T) {
 	router := testutils.SetupTestRouter()
 	req, w := testutils.CreateJSONRequest(http.MethodGet, "/non-existent-endpoint", nil, nil)

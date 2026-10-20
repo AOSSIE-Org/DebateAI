@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TestLiveServerHealth probes the live backend server if reachable to confirm active endpoint responses.
 func TestLiveServerHealth(t *testing.T) {
 	baseURL := "http://localhost:1313"
 	client := &http.Client{Timeout: 1 * time.Second}
@@ -34,6 +35,7 @@ func TestLiveServerHealth(t *testing.T) {
 	t.Logf("Successfully verified live server at %s (Status: %d)", baseURL, resp.StatusCode)
 }
 
+// TestDBUserAuthFixtureFlow validates database user insertion, bcrypt credential check, and deferred cleanup.
 func TestDBUserAuthFixtureFlow(t *testing.T) {
 	testutils.WithTestDB(t, func(database *mongo.Database) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

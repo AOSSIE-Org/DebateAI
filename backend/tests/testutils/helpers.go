@@ -99,8 +99,7 @@ func GenerateTestJWT(email, secret string, expiryMinutes int) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-// WithTestDB executes a test function with the MongoDB instance if it is reachable,
-// or skips the test gracefully if no database is connected.
+// WithTestDB executes a test function with the MongoDB instance if reachable, or skips gracefully.
 func WithTestDB(t *testing.T, fn func(database *mongo.Database)) {
 	if db.MongoDatabase == nil {
 		t.Skip("MongoDB connection not initialized, skipping database-dependent test")

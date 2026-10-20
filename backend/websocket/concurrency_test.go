@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestRoomClientConcurrency validates thread-safe client registration and reads under Room mutex.
 func TestRoomClientConcurrency(t *testing.T) {
 	room := &Room{
 		Clients: make(map[*gorilla.Conn]*Client),
@@ -51,6 +52,7 @@ func TestRoomClientConcurrency(t *testing.T) {
 	room.Mutex.Unlock()
 }
 
+// TestRoomBroadcastSnapshotConcurrency verifies safe simultaneous participant modification and broadcast snapshotting.
 func TestRoomBroadcastSnapshotConcurrency(t *testing.T) {
 	room := &Room{
 		Clients: make(map[*gorilla.Conn]*Client),
@@ -94,6 +96,7 @@ func TestRoomBroadcastSnapshotConcurrency(t *testing.T) {
 	wg.Wait()
 }
 
+// TestDebateStateTransitions checks the sequential progression and termination across all debate phases.
 func TestDebateStateTransitions(t *testing.T) {
 	phases := debatePhaseOrder
 	require.NotEmpty(t, phases)
@@ -113,6 +116,7 @@ func TestDebateStateTransitions(t *testing.T) {
 	assert.Empty(t, next)
 }
 
+// TestDebateStartErrorLocked asserts setup validation rules enforcing 2 opposing, ready debaters to start.
 func TestDebateStartErrorLocked(t *testing.T) {
 	conn1 := &gorilla.Conn{}
 	conn2 := &gorilla.Conn{}
