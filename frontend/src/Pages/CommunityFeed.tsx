@@ -4,6 +4,7 @@ import { useUser } from "../hooks/useUser";
 import CommentTree from "../components/CommentTree";
 import ProfileHover from "../components/ProfileHover";
 import { Button } from "../components/ui/button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import {
   Card,
   CardContent,
@@ -189,6 +190,7 @@ const CommunityFeed: React.FC = () => {
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<
     string | null
   >(null);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const baseURL = config.baseUrl || "http://localhost:1313";
   const normalizeObjectId = useCallback(
     (value: ObjectIdLike | undefined): string => {
@@ -402,17 +404,17 @@ const CommunityFeed: React.FC = () => {
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = (postId: string) => {
+    setPostToDelete(postId);
+  };
+
+  const confirmDeletePost = async () => {
+    if (!postToDelete) return;
+    const postId = postToDelete;
+    setPostToDelete(null);
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please log in to delete posts");
-      return;
-    }
-
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this post?"
-    );
-    if (!confirmDelete) {
       return;
     }
 
@@ -635,6 +637,19 @@ const CommunityFeed: React.FC = () => {
           })}
         </div>
       )}
+      <ConfirmationDialog
+        open={postToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPostToDelete(null);
+        }}
+        title="Delete post?"
+        description="This post and its associated content will be permanently deleted."
+        confirmLabel="Delete post"
+        onConfirm={() => {
+          void confirmDeletePost();
+        }}
+        destructive
+      />
     </div>
   );
 };

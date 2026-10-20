@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
@@ -26,7 +27,7 @@ const allBots: Bot[] = [
     name: "Rookie Rick",
     level: "Easy",
     desc: "A beginner who stumbles over logic.",
-    avatar: "/images/rookie_rick.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/rookie_rick.jpg`,
     quote: "Uh, wait, what's your point again?",
     rating: 1200,
   },
@@ -34,7 +35,7 @@ const allBots: Bot[] = [
     name: "Casual Casey",
     level: "Easy",
     desc: "Friendly but not too sharp.",
-    avatar: "/images/casual_casey.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/casual_casey.jpg`,
     quote: "Let's just chill and chat, okay?",
     rating: 1300,
   },
@@ -42,7 +43,7 @@ const allBots: Bot[] = [
     name: "Moderate Mike",
     level: "Medium",
     desc: "Balanced and reasonable.",
-    avatar: "/images/moderate_mike.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/moderate_mike.jpg`,
     quote: "I see your side, but here's mine.",
     rating: 1500,
   },
@@ -50,7 +51,7 @@ const allBots: Bot[] = [
     name: "Sassy Sarah",
     level: "Medium",
     desc: "Witty with decent arguments.",
-    avatar: "/images/sassy_sarah.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/sassy_sarah.jpg`,
     quote: "Oh honey, you're in for it now!",
     rating: 1600,
   },
@@ -58,7 +59,7 @@ const allBots: Bot[] = [
     name: "Innovative Iris",
     level: "Medium",
     desc: "A creative thinker",
-    avatar: "/images/innovative_iris.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/innovative_iris.jpg`,
     quote: "Fresh ideas fuel productive debates.",
     rating: 1550,
   },
@@ -66,7 +67,7 @@ const allBots: Bot[] = [
     name: "Tough Tony",
     level: "Hard",
     desc: "Logical and relentless.",
-    avatar: "/images/tough_tony.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/tough_tony.jpg`,
     quote: "Prove it or step aside.",
     rating: 1700,
   },
@@ -74,7 +75,7 @@ const allBots: Bot[] = [
     name: "Expert Emma",
     level: "Hard",
     desc: "Master of evidence and rhetoric.",
-    avatar: "/images/expert_emma.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/expert_emma.jpg`,
     quote: "Facts don't care about your feelings.",
     rating: 1800,
   },
@@ -82,7 +83,7 @@ const allBots: Bot[] = [
     name: "Grand Greg",
     level: "Expert",
     desc: "Unbeatable debate titan.",
-    avatar: "/images/grand_greg.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/grand_greg.jpg`,
     quote: "Checkmate. Your move.",
     rating: 2000,
   },
@@ -90,7 +91,7 @@ const allBots: Bot[] = [
     name: "Yoda",
     level: "Legends",
     desc: "Wise, cryptic, and patient. Speaks in riddles.",
-    avatar: "/images/yoda.jpeg",
+    avatar: `${import.meta.env.BASE_URL}images/yoda.jpeg`,
     quote:
       "Hmm, strong your point is. But ask yourself, does the tree fall because it wills, or because the wind commands?",
     rating: 2400,
@@ -99,7 +100,7 @@ const allBots: Bot[] = [
     name: "Tony Stark",
     level: "Legends",
     desc: "Witty, arrogant, and clever. Loves quick comebacks.",
-    avatar: "/images/tony.webp",
+    avatar: `${import.meta.env.BASE_URL}images/tony.webp`,
     quote:
       "Nice try, but your logic's running on fumes. Step aside, I'll show you how a genius does it.",
     rating: 2200,
@@ -108,7 +109,7 @@ const allBots: Bot[] = [
     name: "Professor Dumbledore",
     level: "Legends",
     desc: "Calm, strategic, and insightful. Sees the bigger picture.",
-    avatar: "/images/dumbledore.avif",
+    avatar: `${import.meta.env.BASE_URL}images/dumbledore.avif`,
     quote:
       "A valid point, but have you considered its ripple effects? Let us explore the deeper truth.",
     rating: 2500,
@@ -117,7 +118,7 @@ const allBots: Bot[] = [
     name: "Rafiki",
     level: "Legends",
     desc: "Quirky, playful, and humorous. Teaches through stories.",
-    avatar: "/images/rafiki.jpeg",
+    avatar: `${import.meta.env.BASE_URL}images/rafiki.jpeg`,
     quote:
       "Haha! You think too hard, my friend! The answer's right there, like a monkey on a branch!",
     rating: 1800,
@@ -126,7 +127,7 @@ const allBots: Bot[] = [
     name: "Darth Vader",
     level: "Legends",
     desc: "Powerful, stern, and intimidating. Uses forceful logic.",
-    avatar: "/images/darthvader.jpg",
+    avatar: `${import.meta.env.BASE_URL}images/darthvader.jpg`,
     quote:
       "Your reasoning falters. Submit to the strength of my argument, or be crushed.",
     rating: 2300,
@@ -461,6 +462,8 @@ const DebateRoom: React.FC = () => {
   const [failedJudgmentMessages, setFailedJudgmentMessages] = useState<Message[] | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
+  const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
+  const [isConceding, setIsConceding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
   const advancingTurnRef = useRef(false);
@@ -476,7 +479,7 @@ const DebateRoom: React.FC = () => {
   const userAvatar =
     user?.avatarUrl || DEFAULT_AVATAR_URL;
 
-  // Redirect to start-debate if no debate data is present
+  // Redirect to startDebate if no debate data is present
   useEffect(() => {
     if (!debateData) {
       toast({
@@ -484,7 +487,7 @@ const DebateRoom: React.FC = () => {
         title: "Debate Session Not Found",
         description: "No active debate session found. Redirecting to debate setup.",
       });
-      navigate("/start-debate", { replace: true });
+      navigate("/startDebate", { replace: true });
     }
   }, [debateData, navigate, toast]);
 
@@ -523,26 +526,31 @@ const DebateRoom: React.FC = () => {
   };
 
   const handleConcede = async () => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
-      try {
-        if (debateData?.debateId) {
-          await concedeDebate(debateData.debateId, state.messages);
-        }
+    if (isConceding) {
+      return;
+    }
 
-        setState(prev => ({ ...prev, isDebateEnded: true }));
-        setPopup({
-          show: true,
-          message: "You have conceded the debate.",
-          isJudging: false
-        });
-
-        setTimeout(() => {
-          navigate("/startDebate");
-        }, 2000);
-
-      } catch (error) {
-        console.error("Error conceding:", error);
+    setIsConceding(true);
+    setIsConcedeDialogOpen(false);
+    try {
+      if (debateData?.debateId) {
+        await concedeDebate(debateData.debateId, state.messages);
       }
+
+      setState((prev) => ({ ...prev, isDebateEnded: true }));
+      setPopup({
+        show: true,
+        message: "You have conceded the debate.",
+        isJudging: false,
+      });
+
+      setTimeout(() => {
+        navigate("/startDebate");
+      }, 2000);
+    } catch (error) {
+      console.error("Error conceding:", error);
+    } finally {
+      setIsConceding(false);
     }
   };
 
@@ -947,52 +955,54 @@ const judgeDebateResult = async (messages: Message[]) => {
     return;
   }
 
-  try {
-    setPopup({
-      show: true,
-      message: "Calculating scores and judging results...",
-      isJudging: true,
-    });
 
-    const { result } = await judgeDebate({
-      debateId: debateData.debateId,
-      history: messages,
-    });
+try {
+  setPopup({
+    show: true,
+    message: "Calculating scores and judging results...",
+    isJudging: true,
+  });
 
-    let judgment: JudgmentData;
+  const { result } = await judgeDebate({
+    debateId: debateData.debateId,
+    history: messages,
+  });
 
-    if (typeof result === "string") {
-      const jsonString = extractJSON(result);
-      judgment = JSON.parse(jsonString);
-    } else {
-      judgment = result as JudgmentData;
-    }
+  let judgment: JudgmentData;
 
-    // Validate the structure before displaying the result.
-    if (!isJudgmentDataValid(judgment)) {
-      throw new Error("The AI returned an incomplete judgment.");
-    }
-    setJudgmentData(judgment);
-    setFailedJudgmentMessages(null);
-    setPopup({ show: false, message: "" });
-  } catch (error) {
-    console.error("Judging error:", error);
-
-    // Keep the original messages so the user can retry.
-    setFailedJudgmentMessages(messages);
-    setJudgmentData(null);
-
-    setPopup({
-      show: true,
-      message:
-        "We couldn't generate your debate judgment. The AI service may be temporarily unavailable. Please try again.",
-      isJudging: false,
-      type: "error",
-    });
-  }finally {
-    judgmentInFlightRef.current = false;
+  if (typeof result === "string") {
+    const jsonString = extractJSON(result);
+    judgment = JSON.parse(jsonString);
+  } else {
+    judgment = result as JudgmentData;
   }
-};
+
+  // Validate the judgment before displaying it.
+  if (!isJudgmentDataValid(judgment)) {
+    console.error("Invalid judgment structure:", judgment);
+    throw new Error("The AI returned an incomplete judgment.");
+  }
+
+  setJudgmentData(judgment);
+  setFailedJudgmentMessages(null);
+  setPopup({ show: false, message: "" });
+} catch (error) {
+  console.error("Judging error:", error);
+
+  // Keep the original messages so the user can retry.
+  setFailedJudgmentMessages(messages);
+  setJudgmentData(null);
+
+  setPopup({
+    show: true,
+    message:
+      "We couldn't generate your debate judgment. The AI service may be temporarily unavailable. Please try again.",
+    isJudging: false,
+    type: "error",
+  });
+} finally {
+  judgmentInFlightRef.current = false;
+}
 
 const retryJudgment = () => {
   if (!failedJudgmentMessages) return;
@@ -1034,27 +1044,26 @@ const retryJudgment = () => {
     );
   };
 
-  const currentStance = phaseSequences[state.currentPhase][state.phaseStep];
+  const currentStance = phaseSequences[state.currentPhase]?.[state.phaseStep] ?? "For";
   const currentEntity = state.userStance === currentStance ? "User" : "Bot";
-  const currentTurnType = turnTypes[state.currentPhase][state.phaseStep];
+  const currentTurnType = turnTypes[state.currentPhase]?.[state.phaseStep] ?? "statement";
 
   if (judgmentData) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-black">
-        <JudgmentPopup
-          judgment={judgmentData}
-          userAvatar={userAvatar}
-          botAvatar={bot.avatar}
-          botName={debateData?.botName || "Bot"}
-          userStance={state.userStance}
-          botStance={state.botStance}
-          botDesc={bot.desc}
-          onClose={() => {
-            setJudgmentData(null);
-            navigate("/startDebate");
-          }}
-        />
-      </div>
+      <JudgmentPopup
+        judgment={judgmentData}
+        userAvatar={userAvatar}
+        botAvatar={bot.avatar}
+        botName={debateData?.botName || "Bot"}
+        userStance={state.userStance}
+        botStance={state.botStance}
+        botDesc={bot.desc}
+        topic={debateData?.topic}
+        onClose={() => {
+          setJudgmentData(null);
+          navigate("/startDebate");
+        }}
+      />
     );
   }
 
@@ -1232,7 +1241,8 @@ const retryJudgment = () => {
             </div>
             {!state.isDebateEnded && (
               <Button
-                onClick={handleConcede}
+                onClick={() => setIsConcedeDialogOpen(true)}
+                disabled={isConceding}
                 className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md px-3 text-sm"
               >
                 Concede
@@ -1328,6 +1338,17 @@ const retryJudgment = () => {
           animation: glow 2s infinite;
         }
       `}</style>
+      <ConfirmationDialog
+        open={isConcedeDialogOpen}
+        onOpenChange={setIsConcedeDialogOpen}
+        title="Concede debate?"
+        description="Are you sure you want to concede? This will count as a loss."
+        confirmLabel="Concede"
+        onConfirm={() => {
+          void handleConcede();
+        }}
+        destructive
+      />
     </div>
   );
 };

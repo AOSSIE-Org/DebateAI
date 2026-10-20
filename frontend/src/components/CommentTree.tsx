@@ -5,10 +5,8 @@ import { useUser } from '../hooks/useUser';
 import ProfileHover from './ProfileHover';
 import UserProfileModal from './UserProfileModal';
 import {
-  commentsByTranscriptAtom,
   getCommentsForTranscriptAtom,
   setCommentsForTranscriptAtom,
-  addCommentToTranscriptAtom,
   removeCommentFromTranscriptAtom,
   type Comment,
 } from '../state/commentsAtom';
@@ -228,10 +226,19 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   className = '',
 }) => {
   const { user } = useUser();
-  const [commentsAtom] = useAtom(getCommentsForTranscriptAtom(transcriptId));
-  const [, setCommentsAtom] = useAtom(setCommentsForTranscriptAtom(transcriptId));
-  const [, addCommentAtom] = useAtom(addCommentToTranscriptAtom(transcriptId));
-  const [, removeCommentAtom] = useAtom(removeCommentFromTranscriptAtom(transcriptId));
+  // Create the per-transcript atoms once per transcript; atoms created during
+  // render are new on every render and make jotai re-subscribe in a loop.
+  const transcriptAtoms = useMemo(
+    () => ({
+      comments: getCommentsForTranscriptAtom(transcriptId),
+      setComments: setCommentsForTranscriptAtom(transcriptId),
+      removeComment: removeCommentFromTranscriptAtom(transcriptId),
+    }),
+    [transcriptId]
+  );
+  const [commentsAtom] = useAtom(transcriptAtoms.comments);
+  const [, setCommentsAtom] = useAtom(transcriptAtoms.setComments);
+  const [, removeCommentAtom] = useAtom(transcriptAtoms.removeComment);
   
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -391,9 +398,6 @@ const CommentTree: React.FC<CommentTreeProps> = ({
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to post comment');
       }
-
-      const result = await response.json();
-      const newComment: Comment = result.comment;
       
       // Fetch updated comments (including the new one) and update atom
       await fetchComments();
