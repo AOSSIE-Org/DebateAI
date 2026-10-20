@@ -355,8 +355,8 @@ const player2RatingSummary =
       <div className="flex max-h-[95dvh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-orange-200 bg-gradient-to-br from-white to-gray-100 shadow-2xl">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 lg:p-8">
         {/* Top Profile Section */}
-        <div className='flex justify-between items-center mb-8'>
-          <div className='flex items-center space-x-4 bg-gray-50 p-4 rounded-lg shadow-sm w-1/2 mr-2'>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex w-full items-center space-x-4 rounded-lg bg-gray-50 p-4 shadow-sm sm:w-1/2">
             <img
               src={player1Avatar}
               alt={player1Name}
@@ -373,7 +373,7 @@ const player2RatingSummary =
               <p className='text-xs text-gray-500'>Debater</p>
             </div>
           </div>
-          <div className='flex items-center space-x-4 bg-gray-50 p-4 rounded-lg shadow-sm w-1/2 ml-2'>
+          <div className="flex w-full items-center space-x-4 rounded-lg bg-gray-50 p-4 shadow-sm sm:w-1/2">
             <img
               src={player2Avatar}
               alt={player2Name}
