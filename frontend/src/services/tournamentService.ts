@@ -123,7 +123,12 @@ export const getTournaments = async (): Promise<Tournament[]> => {
     );
   }
 
-  return response.json();
+  const data = (await response.json()) as Tournament[];
+
+  return data.map((tournament) => ({
+    ...tournament,
+    participants: tournament.participants ?? [],
+  }));
 };
 
 export const getTournamentById = async (
@@ -151,7 +156,12 @@ export const getTournamentById = async (
     );
   }
 
-  return response.json();
+  const data = (await response.json()) as Tournament;
+
+  return {
+    ...data,
+    participants: data.participants ?? [],
+  };
 };
 
 export const joinPublicTournament = async (

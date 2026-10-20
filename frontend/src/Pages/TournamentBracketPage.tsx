@@ -66,23 +66,36 @@ export default function TournamentBracket() {
       return;
     }
 
+    let cancelled = false;
+
     const loadTournament = async () => {
       try {
         setLoading(true);
         setError(null);
 
         const data = await getTournamentById(id);
-        setTournament(data);
+
+        if (!cancelled) {
+          setTournament(data);
+        }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load tournament."
-        );
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Failed to load tournament."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     void loadTournament();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (loading) {
@@ -120,6 +133,7 @@ export default function TournamentBracket() {
     firstRoundMatches.push({
       player1: slots[index],
       player2: slots[index + 1],
+      isBye: index + 1 >= slots.length,
       matchNumber: index / 2 + 1,
     });
   }
@@ -194,11 +208,13 @@ export default function TournamentBracket() {
           First Round
         </h3>
 
-        {firstRoundMatches.length === 0 ? (
-          <p className="text-center text-muted-foreground">
+        {tournament.participants.length === 0 && (
+          <p className="text-center text-muted-foreground mb-6">
             No participants have joined this tournament yet.
           </p>
-        ) : (
+        )}
+
+        {firstRoundMatches.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {firstRoundMatches.map((match) => (
               <div
@@ -216,7 +232,11 @@ export default function TournamentBracket() {
                     VS
                   </span>
 
-                  <Participant participant={match.player2} />
+                  {match.isBye ? (
+                    <span className="text-xs text-muted-foreground">Bye</span>
+                  ) : (
+                    <Participant participant={match.player2} />
+                  )}
                 </div>
               </div>
             ))}

@@ -178,7 +178,7 @@ export default function TournamentPage() {
               {error}
             </p>
           )}
-          {visibleTournaments.length === 0 ? (
+          {loading || error ? null : visibleTournaments.length === 0 ? (
             <p className="text-center text-muted-foreground text-lg">
               {statusFilter === "all"
                 ? "No tournaments available yet."
