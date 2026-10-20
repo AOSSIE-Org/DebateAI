@@ -87,7 +87,7 @@ export const createDebate = async (data: DebateRequest): Promise<DebateResponse>
 };
 
 // Function to send a message in an existing debate
-export const sendDebateMessage = async (data: DebateRequest): Promise<{ response: string }> => {
+export const sendDebateMessage = async (data: DebateRequest): Promise<{ response: string; isFallback?: boolean }> => {
   const token = getAuthToken();
   const response = await fetch(`${baseURL}/vsbot/debate`, {
     method: "POST",
@@ -104,7 +104,10 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
   }
 
   const result = await response.json();
-  return { response: result.response }; // Adjusted to return bot's response directly
+  return {
+    response: result.response,  // Adjusted to return bot's response directly
+    isFallback: result.isFallback,
+  };
 };
 
 export const concedeDebate = async (debateId: string, history: DebateMessage[] = []): Promise<void> => {

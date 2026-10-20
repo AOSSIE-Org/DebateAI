@@ -268,28 +268,40 @@ Please provide your full argument.`,
 
 // GenerateBotResponse generates a response from the debate bot using the Gemini client library.
 // It uses the bot’s personality to handle errors and responses vividly.
-func GenerateBotResponse(botName, botLevel, topic string, history []models.Message, stance, extraContext string, maxWords int) string {
+func GenerateBotResponse(
+	botName, botLevel, topic string,
+	history []models.Message,
+	stance, extraContext string,
+	maxWords int,
+) (string, bool) {
 	if geminiClient == nil {
-		return personalityErrorResponse(botName, "My systems are offline, it seems.")
+		return personalityErrorResponse(
+			botName, "My systems are offline, it seems.",
+		), true
 	}
 
 	bot := GetBotPersonality(botName)
-	// Construct prompt with enhanced personality integration
 	prompt := constructPrompt(bot, topic, history, stance, extraContext, maxWords)
 
-	ctx := context.Background()
-	response, err := generateDefaultModelText(ctx, prompt)
+	response, err := generateDefaultModelText(context.Background(), prompt)
 	if err != nil {
 		log.Printf("❌ Gemini error in GenerateBotResponse: %v", err)
-		return personalityErrorResponse(botName, "A glitch in my logic, there is.")
+		return personalityErrorResponse(
+			botName, "A glitch in my logic, there is.",
+		), true
 	}
+
 	if response == "" {
-		return personalityErrorResponse(botName, "Lost in translation, my thoughts are.")
+		return personalityErrorResponse(
+			botName, "Lost in translation, my thoughts are.",
+		), true
 	}
+
 	if strings.Contains(strings.ToLower(response), "clarify") {
-		return personalityClarificationRequest(botName)
+		return personalityClarificationRequest(botName), false
 	}
-	return response
+
+	return response, false
 }
 
 // personalityErrorResponse returns a personality-specific error message

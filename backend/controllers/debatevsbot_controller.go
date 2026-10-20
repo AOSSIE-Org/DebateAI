@@ -235,7 +235,7 @@ func SendDebateMessage(c *gin.Context) {
 	}
 
 	// Generate the bot response without holding a database timeout open.
-	botResponse := services.GenerateBotResponse(
+	botResponse, isFallback := services.GenerateBotResponse(
 		debate.BotName,
 		debate.BotLevel,
 		debate.Topic,
@@ -298,13 +298,14 @@ func SendDebateMessage(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, DebateMessageResponse{
-		DebateId: debateID.Hex(),
-		BotName:  debate.BotName,
-		BotLevel: debate.BotLevel,
-		Topic:    debate.Topic,
-		Stance:   debate.Stance,
-		Response: botResponse,
+	c.JSON(http.StatusOK, gin.H{
+		"debateId":   debateID.Hex(),
+		"botName":    debate.BotName,
+		"botLevel":   debate.BotLevel,
+		"topic":      debate.Topic,
+		"stance":     debate.Stance,
+		"response":   botResponse,
+		"isFallback": isFallback,
 	})
 }
 

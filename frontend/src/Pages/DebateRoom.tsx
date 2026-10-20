@@ -720,7 +720,7 @@ const DebateRoom: React.FC = () => {
           : "Provide your answer";
       }
 
-      const { response } = await sendDebateMessage({
+      const { response, isFallback } = await sendDebateMessage({
         debateId: debateData.debateId,
         botLevel: debateData.botLevel,
         topic: debateData.topic,
@@ -729,6 +729,14 @@ const DebateRoom: React.FC = () => {
         stance: state.botStance,
         context,
       });
+
+      if (isFallback) {
+        toast({
+          title: "AI usage limit reached",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+      }
 
       const botMessage: Message = {
         sender: "Bot",
@@ -749,24 +757,33 @@ const DebateRoom: React.FC = () => {
       });
     } catch (error) {
       console.error("Bot error:", error);
-      // Even on error, advance turn to prevent getting stuck
-      setState((prev) => {
-        const errorMessage: Message = {
-          sender: "Bot",
-          text: "I encountered an error. Please continue.",
-          phase: phases[prev.currentPhase].name,
-        };
-        const updatedState = {
-          ...prev,
-          messages: [...prev.messages, errorMessage],
-          isBotTurn: false, // Reset bot turn on error
-        };
-        advanceTurn(updatedState);
-        return updatedState;
-      });
-    } finally {
-      botTurnRef.current = false;
-    }
+
+  toast({
+    title: "AI usage limit reached",
+    description: "Please try again later.",
+    variant: "destructive",
+  });
+
+  // Keep your existing behavior and message
+  setState((prev) => {
+    const errorMessage: Message = {
+      sender: "Bot",
+      text: "I encountered an error. Please continue.",
+      phase: phases[prev.currentPhase].name,
+    };
+
+    const updatedState = {
+      ...prev,
+      messages: [...prev.messages, errorMessage],
+      isBotTurn: false,
+    };
+
+    advanceTurn(updatedState);
+    return updatedState;
+  });
+} finally {
+  botTurnRef.current = false;
+}
   };
 
 
