@@ -226,7 +226,7 @@ func TestJudgeDebate_InvalidJudgmentReturns502(t *testing.T) {
 		return testUserID, nil
 	}
 
-	judgeDebateFunc = func(_ []models.Message) (string, error) {
+	judgeDebateFunc = func(_ context.Context, _ []models.Message) (string, error) {
 		return `{"opening_statement":`, nil
 	}
 
@@ -355,7 +355,7 @@ func TestJudgeDebate_ValidJudgmentReturns200(t *testing.T) {
 		return testUserID, nil
 	}
 
-	judgeDebateFunc = func(_ []models.Message) (string, error) {
+	judgeDebateFunc = func(_ context.Context, _ []models.Message) (string, error) {
 		return validJudgmentJSON(), nil
 	}
 	settlementCalled := false
@@ -485,7 +485,7 @@ func TestJudgeDebate_OutcomePersistenceFailure(t *testing.T) {
 		return testUserID, nil
 	}
 
-	judgeDebateFunc = func(_ []models.Message) (string, error) {
+	judgeDebateFunc = func(_ context.Context, _ []models.Message) (string, error) {
 		return validJudgmentJSON(), nil
 	}
 
@@ -622,7 +622,7 @@ func TestJudgeDebate_AlreadySettledReturnsStoredJudgment(t *testing.T) {
 
 	judgeCalled := false
 
-	judgeDebateFunc = func(_ []models.Message) (string, error) {
+	judgeDebateFunc = func(_ context.Context, _ []models.Message) (string, error) {
 		judgeCalled = true
 		return strings.Replace(
 			storedJudgment,

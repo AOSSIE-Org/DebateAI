@@ -390,7 +390,7 @@ func personalityClarificationRequest(botName string) string {
 }
 
 // JudgeDebate evaluates the debate, factoring in the bot’s personality adherence
-func JudgeDebateWithError(history []models.Message) (string, error) {
+func JudgeDebateWithError(ctx context.Context, history []models.Message) (string, error) {
 	if geminiClient == nil {
 		return "", errors.New("Gemini client is not initialized")
 	}
@@ -470,7 +470,7 @@ Required Output Format:
     "bot": Y
   },
   "verdict": {
-    "winner": "User, Bot, or Draw",
+    "winner": "User",
     "reason": "text",
     "congratulations": "text",
     "opponent_analysis": "text"
@@ -484,7 +484,7 @@ Provide ONLY the JSON output without any additional text.`,
 		bot.Name, bot.Tone, bot.RhetoricalStyle, strings.Join(bot.Catchphrases, ", "), strings.Join(bot.UniverseTies, ", "),
 		bot.DebateStrategy, strings.Join(bot.SignatureMoves, ", "), strings.Join(bot.PhilosophicalTenets, ", "), FormatHistory(history))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 85*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 85*time.Second)
 	defer cancel()
 
 	text, err := generateDefaultModelText(ctx, prompt)
@@ -502,7 +502,7 @@ Provide ONLY the JSON output without any additional text.`,
 
 // JudgeDebate preserves compatibility with existing callers.
 func JudgeDebate(history []models.Message) string {
-	result, err := JudgeDebateWithError(history)
+	result, err := JudgeDebateWithError(context.Background(), history)
 	if err != nil {
 		log.Printf("JudgeDebate failed: %v", err)
 		return ""

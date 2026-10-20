@@ -246,9 +246,10 @@ func SendDebateMessage(c *gin.Context) {
 	)
 
 	// Do not persist a failed or empty bot response.
-	if strings.TrimSpace(botResponse) == "" {
+	if isFallback || strings.TrimSpace(botResponse) == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "The bot could not generate a response. Please try again.",
+			"error":      "The bot could not generate a response. Please try again.",
+			"isFallback": isFallback,
 		})
 		return
 	}
@@ -484,7 +485,7 @@ func JudgeDebate(c *gin.Context) {
 		return
 	}
 
-	result, err := judgeDebateFunc(req.History)
+	result, err := judgeDebateFunc(c.Request.Context(), req.History)
 	if err != nil {
 		log.Printf("Debate judgment failed: %v", err)
 		c.JSON(http.StatusBadGateway, gin.H{
