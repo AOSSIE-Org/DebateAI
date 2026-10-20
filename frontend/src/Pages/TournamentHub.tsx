@@ -30,6 +30,11 @@ export default function TournamentPage() {
   const [tournaments, setTournaments] = useState<ApiTournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [joiningTournamentId, setJoiningTournamentId] = useState<string | null>(
+    null
+  );
+
   const [statusFilter, setStatusFilter] = useState<TournamentStatus | "all">(
     "all"
   );
@@ -69,6 +74,12 @@ export default function TournamentPage() {
     !loading && (!error || tournaments.length > 0);
 
   const handleJoin = async (tournament: ApiTournament) => {
+    if (joiningTournamentId === tournament.id) {
+      return;
+    }
+
+    setJoiningTournamentId(tournament.id);
+
     try {
       setError(null);
 
@@ -81,6 +92,8 @@ export default function TournamentPage() {
       setError(
         err instanceof Error ? err.message : "Failed to join tournament."
       );
+    } finally {
+      setJoiningTournamentId(null);
     }
   };
 
@@ -199,6 +212,7 @@ export default function TournamentPage() {
 
                 const isHost = t.hostId === user?.id;
                 const isFull = t.participants.length >= t.maxParticipants;
+                const isJoining = joiningTournamentId === t.id;
 
                 return (
                 <div
@@ -257,7 +271,7 @@ export default function TournamentPage() {
                   <button
                     onClick={() => handleJoin(t)}
                     className="w-full bg-primary text-primary-foreground py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold disabled:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground mt-auto"
-                    disabled={isHost || isParticipant || isFull}
+                    disabled={isHost || isParticipant || isFull || isJoining}
                   >
                     {isHost
                       ? "Hosting"
@@ -265,7 +279,9 @@ export default function TournamentPage() {
                         ? "Joined"
                         : isFull
                           ? "Full"
-                          : "Join Tournament"}
+                          : isJoining
+                            ? "Joining..."
+                            : "Join Tournament"}
                   </button>
                 </div>
               );
