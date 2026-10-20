@@ -100,7 +100,9 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
   });
 
   if (!response.ok) {
-    throw new Error("Failed to send debate message");
+    const error = new Error("Failed to send debate message");
+    Object.assign(error, { status: response.status });
+    throw error;
   }
 
   const result = await response.json();
