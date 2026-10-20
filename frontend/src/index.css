@@ -140,3 +140,13 @@ body {
   margin: 0;
   font-family: 'Outfit', sans-serif;
 }
+
+/* Ensure AOSSIE SocialShareButton popup has full interaction above any modal dialog */
+.social-share-modal-overlay {
+  pointer-events: auto !important;
+  z-index: 999999 !important;
+}
+
+.social-share-modal-content {
+  pointer-events: auto !important;
+}

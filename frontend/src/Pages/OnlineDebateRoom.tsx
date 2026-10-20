@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 
@@ -151,6 +151,7 @@ const WS_BASE_URL = BASE_URL.replace(
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
+  const navigate = useNavigate();
   const { user: currentUser } = useUser();
   const currentUserId = currentUser?.id ?? null;
   useDebateWS(roomId ?? null);
@@ -2608,7 +2609,11 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           opponentAvatarUrl={opponentUser?.avatarUrl || null}
           ratingSummary={ratingSummary}
-          onClose={() => setShowJudgment(false)}
+          topic={topic}
+          onClose={() => {
+            setShowJudgment(false);
+            navigate("/startDebate");
+          }}
         />
       )}
 
