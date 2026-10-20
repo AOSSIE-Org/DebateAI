@@ -12,7 +12,7 @@ export default function ServerBadge() {
         className="underline text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
         onClick={() => {
           resetServer();
-          window.location.href = '/';
+          window.location.href = import.meta.env.BASE_URL;
         }}
       >
         Use official server

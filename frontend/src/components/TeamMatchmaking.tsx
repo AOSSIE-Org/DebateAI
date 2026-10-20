@@ -135,6 +135,8 @@ const TeamMatchmaking: React.FC<TeamMatchmakingProps> = ({ team, user }) => {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to join matchmaking';
       alert(errorMessage);
+    } finally {
+      // Reset so "Find Match" is usable again after cancelling a search.
       setIsSearching(false);
     }
   };
