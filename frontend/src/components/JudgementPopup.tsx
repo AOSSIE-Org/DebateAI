@@ -334,8 +334,10 @@ const player2RatingSummary =
   const recommendedSkills = recommendSkills();
 
   return (
-    <div className='fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 p-4'>
-      <div className='bg-gradient-to-br from-white to-gray-100 p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-orange-200 transform transition-all duration-300 scale-100 hover:scale-102'>
+    
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4">
+      <div className="flex max-h-[95dvh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-orange-200 bg-gradient-to-br from-white to-gray-100 shadow-2xl">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 lg:p-8">
         {/* Top Profile Section */}
         <div className='flex justify-between items-center mb-8'>
           <div className='flex items-center space-x-4 bg-gray-50 p-4 rounded-lg shadow-sm w-1/2 mr-2'>
@@ -382,7 +384,7 @@ const player2RatingSummary =
             <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
               Opening Statement
             </h3>
-            <div className='grid grid-cols-2 gap-6'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6'>
               <div className='p-4 bg-gray-50 rounded-lg'>
                 <h4 className='text-lg font-semibold text-gray-700'>
                   {player1Name}
@@ -413,7 +415,7 @@ const player2RatingSummary =
               <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
                 Cross Examination
               </h3>
-              <div className='grid grid-cols-2 gap-6'>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6'>
                 <div className='p-4 bg-gray-50 rounded-lg'>
                   <h4 className='text-lg font-semibold text-gray-700'>
                     {player1Name}
@@ -444,7 +446,7 @@ const player2RatingSummary =
                 <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
                   Cross Examination Questions
                 </h3>
-                <div className='grid grid-cols-2 gap-6'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6'>
                   <div className='p-4 bg-gray-50 rounded-lg'>
                     <h4 className='text-lg font-semibold text-gray-700'>
                       {player1Name}
@@ -495,7 +497,7 @@ const player2RatingSummary =
                 <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
                   Cross Examination Answers
                 </h3>
-                <div className='grid grid-cols-2 gap-6'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6'>
                   <div className='p-4 bg-gray-50 rounded-lg'>
                     <h4 className='text-lg font-semibold text-gray-700'>
                       {player1Name}
@@ -550,7 +552,7 @@ const player2RatingSummary =
               <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
                 Answers to Cross Examination
               </h3>
-              <div className='grid grid-cols-2 gap-6'>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6'>
                 <div className='p-4 bg-gray-50 rounded-lg'>
                   <h4 className='text-lg font-semibold text-gray-700'>
                     {player1Name}
@@ -581,7 +583,7 @@ const player2RatingSummary =
             <h3 className='text-2xl font-bold text-gray-800 text-center mb-6'>
               Closing Statement
             </h3>
-            <div className='grid grid-cols-2 gap-6'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6'>
               <div className='p-4 bg-gray-50 rounded-lg'>
                 <h4 className='text-lg font-semibold text-gray-700'>
                   {player1Name}
@@ -746,6 +748,7 @@ const player2RatingSummary =
           >
             Close
           </Button>
+        </div>
         </div>
       </div>
     </div>

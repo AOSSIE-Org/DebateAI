@@ -575,9 +575,7 @@ const DebateRoom: React.FC = () => {
     state.isDebateEnded,
   ]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [state.messages]);
+
 
   const getPhaseInstructions = (phaseIndex: number) => {
     switch (phaseIndex) {
