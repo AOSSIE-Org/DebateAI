@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import { forwardRef } from 'react';
 import { DebateVictoryCardData } from './types';
 import AOSSIELogo from '@/assets/aossie.png';
 import { Trophy, Crown, Swords, Calendar } from 'lucide-react';
