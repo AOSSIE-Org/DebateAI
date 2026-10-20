@@ -1,6 +1,6 @@
 import config from "../config/config";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useUser } from '../hooks/useUser';
 import ProfileHover from './ProfileHover';
 import UserProfileModal from './UserProfileModal';
@@ -220,15 +220,29 @@ interface CommentTreeProps {
   className?: string;
 }
 
+/** Renders threaded comments with stable atoms for the selected transcript. */
 const CommentTree: React.FC<CommentTreeProps> = ({
   transcriptId,
   onCommentAdded,
   className = '',
 }) => {
   const { user } = useUser();
-  const [commentsAtom] = useAtom(getCommentsForTranscriptAtom(transcriptId));
-  const [, setCommentsAtom] = useAtom(setCommentsForTranscriptAtom(transcriptId));
-  const [, removeCommentAtom] = useAtom(removeCommentFromTranscriptAtom(transcriptId));
+  // Jotai atom identities must stay stable until the transcript changes.
+  const transcriptCommentsAtom = useMemo(
+    () => getCommentsForTranscriptAtom(transcriptId),
+    [transcriptId],
+  );
+  const setTranscriptCommentsAtom = useMemo(
+    () => setCommentsForTranscriptAtom(transcriptId),
+    [transcriptId],
+  );
+  const removeTranscriptCommentAtom = useMemo(
+    () => removeCommentFromTranscriptAtom(transcriptId),
+    [transcriptId],
+  );
+  const commentsAtom = useAtomValue(transcriptCommentsAtom);
+  const setCommentsAtom = useSetAtom(setTranscriptCommentsAtom);
+  const removeCommentAtom = useSetAtom(removeTranscriptCommentAtom);
   
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
