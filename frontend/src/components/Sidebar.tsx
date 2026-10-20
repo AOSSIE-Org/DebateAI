@@ -11,7 +11,7 @@ import {
   MessageCircle,
   Heart,
 } from 'lucide-react';
-import debateAiLogo from '@/assets/debateai-logo.svg';
+import { DebateAiLogo } from './DebateAiLogo';
 import { ThemeToggle } from './ThemeToggle';
 
 function Sidebar() {
@@ -20,11 +20,7 @@ function Sidebar() {
       {/* Logo / Brand */}
       <div className='flex items-center h-16 px-4 border-b border-border'>
         <div className='flex items-center gap-2'>
-          <img
-            src={debateAiLogo}
-            alt='DebateAI Logo'
-            className='h-8 w-auto object-contain'
-          />
+          <DebateAiLogo className='h-8 w-auto' />
           <div className='flex flex-col'>
             <span className='text-xl font-bold leading-none'>DebateAI</span>
             <a
