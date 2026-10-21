@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"math"
 	"net/http"
@@ -77,9 +78,8 @@ func debatePhaseRole(phase string) string {
 	}
 }
 
-// canStartDebateLocked requires two ready debaters with distinct roles.
-// The caller must hold room.Mutex.
-func canStartDebateLocked(room *Room) bool {
+// debateStartErrorLocked validates the setup state. The caller must hold room.Mutex.
+func debateStartErrorLocked(room *Room) error {
 	debaters := 0
 	roles := map[string]bool{}
 	for _, client := range room.Clients {
@@ -88,13 +88,25 @@ func canStartDebateLocked(room *Room) bool {
 		}
 
 		debaters++
-		if !client.Ready || (client.Role != "for" && client.Role != "against") || roles[client.Role] {
-			return false
+		if client.Role != "for" && client.Role != "against" {
+			return errors.New("both debaters must select a stance")
+		}
+		if roles[client.Role] {
+			return errors.New("each debater must choose a different stance")
 		}
 		roles[client.Role] = true
+		if !client.Ready {
+			return errors.New("both debaters must be ready")
+		}
 	}
 
-	return debaters == 2 && roles["for"] && roles["against"]
+	if debaters != 2 {
+		return errors.New("two debaters must be connected")
+	}
+	if !roles["for"] || !roles["against"] {
+		return errors.New("one debater must choose For and the other Against")
+	}
+	return nil
 }
 
 // Client represents a connected client with user information
@@ -736,13 +748,29 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 	expectedRole := debatePhaseRole(currentPhase)
 	if currentPhase == setupPhase {
 		expectedRole = "for"
-		if !canStartDebateLocked(room) {
+		if err := debateStartErrorLocked(room); err != nil {
 			room.Mutex.Unlock()
+			_ = sender.SafeWriteJSON(map[string]interface{}{
+				"type":   "phaseChangeRejected",
+				"reason": err.Error(),
+			})
+			return
+		}
+		if sender.Role != expectedRole {
+			room.Mutex.Unlock()
+			_ = sender.SafeWriteJSON(map[string]interface{}{
+				"type":   "phaseChangeRejected",
+				"reason": "the For debater starts the debate",
+			})
 			return
 		}
 	}
 	if expectedRole == "" || sender.Role != expectedRole {
 		room.Mutex.Unlock()
+		_ = sender.SafeWriteJSON(map[string]interface{}{
+			"type":   "phaseChangeRejected",
+			"reason": "only the debater whose turn is ending can advance the phase",
+		})
 		return
 	}
 
@@ -819,7 +847,19 @@ func handleRoleSelection(room *Room, conn *websocket.Conn, message Message, room
 		room.Mutex.Unlock()
 		return
 	}
+	for _, other := range room.Clients {
+		if other != client && !other.IsSpectator && other.Role == message.Role {
+			room.Mutex.Unlock()
+			_ = client.SafeWriteJSON(map[string]interface{}{
+				"type":   "roleSelectionRejected",
+				"reason": "your opponent already chose that stance",
+				"role":   client.Role,
+			})
+			return
+		}
+	}
 	client.Role = message.Role
+	client.Ready = false
 	room.Mutex.Unlock()
 
 	// Broadcast role selection to other clients
@@ -843,6 +883,28 @@ func handleReadyStatus(room *Room, conn *websocket.Conn, message Message, roomID
 	if !exists || client.IsSpectator {
 		room.Mutex.Unlock()
 		return
+	}
+	if *message.Ready {
+		if client.Role != "for" && client.Role != "against" {
+			room.Mutex.Unlock()
+			_ = client.SafeWriteJSON(map[string]interface{}{
+				"type":   "readyRejected",
+				"reason": "select For or Against before marking yourself ready",
+				"ready":  client.Ready,
+			})
+			return
+		}
+		for _, other := range room.Clients {
+			if other != client && !other.IsSpectator && other.Role == client.Role {
+				room.Mutex.Unlock()
+				_ = client.SafeWriteJSON(map[string]interface{}{
+					"type":   "readyRejected",
+					"reason": "you and your opponent must choose different stances",
+					"ready":  client.Ready,
+				})
+				return
+			}
+		}
 	}
 	client.Ready = *message.Ready
 	message.UserID = client.UserID

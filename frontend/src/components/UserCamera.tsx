@@ -19,6 +19,11 @@ const UserCamera: React.FC<UserCameraProps> = ({
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
 
   useEffect(() => {
+    // Keep the stream in the effect so cleanup can stop it even after React
+    // has detached videoRef on unmount.
+    let activeStream: MediaStream | null = null;
+    let cancelled = false;
+
     const startCamera = async () => {
       if (!websocket) return; // Wait until WebSocket is available
 
@@ -27,6 +32,13 @@ const UserCamera: React.FC<UserCameraProps> = ({
           video: true,
           audio: true,
         });
+
+        // The component unmounted (or deps changed) while permission was pending.
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        activeStream = stream;
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -62,10 +74,8 @@ const UserCamera: React.FC<UserCameraProps> = ({
 
     return () => {
       // Cleanup
-      if (videoRef.current?.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach((track) => track.stop());
-      }
+      cancelled = true;
+      activeStream?.getTracks().forEach((track) => track.stop());
       if (
         mediaRecorderRef.current &&
         mediaRecorderRef.current.state !== "inactive"

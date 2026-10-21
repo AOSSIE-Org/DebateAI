@@ -54,7 +54,6 @@ import {
 import { FaTrophy, FaMedal, FaAward } from "react-icons/fa";
 import { format, isSameDay, subDays } from "date-fns";
 import defaultAvatar from "@/assets/avatar2.jpg";
-import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import {
   PieChart,
   Pie,
@@ -88,20 +87,6 @@ import {
   SavedDebateTranscript,
 } from "@/services/transcriptService";
 import LoadingSpinner from "@/components/LoadingSpinner";
-
-const handleProfileAvatarLoadError = (
-  event: React.SyntheticEvent<HTMLImageElement>
-) => {
-  const image = event.currentTarget;
-
-  if (image.src !== DEFAULT_AVATAR_URL) {
-    image.src = DEFAULT_AVATAR_URL;
-    return;
-  }
-
-  image.onerror = null;
-  image.src = defaultAvatar;
-};
 
 interface ProfileData {
   displayName: string;
