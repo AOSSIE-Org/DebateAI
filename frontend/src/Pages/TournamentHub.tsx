@@ -161,9 +161,10 @@ export default function TournamentPage() {
     }
   };
 
-  const handleViewBracket = (tournament: Tournament) => {
+    const handleViewBracket = (tournament: Tournament | PastTournament) => {
     navigate(`/tournament/${tournament.id}/bracket`, { state: { tournament } });
   };
+
 
   const renderAvatars = (current: number, max: number) => {
     const avatars = [];
@@ -372,10 +373,12 @@ export default function TournamentPage() {
                   </div>
                   <button
                     type="button"
-                    className="relative w-full sm:w-auto flex-shrink-0 bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm"
+                    onClick={() => handleViewBracket(t)}
+                    className="relative w-full sm:w-auto flex-shrink-0 bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm cursor-pointer"
                   >
                     View Tournament
                   </button>
+
                 </div>
               ))}
             </div>
