@@ -55,7 +55,6 @@ jobs:
                   VITE_BASE_URL: ${{ vars.VITE_BASE_URL }}
                   VITE_API_URL: ${{ vars.VITE_API_URL }}
                   VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-                  VITE_PUBLIC_PATH: ${{ steps.pages.outputs.base_path }}/
               run: npm run build
 
             # GitHub Pages has no SPA fallback; serving index.html as the 404
