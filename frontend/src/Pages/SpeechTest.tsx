@@ -45,6 +45,7 @@ export const SpeechTest: React.FC = () => {
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [isMonitoringMic, setIsMonitoringMic] = useState<boolean>(false);
   const [micTested, setMicTested] = useState<boolean>(false); // true only after user actively runs mic test
+  const [micDetected, setMicDetected] = useState<boolean>(false); // persistent flag: audio was successfully detected
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -221,6 +222,9 @@ export const SpeechTest: React.FC = () => {
         // Normalize to percentage 0 - 100 with boosted sensitivity for speech
         const normalized = Math.min(100, Math.round((average / 128) * 100 * 1.5));
         setAudioLevel(normalized);
+        if (normalized > 0) {
+          setMicDetected(true);
+        }
 
         animationFrameRef.current = requestAnimationFrame(updateVolume);
       };
@@ -431,13 +435,13 @@ export const SpeechTest: React.FC = () => {
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Mic className="h-5 w-5 text-primary" /> Microphone Level
                 </CardTitle>
-                {/* Show Ready badge only after user actively tested mic AND audio is detected */}
-                {micTested && micPermission === "granted" && audioLevel > 0 && (
+                {/* Show Ready badge if mic was tested and audio was detected */}
+                {micTested && micPermission === "granted" && micDetected && (
                   <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1">
                     <CheckCircle2 className="h-3 w-3" /> Ready
                   </Badge>
                 )}
-                {micTested && micPermission === "granted" && audioLevel === 0 && isMonitoringMic && (
+                {micTested && micPermission === "granted" && !micDetected && (
                   <Badge variant="outline" className="text-amber-500 border-amber-400/40 gap-1">
                     <AlertTriangle className="h-3 w-3" /> No Audio
                   </Badge>
