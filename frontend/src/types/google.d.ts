@@ -13,7 +13,8 @@ interface GoogleId {
       theme: 'outline' | 'filled_blue' | 'filled_black';
       size: 'large' | 'medium' | 'small';
       text?: 'signin_with' | 'signup_with' | 'continue_with';
-      width?: string;
+      /** Button width in pixels (Google accepts 200–400); percentages are ignored. */
+      width?: number;
       shape?: 'rectangular' | 'pill';
       logo_alignment?: 'left' | 'center';
     }
