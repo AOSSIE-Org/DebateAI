@@ -18,7 +18,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
     'create'
   );
 
-  // Handler to join a debate room by sending the room code via navigation.
+  // Handler to join a debate room — redirects via speech-test for audio calibration.
   const handleJoinRoom = async () => {
     const trimmedRoomCode = roomCode.trim();
     if (!trimmedRoomCode) return;
@@ -46,19 +46,21 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
         return;
       }
 
-      navigate(`/debate-room/${trimmedRoomCode}`);
+      // Go to speech-test first, then enter debate room
+      navigate('/speech-test', {
+        state: { roomId: trimmedRoomCode, returnUrl: `/debate-room/${trimmedRoomCode}` },
+      });
       onClose();
     } catch {
       alert('Unable to connect to the server.');
     }
   };
 
-  // Handler to create a new room by sending a POST request to the backend.
+  // Handler to create a new room — redirects via speech-test for audio calibration.
   const handleCreateRoom = async () => {
     const token = localStorage.getItem('token');
     try {
       // Sending a POST request to create a new room.
-      // You might also send additional parameters (e.g., room type, settings).
       const response = await fetch(`${baseURL}/rooms`, {
         method: 'POST',
         headers: {
@@ -73,7 +75,10 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
         return;
       }
       const room = await response.json();
-      navigate(`/debate-room/${room.id}`);
+      // Go to speech-test first, then enter the newly created debate room
+      navigate('/speech-test', {
+        state: { roomId: room.id, returnUrl: `/debate-room/${room.id}` },
+      });
       onClose();
     } catch {
       alert('Error creating room.');
@@ -132,11 +137,14 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
             <p className='text-muted-foreground text-sm text-center mb-6'>
               Start a new debate and invite others with a unique room code.
             </p>
+            <p className='text-xs text-muted-foreground mb-4 bg-primary/10 border border-primary/30 rounded-lg px-4 py-2 text-center'>
+              🎤 You'll be taken to a quick <strong>Audio Check</strong> before entering the room.
+            </p>
             <button
               onClick={handleCreateRoom}
-              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full'
+              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full font-medium'
             >
-              Create Room
+              Create Room & Check Audio
             </button>
           </div>
         )}
@@ -154,11 +162,14 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
               placeholder='Enter Room Code'
               className='w-full p-3 border border-border rounded-lg text-center bg-input text-foreground mb-4'
             />
+            <p className='text-xs text-muted-foreground mb-4 bg-primary/10 border border-primary/30 rounded-lg px-4 py-2 text-center w-full'>
+              🎤 You'll be taken to a quick <strong>Audio Check</strong> before entering the room.
+            </p>
             <button
               onClick={handleJoinRoom}
-              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full'
+              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full font-medium'
             >
-              Join Room
+              Join Room & Check Audio
             </button>
           </div>
         )}
