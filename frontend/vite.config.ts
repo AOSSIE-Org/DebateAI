@@ -7,7 +7,7 @@ import svgr from "@svgr/rollup"; // Import the plugin
 export default defineConfig({
   // Defaults to '/'. Set VITE_PUBLIC_PATH (e.g. '/DebateAI/') when the app is
   // served from a sub-path such as a GitHub Pages project site.
-  base: process.env.VITE_PUBLIC_PATH || '/',
+  base: '/',
   plugins: [react(),  svgr(), ],
 
   //shadcn
