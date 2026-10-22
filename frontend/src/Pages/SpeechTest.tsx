@@ -43,17 +43,24 @@ export const SpeechTest: React.FC = () => {
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied">("prompt");
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [isMonitoringMic, setIsMonitoringMic] = useState<boolean>(false);
+  const [micTested, setMicTested] = useState<boolean>(false); // true only after user actively runs mic test
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+  const isRequestingMicRef = useRef<boolean>(false);
+  const chimeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Speaker test state
   const [isPlayingChime, setIsPlayingChime] = useState<boolean>(false);
   const [speakerVerified, setSpeakerVerified] = useState<boolean | null>(null);
+  const [showChimePrompt, setShowChimePrompt] = useState<boolean>(false);
 
-  // Initialize Speech Recognition
+  // Initialize Speech Recognition & Mount Lifecycle
   useEffect(() => {
+    isMountedRef.current = true;
+
     if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
       const SpeechRecognitionCtor = (window.SpeechRecognition ||
         window.webkitSpeechRecognition) as SpeechRecognitionConstructor | undefined;
@@ -131,6 +138,11 @@ export const SpeechTest: React.FC = () => {
     }
 
     return () => {
+      isMountedRef.current = false;
+      if (chimeTimeoutRef.current) {
+        clearTimeout(chimeTimeoutRef.current);
+        chimeTimeoutRef.current = null;
+      }
       try {
         recognitionRef.current?.stop();
       } catch {
@@ -142,18 +154,37 @@ export const SpeechTest: React.FC = () => {
 
   // Web Audio API Microphone Monitoring & Volume Meter
   const startAudioMonitoring = useCallback(async () => {
+    // In-flight guard to prevent concurrent getUserMedia requests
+    if (isRequestingMicRef.current) return;
+    isRequestingMicRef.current = true;
+
     try {
       if (micStreamRef.current) {
         stopAudioMonitoring();
       }
 
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("MediaDevicesUnavailable");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // If stream resolves after component unmounted, stop tracks instead of storing or updating state
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       micStreamRef.current = stream;
       setMicPermission("granted");
       setIsMonitoringMic(true);
+      setMicTested(true); // user actively ran the test
 
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const audioCtx = new AudioContextClass();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
       audioContextRef.current = audioCtx;
 
       const analyser = audioCtx.createAnalyser();
@@ -183,10 +214,25 @@ export const SpeechTest: React.FC = () => {
       };
 
       updateVolume();
-    } catch {
-      setMicPermission("denied");
+    } catch (err: unknown) {
+      if (!isMountedRef.current) return;
+
       setIsMonitoringMic(false);
-      setRecognitionStatus("Microphone permission denied.");
+      setAudioLevel(0);
+
+      const error = err as Error;
+      if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+        setMicPermission("denied");
+        setRecognitionStatus("Microphone access denied. Please grant permission in browser settings.");
+      } else if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") {
+        setRecognitionStatus("No microphone device found on your system.");
+      } else if (error?.message === "MediaDevicesUnavailable" || !navigator.mediaDevices) {
+        setRecognitionStatus("Microphone access is not supported by your browser environment.");
+      } else {
+        setRecognitionStatus(`Microphone error: ${error?.message || "Unable to access microphone"}`);
+      }
+    } finally {
+      isRequestingMicRef.current = false;
     }
   }, []);
 
@@ -203,16 +249,24 @@ export const SpeechTest: React.FC = () => {
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
-    setAudioLevel(0);
-    setIsMonitoringMic(false);
+    if (isMountedRef.current) {
+      setAudioLevel(0);
+      setIsMonitoringMic(false);
+    }
   };
 
   // Web Audio API Synthesized Speaker Chime
   const playSpeakerChime = () => {
     try {
       setIsPlayingChime(true);
+      setShowChimePrompt(false);
+      setSpeakerVerified(null);
+
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioContextClass();
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
 
       // Pleasant 3-tone arpeggio: C5 (523Hz), E5 (659Hz), G5 (784Hz)
       const notes = [523.25, 659.25, 783.99];
@@ -237,9 +291,19 @@ export const SpeechTest: React.FC = () => {
         osc.stop(ctx.currentTime + (idx + 1) * noteDuration);
       });
 
-      setTimeout(() => {
+      if (chimeTimeoutRef.current) {
+        clearTimeout(chimeTimeoutRef.current);
+      }
+
+      chimeTimeoutRef.current = setTimeout(() => {
+        chimeTimeoutRef.current = null;
+        if (!isMountedRef.current) {
+          ctx.close().catch(() => {});
+          return;
+        }
         setIsPlayingChime(false);
-        setSpeakerVerified(true);
+        setShowChimePrompt(true);
+        // keep speakerVerified as null until user answers
         ctx.close().catch(() => {});
       }, (notes.length * noteDuration + 0.1) * 1000);
     } catch {
@@ -331,28 +395,18 @@ export const SpeechTest: React.FC = () => {
 
         {/* Pre-Debate Context Banner if routed from a debate room */}
         {(roomId || returnUrl) && (
-          <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/20 text-primary rounded-lg">
-                <Radio className="h-5 w-5 animate-pulse" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  Pre-Debate Check Active {roomId ? `for Room #${roomId}` : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Confirm your hardware is working to prevent accidental forfeits during timed live debate rounds.
-                </p>
-              </div>
+          <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center gap-3 shadow-sm">
+            <div className="p-2 bg-primary/20 text-primary rounded-lg shrink-0">
+              <Radio className="h-5 w-5 animate-pulse" />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleProceedToDebate}
-              className="border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground whitespace-nowrap"
-            >
-              Skip & Join Directly
-            </Button>
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Pre-Debate Check Active {roomId ? `for Room #${roomId}` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Confirm your hardware is working to prevent accidental forfeits during timed live debate rounds.
+              </p>
+            </div>
           </div>
         )}
 
@@ -366,9 +420,15 @@ export const SpeechTest: React.FC = () => {
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Mic className="h-5 w-5 text-primary" /> Microphone Level
                 </CardTitle>
-                {micPermission === "granted" && (
+                {/* Show Ready badge only after user actively tested mic AND audio is detected */}
+                {micTested && micPermission === "granted" && audioLevel > 0 && (
                   <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1">
                     <CheckCircle2 className="h-3 w-3" /> Ready
+                  </Badge>
+                )}
+                {micTested && micPermission === "granted" && audioLevel === 0 && isMonitoringMic && (
+                  <Badge variant="outline" className="text-amber-500 border-amber-400/40 gap-1">
+                    <AlertTriangle className="h-3 w-3" /> No Audio
                   </Badge>
                 )}
                 {micPermission === "denied" && (
@@ -376,7 +436,7 @@ export const SpeechTest: React.FC = () => {
                     <XCircle className="h-3 w-3" /> Blocked
                   </Badge>
                 )}
-                {micPermission === "prompt" && (
+                {!micTested && micPermission !== "denied" && (
                   <Badge variant="outline" className="text-muted-foreground">Not Tested</Badge>
                 )}
               </div>
@@ -437,10 +497,18 @@ export const SpeechTest: React.FC = () => {
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Volume2 className="h-5 w-5 text-primary" /> Speaker & Output
                 </CardTitle>
-                {speakerVerified && (
+                {speakerVerified === true && (
                   <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1">
                     <CheckCircle2 className="h-3 w-3" /> Audio Verified
                   </Badge>
+                )}
+                {speakerVerified === false && (
+                  <Badge variant="destructive" className="gap-1">
+                    <XCircle className="h-3 w-3" /> Audio Not Heard
+                  </Badge>
+                )}
+                {speakerVerified === null && !isPlayingChime && !showChimePrompt && (
+                  <Badge variant="outline" className="text-muted-foreground">Not Tested</Badge>
                 )}
               </div>
               <CardDescription>
@@ -452,7 +520,43 @@ export const SpeechTest: React.FC = () => {
                 Click below to play a short test chime through your current default sound output device.
               </p>
 
-              <div className="flex items-center gap-3 pt-4">
+              {/* Did you hear the chime? Prompt with Yes and No buttons */}
+              {showChimePrompt && (
+                <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium text-foreground">Did you hear the chime?</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSpeakerVerified(true);
+                        setShowChimePrompt(false);
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-xs"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Yes
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSpeakerVerified(false);
+                        setShowChimePrompt(false);
+                      }}
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10 gap-1 text-xs"
+                    >
+                      <XCircle className="h-3.5 w-3.5" /> No
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {speakerVerified === false && !showChimePrompt && (
+                <p className="text-xs text-amber-500 dark:text-amber-400">
+                  ⚠️ If you couldn't hear the sound, please check your device volume or speaker connection and try again.
+                </p>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
                 <Button
                   onClick={playSpeakerChime}
                   disabled={isPlayingChime}
