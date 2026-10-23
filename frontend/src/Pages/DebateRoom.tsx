@@ -408,19 +408,17 @@ const DebateRoom: React.FC = () => {
   const [botTurnFailed, setBotTurnFailed] = useState(false);
 
   const [state, setState] = useState<DebateState>(() => {
+    const normalizeStance = (stance: string): "For" | "Against" => {
+      return stance.toLowerCase() === "against" ? "Against" : "For";
+    };
+    const normalizedStance = normalizeStance(debateData?.stance ?? "");
     const defaultState: DebateState = {
       messages: [],
       currentPhase: 0,
       phaseStep: 0,
-      isBotTurn: false,
-      userStance: debateData?.stance ?? "",
-      botStance:
-        debateData?.stance === "for"
-          ? "against"
-          : debateData?.stance === "against"
-            ? "for"
-            : "",
-
+      isBotTurn: normalizedStance === "Against",
+      userStance: normalizedStance,
+      botStance: normalizedStance === "For" ? "Against" : "For",
       timer: debateKey ? phases[0]?.time ?? 60 : 60,
       isDebateEnded: false,
     };
