@@ -36,18 +36,25 @@ func resolveUniqueDisplayName(ctx context.Context, col *mongo.Collection, base s
 	if base == "" {
 		base = "debater"
 	}
-	// Limit base length so base + "_1234" stays within 30 chars
-	if len(base) > 24 {
-		base = base[:24]
+	baseRunes := []rune(base)
+	if len(baseRunes) > 30 {
+		baseRunes = baseRunes[:30]
 	}
+	candidateBase := string(baseRunes)
 
-	// First check if base name is already free
+	// First check if full eligible name is already available
 	var existing models.User
-	err := col.FindOne(ctx, bson.M{"displayName": base}).Decode(&existing)
+	err := col.FindOne(ctx, bson.M{"displayName": candidateBase}).Decode(&existing)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return base, nil
+		return candidateBase, nil
 	} else if err != nil {
 		return "", err
+	}
+
+	// Collision: shorten base at rune boundary (max 24 runes) so base + "_XXXX" <= 30 chars
+	suffixBase := candidateBase
+	if len(baseRunes) > 24 {
+		suffixBase = string(baseRunes[:24])
 	}
 
 	// Collision: append random 4-digit discriminator
@@ -59,7 +66,7 @@ func resolveUniqueDisplayName(ctx context.Context, col *mongo.Collection, base s
 		} else {
 			val = time.Now().UnixNano() % 9000
 		}
-		candidate := fmt.Sprintf("%s_%d", base, val+1000)
+		candidate := fmt.Sprintf("%s_%d", suffixBase, val+1000)
 		err = col.FindOne(ctx, bson.M{"displayName": candidate}).Decode(&existing)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return candidate, nil
@@ -69,7 +76,7 @@ func resolveUniqueDisplayName(ctx context.Context, col *mongo.Collection, base s
 	}
 
 	// Fallback to timestamp suffix if all random attempts collided
-	return fmt.Sprintf("%s_%d", base, time.Now().Unix()%100000), nil
+	return fmt.Sprintf("%s_%d", suffixBase, time.Now().Unix()%100000), nil
 }
 
 type GoogleLoginRequest struct {
@@ -144,7 +151,12 @@ func GoogleLogin(ctx *gin.Context) {
 		if err != nil {
 			if mongo.IsDuplicateKeyError(err) {
 				// Retry with fresh unique name in case of race condition
-				uniqueDisplayName, _ = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), nickname)
+				var resolveErr error
+				uniqueDisplayName, resolveErr = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), nickname)
+				if resolveErr != nil {
+					ctx.JSON(500, gin.H{"error": "Database error", "message": "Failed to resolve display name"})
+					return
+				}
 				newUser.DisplayName = uniqueDisplayName
 				newUser.Nickname = uniqueDisplayName
 				result, err = db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
@@ -203,9 +215,14 @@ func SignUp(ctx *gin.Context) {
 	}
 
 	var finalDisplayName string
-	customDisplayName := strings.TrimSpace(request.DisplayName)
+	if request.DisplayName != "" {
+		customDisplayName := strings.TrimSpace(request.DisplayName)
+		customRunes := []rune(customDisplayName)
+		if len(customRunes) < 2 || len(customRunes) > 30 {
+			ctx.JSON(400, gin.H{"error": "Invalid input", "message": "Display name must be between 2 and 30 characters"})
+			return
+		}
 
-	if customDisplayName != "" {
 		// User explicitly provided a custom display name: validate uniqueness
 		var existingDisplayName models.User
 		err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": customDisplayName}).Decode(&existingDisplayName)
@@ -261,9 +278,14 @@ func SignUp(ctx *gin.Context) {
 	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
-			if customDisplayName == "" {
+			if request.DisplayName == "" {
 				// Retry with fresh unique candidate if auto-generated
-				finalDisplayName, _ = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), utils.ExtractNameFromEmail(request.Email))
+				var dnErr error
+				finalDisplayName, dnErr = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), utils.ExtractNameFromEmail(request.Email))
+				if dnErr != nil {
+					ctx.JSON(500, gin.H{"error": "Database error", "message": "Failed to resolve display name"})
+					return
+				}
 				newUser.DisplayName = finalDisplayName
 				newUser.Nickname = finalDisplayName
 				result, err = db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)

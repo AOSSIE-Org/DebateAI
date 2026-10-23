@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"arguehub/db"
+	"arguehub/internal/testkit"
 	"arguehub/models"
 	"arguehub/structs"
 
@@ -21,19 +24,45 @@ import (
 )
 
 func setupTestDB(t *testing.T) {
-	_ = os.Setenv("CONFIG_PATH", "../config/config.prod.yml")
-	mongoURI := os.Getenv("DATABASE_URI")
+	gin.SetMode(gin.TestMode)
+	_ = os.Setenv("ENV", "test")
+
+	testkit.StartSMTP(t)
+
+	// Set test-specific config path
+	if cfgPath := testkit.ConfigPath(); cfgPath != "" {
+		_ = os.Setenv("CONFIG_PATH", cfgPath)
+	}
+
+	mongoURI := os.Getenv("MONGO_TEST_URI")
+	if mongoURI == "" {
+		mongoURI = os.Getenv("DATABASE_URI")
+	}
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017/debateai_test"
 	}
-	err := db.ConnectMongoDB(mongoURI)
+
+	// Validate target database name is explicitly test-only
+	parsedURI, err := url.Parse(mongoURI)
+	dbName := "debateai_test"
+	if err == nil && parsedURI.Path != "" && parsedURI.Path != "/" {
+		dbName = strings.TrimPrefix(parsedURI.Path, "/")
+	}
+	if !strings.Contains(strings.ToLower(dbName), "test") {
+		t.Fatalf("Refusing to run tests against non-test database: %q", dbName)
+	}
+
+	err = db.ConnectMongoDB(mongoURI)
 	if err != nil {
-		t.Skipf("Skipping live Mongo test: failed to connect to %s: %v", mongoURI, err)
+		redactedEndpoint := "MongoDB"
+		if parsedURI != nil && parsedURI.Host != "" {
+			redactedEndpoint = parsedURI.Host
+		}
+		t.Skipf("Skipping live Mongo test: failed to connect to %s: %v", redactedEndpoint, err)
 	}
 }
 
 func TestSignUp_AutoResolvedDisplayNameOnCollision(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	setupTestDB(t)
 
 	userCol := db.MongoDatabase.Collection("users")
@@ -44,24 +73,13 @@ func TestSignUp_AutoResolvedDisplayNameOnCollision(t *testing.T) {
 	email1 := testBaseName + "@domain1.com"
 	email2 := testBaseName + "@domain2.com"
 
-	// Cleanup
-	_, _ = userCol.DeleteMany(ctx, bson.M{
-		"$or": []bson.M{
-			{"displayName": bson.M{"$regex": "^" + testBaseName}},
-			{"email": email1},
-			{"email": email2},
-		},
-	})
+	filter := bson.M{"email": bson.M{"$in": []string{email1, email2}}}
+	// Cleanup scoped strictly to records created by this test
+	_, _ = userCol.DeleteMany(ctx, filter)
 	defer func() {
 		cleanupCtx, cCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cCancel()
-		_, _ = userCol.DeleteMany(cleanupCtx, bson.M{
-			"$or": []bson.M{
-				{"displayName": bson.M{"$regex": "^" + testBaseName}},
-				{"email": email1},
-				{"email": email2},
-			},
-		})
+		_, _ = userCol.DeleteMany(cleanupCtx, filter)
 	}()
 
 	// 1. Seed existing user with exact displayName = testBaseName
@@ -116,7 +134,6 @@ func TestSignUp_AutoResolvedDisplayNameOnCollision(t *testing.T) {
 }
 
 func TestSignUp_CustomDisplayNameSuccess(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	setupTestDB(t)
 
 	userCol := db.MongoDatabase.Collection("users")
@@ -126,21 +143,12 @@ func TestSignUp_CustomDisplayNameSuccess(t *testing.T) {
 	email := "testcustomname@example.com"
 	customName := "UniqueDebater99"
 
-	_, _ = userCol.DeleteMany(ctx, bson.M{
-		"$or": []bson.M{
-			{"displayName": customName},
-			{"email": email},
-		},
-	})
+	filter := bson.M{"email": email}
+	_, _ = userCol.DeleteMany(ctx, filter)
 	defer func() {
 		cleanupCtx, cCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cCancel()
-		_, _ = userCol.DeleteMany(cleanupCtx, bson.M{
-			"$or": []bson.M{
-				{"displayName": customName},
-				{"email": email},
-			},
-		})
+		_, _ = userCol.DeleteMany(cleanupCtx, filter)
 	}()
 
 	signupReq := structs.SignUpRequest{
@@ -175,7 +183,6 @@ func TestSignUp_CustomDisplayNameSuccess(t *testing.T) {
 }
 
 func TestSignUp_ExplicitCustomDisplayNameCollision_Returns400(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	setupTestDB(t)
 
 	userCol := db.MongoDatabase.Collection("users")
@@ -186,23 +193,12 @@ func TestSignUp_ExplicitCustomDisplayNameCollision_Returns400(t *testing.T) {
 	email1 := "existingoccupied@example.com"
 	email2 := "newuseroccupied@example.com"
 
-	_, _ = userCol.DeleteMany(ctx, bson.M{
-		"$or": []bson.M{
-			{"displayName": existingName},
-			{"email": email1},
-			{"email": email2},
-		},
-	})
+	filter := bson.M{"email": bson.M{"$in": []string{email1, email2}}}
+	_, _ = userCol.DeleteMany(ctx, filter)
 	defer func() {
 		cleanupCtx, cCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cCancel()
-		_, _ = userCol.DeleteMany(cleanupCtx, bson.M{
-			"$or": []bson.M{
-				{"displayName": existingName},
-				{"email": email1},
-				{"email": email2},
-			},
-		})
+		_, _ = userCol.DeleteMany(cleanupCtx, filter)
 	}()
 
 	// Seed existing user with existingName
@@ -249,6 +245,29 @@ func TestSignUp_ExplicitCustomDisplayNameCollision_Returns400(t *testing.T) {
 	}
 }
 
+func TestSignUp_WhitespaceCustomDisplayName_Returns400(t *testing.T) {
+	setupTestDB(t)
+
+	// User sends only whitespace or length < 2 after trim
+	signupReq := structs.SignUpRequest{
+		Email:       "testwhitespace@example.com",
+		Password:    "Password123!",
+		DisplayName: "   ",
+	}
+	body, _ := json.Marshal(signupReq)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/signup", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	SignUp(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 Bad Request for whitespace custom displayName, got %d. Body: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestResolveUniqueDisplayName_Unit(t *testing.T) {
 	setupTestDB(t)
 
@@ -257,13 +276,14 @@ func TestResolveUniqueDisplayName_Unit(t *testing.T) {
 	defer cancel()
 
 	base := "testunitresolver"
+	testEmail := "testunitresolver@example.com"
 
-	// Cleanup
-	_, _ = userCol.DeleteMany(ctx, bson.M{"displayName": bson.M{"$regex": "^" + base}})
+	filter := bson.M{"email": testEmail}
+	_, _ = userCol.DeleteMany(ctx, filter)
 	defer func() {
 		cleanupCtx, cCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cCancel()
-		_, _ = userCol.DeleteMany(cleanupCtx, bson.M{"displayName": bson.M{"$regex": "^" + base}})
+		_, _ = userCol.DeleteMany(cleanupCtx, filter)
 	}()
 
 	// 1. Initial resolution when free
@@ -278,7 +298,7 @@ func TestResolveUniqueDisplayName_Unit(t *testing.T) {
 	// 2. Insert user with that base name
 	_, err = userCol.InsertOne(ctx, models.User{
 		ID:          primitive.NewObjectID(),
-		Email:       "testunitresolver@example.com",
+		Email:       testEmail,
 		DisplayName: base,
 		Nickname:    base,
 		CreatedAt:   time.Now(),
@@ -297,4 +317,58 @@ func TestResolveUniqueDisplayName_Unit(t *testing.T) {
 		t.Fatalf("expected resolved2 to have prefix %q, got %q", base+"_", resolved2)
 	}
 	t.Logf("Collision resolved successfully: %q -> %q", base, resolved2)
+}
+
+func TestResolveUniqueDisplayName_RuneSafeTruncation(t *testing.T) {
+	setupTestDB(t)
+
+	userCol := db.MongoDatabase.Collection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// 28-character UTF-8 string with multi-byte characters
+	base := "辩论家_debater_super_master"
+	testEmail := "testrunesafe@example.com"
+
+	filter := bson.M{"email": testEmail}
+	_, _ = userCol.DeleteMany(ctx, filter)
+	defer func() {
+		cleanupCtx, cCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cCancel()
+		_, _ = userCol.DeleteMany(cleanupCtx, filter)
+	}()
+
+	// 1. First resolution: should allow full base without premature truncation
+	resolved1, err := resolveUniqueDisplayName(ctx, userCol, base)
+	if err != nil {
+		t.Fatalf("resolveUniqueDisplayName returned error: %v", err)
+	}
+	if resolved1 != base {
+		t.Fatalf("expected full base %q when free, got %q", base, resolved1)
+	}
+
+	// 2. Seed record to cause collision
+	_, err = userCol.InsertOne(ctx, models.User{
+		ID:          primitive.NewObjectID(),
+		Email:       testEmail,
+		DisplayName: base,
+		Nickname:    base,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("failed to insert user: %v", err)
+	}
+
+	// 3. Second resolution: collision should truncate at rune boundary (<= 24 runes) and append suffix
+	resolved2, err := resolveUniqueDisplayName(ctx, userCol, base)
+	if err != nil {
+		t.Fatalf("resolveUniqueDisplayName returned error: %v", err)
+	}
+	if !utf8.ValidString(resolved2) {
+		t.Fatalf("resolved name %q is not valid UTF-8", resolved2)
+	}
+	if utf8.RuneCountInString(resolved2) > 30 {
+		t.Fatalf("resolved name %q exceeds 30 runes (count: %d)", resolved2, utf8.RuneCountInString(resolved2))
+	}
 }
