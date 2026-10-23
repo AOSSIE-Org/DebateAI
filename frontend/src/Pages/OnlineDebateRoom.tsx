@@ -2165,6 +2165,11 @@ const OnlineDebateRoom = (): JSX.Element => {
     setLocalReady(newReadyState);
   };
 
+  const handleLeaveDebate = () => {
+    wsRef.current?.close();
+    navigate("/startDebate");
+  };
+
   // Manage setup popup visibility
   useEffect(() => {
     if (localReady && peerReady && rolesAreOpposite) {
@@ -2528,6 +2533,15 @@ const OnlineDebateRoom = (): JSX.Element => {
                       ? "Cancel Ready"
                       : "I'm Ready"}
                   </Button>
+                  
+                  {/*Leave Button*/}
+                  <Button
+                  variant="outline"
+                  onClick={handleLeaveDebate}
+                  className="w-full py-2 mt-2 rounded-lg"
+                  >
+                    Leave Debate 
+                    </Button>
                 </div>
               </>
             )}
