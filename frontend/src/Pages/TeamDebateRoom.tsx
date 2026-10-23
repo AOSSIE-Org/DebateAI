@@ -1,6 +1,6 @@
 import config from "../config/config";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { useUser } from "@/hooks/useUser";
@@ -205,6 +205,7 @@ const extractJSON = (response: string): string => {
 
 const TeamDebateRoom: React.FC = () => {
   const { debateId } = useParams<{ debateId: string }>();
+  const navigate = useNavigate();
   const [user] = useAtom(userAtom);
   const { user: userFromHook, isLoading: isUserLoading, isAuthenticated } = useUser();
   
@@ -2508,7 +2509,11 @@ const TeamDebateRoom: React.FC = () => {
           judgment={judgmentData}
           forRole={localRole === "for" ? "Your Team" : "Opponent Team"}
           againstRole={localRole === "against" ? "Your Team" : "Opponent Team"}
-          onClose={() => setShowJudgment(false)}
+          topic={topic}
+          onClose={() => {
+            setShowJudgment(false);
+            navigate("/startDebate");
+          }}
         />
       )}
 

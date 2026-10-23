@@ -7,7 +7,7 @@ import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { Button } from "../components/ui/button";
 import { AuthContext } from "../context/authContext";
 import DebatePopup from "@/components/DebatePopup";
-import debateAiLogo from "@/assets/debateai-logo.svg";
+import { DebateAiLogo } from "../components/DebateAiLogo";
 
 const StartDebate = () => {
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ const StartDebate = () => {
           </div>
           <div className="flex w-full lg:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <div className="flex flex-col items-center mb-6">
-              <img src={debateAiLogo} alt="DebateAI Logo" className="h-12 w-auto object-contain mb-2" />
+              <DebateAiLogo className="h-12 w-auto mb-2" />
               <div className="text-center">
                 <span className="text-2xl font-black tracking-tight text-primary leading-none block">DebateAI</span>
                 <a
