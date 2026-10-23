@@ -8,8 +8,8 @@ database:
 
 gemini:
   apiKey: "<YOUR_GEMINI_API_KEY>"
-  # API key for OpenAI / Gemini model access
-  # Obtain from your OpenRouter.ai or OpenAI account dashboard
+  # API key for the Gemini client
+  # Obtain it from the Gemini provider's credential console
 
 jwt:
   secret: "<YOUR_JWT_SECRET>"
