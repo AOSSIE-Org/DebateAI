@@ -20,6 +20,7 @@ export type PhaseTiming = {
 };
 
 export type DebateRequest = {
+  debateId?: string; // Optional session ID for ongoing debate
   botLevel: string;
   topic: string;
   history: DebateMessage[];
@@ -39,6 +40,7 @@ export type DebateResponse = {
 };
 
 export type JudgeRequest = {
+  debateId?: string; // Optional session ID to target specific ongoing debate
   history: DebateMessage[];
   userId: string;
 };
