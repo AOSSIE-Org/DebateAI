@@ -5,7 +5,7 @@ import { AuthContext } from "@/context/authContext";
 import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { RiRobot2Fill } from "react-icons/ri";
 import { FaHandshakeSimpleSlash } from "react-icons/fa6";
-import AOSSIELogo from "@/assets/aossie.png";
+import { DebateAiLogo } from "../components/DebateAiLogo";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -45,16 +45,21 @@ const Home: React.FC = () => {
       <nav className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4">
           <a
-            href="https://aossie.org"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/"
             className="p-1 hover:opacity-80 transition-opacity"
           >
-            <img src={AOSSIELogo} alt="AOSSIE Logo" className="h-8 w-auto object-contain" />
+            <DebateAiLogo className="h-8 w-auto" />
           </a>
           <div className="flex flex-col">
             <span className="text-2xl font-black tracking-tight text-primary leading-none">DebateAI</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">by AOSSIE</span>
+            <a
+              href="https://aossie.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold hover:text-foreground transition-colors"
+            >
+              by AOSSIE
+            </a>
           </div>
         </div>
         <div className="flex items-center gap-3">

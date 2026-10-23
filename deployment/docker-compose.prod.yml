@@ -1,0 +1,19 @@
+
+services:
+  backend:
+    image: ghcr.io/aossie-org/debateai-backend:latest
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-1313}:1313"
+    environment:
+      PORT: "1313"
+      CONFIG_PATH: /app/config/config.prod.yml
+      DATABASE_URI: ${DATABASE_URI:?Set DATABASE_URI in your environment}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in your environment}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your environment}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      REDIS_ADDR: ${REDIS_ADDR:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?Set CORS_ALLOWED_ORIGINS in your environment}
+      SEED_DEMO_DATA: "false"

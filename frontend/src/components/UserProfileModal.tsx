@@ -1,6 +1,6 @@
 import config from "../config/config";
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { UserPlus, UserCheck, Users } from 'lucide-react';
@@ -248,6 +248,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>User Profile</DialogTitle>
+          <DialogDescription className="sr-only">
+            Profile details, followers and people this user follows.
+          </DialogDescription>
         </DialogHeader>
 
         {loading ? (

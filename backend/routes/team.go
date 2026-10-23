@@ -23,6 +23,7 @@ func SetupTeamRoutes(router *gin.RouterGroup) {
 		teamRoutes.GET("/members/:memberId", controllers.GetTeamMemberProfile)
 		teamRoutes.GET("/user/teams", controllers.GetUserTeams)
 		teamRoutes.GET("/available", controllers.GetAvailableTeams)
+		teamRoutes.PUT("/:teamId/captain", controllers.TransferTeamCaptain)
 	}
 }
 

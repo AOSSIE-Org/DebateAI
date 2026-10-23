@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"os"
 )
 
@@ -48,7 +49,7 @@ func SubmitTranscripts(c *gin.Context) {
 
 	token = strings.TrimPrefix(token, "Bearer ")
 	valid, email, err := utils.ValidateTokenAndFetchEmail("./config/config.prod.yml", token, c)
- 	if err != nil || !valid || email == "" {
+	if err != nil || !valid || email == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}
@@ -500,4 +501,48 @@ func UpdateTranscriptResultHandler(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"message": "Transcript result updated successfully"})
+}
+
+// GetDebateResultHandler lets every participant retrieve the shared judgment once it is ready.
+func GetDebateResultHandler(c *gin.Context) {
+	roomID := strings.TrimSpace(c.Param("roomId"))
+	if roomID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Room ID is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	teamDebate, err := services.GetTeamDebateByID(ctx, roomID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve debate"})
+		return
+	}
+	if teamDebate != nil {
+		email := strings.ToLower(strings.TrimSpace(c.GetString("email")))
+		isParticipant := false
+		for _, member := range append(append([]models.TeamMember{}, teamDebate.Team1Members...), teamDebate.Team2Members...) {
+			if email != "" && strings.EqualFold(strings.TrimSpace(member.Email), email) {
+				isParticipant = true
+				break
+			}
+		}
+		if !isParticipant {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only debate participants can view this judgment"})
+			return
+		}
+	}
+
+	var result models.DebateResult
+	err = db.MongoDatabase.Collection("debate_results").FindOne(ctx, bson.M{"roomId": roomID}).Decode(&result)
+	if err == mongo.ErrNoDocuments {
+		c.JSON(http.StatusAccepted, gin.H{"message": "Judgment pending"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve debate judgment"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Debate judged", "result": result.Result})
 }

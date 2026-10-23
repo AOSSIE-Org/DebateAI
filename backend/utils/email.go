@@ -27,7 +27,7 @@ func GenerateRandomCode(length int) string {
 
 // SendVerificationEmail sends an email with a verification code using Gmail SMTP
 func SendVerificationEmail(email, code string) error {
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	cfg, err := config.LoadConfig(configPath())
 	if err != nil {
 		return fmt.Errorf("failed to load config: %v", err)
 	}
@@ -56,7 +56,7 @@ func SendVerificationEmail(email, code string) error {
 
 // SendPasswordResetEmail sends an email with a password reset code using Gmail SMTP
 func SendPasswordResetEmail(email, code string) error {
-	cfg, err := config.LoadConfig("./config/config.prod.yml")
+	cfg, err := config.LoadConfig(configPath())
 	if err != nil {
 		return fmt.Errorf("failed to load config: %v", err)
 	}
