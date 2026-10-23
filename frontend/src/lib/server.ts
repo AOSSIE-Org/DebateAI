@@ -2,7 +2,7 @@ const OFFICIAL = import.meta.env.VITE_BASE_URL;
 const LOCAL_BACKEND = 'http://localhost:1313';
 const KEY = 'debateai:server';
 
-// Clean origin, or null if invalid. https only (http allowed for localhost).
+// Clean origin, or null if invalid.
 export function normalize(raw: unknown): string | null {
   if (!raw) return null;
   try {

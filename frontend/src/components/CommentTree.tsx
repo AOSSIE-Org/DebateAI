@@ -226,9 +226,19 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   className = '',
 }) => {
   const { user } = useUser();
-  const [commentsAtom] = useAtom(getCommentsForTranscriptAtom(transcriptId));
-  const [, setCommentsAtom] = useAtom(setCommentsForTranscriptAtom(transcriptId));
-  const [, removeCommentAtom] = useAtom(removeCommentFromTranscriptAtom(transcriptId));
+  // Create the per-transcript atoms once per transcript; atoms created during
+  // render are new on every render and make jotai re-subscribe in a loop.
+  const transcriptAtoms = useMemo(
+    () => ({
+      comments: getCommentsForTranscriptAtom(transcriptId),
+      setComments: setCommentsForTranscriptAtom(transcriptId),
+      removeComment: removeCommentFromTranscriptAtom(transcriptId),
+    }),
+    [transcriptId]
+  );
+  const [commentsAtom] = useAtom(transcriptAtoms.comments);
+  const [, setCommentsAtom] = useAtom(transcriptAtoms.setComments);
+  const [, removeCommentAtom] = useAtom(transcriptAtoms.removeComment);
   
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);

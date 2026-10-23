@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -413,6 +414,8 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                         size='sm'
                         onClick={() => handleDeleteTranscript(transcript.id)}
                         disabled={deletingId === transcript.id}
+                        aria-label={`Delete transcript: ${transcript.topic}`}
+                        title='Delete transcript'
                         className='h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50'
                       >
                         <Trash2 className='w-3 h-3' />
@@ -436,6 +439,9 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
               <MessageSquare className='w-5 h-5' />
               Debate Transcript
             </DialogTitle>
+            <DialogDescription className='sr-only'>
+              Full transcript, phase summaries and comments for this debate.
+            </DialogDescription>
           </DialogHeader>
           {selectedTranscript && (
             <div className='space-y-4'>

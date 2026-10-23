@@ -20,9 +20,19 @@ jobs:
     build:
         runs-on: ubuntu-latest
 
+        permissions:
+            contents: read
+            pages: write
+
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
+
+            # Gives the Pages base path: "/DebateAI" for the project site,
+            # or "" if a custom domain is configured.
+            - name: Configure GitHub Pages
+              id: pages
+              uses: actions/configure-pages@v5
 
             - name: Set up Node.js
               uses: actions/setup-node@v4
@@ -35,11 +45,23 @@ jobs:
               working-directory: frontend
               run: npm ci
 
+            - name: Run tests
+              working-directory: frontend
+              run: npm test
+
             - name: Build frontend
               working-directory: frontend
               env:
                   VITE_BASE_URL: ${{ vars.VITE_BASE_URL }}
+                  VITE_API_URL: ${{ vars.VITE_API_URL }}
+                  VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
               run: npm run build
+
+            # GitHub Pages has no SPA fallback; serving index.html as the 404
+            # page lets deep links such as /DebateAI/coach/... load the app.
+            - name: Add SPA fallback
+              working-directory: frontend
+              run: cp dist/index.html dist/404.html
 
             - name: Upload Pages artifact
               uses: actions/upload-pages-artifact@v3
