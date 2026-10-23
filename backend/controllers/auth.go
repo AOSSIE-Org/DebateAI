@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
 	"errors"
 	"fmt"
 	"log"
 	"math"
+	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -26,6 +28,49 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/idtoken"
 )
+
+// resolveUniqueDisplayName resolves or generates an available displayName in MongoDB.
+// If base is available, it is returned. If taken, it appends a random 4-digit discriminator.
+func resolveUniqueDisplayName(ctx context.Context, col *mongo.Collection, base string) (string, error) {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "debater"
+	}
+	// Limit base length so base + "_1234" stays within 30 chars
+	if len(base) > 24 {
+		base = base[:24]
+	}
+
+	// First check if base name is already free
+	var existing models.User
+	err := col.FindOne(ctx, bson.M{"displayName": base}).Decode(&existing)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return base, nil
+	} else if err != nil {
+		return "", err
+	}
+
+	// Collision: append random 4-digit discriminator
+	for i := 0; i < 10; i++ {
+		num, err := cryptoRand.Int(cryptoRand.Reader, big.NewInt(9000))
+		val := int64(0)
+		if err == nil {
+			val = num.Int64()
+		} else {
+			val = time.Now().UnixNano() % 9000
+		}
+		candidate := fmt.Sprintf("%s_%d", base, val+1000)
+		err = col.FindOne(ctx, bson.M{"displayName": candidate}).Decode(&existing)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return candidate, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+
+	// Fallback to timestamp suffix if all random attempts collided
+	return fmt.Sprintf("%s_%d", base, time.Now().Unix()%100000), nil
+}
 
 type GoogleLoginRequest struct {
 	IDToken string `json:"idToken" binding:"required"`
@@ -71,21 +116,17 @@ func GoogleLogin(ctx *gin.Context) {
 
 	now := time.Now()
 	if err == mongo.ErrNoDocuments {
-		// Check if displayName is already taken for new Google users
-		var existingDisplayName models.User
-		dnErr := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": nickname}).Decode(&existingDisplayName)
-		if dnErr == nil {
-			ctx.JSON(400, gin.H{"error": "Display name already taken"})
-			return
-		} else if !errors.Is(dnErr, mongo.ErrNoDocuments) {
-			ctx.JSON(500, gin.H{"error": "Database error"})
+		// Gracefully resolve unique displayName for new Google users
+		uniqueDisplayName, dnErr := resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), nickname)
+		if dnErr != nil {
+			ctx.JSON(500, gin.H{"error": "Database error", "message": "Failed to resolve display name"})
 			return
 		}
 
 		newUser := models.User{
 			Email:            email,
-			DisplayName:      nickname,
-			Nickname:         nickname,
+			DisplayName:      uniqueDisplayName,
+			Nickname:         uniqueDisplayName,
 			Bio:              "",
 			Rating:           1200.0,
 			RD:               350.0,
@@ -101,8 +142,17 @@ func GoogleLogin(ctx *gin.Context) {
 		}
 		result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 		if err != nil {
-			ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
-			return
+			if mongo.IsDuplicateKeyError(err) {
+				// Retry with fresh unique name in case of race condition
+				uniqueDisplayName, _ = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), nickname)
+				newUser.DisplayName = uniqueDisplayName
+				newUser.Nickname = uniqueDisplayName
+				result, err = db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
+			}
+			if err != nil {
+				ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
+				return
+			}
 		}
 		newUser.ID = result.InsertedID.(primitive.ObjectID)
 		existingUser = newUser
@@ -152,16 +202,30 @@ func SignUp(ctx *gin.Context) {
 		return
 	}
 
-	// Check if displayName is already taken
-	defaultDisplayName := utils.ExtractNameFromEmail(request.Email)
-	var existingDisplayName models.User
-	err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": defaultDisplayName}).Decode(&existingDisplayName)
-	if err == nil {
-		ctx.JSON(400, gin.H{"error": "Display name already taken"})
-		return
-	} else if !errors.Is(err, mongo.ErrNoDocuments) {
-		ctx.JSON(500, gin.H{"error": "Database error"})
-		return
+	var finalDisplayName string
+	customDisplayName := strings.TrimSpace(request.DisplayName)
+
+	if customDisplayName != "" {
+		// User explicitly provided a custom display name: validate uniqueness
+		var existingDisplayName models.User
+		err = db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"displayName": customDisplayName}).Decode(&existingDisplayName)
+		if err == nil {
+			ctx.JSON(400, gin.H{"error": "Display name already taken"})
+			return
+		} else if !errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(500, gin.H{"error": "Database error"})
+			return
+		}
+		finalDisplayName = customDisplayName
+	} else {
+		// User did not provide custom display name: resolve unique name using email prefix
+		defaultBaseName := utils.ExtractNameFromEmail(request.Email)
+		var dnErr error
+		finalDisplayName, dnErr = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), defaultBaseName)
+		if dnErr != nil {
+			ctx.JSON(500, gin.H{"error": "Database error", "message": "Failed to resolve display name"})
+			return
+		}
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -174,8 +238,8 @@ func SignUp(ctx *gin.Context) {
 	now := time.Now()
 	newUser := models.User{
 		Email:                  request.Email,
-		DisplayName:            defaultDisplayName,
-		Nickname:               defaultDisplayName,
+		DisplayName:            finalDisplayName,
+		Nickname:               finalDisplayName,
 		Bio:                    "",
 		Rating:                 1200.0,
 		RD:                     350.0,
@@ -197,11 +261,22 @@ func SignUp(ctx *gin.Context) {
 	result, err := db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
-			ctx.JSON(400, gin.H{"error": "Display name already taken"})
+			if customDisplayName == "" {
+				// Retry with fresh unique candidate if auto-generated
+				finalDisplayName, _ = resolveUniqueDisplayName(dbCtx, db.MongoDatabase.Collection("users"), utils.ExtractNameFromEmail(request.Email))
+				newUser.DisplayName = finalDisplayName
+				newUser.Nickname = finalDisplayName
+				result, err = db.MongoDatabase.Collection("users").InsertOne(dbCtx, newUser)
+			}
+			if err != nil && mongo.IsDuplicateKeyError(err) {
+				ctx.JSON(400, gin.H{"error": "Display name already taken"})
+				return
+			}
+		}
+		if err != nil {
+			ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
 			return
 		}
-		ctx.JSON(500, gin.H{"error": "Failed to create user", "message": err.Error()})
-		return
 	}
 	newUser.ID = result.InsertedID.(primitive.ObjectID)
 
