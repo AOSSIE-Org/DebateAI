@@ -110,13 +110,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
       const entry = entries[0];
       if (!entry) return;
       const width = Math.floor(entry.contentRect.width);
-      if (width <= 0 || width === lastWidth) return;
+      if (width <= 0) return;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (width === lastWidth) return;
 
       if (lastWidth === 0) {
         lastWidth = width;
         setContainerWidth(width);
       } else {
-        if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
           lastWidth = width;
           setContainerWidth(width);
@@ -308,13 +314,19 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       const entry = entries[0];
       if (!entry) return;
       const width = Math.floor(entry.contentRect.width);
-      if (width <= 0 || width === lastWidth) return;
+      if (width <= 0) return;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (width === lastWidth) return;
 
       if (lastWidth === 0) {
         lastWidth = width;
         setContainerWidth(width);
       } else {
-        if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
           lastWidth = width;
           setContainerWidth(width);
