@@ -47,7 +47,7 @@ export default function TournamentHub() {
   }, [user?.id]);
 
   const requests = cache.owner === user?.id ? cache.requests : [];
-  const requestIds = requests.map(request => request.tournamentId).join(",");
+  const requestIds = requests.filter(request => request.status === "pending").map(request => request.tournamentId).join(",");
   useEffect(() => {
     if (!requestIds) return;
     const controller = new AbortController();

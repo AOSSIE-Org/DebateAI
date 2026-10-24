@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"time"
 
 	"arguehub/models"
@@ -132,6 +134,12 @@ func SubmitTournamentTranscriptHandler(c *gin.Context) {
 	if !ok {
 		return
 	}
+	reader := http.NewResponseController(c.Writer)
+	// Bound the 16 KiB JSON body without imposing timeouts on WebSocket routes.
+	if err := reader.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Unable to read transcript"})
+		return
+	}
 	var input struct {
 		RunID   string `json:"runId"`
 		Round   string `json:"round"`
@@ -141,6 +149,8 @@ func SubmitTournamentTranscriptHandler(c *gin.Context) {
 	if !bindTournamentJSON(c, &input, 16384) {
 		return
 	}
+	// Failed reads keep the deadline so the server cannot block draining the body.
+	_ = reader.SetReadDeadline(time.Time{})
 	run, err := primitive.ObjectIDFromHex(input.RunID)
 	if err != nil || run.IsZero() {
 		c.JSON(400, gin.H{"error": "Invalid run ID"})
