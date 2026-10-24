@@ -15,11 +15,13 @@ import { DebateAiLogo } from '../components/DebateAiLogo';
 const LeftSection = () => (
   <div className="hidden xl:flex flex-col justify-between bg-muted p-6 sm:p-8 xl:p-10 text-black dark:text-white w-full xl:w-1/2 xl:h-full min-h-[50vh] [.contrast_&]:text-white overflow-hidden">
     <div className="flex w-full items-center justify-center xl:justify-start text-lg font-medium text-center mx-auto">
-      <Link to="/" className="flex flex-wrap items-center justify-center xl:justify-start gap-2 max-w-full break-words mx-auto xl:mx-0">
-        <svg>
-          {/* SVG Content */}
-        </svg>
-        Arguehub
+      <Link
+        to="/"
+        aria-label="DebateAI home"
+        className="flex flex-wrap items-center justify-center xl:justify-start gap-2 max-w-full break-words mx-auto xl:mx-0"
+      >
+        <DebateAiLogo className="h-8 w-auto" />
+        <span>DebateAI</span>
       </Link>
     </div>
     <div className="flex justify-center items-center flex-1 min-h-0 p-6">
