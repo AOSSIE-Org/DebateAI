@@ -6,6 +6,11 @@ import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/authContext';
 import { useCallback } from "react";
 
+// Google's renderButton only accepts a pixel width between 200 and 400;
+// a percentage is ignored and the button shrinks to fit its text.
+const googleButtonWidth = (element: HTMLElement) =>
+  Math.round(Math.min(400, Math.max(200, element.clientWidth)));
+
 interface LoginFormProps {
   startForgotPassword: () => void;
   infoMessage?: string;
@@ -80,7 +85,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
         theme: 'outline',
         size: 'large',
         text: 'signin_with',
-        width: '100%',
+        width: googleButtonWidth(buttonElement),
       });
     }
 
@@ -139,7 +144,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
       <Button type="submit" className="w-full mb-2 border border-border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
-      <div id="googleSignInButton" className="w-full"></div>
+      <div id="googleSignInButton" className="w-full flex justify-center"></div>
     </form>
   );
 };
@@ -212,7 +217,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
         theme: 'outline',
         size: 'large',
         text: 'signup_with',
-        width: '100%',
+        width: googleButtonWidth(buttonElement),
       });
     }
 
@@ -268,7 +273,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
-      <div id="googleSignUpButton" className="w-full"></div>
+      <div id="googleSignUpButton" className="w-full flex justify-center"></div>
     </form>
   );
 };
