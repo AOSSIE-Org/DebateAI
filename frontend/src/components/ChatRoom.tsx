@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import clsx from 'clsx';
 
-const reactionsList = ['😂', '❤️', '❤️', '👍'];
+const reactionsList = ['😂', '❤️', '👍'];
 
 interface Message {
   username: string;

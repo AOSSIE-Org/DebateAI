@@ -65,8 +65,9 @@ by account/run/phase, not confidential from someone using the same device.
 ## Validation
 
 Run `go test ./... -count=1` and `go vet ./...` from backend, and `npm run build`
-and `npm run lint` from frontend. Set `TOURNAMENT_TEST_MONGO_URI` to isolated local
-Mongo for database tests; they create/drop uniquely named databases and skip if
-unset. Never use production. Provider tests use injected mock HTTP transport;
-mock scores are not live-model evidence. Full repository lint has existing legacy
-failures; race instrumentation needs a compatible 64-bit C toolchain.
+and `npm test` / `npm run lint` from frontend. This contribution does not include
+tournament-specific regression test files; these commands exercise the remaining
+repository coverage. Local mock validation is not live-model evidence or proof of
+production readiness. Never use production databases for testing. Full repository
+lint has existing legacy failures; race instrumentation needs a compatible
+64-bit C toolchain.

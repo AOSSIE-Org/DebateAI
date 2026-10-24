@@ -10,7 +10,7 @@ import { Link, useLocation } from 'react-router-dom';
 import DebateCoverIllustration from '../components/DebateCoverIllustration';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { AuthContext } from '../context/authContext';
-import debateAiLogo from '@/assets/aossie.png';
+import { DebateAiLogo } from '../components/DebateAiLogo';
 
 const LeftSection = () => (
   <div className="hidden xl:flex flex-col justify-between bg-muted p-6 sm:p-8 xl:p-10 text-black dark:text-white w-full xl:w-1/2 xl:h-full min-h-[50vh] [.contrast_&]:text-white overflow-hidden">
@@ -97,7 +97,7 @@ const RightSection: React.FC<RightSectionProps> = ({
     <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-xl p-6 sm:p-8 backdrop-blur-sm">
       <div className="flex flex-col items-center text-center mb-6">
         <Link to="/" className="mb-2 hover:opacity-80 transition-opacity">
-          <img src={debateAiLogo} alt="DebateAI Logo" className="h-10 w-auto object-contain" />
+          <DebateAiLogo className="h-10 w-auto" />
         </Link>
         <h2 className="text-2xl font-bold tracking-tight text-foreground">
           {authMode === 'login' && 'Welcome to DebateAI'}

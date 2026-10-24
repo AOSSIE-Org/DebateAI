@@ -33,6 +33,7 @@ const Game: React.FC = () => {
   });
 
   const websocketRef = useRef<WebSocket | null>(null);
+
   type GameWebSocketMessage = {
     type: string;
     content?: string;
@@ -427,3 +428,4 @@ const Game: React.FC = () => {
 };
 
 export default Game;
+

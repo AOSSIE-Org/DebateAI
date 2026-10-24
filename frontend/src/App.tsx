@@ -94,6 +94,8 @@ function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Layout />}>
           <Route path="startDebate" element={<StartDebate />} />
+          <Route path="startdebate" element={<Navigate to="/startDebate" replace />} />
+          <Route path="start-debate" element={<Navigate to="/startDebate" replace />} />
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="profile" element={<Profile />} />
           <Route path="community" element={<CommunityFeed />} />

@@ -32,11 +32,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import debateAiLogo from "@/assets/aossie.png";
+import { DebateAiLogo } from "./DebateAiLogo";
 import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
 import { ThemeToggle } from "./ThemeToggle";
+import ServerBadge from "./ServerBadge";
 
 const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) => {
   const image = event.currentTarget;
@@ -170,6 +171,7 @@ function Header() {
       <header className="flex items-center justify-between h-16 px-2 sm:px-4 border-b border-border bg-background">
         <div className="hidden xs:flex flex-1 min-w-0 overflow-hidden text-sm sm:text-lg font-semibold mr-2">{getBreadcrumbs()}</div>
         <div className="flex-shrink-0 flex items-center gap-2 sm:gap-4">
+          <ServerBadge />
           <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
             <PopoverTrigger asChild>
               <button
@@ -314,21 +316,20 @@ function Header() {
           <div className="relative w-64 h-full bg-background border-l border-border shadow-lg flex flex-col ml-auto">
             <div className="flex items-center justify-between h-16 px-4 border-b border-border">
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold">
-                  DebateAI
-                </span>
-                <a 
-                  href="https://aossie.org" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src={debateAiLogo}
-                    alt="DebateAI Logo"
-                    className="h-8 w-auto object-contain"
-                  />
-                </a>
+                <DebateAiLogo className="h-8 w-auto" />
+                <div className="flex flex-col">
+                  <span className="text-xl font-bold leading-none">
+                    DebateAI
+                  </span>
+                  <a 
+                    href="https://aossie.org" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold hover:text-foreground transition-colors"
+                  >
+                    by AOSSIE
+                  </a>
+                </div>
               </div>
               <button
                 onClick={toggleDrawer}

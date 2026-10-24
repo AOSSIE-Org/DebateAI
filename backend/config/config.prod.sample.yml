@@ -7,9 +7,10 @@ database:
   # Get this from your MongoDB Atlas dashboard after creating a cluster and database
 
 gemini:
-  apiKey: "<YOUR_GEMINI_API_KEY>"
-  # API key for OpenAI / Gemini model access
-  # Obtain from your OpenRouter.ai or OpenAI account dashboard
+  apiKey:
+    "<YOUR_GEMINI_API_KEY>"
+    # API key for the Gemini client
+    # Obtain it from the Gemini provider's credential console
 
 jwt:
   secret: "<YOUR_JWT_SECRET>"
@@ -41,3 +42,8 @@ googleOAuth:
   clientID: "<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
   # Google OAuth Client ID for OAuth login
   # Obtain from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs)
+
+redis:
+  addr: "localhost:6379"
+  password: "<YOUR_REDIS_PASSWORD>"
+  db: 0

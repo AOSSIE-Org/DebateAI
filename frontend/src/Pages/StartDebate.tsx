@@ -7,7 +7,7 @@ import DebateCoverIllustration from "../components/DebateCoverIllustration";
 import { Button } from "../components/ui/button";
 import { AuthContext } from "../context/authContext";
 import DebatePopup from "@/components/DebatePopup";
-import AOSSIELogo from "@/assets/aossie.png";
+import { DebateAiLogo } from "../components/DebateAiLogo";
 
 const StartDebate = () => {
   const navigate = useNavigate();
@@ -43,16 +43,17 @@ const StartDebate = () => {
           </div>
           <div className="flex w-full lg:w-1/3 flex-col items-center justify-center space-y-4 p-4">
             <div className="flex flex-col items-center mb-6">
-              <a
-                href="https://aossie.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-2 hover:opacity-80 transition-opacity"
-              >
-                <img src={AOSSIELogo} alt="AOSSIE Logo" className="h-12 w-auto object-contain" />
-              </a>
+              <DebateAiLogo className="h-12 w-auto mb-2" />
               <div className="text-center">
-                <span className="text-sm text-muted-foreground uppercase tracking-[0.2em] font-black">by AOSSIE</span>
+                <span className="text-2xl font-black tracking-tight text-primary leading-none block">DebateAI</span>
+                <a
+                  href="https://aossie.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground uppercase tracking-[0.2em] font-black hover:text-foreground transition-colors"
+                >
+                  by AOSSIE
+                </a>
               </div>
             </div>
             <h3 className="text-2xl md:text-4xl font-bold text-center">

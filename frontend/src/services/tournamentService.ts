@@ -1,8 +1,11 @@
 import config from "../config/config";
 import { getAuthToken } from "@/utils/auth";
 
-const API_BASE_URL =
-  config.baseUrl?.replace(/\/+$/, "") ?? "http://localhost:1313";
+function tournamentBaseURL(): string {
+  const baseURL = config.baseUrl;
+  if (!baseURL) throw new Error("No valid backend server is configured.");
+  return baseURL.replace(/\/+$/, "");
+}
 
 export interface TournamentParticipant {
   userId: string;
@@ -74,7 +77,7 @@ export class TournamentRequestError extends Error {
 async function tournamentRequest<T>(path: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
   const token = getAuthToken();
   if (!token) throw new Error("Please sign in to continue.");
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${tournamentBaseURL()}${path}`, {
     method, signal,
     headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -197,7 +200,7 @@ export const createTournament = async (
     throw new Error("Please sign in before creating a tournament.");
   }
 
-  const response = await fetch(`${API_BASE_URL}/tournaments`, {
+  const response = await fetch(`${tournamentBaseURL()}/tournaments`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
