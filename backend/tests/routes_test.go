@@ -280,3 +280,67 @@ func TestJoinPublicTournamentLifecycleValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestJoinPrivateTournamentLifecycleValidation(t *testing.T) {
+	database := testkit.ConnectMongo(t)
+
+	prevCollection := db.TournamentCollection
+	db.TournamentCollection = database.Collection("tournaments")
+	t.Cleanup(func() {
+		db.TournamentCollection = prevCollection
+	})
+
+	userID := primitive.NewObjectID()
+	router := gin.New()
+	router.POST("/tournaments/private/join", func(c *gin.Context) {
+		c.Set("userID", userID)
+		c.Set("displayName", "Test User")
+		controllers.JoinPrivateTournament(c)
+	})
+
+	cases := []struct {
+		name         string
+		status       string
+		wantStatus   int
+		wantRequests int
+	}{
+		{name: "upcoming tournament accepts join request", status: models.StatusUpcoming, wantStatus: http.StatusOK, wantRequests: 1},
+		{name: "live tournament rejects join request", status: models.StatusLive, wantStatus: http.StatusBadRequest, wantRequests: 0},
+		{name: "completed tournament rejects join request", status: models.StatusCompleted, wantStatus: http.StatusBadRequest, wantRequests: 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tournamentID := primitive.NewObjectID()
+			inviteCode := "invite-" + tournamentID.Hex()
+			_, err := db.TournamentCollection.InsertOne(context.Background(), bson.M{
+				"_id":             tournamentID,
+				"visibility":      models.VisibilityPrivate,
+				"status":          tc.status,
+				"inviteCode":      inviteCode,
+				"maxParticipants": 8,
+				"participants":    bson.A{},
+				"joinRequests":    bson.A{},
+			})
+			if err != nil {
+				t.Fatalf("insert tournament: %v", err)
+			}
+
+			rec := perform(router, http.MethodPost, "/tournaments/private/join", map[string]string{"inviteCode": inviteCode}, nil)
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d, body %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+
+			var stored struct {
+				JoinRequests []bson.M `bson:"joinRequests"`
+			}
+			err = db.TournamentCollection.FindOne(context.Background(), bson.M{"_id": tournamentID}).Decode(&stored)
+			if err != nil {
+				t.Fatalf("reload tournament: %v", err)
+			}
+			if len(stored.JoinRequests) != tc.wantRequests {
+				t.Fatalf("joinRequests = %d, want %d", len(stored.JoinRequests), tc.wantRequests)
+			}
+		})
+	}
+}
