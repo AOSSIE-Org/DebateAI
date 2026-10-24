@@ -1,10 +1,38 @@
+<!-- Don't delete it -->
+<div id="readme-top"></div>
+
+<!-- Organization & Project Logos -->
 <p align="center">
-  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRpPlI1P7SK3pemg67VMPbvNzxYyk0UtlmJiQ&s" alt="Aossie Logo" height="100"/>
+  <img src="frontend/public/aossie-logo.svg" height="130" alt="AOSSIE Logo" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="./frontend/public/debateai-logo.svg" alt="DebateAI Logo" height="100"/>
+  <img src="frontend/public/debateai-logo.svg" height="130" alt="DebateAI Logo" />
 </p>
 
-<h1 align="center">AOSSIE | DebateAI</h1>
+<!-- Live at URL (To be configured later) -->
+<p align="center">
+  <!-- Live at URL will be configured later -->
+  <a href="https://hub.debateai.aossie.org/">
+    <img src="https://img.shields.io/badge/DebateAI Landing Page-Live_at_URL-228B22?style=for-the-badge&labelColor=FFC517" alt="DebateAI Live at URL" />
+  </a>
+  <a href="https://debateai.aossie.org/">
+    <img src="https://img.shields.io/badge/DebateAI-Live_at_URL-228B22?style=for-the-badge&labelColor=FFC517" alt="DebateAI Live at URL" />
+  </a>
+</p>
+
+<!-- Community & Social Handles -->
+<p align="center">
+  <a href="https://discord.gg/hjUhu33uAn"><img src="https://img.shields.io/discord/995968619034984528?style=flat&logo=discord&logoColor=white&label=Discord%20AOSSIE&labelColor=5865F2&color=57F287" alt="Discord AOSSIE"/></a>
+  &nbsp;
+  <a href="https://x.com/aossie_org"><img src="https://img.shields.io/twitter/follow/aossie_org" alt="X Badge"/></a>
+  &nbsp;
+  <a href="https://t.me/+bMWGzaMTMa8xN2Ex"><img src="https://img.shields.io/badge/Telegram_AOSSIE-black?style=flat&logo=telegram&logoColor=white&color=24A1DE" alt="Telegram Badge"/></a>
+  &nbsp;
+  <a href="https://www.linkedin.com/company/aossie/"><img src="https://img.shields.io/badge/LinkedIn_AOSSIE-black?style=flat&logo=LinkedIn&logoColor=white&color=0A66C2" alt="LinkedIn Badge"/></a>
+  &nbsp;
+  <a href="https://www.youtube.com/@AOSSIE-Org"><img src="https://img.shields.io/badge/Subscribe_to_AOSSIE-red?style=flat&logo=youtube&logoColor=white" alt="Subscribe to AOSSIE"/></a>
+  &nbsp;
+  <a href="https://www.youtube.com/@StabilityNexus"><img src="https://img.shields.io/badge/Subscribe_to_Stability_Nexus-red?style=flat&logo=youtube&logoColor=white" alt="Subscribe to Stability Nexus"/></a>
+</p>
 
 ---
 
@@ -15,41 +43,93 @@
 ### Key Features
 
 - **User vs. User Debates**
-- Real-time debates via **WebSockets**, **WebRTC** (audio/video/text)
-- Structured formats: **opening**, **cross-exam**, and **closing**
+  - Real-time debates via **WebSockets**, **WebRTC** (audio/video/text)
+  - Structured formats: **opening**, **cross-exam**, and **closing**
 
 - **User vs. AI Debates**
-- LLM-generated counterarguments that adapt to your input
+  - LLM-generated counterarguments that adapt to your input
 
 - **Custom Debate Rooms**
-- Create private, topic-specific debate spaces
+  - Create private, topic-specific debate spaces
+
+---
+
+## Community & Discussion
+
+If you have questions, feedback, or want to discuss ideas before building:
+- **AOSSIE Discord Server:** [https://discord.gg/hjUhu33uAn](https://discord.gg/hjUhu33uAn)
+- **Discord Channel:** `#AI for Debate` channel in the [AOSSIE Server](https://discord.com/channels/1022871757289422898/1312986807914463252)
+- **GitHub Issues:** [https://github.com/AOSSIE-Org/DebateAI/issues](https://github.com/AOSSIE-Org/DebateAI/issues)
 
 ---
 
 ## Project Setup Guide
 
-### Backend Configuration
-### Prerequisites
-- Go (version 1.20 or later)
-- MongoDB (local instance or MongoDB Atlas)
+You can run DebateAI locally using either **Docker Compose** (recommended for a one-command full-stack environment) or via **Manual Local Setup**.
 
 ---
 
-### 1. Create the Backend Config File
+### Option 1: Quick Start with Docker (Recommended)
 
-The backend expects a `config.prod.yml` file at runtime.  
-Only a sample config file is provided in the repository.
+DebateAI includes pre-configured Dockerfiles for both frontend and backend along with a root `docker-compose.yml` that starts the Backend, Frontend, MongoDB, and Redis automatically.
 
-Create the required config file by copying the sample:
+#### 1. Setup Environment Files
 
 ```bash
-cd backend/config
-cp config.prod.sample.yml config.prod.yml
+# 1. Setup Backend environment & config:
+cd backend
+cp .env.example .env
+cp config/config.prod.sample.yml config/config.prod.yml
+cd ..
+
+# 2. Setup Frontend environment:
+cd frontend
+cp .env.example .env
+cd ..
+```
+
+#### 2. Run with Docker Compose
+
+From the root project directory:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend:** [http://localhost:5173](http://localhost:5173)
+- **Backend Server:** [http://localhost:1313](http://localhost:1313)
+- **MongoDB:** `localhost:27017`
+- **Redis:** `localhost:6379`
+
+To stop:
+
+```bash
+docker compose down
 ```
 
 ---
 
-### 2. Configure MongoDB
+### Option 2: Manual Local Setup
+
+#### Prerequisites
+- **Go** (version 1.20 or later, 1.24 recommended)
+- **Node.js** (version 20 or later) & **npm**
+- **MongoDB** (local instance or MongoDB Atlas)
+- **Redis** (local instance or cloud Redis)
+
+---
+
+### Backend Configuration
+
+#### 1. Create Backend Config & Environment Files
+
+```bash
+cd backend
+cp .env.example .env
+cp config/config.prod.sample.yml config/config.prod.yml
+```
+
+#### 2. Configure MongoDB
 
 Update `backend/config/config.prod.yml` with a valid MongoDB connection string:
 
@@ -60,20 +140,27 @@ database:
 
 Without a valid MongoDB URI, the backend will fail to start.
 
----
+#### 3. Configure Redis
 
-### 3. (Optional) Gemini API Configuration
+Update `backend/config/config.prod.yml` with your Redis address:
 
-If the Gemini API key is not configured, the backend will still run, but AI-related features will be disabled.
+```yaml
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+```
+
+#### 4. Configure Gemini API (Optional)
+
+Configure your Gemini API key for AI debate features:
 
 ```yaml
 gemini:
   apiKey: "<YOUR_GEMINI_API_KEY>"
 ```
 
----
-
-### 4. Run the Backend Server
+#### 5. Run the Backend Server
 
 From the `backend` directory, start the server:
 
@@ -83,135 +170,81 @@ go run cmd/server/main.go
 
 The server will start on the port defined in the config file (default: `1313`).
 
+> **Note:** Do **not** commit `config.prod.yml` or `.env` to version control.
+
 ---
 
-### Notes
-- Do **not** commit `config.prod.yml` to version control.
-- Only `config.prod.sample.yml` should remain committed.
+### Frontend Configuration (React + Vite)
 
+#### 1. Navigate to the Frontend Directory and Install Dependencies
 
-### Frontend Configuration
-
-1. In the `frontend/` directory, create a file named `.env`.
-
-2. Add the following environment variables to the `.env` file:
-
+```bash
+cd frontend
+npm install
 ```
+
+#### 2. Setup Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Ensure `frontend/.env` contains the required URLs:
+
+```env
 VITE_BASE_URL="http://localhost:1313"
+VITE_API_URL="http://localhost:1313"
 VITE_GOOGLE_CLIENT_ID="<YOUR_GOOGLE_OAUTH_CLIENT_ID>"
 ```
 
-- Replace `<YOUR_GOOGLE_OAUTH_CLIENT_ID>` with your actual Google OAuth Client ID from Google Cloud Console.
+#### 3. Start the Development Server
 
-> **Note:** Do **not** commit this file to a public repository. Add `.env` to your `.gitignore` to keep it secure.
+```bash
+npm run dev
+```
 
----
-
-### Running the Frontend (React + Vite)
-
-1. Open a new terminal and navigate to the frontend directory:
-
-   ```
-   cd frontend
-   ```
-
-2. Install dependencies:
-
-   ```
-   npm install
-   ```
-
-3. Create a `.env` file and add:
-
-   ```
-   VITE_BASE_URL="http://localhost:1313"
-   ```
-
-4. Start the development server:
-   ```
-   npm run dev
-   ```
+The frontend will run on [http://localhost:5173](http://localhost:5173).
 
 ---
 
 ## Contribution Guidelines
 
-Thank you for your interest in contributing to **DebateAI**! We appreciate your efforts in making this project better. Please follow these best practices to ensure smooth collaboration.
+Thank you for your interest in contributing to **DebateAI**! Please refer to our detailed [`CONTRIBUTING.md`](CONTRIBUTING.md) for full contribution guidelines, testing procedures, coding standards, and Git workflows.
 
-### How to Contribute
+### Quick Contribution Steps
 
-#### 1. Fork the Repository
-
-- Navigate to the [DebateAI repository](https://github.com/AOSSIE-Org/DebateAI).
-- Click the **Fork** button in the top right corner.
-- Clone the forked repository to your local machine:
-
-```sh
-git clone https://github.com/your-username/DebateAI.git
-cd DebateAI
-```
-
-#### 2. Create a Feature Branch
-
-- Always create a new branch for your contributions:
-
-```sh
-git checkout -b feature-name
-```
-
-#### 3. Make Changes and Commit
-
-- Follow coding best practices and maintain code consistency.
-- Write clear commit messages:
-
-```sh
-git commit -m "Added [feature/fix]: Short description"
-```
-
-#### 4. Push Changes and Open a Pull Request
-
-- Push your changes to your forked repository:
-
-```sh
-git push origin feature-name
-```
-
-- Navigate to the original repository and open a **Pull Request (PR)**.
-- Provide a detailed description of the changes in the PR.
-
----
-
-### Best Practices
-
-- **Code Quality**: Ensure your code is clean, readable, and consistent with the existing codebase.
-- **Testing**: Test your changes locally before submitting a PR.
-- **Security**: Never commit sensitive information (e.g., API keys or passwords).
-- **Communication**: Be responsive to reviews and update your PRs as requested.
+1. **Fork the Repository:** Fork [DebateAI](https://github.com/AOSSIE-Org/DebateAI) and clone your fork locally:
+   ```bash
+   git clone https://github.com/<your-username>/DebateAI.git
+   cd DebateAI
+   ```
+2. **Create a Feature Branch:**
+   ```bash
+   git checkout -b feat/your-feature-name
+   ```
+3. **Run Code Validation:**
+   - **Backend:** `cd backend && go test ./... && go vet ./...`
+   - **Frontend:** `cd frontend && npm run lint && npm run build`
+4. **Push and Open a Pull Request:** Push to your fork and open a PR against `main`.
 
 ---
 
 ### Submitting a Video Demonstration
 
-To help maintainers understand your changes, consider submitting a short video showcasing the feature or fix:
-
-- Record a short demo (you can use tools like Loom or OBS).
-- Upload and include the video link in your Pull Request description.
+To help maintainers review and understand your changes, please consider submitting a short video demo showcasing your feature or fix in your Pull Request description.
 
 ---
 
 ### Reporting Issues
 
 If you find a bug or have a feature request:
-
-- Open an issue [here](https://github.com/AOSSIE-Org/DebateAI/issues).
-- Clearly describe the problem and, if possible, suggest solutions.
-
-We look forward to your contributions!
+- Open an issue on [GitHub Issues](https://github.com/AOSSIE-Org/DebateAI/issues).
+- Clearly describe the problem, steps to reproduce, and suggest solutions if possible.
 
 ---
 
 ## License
 
 MIT © [AOSSIE](https://aossie.org)
-
----
