@@ -5,9 +5,10 @@ import { Moon, Sun, Contrast } from "lucide-react";
 interface ThemeToggleProps {
   iconSize?: number;
   direction?: "up" | "down";
+  align?: "stretch" | "end";
 }
 
-export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeToggleProps) {
+export function ThemeToggle({ iconSize = 16, direction = "down", align = "stretch" }: ThemeToggleProps) {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -39,7 +40,7 @@ export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeTogglePr
     <div className="relative w-full" ref={dropdownRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full flex items-center gap-2 p-2 text-sm font-medium text-foreground rounded-md hover:bg-muted/70 transition"
+        className="w-full flex items-center gap-2 p-2 text-sm font-medium text-foreground whitespace-nowrap rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition"
       >
         {themeOptions.find((t) => t.id === theme)?.icon} Theme:{" "}
         <span>{themeOptions.find((t) => t.id === theme)?.name}</span>
@@ -64,16 +65,16 @@ export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeTogglePr
 
       {open && (
         <div
-          className={`absolute left-2 right-2 bg-popover border border-border rounded-md shadow z-10 ${
-            direction === "up" ? "bottom-full mb-1" : "top-full mt-1"
-          }`}
+          className={`absolute min-w-max p-1 bg-popover text-popover-foreground border border-border rounded-md shadow z-10 ${
+            align === "end" ? "right-0 w-max" : "left-2 right-2"
+          } ${direction === "up" ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           {themeOptions.map((option) => (
             <button
               type="button"
               key={option.id}
               onClick={() => setTheme(option.id)}
-              className="w-full flex items-center gap-2 p-2 text-sm hover:bg-muted cursor-pointer rounded-md text-left transition"
+              className="w-full flex items-center gap-2 p-2 text-sm whitespace-nowrap hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground cursor-pointer rounded-md text-left transition"
             >
               {option.icon}
               <span>{option.name}</span>
