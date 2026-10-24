@@ -62,11 +62,11 @@ const StartDebate = () => {
             </h3>
             <div className="flex flex-col w-full">
               <Button
-                className="my-2 h-auto rounded text-xl flex items-center justify-start"
+                className="my-2 h-auto rounded text-xl flex items-center justify-start whitespace-normal text-left"
                 onClick={handlePlayDebateClick}
               >
-                <FaHandshakeSimpleSlash className="text-4xl" />
-                <div className="flex flex-col items-start ml-4">
+                <FaHandshakeSimpleSlash className="text-4xl shrink-0" />
+                <div className="flex min-w-0 flex-col items-start ml-4">
                   <span className="font-bold">Play Online</span>
                   <span className="text-sm text-primary-foreground font-thin">
                     Play with someone at your level
@@ -74,12 +74,12 @@ const StartDebate = () => {
                 </div>
               </Button>
               <Button
-                className="my-2 h-auto rounded text-xl flex items-center justify-start"
+                className="my-2 h-auto rounded text-xl flex items-center justify-start whitespace-normal text-left"
                 variant="outline"
                 onClick={handlePlayBotClick}
               >
-                <RiRobot2Fill className="text-4xl" />
-                <div className="flex flex-col items-start ml-4">
+                <RiRobot2Fill className="text-4xl shrink-0" />
+                <div className="flex min-w-0 flex-col items-start ml-4">
                   <span className="font-bold">Practice with Bot</span>
                   <span className="text-sm text-muted-foreground font-thin">
                     Improve your skills with AI guidance
