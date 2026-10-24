@@ -101,7 +101,7 @@ const coachSkills: CoachSkill[] = [
     title: 'Strengthen Argument',
     description:
       'Master the art of crafting compelling, persuasive arguments that win debates.',
-    url: `${import.meta.env.BASE_URL}coach/strengthen-argument`,
+    url: `${import.meta.env.BASE_URL}coach/strengthen-argument`,  
   },
   {
     title: 'Pros and Cons Challenge',
