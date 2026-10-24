@@ -5,9 +5,10 @@ import { Moon, Sun, Contrast } from "lucide-react";
 interface ThemeToggleProps {
   iconSize?: number;
   direction?: "up" | "down";
+  align?: "stretch" | "end";
 }
 
-export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeToggleProps) {
+export function ThemeToggle({ iconSize = 16, direction = "down", align = "stretch" }: ThemeToggleProps) {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -64,9 +65,9 @@ export function ThemeToggle({ iconSize = 16, direction = "down" }: ThemeTogglePr
 
       {open && (
         <div
-          className={`absolute left-2 right-2 min-w-max p-1 bg-popover text-popover-foreground border border-border rounded-md shadow z-10 ${
-            direction === "up" ? "bottom-full mb-1" : "top-full mt-1"
-          }`}
+          className={`absolute min-w-max p-1 bg-popover text-popover-foreground border border-border rounded-md shadow z-10 ${
+            align === "end" ? "right-0 w-max" : "left-2 right-2"
+          } ${direction === "up" ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           {themeOptions.map((option) => (
             <button

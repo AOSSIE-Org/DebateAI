@@ -51,6 +51,18 @@ describe('ThemeToggle', () => {
     }
   });
 
+  it('right-aligns a content-width menu when align is "end"', async () => {
+    render(
+      <ThemeContext.Provider value={{ theme: ThemeOptions.Contrast, toggleTheme: vi.fn() }}>
+        <ThemeToggle align="end" />
+      </ThemeContext.Provider>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Theme:/ }));
+    const menu = screen.getByRole('button', { name: 'Light' }).parentElement;
+    expect(menu).toHaveClass('right-0', 'w-max');
+    expect(menu).not.toHaveClass('left-2');
+  });
+
   it.each([
     [ThemeOptions.Light, 'Dark', 1],
     [ThemeOptions.Light, 'High Contrast', 2],

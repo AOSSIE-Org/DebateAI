@@ -90,7 +90,7 @@ const RightSection: React.FC<RightSectionProps> = ({
         <span>Home</span>
       </Link>
       <div className="ml-auto">
-        <ThemeToggle iconSize={18} />
+        <ThemeToggle iconSize={18} align="end" />
       </div>
     </div>
 
