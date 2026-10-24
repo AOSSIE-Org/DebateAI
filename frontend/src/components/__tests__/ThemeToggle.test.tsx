@@ -28,6 +28,29 @@ describe('ThemeToggle', () => {
     expect(screen.queryByRole('button', { name: 'High Contrast' })).toBeNull();
   });
 
+  it('keeps the trigger and option labels on a single line', async () => {
+    renderWithTheme(ThemeOptions.Contrast);
+    const trigger = screen.getByRole('button', { name: /Theme:\s*High Contrast/ });
+    expect(trigger).toHaveClass('whitespace-nowrap');
+    await userEvent.click(trigger);
+    const option = screen.getByRole('button', { name: 'High Contrast' });
+    expect(option).toHaveClass('whitespace-nowrap');
+    expect(option.parentElement).toHaveClass('min-w-max');
+  });
+
+  it('applies hover styles that use the theme tokens', async () => {
+    renderWithTheme(ThemeOptions.Contrast);
+    const trigger = screen.getByRole('button', { name: /Theme:/ });
+    expect(trigger).toHaveClass('hover:bg-muted');
+    await userEvent.click(trigger);
+    for (const name of ['Light', 'Dark', 'High Contrast']) {
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'hover:bg-accent',
+        'hover:text-accent-foreground'
+      );
+    }
+  });
+
   it.each([
     [ThemeOptions.Light, 'Dark', 1],
     [ThemeOptions.Light, 'High Contrast', 2],
