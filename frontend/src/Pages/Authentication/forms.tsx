@@ -76,11 +76,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
 
     const buttonElement = document.getElementById('googleSignInButton');
     if (buttonElement) {
+      const buttonWidth = Math.min(Math.max(buttonElement.clientWidth || 384, 200), 400);
       google.accounts.id.renderButton(buttonElement, {
         theme: 'outline',
         size: 'large',
         text: 'signin_with',
-        width: '100%',
+        width: buttonWidth.toString(),
       });
     }
 
@@ -139,7 +140,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
       <Button type="submit" className="w-full mb-2 border border-border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
-      <div id="googleSignInButton" className="w-full"></div>
+      <div id="googleSignInButton" className="w-full flex justify-center"></div>
     </form>
   );
 };
@@ -208,11 +209,12 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
 
     const buttonElement = document.getElementById('googleSignUpButton');
     if (buttonElement) {
+      const buttonWidth = Math.min(Math.max(buttonElement.clientWidth || 384, 200), 400);
       google.accounts.id.renderButton(buttonElement, {
         theme: 'outline',
         size: 'large',
         text: 'signup_with',
-        width: '100%',
+        width: buttonWidth.toString(),
       });
     }
 
@@ -268,7 +270,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
-      <div id="googleSignUpButton" className="w-full"></div>
+      <div id="googleSignUpButton" className="w-full flex justify-center"></div>
     </form>
   );
 };
