@@ -1,6 +1,10 @@
 package models
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // Message represents a single message in the debate
 type Message struct {
@@ -28,4 +32,6 @@ type DebateVsBot struct {
 	PhaseTimings []PhaseTiming      `json:"phaseTimings" bson:"phaseTimings"` // Added for custom timings
 	Outcome      string             `json:"outcome" bson:"outcome"`           // Result of the debate (e.g., "User wins")
 	CreatedAt    int64              `json:"createdAt" bson:"createdAt"`
+	Judgment     string             `json:"-" bson:"judgment,omitempty"`
+	SettledAt    time.Time          `json:"-" bson:"settledAt,omitempty"`
 }

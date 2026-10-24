@@ -20,6 +20,7 @@ export type PhaseTiming = {
 };
 
 export type DebateRequest = {
+  debateId?: string; // Optional for createDebate, required for message requests
   botLevel: string;
   topic: string;
   history: DebateMessage[];
@@ -39,8 +40,8 @@ export type DebateResponse = {
 };
 
 export type JudgeRequest = {
+  debateId: string;
   history: DebateMessage[];
-  userId: string;
 };
 
 export type JudgeResponse = {
@@ -86,7 +87,7 @@ export const createDebate = async (data: DebateRequest): Promise<DebateResponse>
 };
 
 // Function to send a message in an existing debate
-export const sendDebateMessage = async (data: DebateRequest): Promise<{ response: string }> => {
+export const sendDebateMessage = async (data: DebateRequest): Promise<{ response: string; isFallback?: boolean }> => {
   const token = getAuthToken();
   const response = await fetch(`${baseURL}/vsbot/debate`, {
     method: "POST",
@@ -99,11 +100,16 @@ export const sendDebateMessage = async (data: DebateRequest): Promise<{ response
   });
 
   if (!response.ok) {
-    throw new Error("Failed to send debate message");
+    const error = new Error("Failed to send debate message");
+    Object.assign(error, { status: response.status });
+    throw error;
   }
 
   const result = await response.json();
-  return { response: result.response }; // Adjusted to return bot's response directly
+  return {
+    response: result.response,  // Adjusted to return bot's response directly
+    isFallback: result.isFallback,
+  };
 };
 
 export const concedeDebate = async (debateId: string, history: DebateMessage[] = []): Promise<void> => {
@@ -124,8 +130,12 @@ export const concedeDebate = async (debateId: string, history: DebateMessage[] =
 };
 
 // Function to judge a debate
-export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> => {
+
+export const judgeDebate = async (
+  data: JudgeRequest
+): Promise<JudgeResponse> => {
   const token = getAuthToken();
+
   const response = await fetch(`${baseURL}/vsbot/judge`, {
     method: "POST",
     headers: {
@@ -137,7 +147,27 @@ export const judgeDebate = async (data: JudgeRequest): Promise<JudgeResponse> =>
   });
 
   if (!response.ok) {
-    throw new Error("Failed to judge debate");
+    let message = "Unable to generate your debate judgment.";
+
+    try {
+      const errorData = await response.json();
+
+      if (typeof errorData.error === "string" && errorData.error.trim()) {
+        message = errorData.error;
+      }
+    } catch {
+      // Keep the fallback message if the response isn't JSON.
+    }
+
+    if (response.status === 429) {
+      message = "The AI service is rate-limited. Please try again later.";
+    } else if (response.status === 502) {
+      message = "The AI couldn't generate a valid judgment. Please try again.";
+    } else if (response.status >= 500 && response.status !== 502) {
+      message = "The AI service is temporarily unavailable. Please try again.";
+    }
+
+    throw new Error(message);
   }
 
   return response.json();

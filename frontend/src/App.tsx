@@ -2,6 +2,7 @@ import { useContext } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, AuthContext } from "./context/authContext";
 import { ThemeProvider } from "./context/theme-provider";
+import { Toaster } from "./components/ui/toaster";
 // Pages
 import Home from "./Pages/Home";
 import Authentication from "./Pages/Authentication";
@@ -133,9 +134,9 @@ function App() {
       <ThemeProvider>
         <PageTitle />
         <AppRoutes />
+        <Toaster />
       </ThemeProvider>
     </AuthProvider>
   );
 }
-
 export default App;
