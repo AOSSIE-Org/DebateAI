@@ -2,9 +2,9 @@ import config from "../../config/config";
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { AuthContext } from '../../context/authContext';
-import { useCallback } from "react";
+
 
 interface LoginFormProps {
   startForgotPassword: () => void;
@@ -63,31 +63,101 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     },
     [googleLogin]
   );
-  useEffect(() => {
+  const [containerWidth, setContainerWidth] = useState<number>(384);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  const renderGoogleButton = useCallback(() => {
     const google = window.google;
-    if (!google?.accounts) {
-      return;
-    }
+    if (!google?.accounts) return;
 
     google.accounts.id.initialize({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       callback: handleGoogleLogin,
     });
 
-    const buttonElement = document.getElementById('googleSignInButton');
-    if (buttonElement) {
-      google.accounts.id.renderButton(buttonElement, {
-        theme: 'outline',
-        size: 'large',
-        text: 'signin_with',
-        width: '100%',
-      });
+    const buttonElement = buttonRef.current;
+    if (!buttonElement) return;
+
+    const clampedWidth = Math.min(Math.max(containerWidth, 200), 400);
+    buttonElement.innerHTML = '';
+    google.accounts.id.renderButton(buttonElement, {
+      theme: 'outline',
+      size: 'large',
+      text: 'signin_with',
+      width: clampedWidth.toString(),
+    });
+
+    if (containerWidth < 200 && containerWidth > 0) {
+      const scale = containerWidth / 200;
+      buttonElement.style.transform = `scale(${scale})`;
+      buttonElement.style.transformOrigin = 'center';
+      buttonElement.style.height = `${Math.round(40 * scale)}px`;
+    } else {
+      buttonElement.style.transform = 'none';
+      buttonElement.style.height = 'auto';
+    }
+  }, [containerWidth, handleGoogleLogin]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let lastWidth = 0;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const width = Math.floor(entry.contentRect.width);
+      if (width <= 0) return;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (width === lastWidth) return;
+
+      if (lastWidth === 0) {
+        lastWidth = width;
+        setContainerWidth(width);
+      } else {
+        timeoutId = setTimeout(() => {
+          lastWidth = width;
+          setContainerWidth(width);
+        }, 100);
+      }
+    });
+
+    observer.observe(container);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (window.google?.accounts) {
+      renderGoogleButton();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts) {
+          clearInterval(interval);
+          renderGoogleButton();
+        }
+      }, 100);
+      return () => {
+        clearInterval(interval);
+        window.google?.accounts?.id?.cancel();
+      };
     }
 
     return () => {
-      google.accounts.id.cancel();
+      window.google?.accounts?.id?.cancel();
     };
-  }, [handleGoogleLogin]);
+  }, [renderGoogleButton]);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -139,7 +209,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
       <Button type="submit" className="w-full mb-2 border border-border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
-      <div id="googleSignInButton" className="w-full"></div>
+      <div ref={containerRef} className="w-full flex justify-center overflow-hidden">
+        <div ref={buttonRef} id="googleSignInButton" className="flex justify-center"></div>
+      </div>
     </form>
   );
 };
@@ -195,31 +267,101 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   );
 
 
-  useEffect(() => {
+  const [containerWidth, setContainerWidth] = useState<number>(384);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  const renderGoogleButton = useCallback(() => {
     const google = window.google;
-    if (!google?.accounts) {
-      return;
-    }
+    if (!google?.accounts) return;
 
     google.accounts.id.initialize({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       callback: handleGoogleLogin,
     });
 
-    const buttonElement = document.getElementById('googleSignUpButton');
-    if (buttonElement) {
-      google.accounts.id.renderButton(buttonElement, {
-        theme: 'outline',
-        size: 'large',
-        text: 'signup_with',
-        width: '100%',
-      });
+    const buttonElement = buttonRef.current;
+    if (!buttonElement) return;
+
+    const clampedWidth = Math.min(Math.max(containerWidth, 200), 400);
+    buttonElement.innerHTML = '';
+    google.accounts.id.renderButton(buttonElement, {
+      theme: 'outline',
+      size: 'large',
+      text: 'signup_with',
+      width: clampedWidth.toString(),
+    });
+
+    if (containerWidth < 200 && containerWidth > 0) {
+      const scale = containerWidth / 200;
+      buttonElement.style.transform = `scale(${scale})`;
+      buttonElement.style.transformOrigin = 'center';
+      buttonElement.style.height = `${Math.round(40 * scale)}px`;
+    } else {
+      buttonElement.style.transform = 'none';
+      buttonElement.style.height = 'auto';
+    }
+  }, [containerWidth, handleGoogleLogin]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let lastWidth = 0;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const width = Math.floor(entry.contentRect.width);
+      if (width <= 0) return;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (width === lastWidth) return;
+
+      if (lastWidth === 0) {
+        lastWidth = width;
+        setContainerWidth(width);
+      } else {
+        timeoutId = setTimeout(() => {
+          lastWidth = width;
+          setContainerWidth(width);
+        }, 100);
+      }
+    });
+
+    observer.observe(container);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (window.google?.accounts) {
+      renderGoogleButton();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts) {
+          clearInterval(interval);
+          renderGoogleButton();
+        }
+      }, 100);
+      return () => {
+        clearInterval(interval);
+        window.google?.accounts?.id?.cancel();
+      };
     }
 
     return () => {
-      google.accounts.id.cancel();
+      window.google?.accounts?.id?.cancel();
     };
-  }, [handleGoogleLogin]);
+  }, [renderGoogleButton]);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -268,7 +410,9 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
-      <div id="googleSignUpButton" className="w-full"></div>
+      <div ref={containerRef} className="w-full flex justify-center overflow-hidden">
+        <div ref={buttonRef} id="googleSignUpButton" className="flex justify-center"></div>
+      </div>
     </form>
   );
 };
