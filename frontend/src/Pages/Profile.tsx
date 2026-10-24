@@ -87,6 +87,7 @@ import {
   SavedDebateTranscript,
 } from "@/services/transcriptService";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 
 interface ProfileData {
   displayName: string;
@@ -206,6 +207,37 @@ const Profile: React.FC = () => {
   const availabilityCheckId = useRef(0);
   const editSessionRef = useRef(0);
 
+  const { user, setUser } = useUser();
+
+  const syncUserProfileToCache = (profile: {
+    displayName?: string;
+    email?: string;
+    avatarUrl?: string;
+    bio?: string;
+    rating?: number;
+    twitter?: string;
+    instagram?: string;
+    linkedin?: string;
+  }) => {
+    if (!user && !profile) return;
+
+    const updatedUser = {
+      ...user,
+      email: profile.email || user?.email || "",
+      displayName: profile.displayName || user?.displayName || "User",
+      bio: profile.bio || user?.bio || "",
+      rating: profile.rating ?? user?.rating ?? 1500,
+      avatarUrl: profile.avatarUrl || user?.avatarUrl || DEFAULT_AVATAR_URL,
+      twitter: profile.twitter ?? user?.twitter,
+      instagram: profile.instagram ?? user?.instagram,
+      linkedin: profile.linkedin ?? user?.linkedin,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setUser(updatedUser);
+    localStorage.setItem("userProfile", JSON.stringify(updatedUser));
+  };
+
   const handleStartEdit = (field: string, initialValue: string = "") => {
     editSessionRef.current += 1;
     availabilityCheckId.current += 1;
@@ -260,23 +292,24 @@ const Profile: React.FC = () => {
       setErrorMessage("Transcript not available for this debate.");
       return;
     }
+
     setSelectedDebate(debate);
     setIsDebateDialogOpen(true);
     setTranscriptLoading(true);
-        setErrorMessage("");
-        setFullTranscript(null); 
+    setErrorMessage("");
+    setFullTranscript(null);
 
     try {
       const transcript = await transcriptService.getTranscriptById(debate.id);
       setFullTranscript(transcript);
-    } catch(error) {
-       console.error("Error fetching transcript:", error);
-       setFullTranscript(null);
-       setErrorMessage(
-         error instanceof Error
-           ? error.message
-           : "Failed to load transcript. Please try again."
-       );
+    } catch (error) {
+      console.error("Error fetching transcript:", error);
+      setFullTranscript(null);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load transcript. Please try again."
+      );
     } finally {
       setTranscriptLoading(false);
     }
@@ -322,16 +355,23 @@ const Profile: React.FC = () => {
         field === "linkedin" ? draftValue : dashboard.profile.linkedin,
         dashboard.profile.avatarUrl
       );
+
       setSuccessMessage(
         `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully!`
       );
       setErrorMessage("");
+
       if (editSessionRef.current === sessionAtSubmit) {
         handleCancelEdit();
       }
-      // Refetch to sync updated displayName across the page
+
       const updatedData = await getProfile(token);
       setDashboard(updatedData);
+
+      if (updatedData.profile) {
+        syncUserProfileToCache(updatedData.profile);
+      }
+
       if (updatedData.stats?.recentDebates) {
         setRecentDebates(updatedData.stats.recentDebates);
       }
@@ -344,13 +384,19 @@ const Profile: React.FC = () => {
 
   const handleAvatarSelect = async (avatarUrl: string) => {
     if (!dashboard?.profile) return;
+
     const token = getAuthToken();
     if (!token) {
       setErrorMessage("Authentication token is missing.");
       return;
     }
+
     try {
-      setDashboard({ ...dashboard, profile: { ...dashboard.profile, avatarUrl } });
+      setDashboard({
+        ...dashboard,
+        profile: { ...dashboard.profile, avatarUrl },
+      });
+
       await updateProfile(
         token,
         dashboard.profile.displayName,
@@ -360,6 +406,12 @@ const Profile: React.FC = () => {
         dashboard.profile.linkedin,
         avatarUrl
       );
+
+      syncUserProfileToCache({
+        ...dashboard.profile,
+        avatarUrl,
+      });
+
       setSuccessMessage("Avatar updated successfully!");
       setErrorMessage("");
     } catch {
@@ -676,7 +728,7 @@ const Profile: React.FC = () => {
           </div>
           <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-muted/50 rounded border">
             {loadingFollowers ? (
-              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner/></div>
+              <div className="text-center py-2 text-xs text-muted-foreground"><LoadingSpinner /></div>
             ) : followers.length === 0 ? (
               <div className="text-center py-2 text-xs text-muted-foreground">No followers yet</div>
             ) : (
@@ -730,6 +782,7 @@ const Profile: React.FC = () => {
             {errorMessage}
           </div>
         )}
+
         <div className="flex flex-col items-center mb-4">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden bg-muted flex-shrink-0 mb-2 border-2 border-primary shadow-md group">
             <img src={profile.avatarUrl || defaultAvatar} alt="Avatar" className="object-cover w-full h-full" />
@@ -741,6 +794,7 @@ const Profile: React.FC = () => {
               <ImageIcon className="w-6 h-6 text-white" />
             </button>
           </div>
+
           <AvatarModal
             isOpen={isAvatarModalOpen}
             onClose={() => setIsAvatarModalOpen(false)}
@@ -925,7 +979,6 @@ const Profile: React.FC = () => {
 
       <div className="flex-1 flex flex-col space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Keep chart canvases constrained to their cards so Recharts responds to every container resize. */}
           <Card className="shadow h-[250px] sm:h-[300px] flex flex-col">
             <CardContent className="flex-1 min-h-0 min-w-0 p-4">
               {totalMatches === 0 ? (
@@ -1014,7 +1067,16 @@ const Profile: React.FC = () => {
                 <ChartContainer config={eloChartConfig} className="h-full min-h-0 w-full min-w-0">
                   <LineChart data={filteredEloHistory} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" />
-                    <XAxis dataKey="formattedDate" tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} angle={filteredEloHistory.length > 5 ? -45 : 0} textAnchor="end" height={40} interval={Math.floor(filteredEloHistory.length / 5)} />
+                    <XAxis
+                      dataKey="formattedDate"
+                      tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }}
+                      tickLine={false}
+                      axisLine={{ stroke: "hsl(var(--muted-foreground))" }}
+                      angle={filteredEloHistory.length > 5 ? -45 : 0}
+                      textAnchor="end"
+                      height={40}
+                      interval={Math.floor(filteredEloHistory.length / 5)}
+                    />
                     <YAxis domain={yDomain} tick={{ fontSize: 8, fill: "hsl(var(--foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--muted-foreground))" }} width={30} />
                     <ChartTooltip content={<CustomTooltip />} />
                     <Line dataKey="elo" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))", r: 3 }} activeDot={{ r: 5 }} />
