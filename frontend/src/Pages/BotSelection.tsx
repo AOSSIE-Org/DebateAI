@@ -381,7 +381,7 @@ const BotSelection: React.FC = () => {
       setShowSuccess(true);
       localStorage.removeItem("botSelectionState");
       preventPersistRef.current = true;
-      const state = {
+      const debateState = {
         ...data,
         phaseTimings,
         stance: finalStance,
@@ -391,8 +391,14 @@ const BotSelection: React.FC = () => {
         topic: effectiveTopic.trim(),
       };
       if (navTimerRef.current) clearTimeout(navTimerRef.current);
+      // Redirect to speech-test for audio calibration before entering debate
       navTimerRef.current = setTimeout(() => {
-        navigate(`/debate/${data.debateId}`, { state });
+        navigate("/speech-test", {
+          state: {
+            returnUrl: `/debate/${data.debateId}`,
+            debateState,
+          },
+        });
         setIsCreating(false);
       }, 1500);
     } catch (error) {

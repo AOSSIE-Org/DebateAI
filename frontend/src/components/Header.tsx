@@ -13,6 +13,7 @@ import {
   Users,
   MessageCircle,
   MessageSquare,
+  Mic,
 } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
@@ -386,6 +387,12 @@ function Header() {
                 to="/support-os"
                 label="Support DebateAI"
                 icon={<Heart className="mr-3 h-4 w-4 text-red-500 transition-all duration-300 group-hover:fill-red-500 group-hover:scale-110" />}
+                onClick={toggleDrawer}
+              />
+              <NavItem
+                to="/speech-test"
+                label="Audio Setup"
+                icon={<Mic className="mr-3 h-4 w-4" />}
                 onClick={toggleDrawer}
               />
               <ThemeToggle />
