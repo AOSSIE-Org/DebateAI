@@ -84,6 +84,7 @@ func JoinPublicTournament(c *gin.Context) {
 		context.Background(),
 		bson.M{
 			"_id":                 objID,
+			"status":              models.StatusUpcoming,
 			"participants.userId": bson.M{"$ne": userObjID},
 			"$expr": bson.M{
 				"$lt": []interface{}{
@@ -101,6 +102,14 @@ func JoinPublicTournament(c *gin.Context) {
 	}
 
 	if result.MatchedCount == 0 {
+		if tournament.Status != models.StatusUpcoming {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tournament is not open for joining"})
+			return
+		}
+		if len(tournament.Participants) >= tournament.MaxParticipants {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tournament is full"})
+			return
+		}
 		if len(tournament.Participants) >= tournament.MaxParticipants {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Tournament is full"})
 			return
