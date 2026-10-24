@@ -16,9 +16,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type DebateRequest struct {
+	DebateId     string           `json:"debateId,omitempty"`
 	BotName      string           `json:"botName" binding:"required"`
 	BotLevel     string           `json:"botLevel" binding:"required"`
 	Topic        string           `json:"topic" binding:"required"`
@@ -34,7 +36,8 @@ type PhaseTiming struct {
 }
 
 type JudgeRequest struct {
-	History []models.Message `json:"history" binding:"required"`
+	DebateId string           `json:"debateId,omitempty"`
+	History  []models.Message `json:"history" binding:"required"`
 }
 
 type DebateResponse struct {
@@ -139,6 +142,33 @@ func SendDebateMessage(c *gin.Context) {
 		return
 	}
 
+	// Resolve the target session before spending an AI call. This prevents
+	// unauthorized or malformed requests from triggering bot generation.
+	var targetObjID primitive.ObjectID
+	hasSession := strings.TrimSpace(req.DebateId) != ""
+	if hasSession {
+		var err error
+		targetObjID, err = primitive.ObjectIDFromHex(strings.TrimSpace(req.DebateId))
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid debate ID"})
+			return
+		}
+
+		// Ensure ongoing debate exists and belongs to the authenticated user
+		dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var existingDebate models.DebateVsBot
+		err = db.DebateVsBotCollection.FindOne(dbCtx, bson.M{"_id": targetObjID, "email": email}).Decode(&existingDebate)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				c.JSON(404, gin.H{"error": "Debate not found"})
+			} else {
+				c.JSON(500, gin.H{"error": "Failed to load debate: " + err.Error()})
+			}
+			return
+		}
+	}
+
 	// Generate bot response with the additional context field.
 	botResponse := services.GenerateBotResponse(req.BotName, req.BotLevel, req.Topic, req.History, req.Stance, req.Context, 150)
 
@@ -149,25 +179,33 @@ func SendDebateMessage(c *gin.Context) {
 		// You can also store the phase if needed.
 	})
 
-	debate := models.DebateVsBot{
-		Email:     email,
-		BotName:   req.BotName,
-		BotLevel:  req.BotLevel,
-		Topic:     req.Topic,
-		Stance:    req.Stance,
-		History:   updatedHistory,
-		CreatedAt: time.Now().Unix(),
-	}
-
-	// Save to database (assuming ID is generated in service or here)
-	if debate.ID.IsZero() {
-		debate.ID = primitive.NewObjectID()
-	}
-	if err := db.SaveDebateVsBot(debate); err != nil {
+	if hasSession {
+		// Update ongoing debate document in-place
+		if err := db.UpdateDebateVsBotHistory(targetObjID, email, updatedHistory); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update debate history: " + err.Error()})
+			return
+		}
+	} else {
+		// Backward compatibility: create new debate document if no debateId provided
+		debate := models.DebateVsBot{
+			ID:        primitive.NewObjectID(),
+			Email:     email,
+			BotName:   req.BotName,
+			BotLevel:  req.BotLevel,
+			Topic:     req.Topic,
+			Stance:    req.Stance,
+			History:   updatedHistory,
+			CreatedAt: time.Now().Unix(),
+		}
+		targetObjID = debate.ID
+		if err := db.SaveDebateVsBot(debate); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to save debate: " + err.Error()})
+			return
+		}
 	}
 
 	response := DebateMessageResponse{
-		DebateId: debate.ID.Hex(),
+		DebateId: targetObjID.Hex(),
 		BotName:  req.BotName,
 		BotLevel: req.BotLevel,
 		Topic:    req.Topic,
@@ -204,22 +242,47 @@ func JudgeDebate(c *gin.Context) {
 		return
 	}
 
-	// Judge the debate
-	result := services.JudgeDebate(req.History)
+	// Resolve the target session before judging so invalid or unauthorized
+	// requests do not trigger an AI call.
+	var targetDebate models.DebateVsBot
+	var targetObjID primitive.ObjectID
+	hasSession := strings.TrimSpace(req.DebateId) != ""
+	if hasSession {
+		var err error
+		targetObjID, err = primitive.ObjectIDFromHex(strings.TrimSpace(req.DebateId))
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid debate ID"})
+			return
+		}
 
-	// Update debate outcome
-	if err := db.UpdateDebateVsBotOutcome(email, result); err != nil {
-	}
-
-	// Get the latest debate information to extract proper details
-	latestDebate, err := db.GetLatestDebateVsBot(email)
-	if err != nil {
-		// Use defaults if we can't get the debate info
-		latestDebate = &models.DebateVsBot{
-			Topic:   "Debate vs Bot",
-			BotName: "AI Bot",
+		dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err = db.DebateVsBotCollection.FindOne(dbCtx, bson.M{"_id": targetObjID, "email": email}).Decode(&targetDebate)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				c.JSON(404, gin.H{"error": "Debate not found"})
+			} else {
+				c.JSON(500, gin.H{"error": "Failed to load debate: " + err.Error()})
+			}
+			return
+		}
+	} else {
+		// Fallback for legacy requests without debateId. Resolve the latest
+		// session up front so the outcome update targets a deterministic document.
+		latestDebate, err := db.GetLatestDebateVsBot(email)
+		if err == nil && latestDebate != nil {
+			targetDebate = *latestDebate
+			targetObjID = latestDebate.ID
+		} else {
+			targetDebate = models.DebateVsBot{
+				Topic:   "Debate vs Bot",
+				BotName: "AI Bot",
+			}
 		}
 	}
+
+	// Judge the debate
+	result := services.JudgeDebate(req.History)
 
 	// Determine result from judge's response
 	resultStatus := "pending"
@@ -266,13 +329,21 @@ func JudgeDebate(c *gin.Context) {
 		}
 	}
 
+	// Persist the normalized outcome and full transcript on the targeted session so
+	// the stored debate stays consistent with the saved transcript.
+	if !targetObjID.IsZero() {
+		_ = db.UpdateDebateVsBotOutcomeAndHistory(targetObjID, email, resultStatus, req.History)
+	} else if !hasSession {
+		_ = db.UpdateDebateVsBotOutcome(email, resultStatus)
+	}
+
 	// Save transcript with proper debate information
 	_ = services.SaveDebateTranscript(
 		userID,
 		email,
 		"user_vs_bot",
-		latestDebate.Topic,
-		latestDebate.BotName,
+		targetDebate.Topic,
+		targetDebate.BotName,
 		resultStatus,
 		req.History,
 		nil,
@@ -280,7 +351,7 @@ func JudgeDebate(c *gin.Context) {
 
 	// Update gamification (score, badges, streaks) after bot debate
 	log.Printf("About to call updateGamificationAfterBotDebate for user %s, result: %s, topic: %s",
-		userID.Hex(), resultStatus, latestDebate.Topic)
+		userID.Hex(), resultStatus, targetDebate.Topic)
 
 	// Call synchronously but with recover to prevent panics from crashing the request
 	func() {
@@ -289,7 +360,7 @@ func JudgeDebate(c *gin.Context) {
 				log.Printf("Panic in updateGamificationAfterBotDebate: %v", r)
 			}
 		}()
-		updateGamificationAfterBotDebate(userID, resultStatus, latestDebate.Topic)
+		updateGamificationAfterBotDebate(userID, resultStatus, targetDebate.Topic)
 	}()
 
 	c.JSON(200, JudgeResponse{

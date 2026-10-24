@@ -10,6 +10,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -77,21 +78,86 @@ func EnsureIndexes() error {
 }
 
 func SaveDebateVsBot(debate models.DebateVsBot) error {
-	_, err := DebateVsBotCollection.InsertOne(context.Background(), debate)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := DebateVsBotCollection.InsertOne(ctx, debate)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func UpdateDebateVsBotOutcome(userId, outcome string) error {
-	filter := bson.M{"userId": userId}
+// UpdateDebateVsBotHistory updates the message history of an existing debate session
+func UpdateDebateVsBotHistory(id primitive.ObjectID, email string, history []models.Message) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{"_id": id, "email": email}
+	update := bson.M{"$set": bson.M{"history": history}}
+	_, err := DebateVsBotCollection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// UpdateDebateVsBotOutcomeById updates the outcome of a specific debate vs bot session
+func UpdateDebateVsBotOutcomeById(id primitive.ObjectID, email, outcome string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if DebateVsBotCollection == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	filter := bson.M{"_id": id, "email": email}
 	update := bson.M{"$set": bson.M{"outcome": outcome}}
-	_, err := DebateVsBotCollection.UpdateOne(context.Background(), filter, update, nil)
-	if err != nil {
+	_, err := DebateVsBotCollection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// UpdateDebateVsBotOutcomeAndHistory updates both outcome and history atomically on the targeted session
+func UpdateDebateVsBotOutcomeAndHistory(id primitive.ObjectID, email, outcome string, history []models.Message) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if DebateVsBotCollection == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	filter := bson.M{"_id": id, "email": email}
+	update := bson.M{"$set": bson.M{
+		"outcome": outcome,
+		"history": history,
+	}}
+	_, err := DebateVsBotCollection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+func UpdateDebateVsBotOutcome(identifier, outcome string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if DebateVsBotCollection == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	if objID, err := primitive.ObjectIDFromHex(identifier); err == nil {
+		filter := bson.M{"_id": objID}
+		update := bson.M{"$set": bson.M{"outcome": outcome}}
+		_, err := DebateVsBotCollection.UpdateOne(ctx, filter, update)
 		return err
 	}
-	return nil
+
+	filter := bson.M{
+		"$or": []bson.M{
+			{"email": identifier},
+			{"userId": identifier},
+		},
+	}
+
+	// Resolve the most recent matching session first; updating with an un-ordered
+	// filter could otherwise target an arbitrary (older) debate.
+	opts := options.FindOne().SetSort(bson.M{"createdAt": -1})
+	var debate models.DebateVsBot
+	if err := DebateVsBotCollection.FindOne(ctx, filter, opts).Decode(&debate); err != nil {
+		return err
+	}
+
+	update := bson.M{"$set": bson.M{"outcome": outcome}}
+	_, err := DebateVsBotCollection.UpdateOne(ctx, bson.M{"_id": debate.ID}, update)
+	return err
 }
 
 func GetLatestDebateVsBot(email string) (*models.DebateVsBot, error) {
