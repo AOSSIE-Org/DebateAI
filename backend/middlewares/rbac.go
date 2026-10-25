@@ -22,6 +22,8 @@ import (
 
 var enforcer *casbin.Enforcer
 
+const AdminJWTAudience = "arguehub-admin"
+
 // InitCasbin initializes Casbin enforcer with MongoDB adapter
 func InitCasbin(configPath string) error {
 	cfg, err := config.LoadConfig(configPath)
@@ -163,8 +165,16 @@ func AdminAuthMiddleware(configPath string) gin.HandlerFunc {
 			return
 		}
 
-		email, ok := claims["sub"].(string)
-		if !ok || email == "" {
+			sub, ok := claims["sub"].(string)
+		if !ok || sub == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
+
+		// The subject of an admin token is the admin's _id, not their email
+		adminObjID, err := primitive.ObjectIDFromHex(sub)
+		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 			c.Abort()
 			return
@@ -175,7 +185,7 @@ func AdminAuthMiddleware(configPath string) gin.HandlerFunc {
 		defer cancel()
 
 		var admin models.Admin
-		err = db.MongoDatabase.Collection("admins").FindOne(dbCtx, bson.M{"email": email}).Decode(&admin)
+		err = db.MongoDatabase.Collection("admins").FindOne(dbCtx, bson.M{"_id": adminObjID}).Decode(&admin)
 		if err != nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
 			c.Abort()
@@ -183,7 +193,7 @@ func AdminAuthMiddleware(configPath string) gin.HandlerFunc {
 		}
 
 		// Set admin data in context
-		c.Set("adminEmail", email)
+		c.Set("adminEmail", admin.Email)
 		c.Set("adminID", admin.ID)
 		c.Set("adminRole", admin.Role)
 		c.Next()
@@ -311,7 +321,11 @@ func validateAdminJWT(tokenString, secret string) (map[string]interface{}, error
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(secret), nil
-	})
+	},
+		jwt.WithAudience(AdminJWTAudience),
+		jwt.WithExpirationRequired(),
+		jwt.WithValidMethods([]string{"HS256"}),
+	)
 	if err != nil {
 		return nil, err
 	}
