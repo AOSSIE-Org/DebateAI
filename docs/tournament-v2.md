@@ -62,6 +62,29 @@ TLS, rubric/privacy and retention/consent. Accepted text is retained; no deletio
 appeals or reevaluation policy is invented. Plaintext browser drafts are isolated
 by account/run/phase, not confidential from someone using the same device.
 
+## Existing Invite-Code Migration
+
+Startup intentionally stops if the required unique invite-code index cannot be
+created. Do not ignore that error: private joins look up a tournament by code.
+Before rollout, stop tournament writers, back up the collection, and run this
+read-only audit in the intended database; its filter matches the partial index:
+
+```javascript
+db.tournaments.aggregate([
+  { $match: { visibility: "private", inviteCode: { $type: "string", $gt: "" } } },
+  { $group: { _id: "$inviteCode", count: { $sum: 1 } } },
+  { $match: { count: { $gt: 1 } } }
+])
+```
+
+For each conflict, identify the affected tournament IDs and coordinate with their
+hosts before reissuing codes. Use approved six-digit replacements not already used
+by another private tournament; update each intended ID only if its old code still
+matches. Preserve tournaments, membership and requests, and have hosts redistribute
+changed invitations. Rerun the audit until empty, then start the backend and verify
+`unique_private_invite_code` exists with the expected unique/partial options before
+restoring traffic. Automatic code rotation is deliberately not a startup action.
+
 ## Validation
 
 Run `go test ./... -count=1` and `go vet ./...` from backend, and `npm run build`
