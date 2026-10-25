@@ -64,8 +64,9 @@ const BotVoiceControls: React.FC<BotVoiceControlsProps> = ({
   };
 
   return (
-    <span
+    <div
       className="inline-flex items-center gap-1 ml-2"
+      role="group"
       aria-label={`Voice controls for ${botName}'s message`}
     >
       {/* Speaker icon — decorative, indicates TTS feature */}
@@ -117,7 +118,7 @@ const BotVoiceControls: React.FC<BotVoiceControlsProps> = ({
           <Square className="w-3 h-3 text-destructive" />
         </Button>
       )}
-    </span>
+    </div>
   );
 };
 

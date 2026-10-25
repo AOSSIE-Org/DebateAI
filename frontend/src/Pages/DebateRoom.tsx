@@ -446,6 +446,15 @@ const DebateRoom: React.FC = () => {
     }
   };
 
+  // Stop TTS when debate ends, judgment data becomes available, or concession is in progress
+  const { stop } = tts;
+
+  useEffect(() => {
+    if (state.isDebateEnded || judgmentData !== null || isConceding) {
+      stop();
+    }
+  }, [state.isDebateEnded, judgmentData, isConceding, stop]);
+
   // Initialize SpeechRecognition
   useEffect(() => {
     if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
@@ -848,14 +857,17 @@ const DebateRoom: React.FC = () => {
               <span className="text-xs text-muted-foreground inline-flex items-center mb-1">
                 {msg.phase}
                 {/* Voice controls are only shown on bot messages */}
-                {sender === "Bot" && (
-                  <BotVoiceControls
-                    messageId={msgId}
-                    text={msg.text}
-                    botName={debateData?.botName ?? "Bot"}
-                    tts={tts}
-                  />
-                )}
+                {sender === "Bot" &&
+                  !state.isDebateEnded &&
+                  judgmentData === null &&
+                  !isConceding && (
+                    <BotVoiceControls
+                      messageId={msgId}
+                      text={msg.text}
+                      botName={debateData?.botName ?? "Bot"}
+                      tts={tts}
+                    />
+                  )}
               </span>
               {msg.text}
             </div>
