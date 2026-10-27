@@ -10,6 +10,11 @@ import (
 	"arguehub/config"
 )
 
+// ProductName is the public-facing name of the platform. Every user-facing
+// email is branded from this constant so the name cannot drift between
+// templates (it was previously hard-coded as "ArgueHub" in some subjects).
+const ProductName = "DebateAI"
+
 // GenerateRandomCode generates a random numeric code of specified length
 func GenerateRandomCode(length int) string {
 	const charset = "0123456789"
@@ -25,6 +30,35 @@ func GenerateRandomCode(length int) string {
 	return string(code)
 }
 
+// buildVerificationEmail renders the account-verification email message.
+func buildVerificationEmail(to, senderName, senderEmail, code string) []byte {
+	return []byte(fmt.Sprintf(
+		"To: %s\r\n"+
+			"From: %s <%s>\r\n"+
+			"Subject: Verify Your "+ProductName+" Account\r\n"+
+			"MIME-Version: 1.0\r\n"+
+			"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
+			"\r\n"+
+			"<h2>Welcome to "+ProductName+"!</h2>\r\n"+
+			"<p>Your verification code is: <strong>%s</strong></p>\r\n"+
+			"<p><em>This code will expire in 24 hours.</em></p>\r\n",
+		to, senderName, senderEmail, code))
+}
+
+// buildPasswordResetEmail renders the password-reset email message.
+func buildPasswordResetEmail(to, senderName, senderEmail, code string) []byte {
+	return []byte(fmt.Sprintf(
+		"To: %s\r\n"+
+			"From: %s <%s>\r\n"+
+			"Subject: "+ProductName+" Password Reset\r\n"+
+			"MIME-Version: 1.0\r\n"+
+			"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
+			"\r\n"+
+			"<p>Your password reset code is: <strong>%s</strong></p>\r\n"+
+			"<p>This code will expire in 15 minutes.</p>\r\n",
+		to, senderName, senderEmail, code))
+}
+
 // SendVerificationEmail sends an email with a verification code using Gmail SMTP
 func SendVerificationEmail(email, code string) error {
 	cfg, err := config.LoadConfig(configPath())
@@ -34,17 +68,7 @@ func SendVerificationEmail(email, code string) error {
 
 	auth := smtp.PlainAuth("", cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.Host)
 	to := []string{email}
-	msg := []byte(fmt.Sprintf(
-		"To: %s\r\n"+
-			"From: %s <%s>\r\n"+
-			"Subject: Verify Your ArgueHub Account\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
-			"\r\n"+
-			"<h2>Welcome to ArgueHub!</h2>\r\n"+
-			"<p>Your verification code is: <strong>%s</strong></p>\r\n"+
-			"<p><em>This code will expire in 24 hours.</em></p>\r\n",
-		email, cfg.SMTP.SenderName, cfg.SMTP.SenderEmail, code))
+	msg := buildVerificationEmail(email, cfg.SMTP.SenderName, cfg.SMTP.SenderEmail, code)
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTP.Host, cfg.SMTP.Port)
 	err = smtp.SendMail(addr, auth, cfg.SMTP.SenderEmail, to, msg)
@@ -63,16 +87,7 @@ func SendPasswordResetEmail(email, code string) error {
 
 	auth := smtp.PlainAuth("", cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.Host)
 	to := []string{email}
-	msg := []byte(fmt.Sprintf(
-		"To: %s\r\n"+
-			"From: %s <%s>\r\n"+
-			"Subject: ArgueHub Password Reset\r\n"+
-			"MIME-Version: 1.0\r\n"+
-			"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
-			"\r\n"+
-			"<p>Your password reset code is: <strong>%s</strong></p>\r\n"+
-			"<p>This code will expire in 15 minutes.</p>\r\n",
-		email, cfg.SMTP.SenderName, cfg.SMTP.SenderEmail, code))
+	msg := buildPasswordResetEmail(email, cfg.SMTP.SenderName, cfg.SMTP.SenderEmail, code)
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTP.Host, cfg.SMTP.Port)
 	err = smtp.SendMail(addr, auth, cfg.SMTP.SenderEmail, to, msg)
