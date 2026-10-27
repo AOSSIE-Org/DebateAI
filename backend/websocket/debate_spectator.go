@@ -33,6 +33,14 @@ type DebateRoom struct {
 	clients  map[*websocket.Conn]*SpectatorClient
 	mu       sync.RWMutex
 	consumer *debate.StreamConsumer
+
+	// presenceMu orders the client-count read with the enqueue below, so count
+	// changes are broadcast in the order they happened. It is only ever held for
+	// bookkeeping, never across a network write, so a stalled spectator cannot
+	// delay joins or departures. A per-room goroutine drains presenceQueue.
+	presenceMu    sync.Mutex
+	presenceQueue []int
+	presenceWake  chan struct{}
 }
 
 // SpectatorClient represents a connected spectator
@@ -54,16 +62,15 @@ func NewDebateHub() *DebateHub {
 
 // Register registers a new WebSocket connection for a debate
 func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHash string) *SpectatorClient {
+	// Create/look up the room under h.mu, then release it before any broadcast.
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	// Get or create debate room
 	room, exists := h.debates[debateID]
 	if !exists {
 		room = &DebateRoom{
-			debateID: debateID,
-			clients:  make(map[*websocket.Conn]*SpectatorClient),
-			consumer: debate.NewStreamConsumer(h),
+			debateID:     debateID,
+			clients:      make(map[*websocket.Conn]*SpectatorClient),
+			consumer:     debate.NewStreamConsumer(h),
+			presenceWake: make(chan struct{}, 1),
 		}
 		h.debates[debateID] = room
 
@@ -71,29 +78,28 @@ func (h *DebateHub) Register(debateID string, conn *websocket.Conn, spectatorHas
 		if room.consumer != nil {
 			go room.consumer.StartConsumerGroup(debateID)
 		}
-	}
 
-	// Create client
+		// Serialize presence broadcasts for this room off the request path.
+		go h.presenceBroadcaster(room)
+	}
+	h.mu.Unlock()
+
 	client := &SpectatorClient{
 		conn:          conn,
 		spectatorHash: spectatorHash,
 		debateID:      debateID,
 	}
 
+	// Assign the count and enqueue it atomically (under presenceMu) so concurrent
+	// joins are broadcast in order, then release the lock before any network
+	// write happens on the room's broadcaster goroutine.
+	room.presenceMu.Lock()
 	room.mu.Lock()
 	room.clients[conn] = client
 	clientCount := len(room.clients)
 	room.mu.Unlock()
-
-	// Broadcast presence update
-	presenceEvent := map[string]interface{}{
-		"type": "presence",
-		"payload": map[string]interface{}{
-			"connected": clientCount,
-		},
-		"timestamp": time.Now().Unix(),
-	}
-	h.BroadcastPresence(debateID, presenceEvent)
+	room.enqueuePresence(clientCount)
+	room.presenceMu.Unlock()
 
 	return client
 }
@@ -108,12 +114,56 @@ func (h *DebateHub) Unregister(debateID string, conn *websocket.Conn) {
 		return
 	}
 
+	// Assign the count and enqueue it atomically (under presenceMu) so concurrent
+	// departures are broadcast in order, then release the lock before any network
+	// write happens on the room's broadcaster goroutine.
+	room.presenceMu.Lock()
 	room.mu.Lock()
 	delete(room.clients, conn)
 	clientCount := len(room.clients)
 	room.mu.Unlock()
+	room.enqueuePresence(clientCount)
+	room.presenceMu.Unlock()
+}
 
-	// Broadcast presence update
+// enqueuePresence appends a count to the room's broadcast queue. Callers must
+// hold presenceMu so counts are queued in the order they were computed. The wake
+// send is non-blocking: a pending wake already guarantees the broadcaster will
+// drain the queue.
+func (room *DebateRoom) enqueuePresence(count int) {
+	room.presenceQueue = append(room.presenceQueue, count)
+	select {
+	case room.presenceWake <- struct{}{}:
+	default:
+	}
+}
+
+// presenceBroadcaster drains queued counts for a room and broadcasts them in
+// order. It holds presenceMu only to dequeue, never during a network write, so a
+// stalled spectator cannot delay joins or departures for the debate.
+func (h *DebateHub) presenceBroadcaster(room *DebateRoom) {
+	for range room.presenceWake {
+		for {
+			room.presenceMu.Lock()
+			if len(room.presenceQueue) == 0 {
+				room.presenceMu.Unlock()
+				break
+			}
+			count := room.presenceQueue[0]
+			room.presenceQueue[0] = 0
+			room.presenceQueue = room.presenceQueue[1:]
+			if len(room.presenceQueue) == 0 {
+				room.presenceQueue = nil
+			}
+			room.presenceMu.Unlock()
+
+			h.broadcastPresence(room.debateID, count)
+		}
+	}
+}
+
+// broadcastPresence sends a presence update with the current client count.
+func (h *DebateHub) broadcastPresence(debateID string, clientCount int) {
 	presenceEvent := map[string]interface{}{
 		"type": "presence",
 		"payload": map[string]interface{}{
@@ -124,14 +174,17 @@ func (h *DebateHub) Unregister(debateID string, conn *websocket.Conn) {
 	h.BroadcastPresence(debateID, presenceEvent)
 }
 
-// BroadcastToDebate broadcasts an event to all connected clients for a debate
-func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
+// clientsSnapshot returns a snapshot of the clients in a debate room. Callers
+// must write to the returned slice after releasing all locks, so a slow or
+// stalled spectator cannot block Register/Unregister, which take room.mu's
+// write lock.
+func (h *DebateHub) clientsSnapshot(debateID string) []*SpectatorClient {
 	h.mu.RLock()
 	room, exists := h.debates[debateID]
 	h.mu.RUnlock()
 
 	if !exists {
-		return
+		return nil
 	}
 
 	room.mu.RLock()
@@ -140,6 +193,13 @@ func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
 		clients = append(clients, client)
 	}
 	room.mu.RUnlock()
+
+	return clients
+}
+
+// BroadcastToDebate broadcasts an event to all connected clients for a debate
+func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
+	clients := h.clientsSnapshot(debateID)
 
 	// Convert event to frontend format - parse payload
 	var payload interface{}
@@ -163,32 +223,20 @@ func (h *DebateHub) BroadcastToDebate(debateID string, event *debate.Event) {
 
 // BroadcastPresence broadcasts a presence update directly
 func (h *DebateHub) BroadcastPresence(debateID string, presenceEvent map[string]interface{}) {
-	h.mu.RLock()
-	room, exists := h.debates[debateID]
-	h.mu.RUnlock()
-
-	if !exists {
-		return
-	}
-
-	room.mu.RLock()
-	clients := make([]*SpectatorClient, 0, len(room.clients))
-	for _, client := range room.clients {
-		clients = append(clients, client)
-	}
-	room.mu.RUnlock()
-
 	// Broadcast to all clients
-	for _, client := range clients {
+	for _, client := range h.clientsSnapshot(debateID) {
 		if err := client.WriteJSON(presenceEvent); err != nil {
 		}
 	}
 }
 
-// WriteJSON safely writes JSON to the WebSocket connection
+// WriteJSON safely writes JSON to the WebSocket connection. A finite write
+// deadline bounds how long a stalled spectator can block the writer, so it
+// cannot hold up presence updates for the debate indefinitely.
 func (c *SpectatorClient) WriteJSON(v interface{}) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return c.conn.WriteJSON(v)
 }
 
@@ -231,30 +279,12 @@ func DebateWebsocketHandler(c *gin.Context) {
 	// Send initial poll snapshot
 	snapshot, err := loadPollSnapshot(debateID)
 	if err == nil && snapshot != nil {
-		conn.WriteJSON(snapshot)
+		client.WriteJSON(snapshot)
 	} else if err != nil {
 	}
 
-	// Send initial presence count - get it from the hub after registration
-	hub.mu.RLock()
-	room, exists := hub.debates[debateID]
-	clientCount := 0
-	if exists {
-		room.mu.RLock()
-		clientCount = len(room.clients)
-		room.mu.RUnlock()
-	}
-	hub.mu.RUnlock()
-
-	// Send presence event in format expected by frontend
-	presenceEvent := map[string]interface{}{
-		"type": "presence",
-		"payload": map[string]interface{}{
-			"connected": clientCount,
-		},
-		"timestamp": time.Now().Unix(),
-	}
-	conn.WriteJSON(presenceEvent)
+	// Presence counts are delivered by the hub's per-room broadcaster (Register
+	// enqueues the initial count), so no separate presence send is needed here.
 
 	// Read pump
 	go readPump(client, hub)
@@ -341,16 +371,9 @@ func handleVote(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	// Broadcast directly to all connected clients
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			c.WriteJSON(voteEvent)
-		}
-		room.mu.RUnlock()
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		c.WriteJSON(voteEvent)
 	}
-	hub.mu.RUnlock()
 
 	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("vote", payload)
@@ -395,17 +418,10 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	// Broadcast directly to all connected clients
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			if err := c.WriteJSON(questionEvent); err != nil {
-			}
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		if err := c.WriteJSON(questionEvent); err != nil {
 		}
-		room.mu.RUnlock()
 	}
-	hub.mu.RUnlock()
 
 	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("question", payload)
@@ -447,16 +463,9 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	// Broadcast directly to all connected clients
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			c.WriteJSON(reactionEvent)
-		}
-		room.mu.RUnlock()
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		c.WriteJSON(reactionEvent)
 	}
-	hub.mu.RUnlock()
 
 	// Also publish to stream for persistence (if Redis is available)
 	event, err := debate.NewEvent("reaction", payload)
@@ -526,19 +535,12 @@ func handleCreatePoll(client *SpectatorClient, payloadBytes []byte) {
 	}
 
 	hub := GetDebateHub()
-	hub.mu.RLock()
-	room, exists := hub.debates[client.debateID]
-	if exists {
-		room.mu.RLock()
-		for _, c := range room.clients {
-			c.WriteJSON(createdEvent)
-			if snapshot != nil {
-				c.WriteJSON(snapshot)
-			}
+	for _, c := range hub.clientsSnapshot(client.debateID) {
+		c.WriteJSON(createdEvent)
+		if snapshot != nil {
+			c.WriteJSON(snapshot)
 		}
-		room.mu.RUnlock()
 	}
-	hub.mu.RUnlock()
 
 	// Publish event for persistence
 	eventPayload := debate.PollCreatedPayload{
