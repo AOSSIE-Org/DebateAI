@@ -13,6 +13,7 @@ import {
   Users,
   MessageCircle,
   MessageSquare,
+  GraduationCap,
 } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
@@ -346,6 +347,14 @@ function Header() {
                 icon={<MessageSquare className="mr-3 h-4 w-4" />}
                 onClick={toggleDrawer}
               />
+
+              <NavItem
+                to="/coach"
+                label="AI Coach"
+                icon={<GraduationCap className="mr-3 h-4 w-4" />}
+                onClick={toggleDrawer}
+              />
+
               <NavItem
                 to="/tournaments"
                 label="Tournaments"
