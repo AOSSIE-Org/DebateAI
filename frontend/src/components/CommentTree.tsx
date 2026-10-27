@@ -205,7 +205,7 @@ const CommentAuthorName: React.FC<CommentAuthorNameProps> = ({ userId, onClick }
   return (
     <ProfileHover userId={String(userId)}>
       <span
-        className="font-medium text-sm text-gray-900 hover:text-primary cursor-pointer transition-colors"
+        className="font-medium text-sm text-foreground hover:text-primary cursor-pointer transition-colors"
         onClick={onClick}
       >
         {displayName}
@@ -428,12 +428,12 @@ const CommentTree: React.FC<CommentTreeProps> = ({
         className="comment-item"
         style={{
           marginLeft: `${marginLeft}px`,
-          borderLeft: depth > 0 ? '2px solid #e5e7eb' : 'none',
+          borderLeft: depth > 0 ? '2px solid hsl(var(--border))' : 'none',
           paddingLeft: depth > 0 ? '12px' : '0',
           marginTop: '12px',
         }}
       >
-        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+        <div className="flex items-start gap-3 p-3 bg-muted rounded-lg hover:brightness-95 transition-[filter]">
           <div className="flex-shrink-0">
             <CommentAuthorAvatar userId={String(comment.userId)} />
           </div>
@@ -471,7 +471,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                   }, 0);
                 }}
               />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted-foreground">
                 {new Date(comment.createdAt).toLocaleDateString()}{' '}
                 {new Date(comment.createdAt).toLocaleTimeString([], {
                   hour: '2-digit',
@@ -480,7 +480,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
               </span>
             </div>
 
-            <p className="text-sm text-gray-700 whitespace-pre-wrap break-words mb-2">
+            <p className="text-sm text-foreground whitespace-pre-wrap break-words mb-2">
               {comment.content}
             </p>
 
@@ -521,7 +521,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                       }
                     }
                   }}
-                  className="text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
+                  className="text-xs text-destructive hover:text-destructive/80 font-medium transition-colors"
                 >
                   Delete
                 </button>
@@ -529,12 +529,12 @@ const CommentTree: React.FC<CommentTreeProps> = ({
             </div>
 
             {replyingTo === comment.id && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
+              <div className="mt-3 pt-3 border-t border-border">
                 <textarea
                   value={replyContent}
                   onChange={(e) => setReplyContent(e.target.value)}
                   placeholder="Write a reply..."
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 bg-white"
+                  className="w-full p-2 border border-input rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background [.contrast_&]:border-white"
                   rows={3}
                 />
                 <div className="flex justify-end gap-2 mt-2">
@@ -543,7 +543,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
                       setReplyingTo(null);
                       setReplyContent('');
                     }}
-                    className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                    className="px-3 py-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Cancel
                   </button>
@@ -572,19 +572,19 @@ const CommentTree: React.FC<CommentTreeProps> = ({
   const renderNewCommentForm = () => {
     if (!user) {
       return (
-        <div className="p-4 text-center text-gray-500 text-sm border border-gray-200 rounded-lg">
+        <div className="p-4 text-center text-muted-foreground text-sm border border-border rounded-lg">
           Please log in to post comments
         </div>
       );
     }
 
     return (
-      <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg">
+      <div className="mb-6 p-4 bg-background border border-border dark:border-white/20 rounded-lg">
         <textarea
           value={replyContent}
           onChange={(e) => setReplyContent(e.target.value)}
           placeholder="Write a comment..."
-          className="w-full p-3 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 bg-white"
+          className="w-full p-3 border border-input rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background [.contrast_&]:border-white"
           rows={4}
         />
         <div className="flex justify-end gap-2 mt-3">
@@ -604,14 +604,14 @@ const CommentTree: React.FC<CommentTreeProps> = ({
     return (
       <div className={`flex items-center justify-center p-8 ${className}`}>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <span className="ml-3 text-gray-600">Loading comments...</span>
+        <span className="ml-3 text-muted-foreground">Loading comments...</span>
       </div>
     );
   }
 
   if (error && comments.length === 0) {
     return (
-      <div className={`p-4 text-center text-red-600 ${className}`}>
+      <div className={`p-4 text-center text-destructive ${className}`}>
         {error}
         <button
           onClick={fetchComments}
@@ -628,11 +628,11 @@ const CommentTree: React.FC<CommentTreeProps> = ({
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-foreground mb-2">Comments</h3>
         {error && (
-          <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+          <div className="p-2 mb-2 bg-destructive/10 border border-destructive/40 rounded text-sm text-destructive">
             {error}
             <button
               onClick={fetchComments}
-              className="ml-2 text-yellow-900 hover:underline"
+              className="ml-2 text-destructive hover:underline"
             >
               Retry
             </button>
@@ -644,7 +644,7 @@ const CommentTree: React.FC<CommentTreeProps> = ({
 
       <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
         {comments.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-muted-foreground">
             No comments yet. Be the first to comment!
           </div>
         ) : (

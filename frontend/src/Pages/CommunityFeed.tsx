@@ -118,7 +118,7 @@ const TranscriptPreview: React.FC<{
     <div className="mb-4 space-y-4">
       {hasMessages && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700">Conversation</h3>
+          <h3 className="text-sm font-semibold text-foreground">Conversation</h3>
           <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
             {messages.map((message, index) => {
               const isUser = message.sender?.toLowerCase() === "user";
@@ -133,7 +133,7 @@ const TranscriptPreview: React.FC<{
                       isUser
                         ? "bg-primary text-primary-foreground"
                         : isJudge
-                        ? "bg-amber-50 text-amber-900 border border-amber-200"
+                        ? "bg-primary/15 text-foreground border border-border"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
@@ -158,7 +158,7 @@ const TranscriptPreview: React.FC<{
 
       {hasPhaseSummaries && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-foreground">
             Phase Summaries
           </h3>
           <div className="space-y-3">
@@ -167,10 +167,10 @@ const TranscriptPreview: React.FC<{
                 key={`${postId}-phase-${phase}`}
                 className="border rounded-lg p-3 bg-muted/40"
               >
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
                   {formatPhaseLabel(phase)}
                 </h4>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                <p className="text-sm text-foreground whitespace-pre-wrap">
                   {transcriptText}
                 </p>
               </div>
@@ -468,7 +468,7 @@ const CommunityFeed: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
+        <div className="bg-destructive/10 border border-destructive/40 text-destructive px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
@@ -476,9 +476,9 @@ const CommunityFeed: React.FC = () => {
       {posts.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
-            <MessageCircle className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-500 mb-4">No posts yet.</p>
-            <p className="text-sm text-gray-400">
+            <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">No posts yet.</p>
+            <p className="text-sm text-muted-foreground">
               Create a post from your saved transcripts to get started!
             </p>
           </CardContent>
@@ -499,7 +499,7 @@ const CommunityFeed: React.FC = () => {
                             <img
                               src={post.avatarUrl}
                               alt={post.displayName || "User"}
-                              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors flex-shrink-0"
+                              className="w-10 h-10 rounded-full object-cover border-2 border-border cursor-pointer hover:border-primary transition-colors flex-shrink-0"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = "none";
@@ -508,7 +508,7 @@ const CommunityFeed: React.FC = () => {
                                   const fallback =
                                     document.createElement("div");
                                   fallback.className =
-                                    "w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors flex-shrink-0";
+                                    "w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-border cursor-pointer hover:border-primary transition-colors flex-shrink-0";
                                   fallback.textContent =
                                     post.displayName?.charAt(0).toUpperCase() ||
                                     "U";
@@ -517,7 +517,7 @@ const CommunityFeed: React.FC = () => {
                               }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors flex-shrink-0">
+                            <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-border cursor-pointer hover:border-primary transition-colors flex-shrink-0">
                               {post.displayName?.charAt(0).toUpperCase() || "U"}
                             </div>
                           )}
@@ -526,7 +526,7 @@ const CommunityFeed: React.FC = () => {
                           <CardTitle className="text-lg sm:text-xl mb-1 truncate">
                             {post.topic}
                           </CardTitle>
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-gray-500">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-muted-foreground">
                             <span className="truncate">by {post.displayName}</span>
                             <span className="hidden sm:inline">•</span>
                             <span className="whitespace-nowrap">
@@ -576,10 +576,10 @@ const CommunityFeed: React.FC = () => {
                     <span
                       className={`px-2.5 py-1 text-xs rounded-full font-medium flex-shrink-0 ${
                         post.result === "win"
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300"
                           : post.result === "loss"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-gray-100 text-gray-800"
+                          ? "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-200"
                       }`}
                     >
                       {post.result}

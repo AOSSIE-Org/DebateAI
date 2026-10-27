@@ -153,3 +153,49 @@ describe('CommentTree', () => {
     expect(await screen.findByText('profile modal for other')).toBeInTheDocument();
   });
 });
+
+describe('CommentTree theming', () => {
+  it('styles the new comment form with theme tokens instead of fixed light colours', async () => {
+    routes(() => []);
+    renderTree();
+    const textarea = await screen.findByPlaceholderText('Write a comment...');
+
+    expect(textarea).toHaveClass('bg-background', 'text-foreground', 'border-input');
+    expect(textarea).not.toHaveClass('bg-white', 'text-gray-900', 'border-gray-300');
+
+    const form = textarea.closest('div.mb-6');
+    expect(form).toHaveClass('bg-background', 'border-border');
+    expect(form).not.toHaveClass('bg-white', 'border-gray-200');
+  });
+
+  it('styles existing comments, timestamps and the reply box with theme tokens', async () => {
+    routes(() => [comment('c1', 'other', 'Root comment', '2026-10-01T10:00:00Z')]);
+    renderTree();
+
+    const body = await screen.findByText('Root comment');
+    expect(body).toHaveClass('text-foreground');
+    expect(body).not.toHaveClass('text-gray-700');
+
+    const bubble = body.closest('.bg-muted');
+    expect(bubble).not.toBeNull();
+    expect(bubble).not.toHaveClass('bg-gray-50', 'hover:bg-gray-100');
+
+    const timestamp = await screen.findByText(/2026/);
+    expect(timestamp).toHaveClass('text-muted-foreground');
+    expect(timestamp).not.toHaveClass('text-gray-500');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    const reply = await screen.findByPlaceholderText('Write a reply...');
+    expect(reply).toHaveClass('bg-background', 'text-foreground', 'border-input');
+    expect(reply).not.toHaveClass('bg-white', 'text-gray-900');
+  });
+
+  it('styles the signed-out prompt with theme tokens', async () => {
+    userState.value = { user: null };
+    routes(() => []);
+    renderTree();
+    const prompt = await screen.findByText('Please log in to post comments');
+    expect(prompt).toHaveClass('text-muted-foreground', 'border-border');
+    expect(prompt).not.toHaveClass('text-gray-500', 'border-gray-200');
+  });
+});
