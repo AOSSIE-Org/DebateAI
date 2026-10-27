@@ -1,8 +1,9 @@
 package structs
 
 type SignUpRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Email       string `json:"email" binding:"required,email"`
+	Password    string `json:"password" binding:"required,min=8"`
+	DisplayName string `json:"displayName,omitempty" binding:"omitempty,min=2,max=30"`
 }
 
 type VerifyEmailRequest struct {
