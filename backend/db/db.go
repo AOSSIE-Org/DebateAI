@@ -61,18 +61,44 @@ func EnsureIndexes() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// 1. Ensure unique display names for users.
 	usersCol := MongoDatabase.Collection("users")
 
-	indexModel := mongo.IndexModel{
-		Keys:    bson.D{{Key: "displayName", Value: 1}},
-		Options: options.Index().SetUnique(true).SetSparse(true).SetName("unique_displayName"),
+	displayNameIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "displayName", Value: 1},
+		},
+		Options: options.Index().
+			SetUnique(true).
+			SetSparse(true).
+			SetName("unique_displayName"),
 	}
 
-	_, err := usersCol.Indexes().CreateOne(ctx, indexModel)
+	_, err := usersCol.Indexes().CreateOne(ctx, displayNameIndex)
 	if err != nil {
 		return fmt.Errorf("failed to create displayName index: %w", err)
 	}
 	log.Println("DisplayName unique index ensured")
+
+	// 2. Prevent duplicate score-update records for the same debate.
+	scoreUpdatesCol := MongoDatabase.Collection("score_updates")
+
+	debateScoreIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "debateId", Value: 1},
+		},
+		Options: options.Index().
+			SetUnique(true).
+			SetSparse(true).
+			SetName("unique_score_updates_debateId"),
+	}
+
+	_, err = scoreUpdatesCol.Indexes().CreateOne(ctx, debateScoreIndex)
+	if err != nil {
+		return fmt.Errorf("failed to create score_updates debateId index: %w", err)
+	}
+	log.Println("Unique score_updates debateId index ensured")
+
 	return nil
 }
 

@@ -289,6 +289,74 @@ const extractJSON = (response: string): string => {
   return "{}";
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isScoreReason = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.score === "number" &&
+  Number.isFinite(value.score) &&
+  value.score >= 0 &&
+  value.score <= 10 &&
+  typeof value.reason === "string" &&
+  value.reason.trim().length > 0;
+
+const isJudgmentDataValid = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+
+  const isUserBotFormat = isRecord(value.opening_statement) &&
+    "user" in value.opening_statement;
+
+  const sections = isUserBotFormat
+    ? [
+        value.opening_statement,
+        value.cross_examination,
+        value.answers,
+        value.closing,
+      ]
+    : [
+        value.opening_statement,
+        value.cross_examination_questions,
+        value.cross_examination_answers,
+        value.closing,
+      ];
+
+  if (!sections.every(
+    (section) =>
+      isRecord(section) &&
+      (isUserBotFormat
+        ? isScoreReason(section.user) && isScoreReason(section.bot)
+        : isScoreReason(section.for) && isScoreReason(section.against)),
+  )) {
+    return false;
+  }
+
+  const total = value.total;
+  const verdict = value.verdict;
+
+  if (!isRecord(total) || !isRecord(verdict)) return false;
+
+  const totalKeys = isUserBotFormat ? ["user", "bot"] : ["for", "against"];
+
+  if (!totalKeys.every(
+    (key) =>
+      typeof total[key] === "number" &&
+      Number.isFinite(total[key]) &&
+      total[key] >= 0 &&
+      total[key] <= 40,
+  )) {
+    return false;
+  }
+
+  return (
+    ["User", "Bot", "Draw"].includes(String(verdict.winner)) &&
+    typeof verdict.reason === "string" &&
+    verdict.reason.trim().length > 0 &&
+    typeof verdict.congratulations === "string" &&
+    typeof verdict.opponent_analysis === "string"
+  );
+};
+
 const DebateRoom: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -337,14 +405,20 @@ const DebateRoom: React.FC = () => {
     : "";
   const [user] = useAtom(userAtom);
 
+  const [botTurnFailed, setBotTurnFailed] = useState(false);
+
   const [state, setState] = useState<DebateState>(() => {
+    const normalizeStance = (stance: string): "For" | "Against" => {
+      return stance.toLowerCase() === "against" ? "Against" : "For";
+    };
+    const normalizedStance = normalizeStance(debateData?.stance ?? "");
     const defaultState: DebateState = {
       messages: [],
       currentPhase: 0,
       phaseStep: 0,
-      isBotTurn: false,
-      userStance: "",
-      botStance: "",
+      isBotTurn: normalizedStance === "Against",
+      userStance: normalizedStance,
+      botStance: normalizedStance === "For" ? "Against" : "For",
       timer: debateKey ? phases[0]?.time ?? 60 : 60,
       isDebateEnded: false,
     };
@@ -380,14 +454,20 @@ const DebateRoom: React.FC = () => {
     show: boolean;
     message: string;
     isJudging?: boolean;
+    type?: "transition" | "judging" | "error" | "info";
   }>({ show: false, message: "" });
   const [judgmentData, setJudgmentData] = useState<JudgmentData | null>(null);
+  const [failedJudgmentMessages, setFailedJudgmentMessages] = useState<Message[] | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [nextTurnPending, setNextTurnPending] = useState(false);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
   const [isConceding, setIsConceding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
+  const advancingTurnRef = useRef(false);
+  const judgmentInFlightRef = useRef(false);
+  const phaseTransitionRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const advanceTokenRef = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -408,6 +488,40 @@ const DebateRoom: React.FC = () => {
       navigate("/startDebate", { replace: true });
     }
   }, [debateData, navigate, toast]);
+
+  const handleExitDebate = () => {
+    if (!window.confirm("Are you sure you want to exit this debate?")) {
+      return;
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    try {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    } catch (err) {
+      console.warn("Speech recognition already stopped:", err);
+    }
+
+    setIsRecognizing(false);
+    setPopup({ show: false, message: "" });
+
+    try {
+      if (debateKey) {
+        localStorage.removeItem(debateKey);
+      }
+
+      sessionStorage.removeItem(`debateData_${location.pathname}`);
+    } catch (err) {
+      console.error("Failed to clear debate session data:", err);
+    }
+
+    navigate("/startDebate", { replace: true });
+  };
 
   const handleConcede = async () => {
     if (isConceding) {
@@ -514,65 +628,79 @@ const DebateRoom: React.FC = () => {
     }
   }, [state, debateKey]);
 
-  useEffect(() => {
-    if (!debateData || !state.userStance) {
-      if (!debateData) return;
-      const stanceNormalized =
-        debateData.stance.toLowerCase() === "for" ||
-          debateData.stance.toLowerCase() === "against"
-          ? debateData.stance.toLowerCase() === "for"
-            ? "For"
-            : "Against"
-          : "For";
-      setState((prev) => ({
-        ...prev,
-        userStance: stanceNormalized,
-        botStance: stanceNormalized === "For" ? "Against" : "For",
-        isBotTurn: stanceNormalized === "Against",
-      }));
+useEffect(() => {
+  if (state.timer <= 0 || state.isDebateEnded) {
+    return;
+  }
+
+  timerRef.current = setInterval(() => {
+    setState((prev) => {
+      if (prev.timer <= 0 || prev.isDebateEnded) {
+        return prev;
+      }
+
+      return { ...prev, timer: prev.timer - 1 };
+    });
+  }, 1000);
+
+  return () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-  }, [state.userStance, debateData?.stance]);
+  };
+}, [state.timer, state.isDebateEnded]);
 
   useEffect(() => {
-    if (state.timer > 0 && !state.isDebateEnded) {
-      timerRef.current = setInterval(() => {
-        setState((prev) => {
-          if (prev.timer <= 1) {
-            clearInterval(timerRef.current!);
-            if (!prev.isBotTurn) {
-              if (isRecognizing) stopRecognition();
-              setPopup({
-                show: true,
-                message: "Time's up! Moving to the next turn.",
-              });
-              setTimeout(() => setPopup({ show: false, message: "" }), 2000);
-              const updatedState = { ...prev, timer: 0 };
-              advanceTurn(updatedState);
-              return updatedState;
-            } else {
-              setNextTurnPending(true);
-              return { ...prev, timer: 0 };
-            }
-          }
-          return { ...prev, timer: prev.timer - 1 };
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [state.timer, state.isDebateEnded, state.isBotTurn, isRecognizing]);
+  if (state.timer !== 0 || state.isDebateEnded) {
+    return;
+  }
 
+  if (state.isBotTurn) {
+    setNextTurnPending(true);
+    return;
+  }
+
+  if (isRecognizing) {
+    stopRecognition();
+  }
+
+  setPopup({
+    show: true,
+    message: "Time's up! Moving to the next turn.",
+    type: "info",
+  });
+
+  const timeoutId = setTimeout(() => {
+    setPopup({ show: false, message: "" });
+    advanceTurn(state);
+  }, 2000);
+
+  return () => clearTimeout(timeoutId);
+}, [
+  state.timer,
+  state.isDebateEnded,
+  state.isBotTurn,
+  state.currentPhase,
+  state.phaseStep,
+  isRecognizing,
+]);
   useEffect(() => {
-    if (state.isBotTurn && !state.isDebateEnded && !botTurnRef.current) {
+    if (
+      state.isBotTurn &&
+      !state.isDebateEnded &&
+      !botTurnRef.current &&
+      !botTurnFailed
+    ) {
       botTurnRef.current = true;
-      handleBotTurn();
+      void handleBotTurn();
     }
   }, [
     state.isBotTurn,
     state.currentPhase,
     state.phaseStep,
     state.isDebateEnded,
+    botTurnFailed,
   ]);
 
 
@@ -590,56 +718,101 @@ const DebateRoom: React.FC = () => {
     }
   };
 
-  const advanceTurn = (currentState: DebateState) => {
-    const currentSequence = phaseSequences[currentState.currentPhase];
-    if (currentState.phaseStep + 1 < currentSequence.length) {
-      const nextStep = currentState.phaseStep + 1;
-      const nextStance = currentSequence[nextStep];
-      const nextEntity =
-        currentState.userStance === nextStance ? "User" : "Bot";
-      setState({
-        ...currentState,
-        phaseStep: nextStep,
-        isBotTurn: nextEntity === "Bot",
-        timer: phases[currentState.currentPhase].time,
-      });
-      setNextTurnPending(false);
-    } else if (currentState.currentPhase < phases.length - 1) {
-      const newPhase = currentState.currentPhase + 1;
-      setPopup({
-        show: true,
-        message: `${phases[currentState.currentPhase].name} completed. Next: ${phases[newPhase].name
-          } - ${getPhaseInstructions(newPhase)}`,
-      });
-      setTimeout(() => {
-        setPopup({ show: false, message: "" });
-        setState((prevState) => ({
-          ...prevState,
-          currentPhase: newPhase,
-          phaseStep: 0,
-          isBotTurn:
-            prevState.userStance === phaseSequences[newPhase][0] ? false : true,
-          timer: phases[newPhase].time,
-        }));
-        setNextTurnPending(false);
-      }, 4000);
-    } else {
-      setPopup({
-        show: true,
-        message: "Calculating scores and judging results...",
-        isJudging: true,
-      });
-      setState({ ...currentState, isDebateEnded: true });
-      judgeDebateResult(currentState.messages);
-      setNextTurnPending(false);
+
+const advanceTurn = (currentState: DebateState) => {
+  if (advancingTurnRef.current || currentState.isDebateEnded) {
+    return;
+  }
+
+  advancingTurnRef.current = true;
+  const advanceToken = ++advanceTokenRef.current;
+
+  const currentSequence = phaseSequences[currentState.currentPhase];
+
+  // Case 1: Move to the next turn within the current phase.
+  if (currentState.phaseStep + 1 < currentSequence.length) {
+    const nextStep = currentState.phaseStep + 1;
+    const nextStance = currentSequence[nextStep];
+    const nextEntity =
+      currentState.userStance === nextStance ? "User" : "Bot";
+
+    setState({
+      ...currentState,
+      phaseStep: nextStep,
+      isBotTurn: nextEntity === "Bot",
+      timer: phases[currentState.currentPhase].time,
+    });
+
+    setNextTurnPending(false);
+    setBotTurnFailed(false);
+
+    queueMicrotask(() => {
+      if (advanceTokenRef.current === advanceToken) {
+        advancingTurnRef.current = false;
+      }
+    });
+
+    return;
+  }
+
+  // Case 2: Move to the next phase after the transition message.
+  if (currentState.currentPhase < phases.length - 1) {
+    const newPhase = currentState.currentPhase + 1;
+
+    setPopup({
+      show: true,
+      message: `${phases[currentState.currentPhase].name} completed. Next: ${
+        phases[newPhase].name
+      } - ${getPhaseInstructions(newPhase)}`,
+      type: "transition",
+    });
+
+    if (phaseTransitionRef.current) {
+      clearTimeout(phaseTransitionRef.current);
     }
-  };
+
+    phaseTransitionRef.current = setTimeout(() => {
+      // Ignore a stale transition callback.
+      if (advanceTokenRef.current !== advanceToken) {
+        return;
+      }
+
+      setPopup({ show: false, message: "" });
+
+      setState((prevState) => ({
+        ...prevState,
+        currentPhase: newPhase,
+        phaseStep: 0,
+        isBotTurn:
+          prevState.userStance === phaseSequences[newPhase][0]
+            ? false
+            : true,
+        timer: phases[newPhase].time,
+      }));
+
+      setNextTurnPending(false);
+      setBotTurnFailed(false);
+      phaseTransitionRef.current = null;
+      advancingTurnRef.current = false;
+    }, 4000);
+
+    return;
+  }
+
+  // Case 3: All phases are complete; finish and judge the debate.
+  setState({
+    ...currentState,
+    isDebateEnded: true,
+  });
+
+  setNextTurnPending(false);
+  setBotTurnFailed(false);
+
+  void judgeDebateResult(currentState.messages);
+};
 
   const handleNextTurn = () => {
-    setState((prev) => {
-      advanceTurn(prev);
-      return prev;
-    });
+    advanceTurn(state);
   };
 
   const sendMessage = async () => {
@@ -651,16 +824,16 @@ const DebateRoom: React.FC = () => {
       phase: phases[state.currentPhase].name,
     };
 
-    setState((prev) => {
       const updatedState = {
-        ...prev,
-        messages: [...prev.messages, newMessage],
-        timer: phases[prev.currentPhase].time,
+        ...state,
+        messages: [...state.messages, newMessage],
+        timer: phases[state.currentPhase].time,
       };
+
       clearInterval(timerRef.current!);
+      setState(updatedState);
       advanceTurn(updatedState);
-      return updatedState;
-    });
+
 
     setFinalInput("");
     setInterimInput("");
@@ -670,12 +843,14 @@ const DebateRoom: React.FC = () => {
   const handleBotTurn = async () => {
     if (!debateData) {
       console.error("Cannot handle bot turn without debate data.");
+      botTurnRef.current = false;
       return;
     }
 
     try {
       const turnType = turnTypes[state.currentPhase][state.phaseStep];
       let context = "";
+
       if (turnType === "statement") {
         context = "Make your statement";
       } else if (turnType === "question") {
@@ -687,7 +862,8 @@ const DebateRoom: React.FC = () => {
           : "Provide your answer";
       }
 
-      const { response } = await sendDebateMessage({
+      const { response, isFallback } = await sendDebateMessage({
+        debateId: debateData.debateId,
         botLevel: debateData.botLevel,
         topic: debateData.topic,
         history: state.messages,
@@ -696,120 +872,134 @@ const DebateRoom: React.FC = () => {
         context,
       });
 
+      // A fallback is not a genuine debate response.
+      // Keep the bot turn active so the user can retry.
+      if (isFallback) {
+        setBotTurnFailed(true);
+
+        toast({
+          title: "AI usage limit reached",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+
+        return;
+      }
+
       const botMessage: Message = {
         sender: "Bot",
-        text: response || "I need to think about that...",
+        text: response,
         phase: phases[state.currentPhase].name,
       };
 
-      setState((prev) => {
-        const updatedState = {
-          ...prev,
-          messages: [...prev.messages, botMessage],
-        };
-        // Advance turn after bot responds
-        setTimeout(() => {
-          advanceTurn(updatedState);
-        }, 100); // Small delay to ensure state is updated
-        return updatedState;
-      });
-    } catch (error) {
+      const updatedState = {
+        ...state,
+        messages: [...state.messages, botMessage],
+      };
+
+      setState(updatedState);
+
+      // Advance only after a genuine bot response has been added.
+      advanceTurn(updatedState);
+      } catch (error: unknown) {
       console.error("Bot error:", error);
-      // Even on error, advance turn to prevent getting stuck
-      setState((prev) => {
-        const errorMessage: Message = {
-          sender: "Bot",
-          text: "I encountered an error. Please continue.",
-          phase: phases[prev.currentPhase].name,
-        };
-        const updatedState = {
-          ...prev,
-          messages: [...prev.messages, errorMessage],
-          isBotTurn: false, // Reset bot turn on error
-        };
-        advanceTurn(updatedState);
-        return updatedState;
+
+      setBotTurnFailed(true);
+
+      const status =
+        typeof error === "object" && error !== null && "status" in error
+          ? error.status
+          : undefined;
+
+      const isRateLimited = status === 429;
+      const isUnavailable = status === 503;
+
+      toast({
+        title: isRateLimited
+          ? "AI usage limit reached"
+          : isUnavailable
+            ? "AI service temporarily unavailable"
+            : "Unable to generate bot response",
+        description: isRateLimited
+          ? "Please try again later."
+          : "Please retry your turn. The debate has not advanced.",
+        variant: "destructive",
       });
     } finally {
       botTurnRef.current = false;
     }
   };
 
-  const judgeDebateResult = async (messages: Message[]) => {
-    if (!debateData) {
-      console.error("Cannot judge debate without debate data.");
+  const retryBotTurn = () => {
+    if (!state.isBotTurn || !botTurnFailed || botTurnRef.current) {
       return;
     }
 
-    try {
-      console.log("Starting judgment with messages:", messages);
-      const { result } = await judgeDebate({
-        history: messages,
-        userId: debateData.userId,
-      });
-      console.log("Raw judge result:", result);
-
-
-      let judgment: JudgmentData;
-
-      if (typeof result === "string") {
-        const jsonString = extractJSON(result);
-        console.log("Extracted JSON:", jsonString);
-        judgment = JSON.parse(jsonString);
-      } else {
-        const res: any = result;
-        judgment = res as JudgmentData;
-      }
-
-      if (!judgment || typeof judgment !== "object" || !judgment.opening_statement || !judgment.verdict) {
-        console.error("Invalid judgment structure:", judgment);
-        throw new Error("Invalid or incomplete judgment structure received from AI");
-      }
-
-      console.log("FINAL PARSED:", judgment);
-      setJudgmentData(judgment);
-      setPopup({ show: false, message: "" });
-
-    } catch (error) {
-      console.error("Judging error:", error);
-      // Show error to user
-      setPopup({
-        show: true,
-        message: `Judgment error: ${error instanceof Error ? error.message : "Unknown error"}. Showing default results.`,
-        isJudging: false,
-      });
-
-      // Set default judgment data
-      setJudgmentData({
-        opening_statement: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        cross_examination: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        answers: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        closing: {
-          user: { score: 0, reason: "Error occurred during judgment" },
-          bot: { score: 0, reason: "Error occurred during judgment" },
-        },
-        total: { user: 0, bot: 0 },
-        verdict: {
-          winner: "None",
-          reason: error instanceof Error ? error.message : "Judgment failed",
-          congratulations: "",
-          opponent_analysis: "",
-        },
-      });
-      setTimeout(() => {
-        setPopup({ show: false, message: "" });
-      }, 3000);
-    }
+    setBotTurnFailed(false);
+    botTurnRef.current = true;
+    void handleBotTurn();
   };
+
+const judgeDebateResult = async (messages: Message[]) => {
+  if (!debateData || judgmentInFlightRef.current) {
+    return;
+  }
+
+  judgmentInFlightRef.current = true;
+
+try {
+  setPopup({
+    show: true,
+    message: "Calculating scores and judging results...",
+    isJudging: true,
+  });
+
+  const { result } = await judgeDebate({
+    debateId: debateData.debateId,
+    history: messages,
+  });
+
+  let judgment: JudgmentData;
+
+  if (typeof result === "string") {
+    const jsonString = extractJSON(result);
+    judgment = JSON.parse(jsonString);
+  } else {
+    judgment = result as JudgmentData;
+  }
+
+  // Validate the judgment before displaying it.
+  if (!isJudgmentDataValid(judgment)) {
+    console.error("Invalid judgment structure:", judgment);
+    throw new Error("The AI returned an incomplete judgment.");
+  }
+
+  setJudgmentData(judgment);
+  setFailedJudgmentMessages(null);
+  setPopup({ show: false, message: "" });
+} catch (error) {
+  console.error("Judging error:", error);
+
+  // Keep the original messages so the user can retry.
+  setFailedJudgmentMessages(messages);
+  setJudgmentData(null);
+
+  setPopup({
+    show: true,
+    message:
+      "We couldn't generate your debate judgment. The AI service may be temporarily unavailable. Please try again.",
+    isJudging: false,
+    type: "error",
+  });
+} finally {
+  judgmentInFlightRef.current = false;
+}
+};
+const retryJudgment = () => {
+  if (!failedJudgmentMessages) return;
+
+  void judgeDebateResult(failedJudgmentMessages);
+};
 
   const formatTime = (seconds: number) => {
     const timeStr = `${Math.floor(seconds / 60)}:${(seconds % 60)
@@ -901,30 +1091,59 @@ const DebateRoom: React.FC = () => {
         </div>
       </div>
 
-      {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105">
-            {popup.isJudging ? (
-              <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  {popup.message}
-                </h2>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-xl font-bold text-primary mb-2">
-                  Phase Transition
-                </h3>
-                <p className="text-muted-foreground text-center text-sm">
-                  {popup.message}
-                </p>
-              </>
-            )}
-          </div>
+        <div className="w-full max-w-5xl mx-auto flex justify-end py-3">
+          <Button
+            variant="outline"
+            onClick={handleExitDebate}
+            className="border-border"
+          >
+            Exit Debate
+          </Button>
+        </div>
+{popup.show && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+    <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full">
+      {popup.isJudging ? (
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4" />
+          <h2 className="text-xl font-semibold text-foreground text-center">
+            {popup.message}
+          </h2>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4">
+          <h3 className="text-xl font-bold text-primary">
+            {popup.type === "transition"
+              ? "Phase Completed"
+              : popup.type === "error"
+                ? "Judgment Unavailable"
+                : popup.type === "info"
+                  ? "Time's Up"
+                  : "Notice"}
+          </h3>
+
+          <p className="text-muted-foreground text-center text-sm">
+            {popup.message}
+          </p>
+
+          {popup.type === "error" && failedJudgmentMessages && (
+            <Button onClick={retryJudgment} className="w-full">
+              Retry Judgment
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() => setPopup({ show: false, message: "" })}
+            className="w-full"
+          >
+            Close
+          </Button>
         </div>
       )}
-
+    </div>
+  </div>
+)}
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
         {/* Bot Section */}
         <div
@@ -970,6 +1189,20 @@ const DebateRoom: React.FC = () => {
               )}
             </p>
             {renderPhaseMessages("Bot")}
+            {botTurnFailed && state.isBotTurn && !state.isDebateEnded && (
+              <div className="mt-3">
+                <p className="text-sm text-destructive mb-2">
+                  The bot couldn't respond. Your turn hasn't advanced.
+                </p>
+                <Button
+                  onClick={retryBotTurn}
+                  disabled={botTurnRef.current}
+                  className="w-full"
+                >
+                  Retry Bot Response
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
