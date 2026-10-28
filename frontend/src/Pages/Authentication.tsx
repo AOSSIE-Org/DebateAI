@@ -89,8 +89,8 @@ const RightSection: React.FC<RightSectionProps> = ({
         </svg>
         <span>Home</span>
       </Link>
-      <div className="w-32 ml-auto">
-        <ThemeToggle iconSize={18} />
+      <div className="ml-auto">
+        <ThemeToggle iconSize={18} align="end" />
       </div>
     </div>
 

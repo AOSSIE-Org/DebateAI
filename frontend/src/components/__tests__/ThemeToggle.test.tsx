@@ -28,6 +28,41 @@ describe('ThemeToggle', () => {
     expect(screen.queryByRole('button', { name: 'High Contrast' })).toBeNull();
   });
 
+  it('keeps the trigger and option labels on a single line', async () => {
+    renderWithTheme(ThemeOptions.Contrast);
+    const trigger = screen.getByRole('button', { name: /Theme:\s*High Contrast/ });
+    expect(trigger).toHaveClass('whitespace-nowrap');
+    await userEvent.click(trigger);
+    const option = screen.getByRole('button', { name: 'High Contrast' });
+    expect(option).toHaveClass('whitespace-nowrap');
+    expect(option.parentElement).toHaveClass('min-w-max');
+  });
+
+  it('applies hover styles that use the theme tokens', async () => {
+    renderWithTheme(ThemeOptions.Contrast);
+    const trigger = screen.getByRole('button', { name: /Theme:/ });
+    expect(trigger).toHaveClass('hover:bg-muted');
+    await userEvent.click(trigger);
+    for (const name of ['Light', 'Dark', 'High Contrast']) {
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'hover:bg-accent',
+        'hover:text-accent-foreground'
+      );
+    }
+  });
+
+  it('right-aligns a content-width menu when align is "end"', async () => {
+    render(
+      <ThemeContext.Provider value={{ theme: ThemeOptions.Contrast, toggleTheme: vi.fn() }}>
+        <ThemeToggle align="end" />
+      </ThemeContext.Provider>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Theme:/ }));
+    const menu = screen.getByRole('button', { name: 'Light' }).parentElement;
+    expect(menu).toHaveClass('right-0', 'w-max');
+    expect(menu).not.toHaveClass('left-2');
+  });
+
   it.each([
     [ThemeOptions.Light, 'Dark', 1],
     [ThemeOptions.Light, 'High Contrast', 2],
