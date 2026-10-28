@@ -15,7 +15,7 @@ func TestMatchmakingService(t *testing.T) {
 		t.Errorf("Failed to add user1 to pool: %v", err)
 	}
 
-	err = ms.AddToPool("user2", "Bob", 1250)
+	err = ms.AddToPool("user2", "Bob", 2000)
 	if err != nil {
 		t.Errorf("Failed to add user2 to pool: %v", err)
 	}
