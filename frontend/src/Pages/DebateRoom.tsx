@@ -10,6 +10,8 @@ import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import BotVoiceControls from "@/components/BotVoiceControls";
 
 // Bot type definition (same as in BotSelection)
 interface Bot {
@@ -391,6 +393,10 @@ const DebateRoom: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  // Text-to-Speech: single hook instance shared across all bot messages
+  // so only one message can play at a time.
+  const tts = useSpeechSynthesis();
+
   const bot = debateData
     ? allBots.find((b) => b.name === debateData.botName) || allBots[0]
     : allBots[0];
@@ -416,6 +422,8 @@ const DebateRoom: React.FC = () => {
 
     setIsConceding(true);
     setIsConcedeDialogOpen(false);
+    // Stop any running TTS when the debate ends via concession.
+    tts.stop();
     try {
       if (debateData?.debateId) {
         await concedeDebate(debateData.debateId, state.messages);
@@ -437,6 +445,15 @@ const DebateRoom: React.FC = () => {
       setIsConceding(false);
     }
   };
+
+  // Stop TTS when debate ends, judgment data becomes available, or concession is in progress
+  const { stop } = tts;
+
+  useEffect(() => {
+    if (state.isDebateEnded || judgmentData !== null || isConceding) {
+      stop();
+    }
+  }, [state.isDebateEnded, judgmentData, isConceding, stop]);
 
   // Initialize SpeechRecognition
   useEffect(() => {
@@ -829,17 +846,33 @@ const DebateRoom: React.FC = () => {
     const phaseMessages = state.messages.filter((msg) => msg.sender === sender);
     return (
       <div className="space-y-4">
-        {phaseMessages.map((msg, idx) => (
-          <div
-            key={idx}
-            className="p-3 bg-muted rounded-lg shadow-sm text-foreground break-words"
-          >
-            <span className="text-xs text-muted-foreground block mb-1">
-              {msg.phase}
-            </span>
-            {msg.text}
-          </div>
-        ))}
+        {phaseMessages.map((msg, idx) => {
+          // Stable message ID: combination of sender, phase, and index
+          const msgId = `${sender}-${msg.phase}-${idx}`;
+          return (
+            <div
+              key={idx}
+              className="p-3 bg-muted rounded-lg shadow-sm text-foreground break-words"
+            >
+              <span className="text-xs text-muted-foreground inline-flex items-center mb-1">
+                {msg.phase}
+                {/* Voice controls are only shown on bot messages */}
+                {sender === "Bot" &&
+                  !state.isDebateEnded &&
+                  judgmentData === null &&
+                  !isConceding && (
+                    <BotVoiceControls
+                      messageId={msgId}
+                      text={msg.text}
+                      botName={debateData?.botName ?? "Bot"}
+                      tts={tts}
+                    />
+                  )}
+              </span>
+              {msg.text}
+            </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
     );
