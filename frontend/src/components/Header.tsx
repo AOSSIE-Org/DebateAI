@@ -35,7 +35,13 @@ import { Button } from "@/components/ui/button";
 import { DebateAiLogo } from "./DebateAiLogo";
 import avatarImage from "@/assets/avatar2.jpg";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
-import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, Notification } from "@/services/notificationService";
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  Notification,
+} from "@/services/notificationService";
 import { ThemeToggle } from "./ThemeToggle";
 import ServerBadge from "./ServerBadge";
 
@@ -51,10 +57,6 @@ const handleAvatarLoadError = (event: React.SyntheticEvent<HTMLImageElement>) =>
   image.src = avatarImage;
 };
 
-/**
- * Header component providing breadcrumb navigation, notifications, 
- * and user profile management.
- */
 function Header() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const location = useLocation();
@@ -65,32 +67,43 @@ function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  const isSignedIn = Boolean(auth?.isAuthenticated || user);
+
   const toggleDrawer = () => setIsDrawerOpen(!isDrawerOpen);
 
   const fetchNotifications = async () => {
-    if (user) {
-      const data = await getNotifications();
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.isRead).length);
+    if (!isSignedIn) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
     }
+
+    const data = await getNotifications();
+    setNotifications(data);
+    setUnreadCount(data.filter((n) => !n.isRead).length);
   };
 
   useEffect(() => {
+    if (!isSignedIn) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
     fetchNotifications();
-    // Poll for notifications every minute
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [isSignedIn, user]);
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead) {
       await markNotificationAsRead(notification.id);
-      setNotifications(prev => 
-        prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     }
-    
+
     if (notification.link) {
       navigate(notification.link);
       setIsNotificationsOpen(false);
@@ -100,24 +113,19 @@ function Header() {
   const handleDeleteNotification = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     await deleteNotification(id);
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    // Update unread count if the deleted notification was unread
-    const notification = notifications.find(n => n.id === id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const notification = notifications.find((n) => n.id === id);
     if (notification && !notification.isRead) {
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     }
   };
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsAsRead();
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
   };
 
-  /**
-   * Generates breadcrumb navigation based on the current URL path.
-   * @returns {JSX.Element} The breadcrumb component.
-   */
   const getBreadcrumbs = () => {
     const pathnames = location.pathname.split("/").filter((x) => x);
     return (
@@ -130,10 +138,10 @@ function Header() {
           </BreadcrumbItem>
           {pathnames.map((value, index) => {
             let to = `/${pathnames.slice(0, index + 1).join("/")}`;
-            if (value === "tournament"){
+            if (value === "tournament") {
               to = "/tournaments";
             }
-              const isLast = index === pathnames.length - 1;
+            const isLast = index === pathnames.length - 1;
             return (
               <React.Fragment key={to}>
                 <BreadcrumbSeparator />
@@ -141,19 +149,19 @@ function Header() {
                   {isLast ? (
                     <BreadcrumbPage className="capitalize">
                       {value === "support-debateai" || value === "support-os"
-                        ? "Support DebateAI" 
-                        : value === "bot-selection" 
-                        ? "Bot Selection" 
-                        : value.replace(/-/g, " ")}
+                        ? "Support DebateAI"
+                        : value === "bot-selection"
+                          ? "Bot Selection"
+                          : value.replace(/-/g, " ")}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
                       <NavLink to={to} className="capitalize">
                         {value === "support-debateai" || value === "support-os"
-                          ? "Support DebateAI" 
-                          : value === "bot-selection" 
-                          ? "Bot Selection" 
-                          : value.replace(/-/g, " ")}
+                          ? "Support DebateAI"
+                          : value === "bot-selection"
+                            ? "Bot Selection"
+                            : value.replace(/-/g, " ")}
                       </NavLink>
                     </BreadcrumbLink>
                   )}
@@ -169,141 +177,182 @@ function Header() {
   return (
     <>
       <header className="flex items-center justify-between h-16 px-2 sm:px-4 border-b border-border bg-background">
-        <div className="hidden xs:flex flex-1 min-w-0 overflow-hidden text-sm sm:text-lg font-semibold mr-2">{getBreadcrumbs()}</div>
+        <div className="hidden xs:flex flex-1 min-w-0 overflow-hidden text-sm sm:text-lg font-semibold mr-2">
+          {getBreadcrumbs()}
+        </div>
+
         <div className="flex-shrink-0 flex items-center gap-2 sm:gap-4">
-          <ServerBadge />
-          <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Open notifications"
-                className="relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full p-1 transition-colors"
+          {!isSignedIn ? (
+            <>
+              <ThemeToggle />
+              <Button variant="outline" size="sm" onClick={() => navigate("/auth")}>
+                Sign in
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => navigate("/auth", { state: { isSignUp: true } })}
               >
-                <Bell className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-destructive" />
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 bg-popover text-popover-foreground border-border" align="end">
-              <div className="flex items-center justify-between p-4 border-b border-border">
-                <h4 className="font-semibold">Notifications</h4>
-                {unreadCount > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-xs h-8 px-2 text-primary hover:text-primary/80"
-                    onClick={handleMarkAllRead}
+                Sign up
+              </Button>
+            </>
+          ) : (
+            <>
+              <ServerBadge />
+              <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Open notifications"
+                    className="relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full p-1 transition-colors"
                   >
-                    Mark all read
-                  </Button>
-                )}
-              </div>
-              <ScrollArea className="h-[300px]">
-                {notifications.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground text-sm">
-                    No notifications yet
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {notifications.map((notification) => (
-                      <div 
-                        key={notification.id}
-                        className={`p-4 hover:bg-accent cursor-pointer transition-colors relative group ${!notification.isRead ? 'bg-accent/50' : ''}`}
-                        onClick={() => handleNotificationClick(notification)}
+                    <Bell className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-destructive" />
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[calc(100vw-2rem)] sm:w-80 p-0 bg-popover text-popover-foreground border-border"
+                  align="end"
+                >
+                  <div className="flex items-center justify-between p-4 border-b border-border">
+                    <h4 className="font-semibold">Notifications</h4>
+                    {unreadCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-8 px-2 text-primary hover:text-primary/80"
+                        onClick={handleMarkAllRead}
                       >
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteNotification(e, notification.id)}
-                          className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                          title="Delete notification"
-                          aria-label="Delete notification"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                        <div className="flex gap-3">
-                          <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${!notification.isRead ? 'bg-primary' : 'bg-transparent'}`} />
-                          <div className="flex-1 space-y-1 pr-4">
-                            <p className="text-sm font-medium leading-none">
-                              {notification.title}
-                            </p>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-muted-foreground/60">
-                              {new Date(notification.createdAt).toLocaleDateString()}
-                            </p>
+                        Mark all read
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground text-sm">
+                        No notifications yet
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`p-4 hover:bg-accent cursor-pointer transition-colors relative group ${
+                              !notification.isRead ? "bg-accent/50" : ""
+                            }`}
+                            onClick={() => handleNotificationClick(notification)}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteNotification(e, notification.id)}
+                              className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                              title="Delete notification"
+                              aria-label="Delete notification"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="flex gap-3">
+                              <div
+                                className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${
+                                  !notification.isRead ? "bg-primary" : "bg-transparent"
+                                }`}
+                              />
+                              <div className="flex-1 space-y-1 pr-4">
+                                <p className="text-sm font-medium leading-none">
+                                  {notification.title}
+                                </p>
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  {notification.message}
+                                </p>
+                                <p className="text-xs text-muted-foreground/60">
+                                  {new Date(notification.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Open user menu"
+                    className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full transition-opacity"
+                  >
+                    <img
+                      src={user?.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt="User avatar"
+                      onError={handleAvatarLoadError}
+                      className="w-8 h-8 rounded-full border-2 border-border object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[calc(100vw-2rem)] sm:w-80 p-0 bg-popover text-popover-foreground border-border"
+                  align="end"
+                >
+                  <div className="p-4 border-b border-border">
+                    <div className="flex items-center gap-3 mb-3">
+                      <img
+                        src={user?.avatarUrl || DEFAULT_AVATAR_URL}
+                        alt="User avatar"
+                        onError={handleAvatarLoadError}
+                        className="w-12 h-12 rounded-full border-2 border-border object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-semibold break-words">
+                          {user?.displayName || "User"}
+                        </h4>
+                        <div className="text-sm text-muted-foreground overflow-x-auto whitespace-nowrap pb-0.5">
+                          {user?.email || "No email"}
                         </div>
                       </div>
-                    ))}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">User ID</span>
+                        <span
+                          className="font-mono text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground truncate max-w-[150px]"
+                          title={user?.id}
+                        >
+                          {user?.id || "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Rating</span>
+                        <span className="font-medium text-primary">
+                          {user?.rating ? Math.round(user.rating) : 1500}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
-          
-          <Popover>
-            <PopoverTrigger asChild>
+                  <div className="p-2">
+                    <button
+                      onClick={() => auth?.logout()}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign out
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <button
-                type="button"
-                aria-label="Open user menu"
-                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full transition-opacity"
+                onClick={toggleDrawer}
+                className="lg:hidden p-2 rounded-md text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Open menu"
               >
-                <img
-                  src={user?.avatarUrl || DEFAULT_AVATAR_URL}
-                  alt="User avatar"
-                  onError={handleAvatarLoadError}
-                  className="w-8 h-8 rounded-full border-2 border-border object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                />
+                <Menu className="h-6 w-6" />
               </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 bg-popover text-popover-foreground border-border" align="end">
-              <div className="p-4 border-b border-border">
-                <div className="flex items-center gap-3 mb-3">
-                  <img
-                    src={user?.avatarUrl || DEFAULT_AVATAR_URL}
-                    alt="User avatar"
-                    onError={handleAvatarLoadError}
-                    className="w-12 h-12 rounded-full border-2 border-border object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-semibold break-words">{user?.displayName || "User"}</h4>
-                    <div className="text-sm text-muted-foreground overflow-x-auto whitespace-nowrap pb-0.5">{user?.email || "No email"}</div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">User ID</span>
-                    <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground truncate max-w-[150px]" title={user?.id}>
-                      {user?.id || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Rating</span>
-                    <span className="font-medium text-primary">{user?.rating ? Math.round(user.rating) : 1500}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-2">
-                <button
-                  onClick={() => auth?.logout()}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign out
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-          
-          <button
-            onClick={toggleDrawer}
-            className="lg:hidden p-2 rounded-md text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Open menu"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -318,12 +367,10 @@ function Header() {
               <div className="flex items-center gap-2">
                 <DebateAiLogo className="h-8 w-auto" />
                 <div className="flex flex-col">
-                  <span className="text-xl font-bold leading-none">
-                    DebateAI
-                  </span>
-                  <a 
-                    href="https://aossie.org" 
-                    target="_blank" 
+                  <span className="text-xl font-bold leading-none">DebateAI</span>
+                  <a
+                    href="https://aossie.org"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold hover:text-foreground transition-colors"
                   >
@@ -339,6 +386,7 @@ function Header() {
                 <X className="h-6 w-6" />
               </button>
             </div>
+
             <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
               <NavItem
                 to="/startDebate"
@@ -404,10 +452,6 @@ interface NavItemProps {
   onClick?: () => void;
 }
 
-/**
- * Individual navigation item for the mobile drawer.
- * @param {NavItemProps} props - Component props.
- */
 function NavItem({ to, label, icon, onClick }: NavItemProps) {
   return (
     <NavLink
