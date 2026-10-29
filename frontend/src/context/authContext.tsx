@@ -128,10 +128,7 @@ const verifyToken = useCallback(async () => {
         return;
       }
 
-      localStorage.removeItem('token');
-      setToken(null);
-      setUser(null);
-      navigate('/auth');
+      logout();
       return;
     }
 
@@ -186,7 +183,7 @@ const verifyToken = useCallback(async () => {
     if (requestId !== currentRequest.current) return;
     console.error('Failed to verify saved authentication token:', error);
   }
-}, [navigate, setUser]);
+}, [logout, setUser]);
   
   useEffect(() => {
     verifyToken();
