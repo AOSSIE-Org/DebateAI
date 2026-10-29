@@ -289,7 +289,8 @@ func JudgeDebate(c *gin.Context) {
 				log.Printf("Panic in updateGamificationAfterBotDebate: %v", r)
 			}
 		}()
-		updateGamificationAfterBotDebate(userID, resultStatus, latestDebate.Topic)
+		// Line 292 ke paas:
+        services.UpdateGamificationForUser(userID, resultStatus, latestDebate.Topic, "user_vs_bot")
 	}()
 
 	c.JSON(200, JudgeResponse{
@@ -608,7 +609,7 @@ func ConcedeDebate(c *gin.Context) {
 				log.Printf("Panic in updateGamificationAfterBotDebate (concede): %v", r)
 			}
 		}()
-		updateGamificationAfterBotDebate(user.ID, "loss", debate.Topic)
+		services.UpdateGamificationForUser(user.ID, "loss", debate.Topic, "user_vs_bot")
 	}()
 
 	c.JSON(200, gin.H{"message": "Debate conceded successfully"})

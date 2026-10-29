@@ -303,31 +303,111 @@ func SubmitTranscripts(
 				case "loss":
 					outcomeFor = 0.0
 				}
+				var lastForRating, lastForChange float64
+	            var lastAgainstRating, lastAgainstChange float64
 
-				debateRecord, opponentRecord, ratingErr := UpdateRatings(forUser.ID, againstUser.ID, outcomeFor, time.Now())
-				if ratingErr != nil {
-					return nil, fmt.Errorf("failed to update debate ratings: %w", ratingErr)
-				}
-				debateRecord.Topic = topic
-				debateRecord.Result = resultFor
-				opponentRecord.Topic = topic
-				opponentRecord.Result = resultAgainst
+	            if teamDebate != nil {
+		                // Team Debate Flow: Process ALL teammates on both sides
+		                forEmails, _ := teamDebateSubmitters(teamDebate, "for")
+		                againstEmails, _ := teamDebateSubmitters(teamDebate, "against")
 
-				records := []interface{}{debateRecord, opponentRecord}
-				if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
-					return nil, fmt.Errorf("failed to save debate rating history: %w", insertErr)
-				}
+		                var allRecords []interface{}
+		                var forTeamUsers []models.User
+		                var againstTeamUsers []models.User
 
-				ratingSummary = map[string]interface{}{
-					"for": map[string]float64{
-						"rating": debateRecord.PostRating,
-						"change": debateRecord.RatingChange,
-					},
-					"against": map[string]float64{
-						"rating": opponentRecord.PostRating,
-						"change": opponentRecord.RatingChange,
-					},
-				}
+		                for _, email := range forEmails {
+			                    var u models.User
+			                    if err := findUserByIdentifier(ctx, userCollection, email, &u); err == nil {
+				                        forTeamUsers = append(forTeamUsers, u)
+			                    }
+		                }
+
+		                for _, email := range againstEmails {
+			                    var u models.User
+			                    if err := findUserByIdentifier(ctx, userCollection, email, &u); err == nil {
+				                            againstTeamUsers = append(againstTeamUsers, u)
+			                   }
+		                }
+
+		                // Update rating and gamification for every member of the For team
+		                for _, member := range forTeamUsers {
+			                    debRec, _, err := UpdateRatings(member.ID, againstUser.ID, outcomeFor, time.Now())
+			                    if err == nil {
+				                        debRec.Topic = topic
+				                        debRec.Result = resultFor
+				                        allRecords = append(allRecords, debRec)
+				                        lastForRating = debRec.PostRating
+				                        lastForChange = debRec.RatingChange
+			                    }
+			                    go UpdateGamificationForUser(member.ID, resultFor, topic, "team_debate")
+		                }
+
+		                // Update rating and gamification for every member of the Against team
+		                outcomeAgainst := 1.0 - outcomeFor
+		                for _, member := range againstTeamUsers {
+			                    debRec, _, err := UpdateRatings(member.ID, forUser.ID, outcomeAgainst, time.Now())
+			                    if err == nil {
+				                        debRec.Topic = topic
+				                        debRec.Result = resultAgainst
+				                        allRecords = append(allRecords, debRec)
+				                        lastAgainstRating = debRec.PostRating
+				                        lastAgainstChange = debRec.RatingChange
+			                    }
+			                    go UpdateGamificationForUser(member.ID, resultAgainst, topic, "team_debate")
+		                }
+
+		                if len(allRecords) > 0 {
+			                    if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, allRecords); insertErr != nil {
+				                        return nil, fmt.Errorf("failed to save debate rating history: %w", insertErr)
+			                    }
+		                }
+
+		                // Recalculate and update AverageElo for both teams
+		                recalculateTeamEloByMembers(ctx, forEmails)
+		                recalculateTeamEloByMembers(ctx, againstEmails)
+
+		                ratingSummary = map[string]interface{}{
+			                    "for": map[string]float64{
+				                        "rating": lastForRating,
+				                        "change": lastForChange,
+			                    },
+			                    "against": map[string]float64{
+				                        "rating": lastAgainstRating,
+				                        "change": lastAgainstChange,
+			                    },
+		                }
+
+	            } else {
+		                // 1v1 Debate Flow
+		                debateRecord, opponentRecord, ratingErr := UpdateRatings(forUser.ID, againstUser.ID, outcomeFor, time.Now())
+		                if ratingErr != nil {
+			                    return nil, fmt.Errorf("failed to update debate ratings: %w", ratingErr)
+		                }
+		                debateRecord.Topic = topic
+		                debateRecord.Result = resultFor
+		                opponentRecord.Topic = topic
+		                opponentRecord.Result = resultAgainst
+
+		                records := []interface{}{debateRecord, opponentRecord}
+		                if _, insertErr := db.MongoDatabase.Collection("debates").InsertMany(ctx, records); insertErr != nil {
+			                    return nil, fmt.Errorf("failed to save debate rating history: %w", insertErr)
+		                }
+
+		                go UpdateGamificationForUser(forUser.ID, resultFor, topic, "user_vs_user")
+		                go UpdateGamificationForUser(againstUser.ID, resultAgainst, topic, "user_vs_user")
+
+		                ratingSummary = map[string]interface{}{
+			                    "for": map[string]float64{
+				                        "rating": debateRecord.PostRating,
+			                        	"change": debateRecord.RatingChange,
+			                    },
+			                    "against": map[string]float64{
+				                        "rating": opponentRecord.PostRating,
+				                        "change": opponentRecord.RatingChange,
+			                    },
+		                }
+	            }
+				
 			} else if err != nil {
 				return nil, fmt.Errorf("failed to check for previously saved debate transcript: %w", err)
 			}
@@ -1385,4 +1465,40 @@ func GetDebateStats(userID primitive.ObjectID) (map[string]interface{}, error) {
 		"winRate":       winRate,
 		"recentDebates": recentDebates,
 	}, nil
+}
+func recalculateTeamEloByMembers(ctx context.Context, memberEmails []string) {
+	if len(memberEmails) == 0 || db.MongoDatabase == nil {
+		return
+	}
+
+	teamsCollection := db.MongoDatabase.Collection("teams")
+	userCollection := db.MongoDatabase.Collection("users")
+
+	// Find the team containing any of these members
+	var team models.Team
+	err := teamsCollection.FindOne(ctx, bson.M{
+		"members.email": bson.M{"$in": memberEmails},
+	}).Decode(&team)
+	if err != nil || len(team.Members) == 0 {
+		return
+	}
+
+	var totalRating float64
+	var count float64
+	for _, m := range team.Members {
+		var u models.User
+		if err := userCollection.FindOne(ctx, bson.M{"email": m.Email}).Decode(&u); err == nil {
+			totalRating += u.Rating
+			count++
+		}
+	}
+
+	if count > 0 {
+		avgElo := totalRating / count
+		_, _ = teamsCollection.UpdateOne(
+			ctx,
+			bson.M{"_id": team.ID},
+			bson.M{"$set": bson.M{"averageElo": avgElo, "updatedAt": time.Now()}},
+		)
+	}
 }
