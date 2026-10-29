@@ -5,11 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/authContext';
 import { useCallback } from "react";
-
-// Google's renderButton only accepts a pixel width between 200 and 400;
-// a percentage is ignored and the button shrinks to fit its text.
-const googleButtonWidth = (element: HTMLElement) =>
-  Math.round(Math.min(400, Math.max(200, element.clientWidth)));
+import { useGoogleButton } from '../../hooks/useGoogleButton';
 
 interface LoginFormProps {
   startForgotPassword: () => void;
@@ -68,31 +64,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
     },
     [googleLogin]
   );
-  useEffect(() => {
-    const google = window.google;
-    if (!google?.accounts) {
-      return;
-    }
-
-    google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      callback: handleGoogleLogin,
-    });
-
-    const buttonElement = document.getElementById('googleSignInButton');
-    if (buttonElement) {
-      google.accounts.id.renderButton(buttonElement, {
-        theme: 'outline',
-        size: 'large',
-        text: 'signin_with',
-        width: googleButtonWidth(buttonElement),
-      });
-    }
-
-    return () => {
-      google.accounts.id.cancel();
-    };
-  }, [handleGoogleLogin]);
+  const googleButtonRef = useGoogleButton('signin_with', handleGoogleLogin);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -144,7 +116,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
       <Button type="submit" className="w-full mb-2 border border-border dark:border-white" disabled={loading}>
         {loading ? 'Signing In...' : 'Sign In With Email'}
       </Button>
-      <div id="googleSignInButton" className="w-full flex justify-center"></div>
+      <div ref={googleButtonRef} id="googleSignInButton" className="w-full flex justify-center"></div>
     </form>
   );
 };
@@ -200,31 +172,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
   );
 
 
-  useEffect(() => {
-    const google = window.google;
-    if (!google?.accounts) {
-      return;
-    }
-
-    google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      callback: handleGoogleLogin,
-    });
-
-    const buttonElement = document.getElementById('googleSignUpButton');
-    if (buttonElement) {
-      google.accounts.id.renderButton(buttonElement, {
-        theme: 'outline',
-        size: 'large',
-        text: 'signup_with',
-        width: googleButtonWidth(buttonElement),
-      });
-    }
-
-    return () => {
-      google.accounts.id.cancel();
-    };
-  }, [handleGoogleLogin]);
+  const googleButtonRef = useGoogleButton('signup_with', handleGoogleLogin);
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -273,7 +221,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
       <Button type="submit" className="w-full mb-2 border dark:border-white" disabled={loading}>
         {loading ? 'Creating Account...' : 'Sign Up With Email'}
       </Button>
-      <div id="googleSignUpButton" className="w-full flex justify-center"></div>
+      <div ref={googleButtonRef} id="googleSignUpButton" className="w-full flex justify-center"></div>
     </form>
   );
 };
