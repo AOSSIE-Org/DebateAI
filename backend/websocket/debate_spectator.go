@@ -373,16 +373,13 @@ func handleQuestion(client *SpectatorClient, payloadBytes []byte) {
 	}
 	payload.Timestamp = time.Now().Unix()
 
-	// Check rate limit
+	// Check and record the rate limit in one step
 	rateLimiter := debate.NewRateLimiter()
 	config := debate.DefaultRateLimitConfig()
-	canAsk, err := rateLimiter.CheckQuestionRateLimit(client.debateID, client.spectatorHash, config)
+	canAsk, err := rateLimiter.AllowQuestion(client.debateID, client.spectatorHash, config)
 	if err != nil || !canAsk {
 		return
 	}
-
-	// Record rate limit
-	rateLimiter.RecordQuestion(client.debateID, client.spectatorHash, config)
 
 	// Get hub to broadcast
 	hub := GetDebateHub()
@@ -425,16 +422,13 @@ func handleReaction(client *SpectatorClient, payloadBytes []byte) {
 	payload.SpectatorHash = client.spectatorHash
 	payload.Timestamp = time.Now().Unix()
 
-	// Check rate limit
+	// Check and record the rate limit in one step
 	rateLimiter := debate.NewRateLimiter()
 	config := debate.DefaultRateLimitConfig()
-	canReact, err := rateLimiter.CheckReactionRateLimit(client.debateID, client.spectatorHash, config)
+	canReact, err := rateLimiter.AllowReaction(client.debateID, client.spectatorHash, config)
 	if err != nil || !canReact {
 		return
 	}
-
-	// Record rate limit
-	rateLimiter.RecordReaction(client.debateID, client.spectatorHash, config)
 
 	// Get hub to broadcast
 	hub := GetDebateHub()

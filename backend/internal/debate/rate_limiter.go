@@ -16,8 +16,13 @@ type RateLimiter struct {
 
 // NewRateLimiter creates a new RateLimiter instance
 func NewRateLimiter() *RateLimiter {
+	return NewRateLimiterWithClient(GetRedisClient())
+}
+
+// NewRateLimiterWithClient creates a RateLimiter that uses the given client.
+func NewRateLimiterWithClient(rdb *redis.Client) *RateLimiter {
 	return &RateLimiter{
-		rdb: GetRedisClient(),
+		rdb: rdb,
 		ctx: GetContext(),
 	}
 }
@@ -42,6 +47,16 @@ func DefaultRateLimitConfig() RateLimitConfig {
 	}
 }
 
+// allowOnce increments the counter and sets its expiry in one atomic step, so
+// two concurrent callers cannot both pass the limit check before recording.
+var allowOnce = redis.NewScript(`
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+	redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+return count
+`)
+
 // CheckVoteRateLimit checks if spectator can vote (1 vote per poll)
 func (rl *RateLimiter) CheckVoteRateLimit(debateID, pollID, spectatorHash string) (bool, error) {
 	// This is handled by the voter SET in poll_store.go
@@ -54,94 +69,27 @@ func (rl *RateLimiter) CheckVoteRateLimit(debateID, pollID, spectatorHash string
 	return !hasVoted, nil
 }
 
-// CheckQuestionRateLimit checks if spectator can ask a question
-func (rl *RateLimiter) CheckQuestionRateLimit(debateID, spectatorHash string, config RateLimitConfig) (bool, error) {
+// AllowQuestion records a question and reports whether it is within the limit.
+func (rl *RateLimiter) AllowQuestion(debateID, spectatorHash string, config RateLimitConfig) (bool, error) {
+	key := fmt.Sprintf("rate:question:%s:%s", debateID, spectatorHash)
+	return rl.allow(key, config.MaxQuestions, config.QuestionWindow)
+}
+
+// AllowReaction records a reaction and reports whether it is within the limit.
+func (rl *RateLimiter) AllowReaction(debateID, spectatorHash string, config RateLimitConfig) (bool, error) {
+	key := fmt.Sprintf("rate:reaction:%s:%s", debateID, spectatorHash)
+	return rl.allow(key, config.MaxReactions, config.ReactionWindow)
+}
+
+func (rl *RateLimiter) allow(key string, max int, window time.Duration) (bool, error) {
 	if rl == nil || rl.rdb == nil {
 		return false, fmt.Errorf("Redis client not available")
 	}
 
-	key := fmt.Sprintf("rate:question:%s:%s", debateID, spectatorHash)
-
-	// Check current count
-	count, err := rl.rdb.Get(rl.ctx, key).Int()
-	if err == redis.Nil {
-		// First question, allow it
-		return true, nil
-	} else if err != nil {
+	count, err := allowOnce.Run(rl.ctx, rl.rdb, []string{key}, window.Milliseconds()).Int64()
+	if err != nil {
 		return false, err
 	}
 
-	if count >= config.MaxQuestions {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-// RecordQuestion records a question for rate limiting
-func (rl *RateLimiter) RecordQuestion(debateID, spectatorHash string, config RateLimitConfig) error {
-	if rl == nil || rl.rdb == nil {
-		return fmt.Errorf("Redis client not available")
-	}
-
-	key := fmt.Sprintf("rate:question:%s:%s", debateID, spectatorHash)
-
-	// Increment count
-	count, err := rl.rdb.Incr(rl.ctx, key).Result()
-	if err != nil {
-		return err
-	}
-
-	// Set expiration if first time
-	if count == 1 {
-		rl.rdb.Expire(rl.ctx, key, config.QuestionWindow)
-	}
-
-	return nil
-}
-
-// CheckReactionRateLimit checks if spectator can send a reaction
-func (rl *RateLimiter) CheckReactionRateLimit(debateID, spectatorHash string, config RateLimitConfig) (bool, error) {
-	if rl == nil || rl.rdb == nil {
-		return false, fmt.Errorf("Redis client not available")
-	}
-
-	key := fmt.Sprintf("rate:reaction:%s:%s", debateID, spectatorHash)
-
-	// Check current count
-	count, err := rl.rdb.Get(rl.ctx, key).Int()
-	if err == redis.Nil {
-		// First reaction, allow it
-		return true, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	if count >= config.MaxReactions {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-// RecordReaction records a reaction for rate limiting
-func (rl *RateLimiter) RecordReaction(debateID, spectatorHash string, config RateLimitConfig) error {
-	if rl == nil || rl.rdb == nil {
-		return fmt.Errorf("Redis client not available")
-	}
-
-	key := fmt.Sprintf("rate:reaction:%s:%s", debateID, spectatorHash)
-
-	// Increment count
-	count, err := rl.rdb.Incr(rl.ctx, key).Result()
-	if err != nil {
-		return err
-	}
-
-	// Set expiration if first time
-	if count == 1 {
-		rl.rdb.Expire(rl.ctx, key, config.ReactionWindow)
-	}
-
-	return nil
+	return count <= int64(max), nil
 }
