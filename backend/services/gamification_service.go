@@ -12,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// UpdateGamificationForUser updates score, streak, badges and persists progression to the database.
 func UpdateGamificationForUser(userID primitive.ObjectID, resultStatus, topic, debateType string) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -59,24 +58,41 @@ func UpdateGamificationForUser(userID primitive.ObjectID, resultStatus, topic, d
 	}
 
 	now := time.Now()
+	newStreak := user.CurrentStreak
+
+	// Daily streak calculation based on last activity date
+	if user.LastActivityDate.IsZero() {
+		newStreak = 1
+	} else {
+		currentYear, currentMonth, currentDay := now.Date()
+		lastYear, lastMonth, lastDay := user.LastActivityDate.Date()
+
+		if currentYear != lastYear || currentMonth != lastMonth || currentDay != lastDay {
+			yesterday := now.AddDate(0, 0, -1)
+			yYear, yMonth, yDay := yesterday.Date()
+
+			if lastYear == yYear && lastMonth == yMonth && lastDay == yDay {
+				newStreak++
+			} else {
+				newStreak = 1
+			}
+		}
+	}
+
 	update := bson.M{
-		"$inc": bson.M{
-			"score":         pointsToAdd,
-			"currentStreak": 1,
-		},
+		"$inc": bson.M{"score": pointsToAdd},
 		"$set": bson.M{
+			"currentStreak":    newStreak,
 			"updatedAt":        now,
 			"lastActivityDate": now,
 		},
 	}
 
-	_, err = userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
-	if err != nil {
-		log.Printf("Error updating score for user %s: %v", userID.Hex(), err)
+	if _, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update); err != nil {
+		log.Printf("Error updating user score and streak for user %s: %v", userID.Hex(), err)
 		return
 	}
 
-	// Score update record
 	scoreCollection := db.MongoDatabase.Collection("score_updates")
 	scoreUpdate := models.ScoreUpdate{
 		ID:        primitive.NewObjectID(),
@@ -90,29 +106,31 @@ func UpdateGamificationForUser(userID primitive.ObjectID, resultStatus, topic, d
 			"result":     resultStatus,
 		},
 	}
-	_, _ = scoreCollection.InsertOne(ctx, scoreUpdate)
+	if _, err := scoreCollection.InsertOne(ctx, scoreUpdate); err != nil {
+		log.Printf("Error saving score update record for user %s: %v", userID.Hex(), err)
+	}
 
-	// Updated state evaluation for badges
 	newScore := user.Score + pointsToAdd
-	newStreak := user.CurrentStreak + 1
-
 	hasBadge := make(map[string]bool)
 	for _, badge := range user.Badges {
 		hasBadge[badge] = true
 	}
 
-	// Novice badge check
 	if newScore >= 10 && !hasBadge["Novice"] {
-		_, _ = userCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$addToSet": bson.M{"badges": "Novice"}})
+		if _, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$addToSet": bson.M{"badges": "Novice"}}); err != nil {
+			log.Printf("Error awarding Novice badge to user %s: %v", userID.Hex(), err)
+		}
 	}
 
-	// Streak5 badge check
 	if newStreak >= 5 && !hasBadge["Streak5"] {
-		_, _ = userCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$addToSet": bson.M{"badges": "Streak5"}})
+		if _, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$addToSet": bson.M{"badges": "Streak5"}}); err != nil {
+			log.Printf("Error awarding Streak5 badge to user %s: %v", userID.Hex(), err)
+		}
 	}
 
-	// FirstWin badge check
 	if resultStatus == "win" && !hasBadge["FirstWin"] {
-		_, _ = userCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$addToSet": bson.M{"badges": "FirstWin"}})
+		if _, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$addToSet": bson.M{"badges": "FirstWin"}}); err != nil {
+			log.Printf("Error awarding FirstWin badge to user %s: %v", userID.Hex(), err)
+		}
 	}
 }
