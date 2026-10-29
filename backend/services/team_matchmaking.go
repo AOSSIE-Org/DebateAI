@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -76,27 +77,68 @@ func FindMatchingTeam(lookingTeamID primitive.ObjectID) (*models.Team, error) {
 		return nil, mongo.ErrNoDocuments
 	}
 
-	// Find teams with matching size and similar elo
 	for teamID, entry := range teamMatchmakingPool {
 		if teamID == lookingTeamID.Hex() {
 			continue
 		}
 
-		// Check if sizes match
-		if entry.MaxSize == lookingEntry.MaxSize {
-			// Check if elo difference is acceptable (within 200 points)
-			eloDiff := entry.AverageElo - lookingEntry.AverageElo
-			if eloDiff < 0 {
-				eloDiff = -eloDiff
-			}
-
-			if eloDiff <= 200 {
-				return &entry.Team, nil
-			}
+		if teamsCompatible(lookingEntry, entry) {
+			return &entry.Team, nil
 		}
 	}
-
 	return nil, mongo.ErrNoDocuments
+}
+
+const maxMatchmakingEloDiff = 200
+
+func teamsCompatible(a, b *TeamMatchmakingEntry) bool {
+	if a.MaxSize != b.MaxSize {
+		return false
+	}
+	eloDiff := a.AverageElo - b.AverageElo
+	if eloDiff < 0 {
+		eloDiff = -eloDiff
+	}
+	return eloDiff <= maxMatchmakingEloDiff
+}
+
+// ErrTeamsNotMatched is returned when two teams are not both in the
+// matchmaking pool or do not satisfy the matchmaking criteria.
+var ErrTeamsNotMatched = errors.New("teams are not matched in matchmaking")
+
+// ClaimMatchedTeams atomically verifies both teams are in the pool and
+// compatible, then removes them so no other request can reuse them. Callers
+// should call RestoreToMatchmaking if later steps fail.
+func ClaimMatchedTeams(team1ID, team2ID primitive.ObjectID) ([]*TeamMatchmakingEntry, error) {
+	teamMatchmakingMutex.Lock()
+	defer teamMatchmakingMutex.Unlock()
+
+	if teamMatchmakingPool == nil || team1ID == team2ID {
+		return nil, ErrTeamsNotMatched
+	}
+
+	entry1, ok1 := teamMatchmakingPool[team1ID.Hex()]
+	entry2, ok2 := teamMatchmakingPool[team2ID.Hex()]
+	if !ok1 || !ok2 || !teamsCompatible(entry1, entry2) {
+		return nil, ErrTeamsNotMatched
+	}
+
+	delete(teamMatchmakingPool, team1ID.Hex())
+	delete(teamMatchmakingPool, team2ID.Hex())
+	return []*TeamMatchmakingEntry{entry1, entry2}, nil
+}
+
+// RestoreToMatchmaking puts previously claimed entries back in the pool.
+func RestoreToMatchmaking(entries []*TeamMatchmakingEntry) {
+	teamMatchmakingMutex.Lock()
+	defer teamMatchmakingMutex.Unlock()
+
+	if teamMatchmakingPool == nil {
+		teamMatchmakingPool = make(map[string]*TeamMatchmakingEntry)
+	}
+	for _, entry := range entries {
+		teamMatchmakingPool[entry.TeamID.Hex()] = entry
+	}
 }
 
 // RemoveFromMatchmaking removes a team from the matchmaking pool
