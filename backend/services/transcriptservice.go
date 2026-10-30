@@ -330,10 +330,27 @@ func SubmitTranscripts(
 		                }
 
 
+		                // Compute pre-debate average ratings for opponents as baseline
 		                oppForRating := forUser.Rating
+		                if len(forTeamUsers) > 0 {
+			                    var sum float64
+			                    for _, u := range forTeamUsers {
+				                        sum += u.Rating
+			                    }
+			                    oppForRating = sum / float64(len(forTeamUsers))
+		                }
+
 		                oppAgainstRating := againstUser.Rating
+		                if len(againstTeamUsers) > 0 {
+			                    var sum float64
+			                    for _, u := range againstTeamUsers {
+				                        sum += u.Rating
+			                    }
+			                    oppAgainstRating = sum / float64(len(againstTeamUsers))
+		                }
+
 		                now := time.Now().UTC()
-                       
+						
 						// For Team members update
                         for _, member := range forTeamUsers {
 			                    newRating, change := calculateRatingChange(member.Rating, oppAgainstRating, outcomeFor)
