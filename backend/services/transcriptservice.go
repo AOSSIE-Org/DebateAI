@@ -304,8 +304,8 @@ func SubmitTranscripts(
 				case "loss":
 					outcomeFor = 0.0
 				}
-				var lastForRating, lastForChange float64
-	            var lastAgainstRating, lastAgainstChange float64
+				var repForRating, repForChange float64
+	            var repAgainstRating, repAgainstChange float64
 
 	            if teamDebate != nil {
 		                forEmails, _ := teamDebateSubmitters(teamDebate, "for")
@@ -329,42 +329,56 @@ func SubmitTranscripts(
 			                    }
 		                }
 
-		                // Calculate initial baseline ratings for opponents to avoid cascading mutations
+
 		                oppForRating := forUser.Rating
 		                oppAgainstRating := againstUser.Rating
-		                now := time.Now()
+		                now := time.Now().UTC()
                        
+						// For Team members update
                         for _, member := range forTeamUsers {
 			                    newRating, change := calculateRatingChange(member.Rating, oppAgainstRating, outcomeFor)
 			                    _, _ = userCollection.UpdateOne(
 				                        ctx,
 				                        bson.M{"_id": member.ID},
-				                        bson.M{"$set": bson.M{"rating": newRating, "updatedAt": now}},
+				                        bson.M{"$set": bson.M{
+					                            "rating":           newRating,
+					                            "lastRatingUpdate": now,
+					                            "updatedAt":        now,
+				                        }},
 			                    )
 
 			                    debRec := bson.M{
-				                "userId":       member.ID,
-				                "opponentId":   againstUser.ID,
-				                "preRating":    member.Rating,
-				                "postRating":   newRating,
-				                "ratingChange": change,
-				                "outcome":      outcomeFor,
-				                "topic":        topic,
-				                "result":       resultFor,
-				                "createdAt":    now,
+				                        "userId":       member.ID,
+				                        "opponentId":   againstUser.ID,
+				                        "preRating":    member.Rating,
+				                        "postRating":   newRating,
+				                        "ratingChange": change,
+				                        "outcome":      outcomeFor,
+				                        "topic":        topic,
+				                        "result":       resultFor,
+				                        "createdAt":    now,
+			                    } 
+						        allRecords = append(allRecords, debRec)
+
+			                    // Capture representative change for summary
+			                    if member.ID == forUser.ID {
+				                        repForRating = newRating
+				                        repForChange = change
 			                    }
-			                    allRecords = append(allRecords, debRec)
-			                    lastForRating = newRating
-			                    lastForChange = change
 		                }
 
 		                outcomeAgainst := 1.0 - outcomeFor
+						// Against Team members update
 		                for _, member := range againstTeamUsers {
 			                    newRating, change := calculateRatingChange(member.Rating, oppForRating, outcomeAgainst)
 			                    _, _ = userCollection.UpdateOne(
 			    	                    ctx,
 				                        bson.M{"_id": member.ID},
-				                        bson.M{"$set": bson.M{"rating": newRating, "updatedAt": now}},
+				                        bson.M{"$set": bson.M{
+					                            "rating":           newRating,
+					                            "lastRatingUpdate": now,
+					                            "updatedAt":        now,
+				                       }},
 			                    )
 
 			                    debRec := bson.M{
@@ -379,8 +393,12 @@ func SubmitTranscripts(
 				                        "createdAt":    now,
 			                    }
 			                    allRecords = append(allRecords, debRec)
-			                    lastAgainstRating = newRating
-			                    lastAgainstChange = change
+								// Capture representative change for summary
+			                    if member.ID == againstUser.ID {
+				                        repAgainstRating = newRating
+				                        repAgainstChange = change
+			                    }
+			                   
 		                }
 
 		                if len(allRecords) > 0 {
@@ -401,12 +419,12 @@ func SubmitTranscripts(
 
 		                ratingSummary = map[string]interface{}{
 			                    "for": map[string]float64{
-				                        "rating": lastForRating,
-				                        "change": lastForChange,
+				                        "rating": repForRating,
+				                        "change": repForChange,
 			                    },
 			                    "against": map[string]float64{
-				                        "rating": lastAgainstRating,
-				                        "change": lastAgainstChange,
+				                        "rating": repAgainstRating,
+				                        "change": repAgainstChange,
 			                    },
 		                }
 

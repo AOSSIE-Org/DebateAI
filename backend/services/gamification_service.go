@@ -57,15 +57,16 @@ func UpdateGamificationForUser(userID primitive.ObjectID, resultStatus, topic, d
 		action = "debate_complete"
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	newStreak := user.CurrentStreak
 
-	// Daily streak calculation based on last activity date
+	// Daily streak calculation in UTC
 	if user.LastActivityDate.IsZero() {
 		newStreak = 1
 	} else {
+		lastActiveUTC := user.LastActivityDate.UTC()
 		currentYear, currentMonth, currentDay := now.Date()
-		lastYear, lastMonth, lastDay := user.LastActivityDate.Date()
+		lastYear, lastMonth, lastDay := lastActiveUTC.Date()
 
 		if currentYear != lastYear || currentMonth != lastMonth || currentDay != lastDay {
 			yesterday := now.AddDate(0, 0, -1)
@@ -78,7 +79,6 @@ func UpdateGamificationForUser(userID primitive.ObjectID, resultStatus, topic, d
 			}
 		}
 	}
-
 	update := bson.M{
 		"$inc": bson.M{"score": pointsToAdd},
 		"$set": bson.M{
