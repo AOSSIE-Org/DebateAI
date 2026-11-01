@@ -10,6 +10,7 @@ import {
   Users,
   MessageCircle,
   Heart,
+  Bot,
 } from 'lucide-react';
 import { DebateAiLogo } from './DebateAiLogo';
 import { ThemeToggle } from './ThemeToggle';
@@ -40,6 +41,11 @@ function Sidebar() {
           to='/startDebate'
           label='Start Debate'
           icon={<MessageSquare className='mr-3 h-4 w-4' />}
+        />
+        <NavItem
+          to='/coach'
+          label='AI Coach'
+          icon={<Bot className='mr-3 h-4 w-4' />}
         />
         <NavItem
           to='/tournaments'
