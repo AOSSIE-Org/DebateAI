@@ -198,7 +198,7 @@ const isValidPhaseTimings = (
   );
 
 const BotSelection: React.FC = () => {
-  const [selectedBot, setSelectedBot] = useState<string | null>(null);
+  const [selectedBot, setSelectedBot] = useState<string | null>(() => allBots[0].name);
   const [topic, setTopic] = useState<string>("custom");
   const [customTopic, setCustomTopic] = useState<string>("");
   const [stance, setStance] = useState<string>("random");
@@ -224,7 +224,7 @@ const BotSelection: React.FC = () => {
     topic?: string;
     timings?: string;
   }>({});
-  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(() => allBots[0].level);
   const navigate = useNavigate();
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -237,8 +237,12 @@ const BotSelection: React.FC = () => {
       try {
         const parsed = JSON.parse(savedState);
         setSelectedBot(
-          typeof parsed.selectedBot === "string" ? parsed.selectedBot : null
+          typeof parsed.selectedBot === "string" ? parsed.selectedBot : allBots[0].name
         );
+        if (typeof parsed.selectedBot === "string") {
+          const matched = allBots.find((b) => b.name === parsed.selectedBot);
+          if (matched) setExpandedLevel(matched.level);
+        }
         setTopic(typeof parsed.topic === "string" ? parsed.topic : "custom");
         setCustomTopic(
           typeof parsed.customTopic === "string" ? parsed.customTopic : ""
@@ -431,41 +435,47 @@ const BotSelection: React.FC = () => {
         {/* Main Content Grid */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Bot Selection Section */}
-          <div className="bg-card border border-border rounded-md shadow-md p-4">
-            <h2 className="text-xl font-light text-foreground mb-4">
-              Pick Your <span className="text-primary">Bot</span>
-            </h2>
+          <div className="bg-card border-2 border-border/80 rounded-2xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-foreground">
+                Pick Your <span className="text-primary">Bot</span>
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {allBots.length} Rivals Available
+              </span>
+            </div>
+
             {fieldErrors.bot && (
-              <p className="text-red-500 text-sm mb-2">{fieldErrors.bot}</p>
+              <p className="text-destructive text-sm mb-3 bg-destructive/10 p-2 rounded-lg border-1 border-destructive/20">{fieldErrors.bot}</p>
             )}
 
             {/* Selected Bot Preview */}
             {selectedBotObj && (
-              <div className="border border-border rounded-md mb-4 p-3 bg-muted">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  Selected Bot
-                </h3>
-                <div className="flex items-center">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary mr-3">
+              <div className="border-2 border-primary/30 rounded-xl mb-4 p-4 bg-muted/40 shadow-sm transition-all duration-200">
+                <span className="text-[11px] font-semibold text-primary uppercase tracking-wider block mb-2">
+                  Active Challenger
+                </span>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-primary ring-offset-2 ring-offset-card flex-shrink-0 shadow-sm">
                     <img
                       src={selectedBotObj.avatar}
                       alt={selectedBotObj.name}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-foreground text-base truncate">
                       {selectedBotObj.name}
                     </h4>
-                    <p className="text-xs text-muted-foreground italic">
+                    <p className="text-xs text-muted-foreground italic line-clamp-1 mt-0.5">
                       "{selectedBotObj.quote}"
                     </p>
-                    <div className="flex mt-1">
-                      <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded mr-2">
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-[11px] font-medium bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md border border-border/60">
                         {selectedBotObj.level}
                       </span>
-                      <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
-                        {selectedBotObj.rating} Rating
+                      <span className="text-[11px] font-semibold bg-primary/15 text-primary border border-primary/25 px-2 py-0.5 rounded-md">
+                        {selectedBotObj.rating} Elo
                       </span>
                     </div>
                   </div>
@@ -473,41 +483,45 @@ const BotSelection: React.FC = () => {
               </div>
             )}
 
-            {/* Difficulty Cards (Fixed Height Scroller) */}
-            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-muted/50">
+            {/* Difficulty Cards (Scrollable List) */}
+            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 debate-scrollbar">
               {levels.map((level) => (
                 <div
                   key={level.name}
-                  className={`border rounded-md cursor-pointer transition-all ${
+                  className={`border-2 rounded-xl transition-all duration-200 overflow-hidden ${
                     expandedLevel === level.name
-                      ? "border-primary shadow-sm"
-                      : "border-border hover:border-muted-foreground"
+                      ? "border-primary/60 shadow-sm"
+                      : "border-border/80 hover:border-muted-foreground/60"
                   }`}
                 >
                   <div
-                    className="flex justify-between items-center p-3 bg-muted rounded-t-md"
+                    className={`flex justify-between items-center p-3.5 cursor-pointer select-none transition-colors ${
+                      expandedLevel === level.name
+                        ? "bg-muted/70 rounded-t-xl"
+                        : "bg-muted/40 hover:bg-muted/60 rounded-xl"
+                    }`}
                     onClick={() => toggleLevel(level.name)}
                   >
-                    <div className="flex items-center">
-                      <span className="font-medium text-foreground">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground text-sm">
                         {level.name}
                       </span>
-                      <span className="ml-2 bg-primary/20 text-primary rounded-full px-2 py-1 text-xs">
+                      <span className="bg-primary/15 text-primary font-medium rounded-full px-2 py-0.5 text-[11px] border-2 border-primary/20">
                         {level.count} bots
                       </span>
                       {recommendedDifficulty === level.name && (
-                        <span className="ml-2 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                        <span className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                           ⭐ Recommended
                         </span>
                       )}
                     </div>
-                    <span className="transform transition-transform">
+                    <span className="text-xs text-muted-foreground transform transition-transform duration-200">
                       {expandedLevel === level.name ? "▲" : "▼"}
                     </span>
                   </div>
 
                   {expandedLevel === level.name && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-card border-t border-border">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-card border-t border-border/80 rounded-b-xl">
                       {allBots
                         .filter((bot) => bot.level === level.name)
                         .map((bot) => (
@@ -533,28 +547,25 @@ const BotSelection: React.FC = () => {
                                 bot: undefined,
                               }));
                             }}
-                            className={`relative flex flex-col items-center p-2 rounded-md border transition-colors cursor-pointer group ${
+                            className={`relative flex flex-col items-center p-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
                               selectedBot === bot.name
-                                ? "border-2 border-primary bg-primary/10"
-                                : "border-border hover:bg-muted"
+                                ? "border-2 border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30 scale-[1.02]"
+                                : "border-2 border-border/70 hover:border-primary/40 hover:bg-muted/40 hover:scale-[1.01]"
                             }`}
                           >
-                            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary">
+                            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-border/80 shadow-sm mb-1.5 flex-shrink-0">
                               <img
                                 src={bot.avatar}
                                 alt={bot.name}
                                 className="w-full h-full object-cover"
                               />
                             </div>
-                            {/* Hover overlay */}
-                            <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 rounded-md">
-                              <h3 className="text-sm font-medium text-white text-center">
-                                {bot.name}
-                              </h3>
-                              <div className="text-xs font-semibold text-primary">
-                                {bot.rating} Rating
-                              </div>
-                            </div>
+                            <span className="text-xs font-semibold text-foreground truncate max-w-full text-center">
+                              {bot.name}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground mt-0.5">
+                              {bot.rating} Elo
+                            </span>
                           </div>
                         ))}
                     </div>
@@ -565,121 +576,126 @@ const BotSelection: React.FC = () => {
           </div>
 
           {/* Debate Setup Section */}
-          <div className="bg-card border border-border rounded-md shadow-md flex flex-col">
-            <div className="p-3">
-              <h2 className="text-xl font-light text-foreground">
-                Debate Setup
+          <div className="bg-card border border-border/80 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col p-5">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">
+                Debate <span className="text-primary">Setup</span>
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 Configure your topic, stance, and phase timings.
               </p>
               {selectedBotObj && selectedBotObj.specialMessage && (
-                <div className="mt-2 p-2 bg-card border border-border rounded-md text-foreground text-sm font-medium">
-                  {selectedBotObj.specialMessage}
+                <div className="mt-3 p-3 bg-primary/10 border border-primary/25 rounded-xl text-foreground text-xs sm:text-sm font-medium leading-relaxed">
+                  <span className="italic">{selectedBotObj.specialMessage}</span>
                 </div>
               )}
             </div>
-            <Separator />
-            <div className="p-3 flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Topic Selection */}
-                <div className="flex flex-col">
-                  <label className="block text-sm text-muted-foreground mb-1">
-                    Debate Topic
-                  </label>
-                  <Select
-                    value={topic}
-                    onValueChange={(val) => {
-                      setTopic(val);
-                      setFieldErrors((prev) => ({ ...prev, topic: undefined }));
-                    }}
-                  >
-                    <SelectTrigger className="w-full bg-background text-foreground border-border">
-                      <SelectValue placeholder="Select a topic" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="custom">Custom Topic</SelectItem>
-                      {predefinedTopics.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {topic === "custom" && (
-                    <Input
-                      value={customTopic}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        setCustomTopic(e.target.value);
-                        setFieldErrors((prev) => ({
-                          ...prev,
-                          topic: undefined,
-                        }));
+
+            <Separator className="my-4 bg-border/80" />
+
+            <div className="h-full justify-between flex flex-col gap-4">
+
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Topic Selection */}
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                      Debate Topic
+                    </label>
+                    <Select
+                      value={topic}
+                      onValueChange={(val) => {
+                        setTopic(val);
+                        setFieldErrors((prev) => ({ ...prev, topic: undefined }));
                       }}
-                      maxLength={MAX_TOPIC_LENGTH}
-                      placeholder="Enter your custom topic"
-                      className="mt-2 bg-background text-foreground border-border"
-                    />
-                  )}
-                  {fieldErrors.topic && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {fieldErrors.topic}
+                    >
+                      <SelectTrigger className="w-full rounded-xl bg-background border-border/80 hover:border-border text-foreground transition-colors">
+                        <SelectValue placeholder="Select a topic" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80">
+                        <SelectItem value="custom">Custom Topic</SelectItem>
+                        {predefinedTopics.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {topic === "custom" && (
+                      <Input
+                        value={customTopic}
+                        onChange={(e) => {
+                          setCustomTopic(e.target.value);
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            topic: undefined,
+                          }));
+                        }}
+                        maxLength={MAX_TOPIC_LENGTH}
+                        placeholder="Enter your custom topic"
+                        className="mt-2.5 rounded-xl bg-background border-border/80 text-foreground focus:border-primary text-sm"
+                      />
+                    )}
+                    {fieldErrors.topic && (
+                      <p className="text-destructive text-xs mt-1">
+                        {fieldErrors.topic}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Stance Selection */}
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                      Your Stance
+                    </label>
+                    <Select value={stance} onValueChange={setStance}>
+                      <SelectTrigger className="w-full rounded-xl bg-background border-border/80 hover:border-border text-foreground transition-colors">
+                        <SelectValue placeholder="Choose your stance" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80">
+                        <SelectItem value="for">Affirmative (For)</SelectItem>
+                        <SelectItem value="against">Negative (Against)</SelectItem>
+                        <SelectItem value="random">Random Stance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Responsive Timer Section */}
+                <div className="flex flex-col mt-1">
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Phase Timings (seconds)
+                  </label>
+                  {fieldErrors.timings && (
+                    <p className="text-destructive text-xs mb-2">
+                      {fieldErrors.timings}
                     </p>
                   )}
-                </div>
-
-                {/* Stance Selection */}
-                <div className="flex flex-col">
-                  <label className="block text-sm text-muted-foreground mb-1">
-                    Your Stance
-                  </label>
-                  <Select value={stance} onValueChange={setStance}>
-                    <SelectTrigger className="w-full bg-background text-foreground border-border">
-                      <SelectValue placeholder="Choose your stance" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="for">For</SelectItem>
-                      <SelectItem value="against">Against</SelectItem>
-                      <SelectItem value="random">Let System Decide</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Responsive Timer Section */}
-              <div className="flex flex-col">
-                <label className="block text-sm text-muted-foreground mb-2">
-                  Phase Timings (seconds)
-                </label>
-                {fieldErrors.timings && (
-                  <p className="text-red-500 text-xs mb-2">
-                    {fieldErrors.timings}
-                  </p>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {phaseTimings.map((phase, index) => (
-                    <div
-                      key={phase.name}
-                      className="flex flex-col p-2 rounded-md border border-border"
-                    >
-                      <span className="text-xs font-medium text-muted-foreground mb-1">
-                        {phase.name}
-                      </span>
-                      <Input
-                        type="number"
-                        value={phase.time.toString()}
-                        onChange={(e) =>
-                          updatePhaseTiming(index, e.target.value)
-                        }
-                        className="text-xs bg-background text-foreground border-border"
-                      />
-                      {(phase.time < 60 || phase.time > 600) && (
-                        <span className="text-[10px] text-red-500 mt-1">
-                          Min 60s, Max 600s
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {phaseTimings.map((phase, index) => (
+                      <div
+                        key={phase.name}
+                        className="flex flex-col p-3 rounded-xl border border-border/80 bg-muted/20 hover:border-primary/40 transition-colors"
+                      >
+                        <span className="text-xs font-semibold text-foreground mb-1.5 truncate">
+                          {phase.name}
                         </span>
-                      )}
-                    </div>
-                  ))}
+                        <Input
+                          type="number"
+                          value={phase.time.toString()}
+                          onChange={(e) =>
+                            updatePhaseTiming(index, e.target.value)
+                          }
+                          className="text-xs rounded-lg bg-background border-border/80 text-foreground font-mono"
+                        />
+                        {(phase.time < 60 || phase.time > 600) && (
+                          <span className="text-[10px] text-destructive mt-1 font-medium">
+                            Min 60s, Max 600s
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -693,7 +709,7 @@ const BotSelection: React.FC = () => {
                   effectiveTopic.trim().length > MAX_TOPIC_LENGTH ||
                   phaseTimings.some((p) => p.time < 60 || p.time > 600)
                 }
-                className="w-full font-semibold py-2 rounded-md transition-colors shadow-md"
+                className="w-full font-bold py-3 mt-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.99] text-base"
               >
                 {isLoading || isCreating
                   ? "Creating Debate..."

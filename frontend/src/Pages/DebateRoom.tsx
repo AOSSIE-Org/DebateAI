@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import TextareaAutosize from "react-textarea-autosize";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, ChevronDown } from "lucide-react";
 import { useAtom } from "jotai";
 import { userAtom } from "@/state/userAtom";
 import { DEFAULT_AVATAR_URL } from "@/constants/avatar";
@@ -389,6 +389,61 @@ const DebateRoom: React.FC = () => {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const botTurnRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Unread bot message & scroll tracking
+  const botScrollRef = useRef<HTMLDivElement>(null);
+  const isBotNearBottomRef = useRef(true);
+  const [showBotScrollDown, setShowBotScrollDown] = useState(false);
+  const [hasUnreadBotMessage, setHasUnreadBotMessage] = useState(false);
+  const prevBotMessageCountRef = useRef(0);
+
+  const captureBotScrollPosition = () => {
+    const el = botScrollRef.current;
+    if (el) {
+      isBotNearBottomRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+    }
+  };
+
+  const handleBotScroll = () => {
+    const el = botScrollRef.current;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+    isBotNearBottomRef.current = isAtBottom;
+    if (isAtBottom) {
+      setShowBotScrollDown(false);
+      setHasUnreadBotMessage(false);
+    } else {
+      setShowBotScrollDown(true);
+    }
+  };
+
+  const scrollToBotBottom = (smooth = true) => {
+    const el = botScrollRef.current;
+    if (!el) return;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: smooth ? "smooth" : "auto",
+    });
+    isBotNearBottomRef.current = true;
+    setShowBotScrollDown(false);
+    setHasUnreadBotMessage(false);
+  };
+
+  // Watch for incoming Bot messages to trigger unread indicator if user is scrolled up
+  useEffect(() => {
+    const botMessages = state.messages.filter((m) => m.sender === "Bot");
+    const count = botMessages.length;
+    if (count > prevBotMessageCountRef.current) {
+      if (isBotNearBottomRef.current) {
+        scrollToBotBottom(true);
+      } else {
+        setShowBotScrollDown(true);
+        setHasUnreadBotMessage(true);
+      }
+    }
+    prevBotMessageCountRef.current = count;
+  }, [state.messages]);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const bot = debateData
@@ -702,6 +757,7 @@ const DebateRoom: React.FC = () => {
         phase: phases[state.currentPhase].name,
       };
 
+      captureBotScrollPosition();
       setState((prev) => {
         const updatedState = {
           ...prev,
@@ -716,6 +772,7 @@ const DebateRoom: React.FC = () => {
     } catch (error) {
       console.error("Bot error:", error);
       // Even on error, advance turn to prevent getting stuck
+      captureBotScrollPosition();
       setState((prev) => {
         const errorMessage: Message = {
           sender: "Bot",
@@ -828,16 +885,20 @@ const DebateRoom: React.FC = () => {
   const renderPhaseMessages = (sender: "User" | "Bot") => {
     const phaseMessages = state.messages.filter((msg) => msg.sender === sender);
     return (
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         {phaseMessages.map((msg, idx) => (
           <div
             key={idx}
-            className="p-3 bg-muted rounded-lg shadow-sm text-foreground break-words"
+            className={`p-3 bg-muted rounded-lg shadow-sm text-foreground break-words ${
+              sender === "User"
+                ? "bg-primary/10 border-primary/25 rounded-tr-sm text-foreground"
+                : "bg-muted/60 border-border/70 rounded-tl-sm text-foreground"
+            }`}
           >
-            <span className="text-xs text-muted-foreground block mb-1">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground inline-block mb-1.5">
               {msg.phase}
             </span>
-            {msg.text}
+            <div className="whitespace-pre-wrap">{msg.text}</div>
           </div>
         ))}
         <div ref={messagesEndRef} />
@@ -878,6 +939,7 @@ const DebateRoom: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 transition-colors duration-300">
+      {/* Header Topic Banner */}
       <div className="w-full max-w-5xl mx-auto py-2">
         <div className="bg-card border border-border rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
           <h1 className="text-3xl font-bold text-foreground tracking-tight">
@@ -902,12 +964,12 @@ const DebateRoom: React.FC = () => {
       </div>
 
       {popup.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-105">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border/80 rounded-2xl shadow-2xl p-6 max-w-md w-full transform transition-all duration-300 scale-100 text-center">
             {popup.isJudging ? (
               <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mb-4"></div>
-                <h2 className="text-xl font-semibold text-gray-800">
+                <div className="animate-spin rounded-full h-14 w-14 border-4 border-primary/30 border-t-primary mb-4"></div>
+                <h2 className="text-xl font-bold text-foreground">
                   {popup.message}
                 </h2>
               </div>
@@ -916,7 +978,7 @@ const DebateRoom: React.FC = () => {
                 <h3 className="text-xl font-bold text-primary mb-2">
                   Phase Transition
                 </h3>
-                <p className="text-muted-foreground text-center text-sm">
+                <p className="text-muted-foreground text-center text-sm leading-relaxed">
                   {popup.message}
                 </p>
               </>
@@ -925,106 +987,143 @@ const DebateRoom: React.FC = () => {
         </div>
       )}
 
-      <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-3">
+      {/* Main Debate Columns */}
+      <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-4">
         {/* Bot Section */}
         <div
-          className={`relative w-full md:w-1/2 ${state.isBotTurn ? "animate-glow" : ""
-            } bg-card border border-border shadow-md transition-colors h-[400px] md:h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 rounded-2xl overflow-hidden ${
+            state.isBotTurn ? "border-2 border-primary/80 ring-2 ring-primary/40 shadow-lg shadow-primary/10 animate-glow" : "border border-border/80"
+          } bg-card shadow-sm transition-all duration-300 h-[460px] md:h-[580px] flex flex-col`}
         >
-          <div className="p-2 bg-muted flex items-center gap-2">
+          {/* Bot Header */}
+          <div className="p-3.5 bg-muted/50 border-b border-border/80 flex items-center gap-3 backdrop-blur-sm">
             <div className="w-12 h-12 flex-shrink-0">
               <img
                 src={bot.avatar}
                 alt={debateData.botName}
-                className="w-full h-full rounded-full border border-border object-cover"
+                className="w-full h-full rounded-full border border-border/80 ring-2 ring-background object-cover shadow-sm"
               />
             </div>
-            <div className="flex flex-col">
-              <div className="text-sm font-medium text-foreground">
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="text-sm font-bold text-foreground truncate">
                 {debateData.botName}
               </div>
-              <div className="text-xs text-muted-foreground">{bot.desc}</div>
-              <div className="text-xs text-muted-foreground">
-                {bot.rating ? `Rating: ${bot.rating}` : "Ready to argue!"}
+              <div className="text-xs text-muted-foreground truncate">{bot.desc}</div>
+              <div className="text-[11px] font-semibold text-primary">
+                {bot.rating ? `${bot.rating} Elo` : "Ready to argue!"}
               </div>
             </div>
             {nextTurnPending && (
               <Button
                 onClick={handleNextTurn}
-                className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
+                className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl px-3 py-1.5 text-xs shadow-sm"
               >
                 Next Turn
               </Button>
             )}
           </div>
-          <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-sm font-semibold text-primary mb-1">
-              Stance: {state.botStance}
-            </p>
-            <p className="text-xs mb-1">
-              Time:{" "}
+
+          {/* Bot Subheader / Timer */}
+          <div className="px-4 py-2 bg-muted/20 border-b border-border/60 flex items-center justify-between text-xs">
+            <span className="font-medium text-muted-foreground">
+              Stance: <span className="font-bold text-primary uppercase">{state.botStance}</span>
+            </span>
+            <div className="flex items-center gap-1.5 bg-background border border-border/80 px-2.5 py-0.5 rounded-md shadow-2xl">
+              <span className="text-muted-foreground text-[11px]">Timer:</span>
               {formatTime(
                 state.isBotTurn
                   ? state.timer
                   : phases[state.currentPhase]?.time || 0
               )}
-            </p>
+            </div>
+          </div>
+
+          <div
+            ref={botScrollRef}
+            onScroll={handleBotScroll}
+            className="p-4 flex-1 overflow-y-auto debate-scrollbar"
+          >
             {renderPhaseMessages("Bot")}
           </div>
+
+          {showBotScrollDown && (
+            <button
+              onClick={() => scrollToBotBottom(true)}
+              aria-label="Scroll to newest message"
+              className={`absolute bottom-4 right-4 z-20 flex items-center px-3 py-3 rounded-full shadow-lg border backdrop-blur-sm transition-all duration-200 active:scale-95 text-xs font-semibold ${
+                hasUnreadBotMessage
+                  ? "bg-primary text-primary-foreground border-primary/40 hover:bg-primary/90"
+                  : "bg-muted text-foreground hover:bg-muted"
+              }`}
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* User Section */}
         <div
-          className={`relative w-full md:w-1/2 ${!state.isBotTurn && !state.isDebateEnded ? "animate-glow" : ""
-            } bg-card border border-border shadow-md transition-colors h-[400px] md:h-[540px] flex flex-col`}
+          className={`relative w-full md:w-1/2 rounded-2xl overflow-hidden ${
+            !state.isBotTurn && !state.isDebateEnded ? "border-2 border-primary/80 ring-2 ring-primary/40 shadow-lg shadow-primary/10 animate-glow" : "border border-border/80"
+          } bg-card shadow-sm transition-all duration-300 h-[460px] md:h-[580px] flex flex-col`}
         >
-          <div className="p-2 bg-muted flex items-center gap-2">
+          {/* User Header */}
+          <div className="p-3.5 bg-muted/50 border-b border-border/80 flex items-center gap-3 backdrop-blur-sm">
             <div className="w-12 h-12 flex-shrink-0">
               <img
                 src={userAvatar}
                 alt="You"
-                className="w-full h-full rounded-full border border-border object-cover"
+                className="w-full h-full rounded-full border border-border/80 ring-2 ring-background object-cover shadow-sm"
               />
             </div>
-            <div className="flex flex-col">
-              <div className="text-sm font-medium text-foreground">
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="text-sm font-bold text-foreground truncate">
                 {user?.displayName || "You"}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground truncate">
                 {user?.bio || "Debater"}
               </div>
-              <div className="text-xs text-muted-foreground">
-                {user?.rating ? `Rating: ${user.rating}` : "Ready to argue!"}
+              <div className="text-[11px] font-semibold text-primary">
+                {user?.rating ? `${user.rating} Elo` : "Ready to argue!"}
               </div>
             </div>
             {!state.isDebateEnded && (
               <Button
                 onClick={() => setIsConcedeDialogOpen(true)}
                 disabled={isConceding}
-                className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md px-3 text-sm"
+                className="ml-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium rounded-xl px-3 py-1.5 text-xs shadow-sm"
               >
                 Concede
               </Button>
             )}
           </div>
-          <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-sm font-semibold text-primary mb-1">
-              Stance: {state.userStance}
-            </p>
-            <p className="text-xs mb-1">
-              Time:{" "}
+
+          {/* User Subheader / Timer */}
+          <div className="px-4 py-2 bg-muted/20 border-b border-border/60 flex items-center justify-between text-xs">
+            <span className="font-medium text-muted-foreground">
+              Stance: <span className="font-bold text-primary uppercase">{state.userStance}</span>
+            </span>
+            <div className="flex items-center gap-1.5 bg-background border border-border/80 px-2.5 py-0.5 rounded-md shadow-2xl">
+              <span className="text-muted-foreground text-[11px]">Timer:</span>
               {formatTime(
                 !state.isBotTurn
                   ? state.timer
                   : phases[state.currentPhase]?.time || 0
               )}
-            </p>
-            <div className="flex-1 overflow-y-auto">
+            </div>
+          </div>
+
+          {/* User Messages and Input */}
+          <div className="p-4 flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto debate-scrollbar pr-1">
               {renderPhaseMessages("User")}
             </div>
+
             {!state.isDebateEnded && (
-              <div className="mt-3 flex gap-2 items-center">
-                <Textarea
+              <div className="mt-3 flex gap-2 items-end pt-3 border-t border-border/60">
+                <TextareaAutosize
+                  minRows={1}
+                  maxRows={4}
                   value={
                     isRecognizing
                       ? finalInput + (interimInput ? " " + interimInput : "")
@@ -1050,17 +1149,18 @@ const DebateRoom: React.FC = () => {
                         ? "Ask your question"
                         : "Provide your answer"
                   }
-                  className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary"
+                  className="flex-1 min-h-[48px] max-h-36 rounded-xl text-sm border border-border/80 bg-background text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary shadow-sm resize-none p-3.5 debate-scrollbar"
                 />
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-md p-2"
+                  className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border/80 rounded-xl p-2.5 h-[50px] w-[50px] flex items-center justify-center transition-all"
+                  title={isRecognizing ? "Stop recording" : "Speech to text"}
                 >
                   {isRecognizing ? (
-                    <MicOff className="w-5 h-5" />
+                    <MicOff className="w-5 h-5 text-destructive animate-pulse" />
                   ) : (
                     <Mic className="w-5 h-5" />
                   )}
@@ -1068,9 +1168,9 @@ const DebateRoom: React.FC = () => {
                 <Button
                   onClick={sendMessage}
                   disabled={
-                    state.isBotTurn || state.timer === 0 || nextTurnPending
+                    state.isBotTurn || state.timer === 0 || nextTurnPending || !finalInput.trim()
                   }
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md px-3 text-sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl px-4 h-[50px] text-sm shadow-md transition-all active:scale-95 disabled:opacity-50"
                 >
                   Send
                 </Button>
@@ -1083,17 +1183,17 @@ const DebateRoom: React.FC = () => {
       <style>{`
         @keyframes glow {
           0% {
-            box-shadow: 0 0 5px rgba(255, 149, 0, 0.5);
+            box-shadow: 0 0 10px rgba(249, 115, 22, 0.25);
           }
           50% {
-            box-shadow: 0 0 20px rgba(255, 149, 0, 0.8);
+            box-shadow: 0 0 25px rgba(249, 115, 22, 0.5);
           }
           100% {
-            box-shadow: 0 0 5px rgba(255, 149, 0, 0.5);
+            box-shadow: 0 0 10px rgba(249, 115, 22, 0.25);
           }
         }
         .animate-glow {
-          animation: glow 2s infinite;
+          animation: glow 2.5s infinite ease-in-out;
         }
       `}</style>
       <ConfirmationDialog
