@@ -392,14 +392,24 @@ const DebateRoom: React.FC = () => {
 
   // Unread bot message & scroll tracking
   const botScrollRef = useRef<HTMLDivElement>(null);
+  const isBotNearBottomRef = useRef(true);
   const [showBotScrollDown, setShowBotScrollDown] = useState(false);
   const [hasUnreadBotMessage, setHasUnreadBotMessage] = useState(false);
   const prevBotMessageCountRef = useRef(0);
 
+  const captureBotScrollPosition = () => {
+    const el = botScrollRef.current;
+    if (el) {
+      isBotNearBottomRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+    }
+  };
+
   const handleBotScroll = () => {
     const el = botScrollRef.current;
     if (!el) return;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 50;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+    isBotNearBottomRef.current = isAtBottom;
     if (isAtBottom) {
       setShowBotScrollDown(false);
       setHasUnreadBotMessage(false);
@@ -415,6 +425,7 @@ const DebateRoom: React.FC = () => {
       top: el.scrollHeight,
       behavior: smooth ? "smooth" : "auto",
     });
+    isBotNearBottomRef.current = true;
     setShowBotScrollDown(false);
     setHasUnreadBotMessage(false);
   };
@@ -424,15 +435,11 @@ const DebateRoom: React.FC = () => {
     const botMessages = state.messages.filter((m) => m.sender === "Bot");
     const count = botMessages.length;
     if (count > prevBotMessageCountRef.current) {
-      const el = botScrollRef.current;
-      if (el) {
-        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
-        if (isAtBottom) {
-          scrollToBotBottom(true);
-        } else {
-          setShowBotScrollDown(true);
-          setHasUnreadBotMessage(true);
-        }
+      if (isBotNearBottomRef.current) {
+        scrollToBotBottom(true);
+      } else {
+        setShowBotScrollDown(true);
+        setHasUnreadBotMessage(true);
       }
     }
     prevBotMessageCountRef.current = count;
@@ -750,6 +757,7 @@ const DebateRoom: React.FC = () => {
         phase: phases[state.currentPhase].name,
       };
 
+      captureBotScrollPosition();
       setState((prev) => {
         const updatedState = {
           ...prev,
@@ -764,6 +772,7 @@ const DebateRoom: React.FC = () => {
     } catch (error) {
       console.error("Bot error:", error);
       // Even on error, advance turn to prevent getting stuck
+      captureBotScrollPosition();
       setState((prev) => {
         const errorMessage: Message = {
           sender: "Bot",
@@ -929,7 +938,7 @@ const DebateRoom: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4transition-colors duration-300">
+    <div className="min-h-screen bg-background p-4 transition-colors duration-300">
       {/* Header Topic Banner */}
       <div className="w-full max-w-5xl mx-auto py-2">
         <div className="bg-card border border-border rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
@@ -1114,7 +1123,7 @@ const DebateRoom: React.FC = () => {
               <div className="mt-3 flex gap-2 items-end pt-3 border-t border-border/60">
                 <TextareaAutosize
                   minRows={1}
-                  maxRows={10}
+                  maxRows={4}
                   value={
                     isRecognizing
                       ? finalInput + (interimInput ? " " + interimInput : "")

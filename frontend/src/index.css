@@ -143,6 +143,11 @@
   scrollbar-color: hsl(var(--primary) / 0.4) transparent;
 }
 
+.debate-scrollbar:hover,
+.custom-scrollbar:hover {
+  scrollbar-color: hsl(var(--primary) / 0.55) transparent;
+}
+
 .debate-scrollbar::-webkit-scrollbar,
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
