@@ -198,7 +198,7 @@ const isValidPhaseTimings = (
   );
 
 const BotSelection: React.FC = () => {
-  const [selectedBot, setSelectedBot] = useState<string | null>(null);
+  const [selectedBot, setSelectedBot] = useState<string | null>(() => allBots[0].name);
   const [topic, setTopic] = useState<string>("custom");
   const [customTopic, setCustomTopic] = useState<string>("");
   const [stance, setStance] = useState<string>("random");
@@ -224,7 +224,7 @@ const BotSelection: React.FC = () => {
     topic?: string;
     timings?: string;
   }>({});
-  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(() => allBots[0].level);
   const navigate = useNavigate();
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -237,8 +237,12 @@ const BotSelection: React.FC = () => {
       try {
         const parsed = JSON.parse(savedState);
         setSelectedBot(
-          typeof parsed.selectedBot === "string" ? parsed.selectedBot : null
+          typeof parsed.selectedBot === "string" ? parsed.selectedBot : allBots[0].name
         );
+        if (typeof parsed.selectedBot === "string") {
+          const matched = allBots.find((b) => b.name === parsed.selectedBot);
+          if (matched) setExpandedLevel(matched.level);
+        }
         setTopic(typeof parsed.topic === "string" ? parsed.topic : "custom");
         setCustomTopic(
           typeof parsed.customTopic === "string" ? parsed.customTopic : ""

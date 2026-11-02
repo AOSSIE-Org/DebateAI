@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import TextareaAutosize from "react-textarea-autosize";
 import { sendDebateMessage, judgeDebate, concedeDebate } from "@/services/vsbot";
 import JudgmentPopup from "@/components/JudgementPopup";
 import { Mic, MicOff, ChevronDown } from "lucide-react";
@@ -1111,8 +1111,10 @@ const DebateRoom: React.FC = () => {
             </div>
 
             {!state.isDebateEnded && (
-              <div className="mt-3 flex gap-2 items-center pt-3 border-t border-border/60">
-                <Textarea
+              <div className="mt-3 flex gap-2 items-end pt-3 border-t border-border/60">
+                <TextareaAutosize
+                  minRows={1}
+                  maxRows={10}
                   value={
                     isRecognizing
                       ? finalInput + (interimInput ? " " + interimInput : "")
@@ -1138,7 +1140,7 @@ const DebateRoom: React.FC = () => {
                         ? "Ask your question"
                         : "Provide your answer"
                   }
-                  className="flex-1 field-sizing-content min-h-[48px] max-h-40 rounded-sm text-sm border border-border/80 bg-background text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary shadow-sm resize-none"
+                  className="flex-1 min-h-[48px] max-h-36 rounded-xl text-sm border border-border/80 bg-background text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary shadow-sm resize-none p-3.5 debate-scrollbar"
                 />
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}
