@@ -593,106 +593,109 @@ const BotSelection: React.FC = () => {
 
             <Separator className="my-4 bg-border/80" />
 
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Topic Selection */}
-                <div className="flex flex-col">
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                    Debate Topic
-                  </label>
-                  <Select
-                    value={topic}
-                    onValueChange={(val) => {
-                      setTopic(val);
-                      setFieldErrors((prev) => ({ ...prev, topic: undefined }));
-                    }}
-                  >
-                    <SelectTrigger className="w-full rounded-xl bg-background border-border/80 hover:border-border text-foreground transition-colors">
-                      <SelectValue placeholder="Select a topic" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/80">
-                      <SelectItem value="custom">Custom Topic</SelectItem>
-                      {predefinedTopics.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {topic === "custom" && (
-                    <Input
-                      value={customTopic}
-                      onChange={(e) => {
-                        setCustomTopic(e.target.value);
-                        setFieldErrors((prev) => ({
-                          ...prev,
-                          topic: undefined,
-                        }));
+            <div className="h-full justify-between flex flex-col gap-4">
+
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Topic Selection */}
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                      Debate Topic
+                    </label>
+                    <Select
+                      value={topic}
+                      onValueChange={(val) => {
+                        setTopic(val);
+                        setFieldErrors((prev) => ({ ...prev, topic: undefined }));
                       }}
-                      maxLength={MAX_TOPIC_LENGTH}
-                      placeholder="Enter your custom topic"
-                      className="mt-2.5 rounded-xl bg-background border-border/80 text-foreground focus:border-primary text-sm"
-                    />
-                  )}
-                  {fieldErrors.topic && (
-                    <p className="text-destructive text-xs mt-1">
-                      {fieldErrors.topic}
+                    >
+                      <SelectTrigger className="w-full rounded-xl bg-background border-border/80 hover:border-border text-foreground transition-colors">
+                        <SelectValue placeholder="Select a topic" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80">
+                        <SelectItem value="custom">Custom Topic</SelectItem>
+                        {predefinedTopics.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {topic === "custom" && (
+                      <Input
+                        value={customTopic}
+                        onChange={(e) => {
+                          setCustomTopic(e.target.value);
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            topic: undefined,
+                          }));
+                        }}
+                        maxLength={MAX_TOPIC_LENGTH}
+                        placeholder="Enter your custom topic"
+                        className="mt-2.5 rounded-xl bg-background border-border/80 text-foreground focus:border-primary text-sm"
+                      />
+                    )}
+                    {fieldErrors.topic && (
+                      <p className="text-destructive text-xs mt-1">
+                        {fieldErrors.topic}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Stance Selection */}
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                      Your Stance
+                    </label>
+                    <Select value={stance} onValueChange={setStance}>
+                      <SelectTrigger className="w-full rounded-xl bg-background border-border/80 hover:border-border text-foreground transition-colors">
+                        <SelectValue placeholder="Choose your stance" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/80">
+                        <SelectItem value="for">Affirmative (For)</SelectItem>
+                        <SelectItem value="against">Negative (Against)</SelectItem>
+                        <SelectItem value="random">Random Stance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Responsive Timer Section */}
+                <div className="flex flex-col mt-1">
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Phase Timings (seconds)
+                  </label>
+                  {fieldErrors.timings && (
+                    <p className="text-destructive text-xs mb-2">
+                      {fieldErrors.timings}
                     </p>
                   )}
-                </div>
-
-                {/* Stance Selection */}
-                <div className="flex flex-col">
-                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                    Your Stance
-                  </label>
-                  <Select value={stance} onValueChange={setStance}>
-                    <SelectTrigger className="w-full rounded-xl bg-background border-border/80 hover:border-border text-foreground transition-colors">
-                      <SelectValue placeholder="Choose your stance" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border/80">
-                      <SelectItem value="for">Affirmative (For)</SelectItem>
-                      <SelectItem value="against">Negative (Against)</SelectItem>
-                      <SelectItem value="random">Random Stance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Responsive Timer Section */}
-              <div className="flex flex-col mt-1">
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Phase Timings (seconds)
-                </label>
-                {fieldErrors.timings && (
-                  <p className="text-destructive text-xs mb-2">
-                    {fieldErrors.timings}
-                  </p>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {phaseTimings.map((phase, index) => (
-                    <div
-                      key={phase.name}
-                      className="flex flex-col p-3 rounded-xl border border-border/80 bg-muted/20 hover:border-primary/40 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-foreground mb-1.5 truncate">
-                        {phase.name}
-                      </span>
-                      <Input
-                        type="number"
-                        value={phase.time.toString()}
-                        onChange={(e) =>
-                          updatePhaseTiming(index, e.target.value)
-                        }
-                        className="text-xs rounded-lg bg-background border-border/80 text-foreground font-mono"
-                      />
-                      {(phase.time < 60 || phase.time > 600) && (
-                        <span className="text-[10px] text-destructive mt-1 font-medium">
-                          Min 60s, Max 600s
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {phaseTimings.map((phase, index) => (
+                      <div
+                        key={phase.name}
+                        className="flex flex-col p-3 rounded-xl border border-border/80 bg-muted/20 hover:border-primary/40 transition-colors"
+                      >
+                        <span className="text-xs font-semibold text-foreground mb-1.5 truncate">
+                          {phase.name}
                         </span>
-                      )}
-                    </div>
-                  ))}
+                        <Input
+                          type="number"
+                          value={phase.time.toString()}
+                          onChange={(e) =>
+                            updatePhaseTiming(index, e.target.value)
+                          }
+                          className="text-xs rounded-lg bg-background border-border/80 text-foreground font-mono"
+                        />
+                        {(phase.time < 60 || phase.time > 600) && (
+                          <span className="text-[10px] text-destructive mt-1 font-medium">
+                            Min 60s, Max 600s
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
