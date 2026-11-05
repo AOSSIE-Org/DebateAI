@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Users, Calendar, Eye, Trophy, Crown } from "lucide-react";
+import { Users, Calendar, Eye, Trophy, Crown, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { CreateTournamentForm } from "@/components/tournament/CreateTournamentForm";
 import {
   Select,
   SelectContent,
@@ -218,24 +217,34 @@ export default function TournamentPage() {
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-primary animate-pulse">
           Tournament Arena
         </h1>
-        <Select
-          value={statusFilter}
-          onValueChange={(val) =>
-            setStatusFilter(val as TournamentStatus | "all")
-          }
-        >
-          <SelectTrigger
-            className="w-32 h-9 px-3 bg-background text-foreground border-border"
-            aria-label="Filter tournaments"
+        <div className="flex items-center gap-3">
+          <Select
+            value={statusFilter}
+            onValueChange={(val) =>
+              setStatusFilter(val as TournamentStatus | "all")
+            }
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="live">{STATUS_LABELS.live}</SelectItem>
-            <SelectItem value="upcoming">{STATUS_LABELS.upcoming}</SelectItem>
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              className="w-32 h-9 px-3 bg-background text-foreground border-border"
+              aria-label="Filter tournaments"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="live">{STATUS_LABELS.live}</SelectItem>
+              <SelectItem value="upcoming">{STATUS_LABELS.upcoming}</SelectItem>
+            </SelectContent>
+          </Select>
+          <button
+            type="button"
+            onClick={() => navigate("/tournament/create")}
+            className="flex items-center gap-1.5 h-9 px-4 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors duration-200 font-semibold text-sm whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            Create Tournament
+          </button>
+        </div>
       </div>
       <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
         {/* Left: Dummy Tournament List */}
@@ -245,7 +254,7 @@ export default function TournamentPage() {
               No live tournaments yet. Create one to start the debate!
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
               {visibleTournaments.map((t) => (
                 <div
                   key={t.id}
@@ -380,13 +389,6 @@ export default function TournamentPage() {
               ))}
             </div>
           </section>
-        </div>
-
-        {/* Right: Create Tournament Form */}
-        <div className="w-full lg:w-1/3 space-y-8">
-          <div className="bg-card rounded-lg border border-border shadow-md p-2">
-            <CreateTournamentForm/>
-          </div>
         </div>
       </div>
     </div>

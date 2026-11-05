@@ -202,7 +202,7 @@ export const CreateTournamentForm = () => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-3xl mx-auto p-6 bg-card rounded-lg"
+      className="w-full p-6 bg-card rounded-xl border border-border shadow-lg"
     >
       <h2 className="text-2xl font-bold mb-6">Create Tournament</h2>
 
@@ -212,9 +212,9 @@ export const CreateTournamentForm = () => {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         {/* Topic */}
-        <div>
+        <div className="md:col-span-2">
           <label className="block mb-1 font-medium">Tournament Topic *</label>
           <input
             value={form.topic}
@@ -226,7 +226,7 @@ export const CreateTournamentForm = () => {
         </div>
 
         {/* Description */}
-        <div>
+        <div className="md:col-span-2">
           <label className="block mb-1 font-medium">Description *</label>
           <textarea
             value={form.description}
@@ -299,34 +299,39 @@ export const CreateTournamentForm = () => {
         </div>
 
         {/* Min + Max */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block mb-1 font-medium">Min Participants *</label>
-            <input
-              type="number"
-              min={MIN_PARTICIPANTS_LIMIT}
-              max={MAX_PARTICIPANTS_LIMIT}
-              value={form.minParticipants}
-              onChange={(e) =>
-                setForm({ ...form, minParticipants: +e.target.value })
-              }
-              className="w-full p-2 border border-border rounded bg-background"
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-1 font-medium">Max Participants *</label>
-            <input
-              type="number"
-              min={form.minParticipants}
-              max={MAX_PARTICIPANTS_LIMIT}
-              value={form.maxParticipants}
-              onChange={(e) =>
-                setForm({ ...form, maxParticipants: +e.target.value })
-              }
-              className="w-full p-2 border border-border rounded bg-background"
-              required
-            />
+        <div>
+          <label className="block mb-1 font-medium">Participants *</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <input
+                aria-label="Minimum participants"
+                type="number"
+                min={MIN_PARTICIPANTS_LIMIT}
+                max={MAX_PARTICIPANTS_LIMIT}
+                value={form.minParticipants}
+                onChange={(e) =>
+                  setForm({ ...form, minParticipants: +e.target.value })
+                }
+                className="w-full p-2 border border-border rounded bg-background"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Minimum</p>
+            </div>
+            <div>
+              <input
+                aria-label="Maximum participants"
+                type="number"
+                min={form.minParticipants}
+                max={MAX_PARTICIPANTS_LIMIT}
+                value={form.maxParticipants}
+                onChange={(e) =>
+                  setForm({ ...form, maxParticipants: +e.target.value })
+                }
+                className="w-full p-2 border border-border rounded bg-background"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Maximum</p>
+            </div>
           </div>
         </div>
 
