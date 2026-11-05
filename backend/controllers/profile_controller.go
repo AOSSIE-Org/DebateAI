@@ -146,7 +146,7 @@ func GetProfile(c *gin.Context) {
 	if user.Rating == 0 {
 		user.Rating = 1200.0
 		user.LastRatingUpdate = time.Now()
-		_, _ = db.MongoDatabase.Collection("users").UpdateOne(
+		_, err = db.MongoDatabase.Collection("users").UpdateOne(
 			dbCtx,
 			bson.M{"_id": user.ID},
 			bson.M{"$set": bson.M{
@@ -154,6 +154,9 @@ func GetProfile(c *gin.Context) {
 				"lastRatingUpdate": user.LastRatingUpdate,
 			}},
 		)
+		if err != nil {
+			log.Printf("Failed to persist default rating for user %s: %v", user.ID.Hex(), err)
+		}
 	}
 
 	displayName := user.DisplayName
