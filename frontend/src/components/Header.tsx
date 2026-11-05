@@ -120,6 +120,22 @@ function Header() {
    */
   const getBreadcrumbs = () => {
     const pathnames = location.pathname.split("/").filter((x) => x);
+    const getBreadcrumbLabel = (value: string, index: number) => {
+      if (
+        pathnames[index - 1] === "tournament" &&
+        pathnames[index + 1] === "bracket" &&
+        location.state?.tournament?.topic
+      ) {
+        return location.state.tournament.topic;
+      }
+
+      return value === "support-debateai" || value === "support-os"
+        ? "Support DebateAI"
+        : value === "bot-selection"
+        ? "Bot Selection"
+        : value.replace(/-/g, " ");
+    };
+
     return (
       <Breadcrumb>
         <BreadcrumbList>
@@ -130,30 +146,23 @@ function Header() {
           </BreadcrumbItem>
           {pathnames.map((value, index) => {
             let to = `/${pathnames.slice(0, index + 1).join("/")}`;
-            if (value === "tournament"){
+            if (value === "tournament") {
               to = "/tournaments";
             }
-              const isLast = index === pathnames.length - 1;
+            const isLast = index === pathnames.length - 1;
+            const label = getBreadcrumbLabel(value, index);
             return (
               <React.Fragment key={to}>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   {isLast ? (
                     <BreadcrumbPage className="capitalize">
-                      {value === "support-debateai" || value === "support-os"
-                        ? "Support DebateAI" 
-                        : value === "bot-selection" 
-                        ? "Bot Selection" 
-                        : value.replace(/-/g, " ")}
+                      {label}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
                       <NavLink to={to} className="capitalize">
-                        {value === "support-debateai" || value === "support-os"
-                          ? "Support DebateAI" 
-                          : value === "bot-selection" 
-                          ? "Bot Selection" 
-                          : value.replace(/-/g, " ")}
+                        {label}
                       </NavLink>
                     </BreadcrumbLink>
                   )}
