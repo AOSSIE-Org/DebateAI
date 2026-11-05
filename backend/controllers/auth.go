@@ -144,6 +144,69 @@ func SignUp(ctx *gin.Context) {
 	var existingUser models.User
 	err := db.MongoDatabase.Collection("users").FindOne(dbCtx, bson.M{"email": request.Email}).Decode(&existingUser)
 	if err == nil {
+		// If the user exists but is not verified, resend a fresh code
+		// instead of blocking them with "User already exists".
+		if !existingUser.IsVerified {
+			const resendCooldown = 2 * time.Minute
+			now := time.Now()
+
+			// Cooldown check: if a code was sent within the last 2 minutes,
+			// don't send another one.
+			if !existingUser.VerificationCodeSentAt.IsZero() &&
+				now.Sub(existingUser.VerificationCodeSentAt) < resendCooldown {
+				ctx.JSON(429, gin.H{
+					"error": "Please wait before requesting another code",
+					"retryAfterSeconds": int(
+						(resendCooldown - now.Sub(existingUser.VerificationCodeSentAt)).Seconds(),
+					),
+				})
+				return
+			}
+
+			// Reuse a still-valid code; only generate a fresh one when the
+			// existing code is expired or absent. This way a delivery failure
+			// can't invalidate a code the user already received.
+			codeToSend := existingUser.VerificationCode
+			expiry := existingUser.VerificationCodeExpiry
+			if codeToSend == "" || expiry.IsZero() || now.After(expiry) {
+				codeToSend = utils.GenerateRandomCode(6)
+				expiry = now.Add(24 * time.Hour)
+			}
+
+			// Persist first, then send, so a delivery failure can't leave
+			// the DB with a code the user never received.
+			_, updErr := db.MongoDatabase.Collection("users").UpdateOne(
+				dbCtx,
+				bson.M{"email": request.Email},
+				bson.M{"$set": bson.M{
+					"verificationCode":       codeToSend,
+					"verificationCodeExpiry": expiry,
+					"verificationCodeSentAt": now,
+					"updatedAt":              now,
+				}},
+			)
+			if updErr != nil {
+				ctx.JSON(500, gin.H{"error": "Failed to resend verification code", "message": updErr.Error()})
+				return
+			}
+
+			if mailErr := utils.SendVerificationEmail(request.Email, codeToSend); mailErr != nil {
+				// Release the cooldown reservation so the user can retry
+				// immediately after a delivery failure. Only clear if the
+				// timestamp still matches THIS request's value, so we don't
+				// wipe out a newer request's state.
+				_, _ = db.MongoDatabase.Collection("users").UpdateOne(
+					dbCtx,
+					bson.M{"email": request.Email, "verificationCodeSentAt": now},
+					bson.M{"$set": bson.M{"verificationCodeSentAt": existingUser.VerificationCodeSentAt}},
+				)
+				ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": mailErr.Error()})
+				return
+			}
+
+			ctx.JSON(200, gin.H{"message": "Sign-up successful. Please verify your email."})
+			return
+		}
 		ctx.JSON(400, gin.H{"error": "User already exists"})
 		return
 	}
@@ -151,7 +214,6 @@ func SignUp(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"error": "Database error", "message": err.Error()})
 		return
 	}
-
 	// Check if displayName is already taken
 	defaultDisplayName := utils.ExtractNameFromEmail(request.Email)
 	var existingDisplayName models.User
@@ -207,6 +269,19 @@ func SignUp(ctx *gin.Context) {
 
 	err = utils.SendVerificationEmail(request.Email, verificationCode)
 	if err != nil {
+		// Rollback: remove the orphan user so signup can be retried.
+		// Use a fresh context (SendVerificationEmail may have consumed
+		// dbCtx's 5s budget) and match by _id (not email) so a duplicate
+		// email edge case can't delete a different account.
+		rollbackCtx, rollbackCancel := context.WithTimeout(
+			context.Background(), 5*time.Second,
+		)
+		defer rollbackCancel()
+		if _, delErr := db.MongoDatabase.Collection("users").DeleteOne(
+			rollbackCtx, bson.M{"_id": newUser.ID},
+		); delErr != nil {
+			log.Printf("failed to rollback user %s after email failure: %v", request.Email, delErr)
+		}
 		ctx.JSON(500, gin.H{"error": "Failed to send verification email", "message": err.Error()})
 		return
 	}
@@ -228,7 +303,7 @@ func VerifyEmail(ctx *gin.Context) {
 		return
 	}
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
-
+	request.ConfirmationCode = strings.TrimSpace(request.ConfirmationCode)
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -298,7 +373,6 @@ func Login(ctx *gin.Context) {
 		return
 	}
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
-
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var user models.User
@@ -315,6 +389,15 @@ func Login(ctx *gin.Context) {
 
 	if !user.IsVerified {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Email not verified", "code": "EMAIL_NOT_VERIFIED"})
+		return
+	}
+
+	// Google-created accounts have no password set.
+	if user.Password == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "This account was created with Google. Please sign in with Google.",
+			"code":  "USE_GOOGLE_LOGIN",
+		})
 		return
 	}
 
