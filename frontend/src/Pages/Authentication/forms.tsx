@@ -165,14 +165,21 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ startOtpVerification }) 
     clearError();
   }, []);
 
+    const MIN_PASSWORD_LENGTH = 8;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      authContext.handleError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
 
     if (password !== confirmPassword) {
       authContext.handleError('Passwords do not match');
       return;
     }
     clearError();
+
     try {
       await signup(email, password);
       startOtpVerification(email);
