@@ -73,6 +73,9 @@ func EnsureIndexes() error {
 		return fmt.Errorf("failed to create displayName index: %w", err)
 	}
 	log.Println("DisplayName unique index ensured")
+	if err := EnsureTournamentIndexes(ctx, MongoDatabase.Collection("tournaments")); err != nil {
+		return fmt.Errorf("failed to ensure tournament indexes (check existing invite-code duplicates): %w", err)
+	}
 	return nil
 }
 

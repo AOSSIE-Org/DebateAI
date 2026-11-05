@@ -1,10 +1,17 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"arguehub/config"
 	"arguehub/db"
@@ -75,8 +82,47 @@ func main() {
 	router := setupRouter(cfg, configPath)
 	port := strconv.Itoa(cfg.Server.Port)
 
-	if err := router.Run(":" + port); err != nil {
-		panic("Failed to start server: " + err.Error())
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	var workers sync.WaitGroup
+	judge, err := services.TournamentJudgeFromEnvironment(cfg.Gemini.ApiKey)
+	if err != nil {
+		log.Fatal("Tournament evaluation configuration is invalid")
+	}
+	if judge != nil {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			services.TournamentEvaluationService{Collection: db.MongoDatabase.Collection("tournaments"), Provider: judge}.Run(ctx)
+		}()
+	} else {
+		log.Print("Tournament evaluation disabled; pending inputs are retained")
+	}
+	workers.Add(1)
+	go func() {
+		defer workers.Done()
+		services.TournamentExecutionService{Collection: db.MongoDatabase.Collection("tournaments")}.RunRecovery(ctx)
+	}()
+	server := &http.Server{Addr: ":" + port, Handler: router, ReadHeaderTimeout: 10 * time.Second}
+	failures := make(chan error, 1)
+	go func() { failures <- server.ListenAndServe() }()
+	var serverError error
+	select {
+	case <-ctx.Done():
+	case err := <-failures:
+		if !errors.Is(err, http.ErrServerClosed) {
+			serverError = err
+		}
+	}
+	stop()
+	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdown); err != nil {
+		log.Printf("Server shutdown: %v", err)
+	}
+	workers.Wait()
+	if serverError != nil {
+		log.Fatalf("Server stopped: %v", serverError)
 	}
 }
 

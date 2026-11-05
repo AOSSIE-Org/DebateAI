@@ -300,7 +300,7 @@ const TeamDebateRoom: React.FC = () => {
 
   // Timer state
   const [timer, setTimer] = useState<number>(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Speech recognition state
   const [isListening, setIsListening] = useState(false);

@@ -2,32 +2,25 @@ package routes
 
 import (
 	"arguehub/controllers"
+	"arguehub/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
 
-func SetupTournamentRoutes(router *gin.RouterGroup) {
-	
-	router.POST("/tournaments", controllers.CreateTournamentHandler)
-	router.GET("/tournaments", controllers.GetTournaments)
-	router.PATCH("/tournaments/:id", controllers.UpdateTournamentHandler)
-	router.GET("/tournaments/:id", controllers.GetTournamentByID)
-	router.DELETE("/tournaments/:id", controllers.DeleteTournamentHandler)
-
-	
-	// ============================================
-	// Public Tournament Join
-	router.POST("/tournaments/:id/join", controllers.JoinPublicTournament)
-
-	// Private Tournament Join (Request)
-	router.POST("/tournaments/join", controllers.JoinPrivateTournament)
-
-	// CHOOSE STANCE
-	router.PATCH("/tournaments/:id/stance", controllers.ChooseStance)
-
-	// MODERATOR: GET PENDING REQUESTS
-	router.GET("/tournaments/:id/requests", controllers.GetPendingRequests)
-
-	// MODERATOR: MANAGE REQUEST (APPROVE/REJECT)
-	router.PATCH("/tournaments/:id/request/:userId", controllers.ManageJoinRequest)
+func SetupTournamentRoutes(auth *gin.RouterGroup) {
+	auth.POST("/tournaments", controllers.CreateTournamentHandler)
+	auth.GET("/tournaments", controllers.GetTournaments)
+	auth.PATCH("/tournaments/:id", controllers.UpdateTournamentHandler)
+	auth.GET("/tournaments/:id", controllers.GetTournamentByID)
+	auth.DELETE("/tournaments/:id", controllers.DeleteTournamentHandler)
+	auth.POST("/tournaments/:id/join", controllers.JoinPublicTournament)
+	auth.POST("/tournaments/join", middlewares.TournamentInviteRateLimit(), controllers.JoinPrivateTournament)
+	auth.GET("/tournaments/:id/request", controllers.GetTournamentRequestHandler)
+	auth.GET("/tournaments/:id/requests", controllers.GetPendingRequests)
+	auth.PATCH("/tournaments/:id/request/:userId", controllers.ManageJoinRequest)
+	auth.PATCH("/tournaments/:id/stance", controllers.ChooseStance)
+	auth.POST("/tournaments/:id/start", controllers.StartTournamentHandler)
+	auth.GET("/tournaments/:id/execution", controllers.GetTournamentExecutionHandler)
+	auth.GET("/tournaments/:id/evaluation", controllers.GetTournamentEvaluationHandler)
+	auth.POST("/tournaments/:id/transcript", controllers.SubmitTournamentTranscriptHandler)
 }
