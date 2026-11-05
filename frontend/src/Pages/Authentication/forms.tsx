@@ -31,26 +31,29 @@ export const LoginForm: React.FC<LoginFormProps> = ({ startForgotPassword, infoM
   }, []);
 
   const MIN_PASSWORD_LENGTH = 8;
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearError();
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setLocalError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
-      return;
-    }
-    setLocalError(null);
-    try {
-      await login(email, password);
-    } catch (err: any) {
-      const code = (err as Error & { code?: string }).code;
-      if (code === 'EMAIL_NOT_VERIFIED') {
-        startOtpVerification(email);
-      } else {
-        const msg = err?.userMessage ?? err?.message;
-        if (msg) authContext.handleError(msg);
-      }
-    }
-  };
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    authContext.handleError('Password must be at least 8 characters long');
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    authContext.handleError('Passwords do not match');
+    return;
+  }
+
+  clearError();
+  try {
+    await signup(email, password);
+    startOtpVerification(email);
+  } catch (err: any) {
+    const msg = err?.userMessage ?? err?.message;
+    if (msg) authContext.handleError(msg);
+  }
+};
 
   const handleGoogleLogin = useCallback(
     async (response: { credential: string; select_by: string }) => {
