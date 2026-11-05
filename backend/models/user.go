@@ -20,16 +20,16 @@ type User struct {
 	Twitter                 string             `bson:"twitter,omitempty" json:"twitter,omitempty"`
 	Instagram               string             `bson:"instagram,omitempty" json:"instagram,omitempty"`
 	LinkedIn                string             `bson:"linkedin,omitempty" json:"linkedin,omitempty"`
-	Password                string             `bson:"password"`
-	Nickname                string             `bson:"nickname"`
-	IsVerified              bool               `bson:"isVerified"`
-	VerificationCode        string             `bson:"verificationCode,omitempty"`
-	VerificationCodeExpiry  time.Time          `bson:"verificationCodeExpiry,omitempty"`
-	VerificationCodeSentAt  time.Time          `bson:"verificationCodeSentAt,omitempty"`
-	ResetPasswordCode       string             `bson:"resetPasswordCode,omitempty"`
-	ResetPasswordCodeExpiry time.Time          `bson:"resetPasswordCodeExpiry,omitempty"`
-	CreatedAt               time.Time          `bson:"createdAt"`
-	UpdatedAt               time.Time          `bson:"updatedAt"`
+	Password                string             `bson:"password" json:"-"`
+	Nickname                string             `bson:"nickname" json:"nickname,omitempty"`
+	IsVerified              bool               `bson:"isVerified" json:"isVerified"`
+	VerificationCode        string             `bson:"verificationCode,omitempty" json:"-"`
+	VerificationCodeExpiry  time.Time          `bson:"verificationCodeExpiry,omitempty" json:"-"`
+	VerificationCodeSentAt  time.Time          `bson:"verificationCodeSentAt,omitempty" json:"-"`
+	ResetPasswordCode       string             `bson:"resetPasswordCode,omitempty" json:"-"`
+	ResetPasswordCodeExpiry time.Time          `bson:"resetPasswordCodeExpiry,omitempty" json:"-"`
+	CreatedAt               time.Time          `bson:"createdAt" json:"createdAt"`
+	UpdatedAt               time.Time          `bson:"updatedAt" json:"updatedAt"`
 	Score                   int                `bson:"score" json:"score"`
 	Badges                  []string           `bson:"badges,omitempty" json:"badges,omitempty"`
 	CurrentStreak           int                `bson:"currentStreak" json:"currentStreak"`
