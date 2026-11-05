@@ -134,6 +134,9 @@ type Client struct {
 func (c *Client) SafeWriteJSON(v any) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if c.Conn == nil {
+		return nil
+	}
 	return c.Conn.WriteJSON(v)
 }
 
@@ -141,6 +144,9 @@ func (c *Client) SafeWriteJSON(v any) error {
 func (c *Client) SafeWriteMessage(messageType int, data []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if c.Conn == nil {
+		return nil
+	}
 	return c.Conn.WriteMessage(messageType, data)
 }
 
