@@ -61,6 +61,8 @@ func main() {
 	}
 
 	go websocket.WatchForNewRooms()
+	routes.StartRoomCleanup()
+	websocket.StartRoomActivityHeartbeat()
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
 	if os.Getenv("SEED_DEMO_DATA") == "true" {
