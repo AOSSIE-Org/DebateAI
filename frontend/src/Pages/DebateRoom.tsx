@@ -688,6 +688,7 @@ const DebateRoom: React.FC = () => {
       }
 
       const { response } = await sendDebateMessage({
+        debateId: debateData.debateId,
         botLevel: debateData.botLevel,
         topic: debateData.topic,
         history: state.messages,
@@ -744,6 +745,7 @@ const DebateRoom: React.FC = () => {
     try {
       console.log("Starting judgment with messages:", messages);
       const { result } = await judgeDebate({
+        debateId: debateData.debateId,
         history: messages,
         userId: debateData.userId,
       });
