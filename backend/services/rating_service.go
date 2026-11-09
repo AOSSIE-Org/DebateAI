@@ -18,7 +18,17 @@ import (
 var ratingSystem *rating.Glicko2
 
 func InitRatingService(cfg *config.Config) {
-	ratingSystem = rating.New(nil)
+	// Create a custom configuration with optimized parameters
+	ratingConfig := &rating.Config{
+		InitialRating:   1500.0, // Base rating
+		InitialRD:       350.0,  // Initial rating deviation
+		InitialVol:      0.06,   // Initial volatility
+		Tau:             0.3,    // Lower tau for more stable ratings
+		RatingPeriodSec: 3600,   // 1 hour rating period
+		MaxRD:           350.0,  // Maximum rating deviation
+	}
+
+	ratingSystem = rating.New(ratingConfig)
 }
 
 func GetRatingSystem() *rating.Glicko2 {
