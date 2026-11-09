@@ -60,12 +60,23 @@ func CreateTeamDebate(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "Teams are not currently matched in matchmaking"})
 		return
 	}
-	created := false
-	defer func() {
-		if !created {
-			services.RestoreToMatchmaking(claimed)
-		}
-	}()
+	// Teams stay reserved until return. requeue decides whether they go back
+	// in the pool: only on transient failures, never after success or when
+	// the entries were stale.
+	requeue := true
+	defer func() { services.ReleaseClaim(claimed, requeue) }()
+
+	if err := collection.FindOne(ctx, bson.M{"_id": req.Team2ID}).Decode(&team2); err != nil {
+		requeue = false
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
+		return
+	}
+
+	if !services.TeamsStillEligible(&team1, &team2) {
+		requeue = false
+		c.JSON(http.StatusConflict, gin.H{"error": "Teams no longer meet the matchmaking criteria"})
+		return
+	}
 
 	if err := collection.FindOne(ctx, bson.M{"_id": req.Team2ID}).Decode(&team2); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
@@ -113,7 +124,7 @@ func CreateTeamDebate(c *gin.Context) {
 	}
 
 	debate.ID = result.InsertedID.(primitive.ObjectID)
-	created = true
+	requeue = false
 
 	// Notify all members of both teams
 	go func() {

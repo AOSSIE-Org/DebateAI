@@ -13,6 +13,7 @@ import (
 // resetTeamPool replaces the package-level pool with exactly the given entries,
 // so each test starts from a known state.
 func resetTeamPool(entries ...*TeamMatchmakingEntry) {
+	reservedTeams = make(map[string]struct{})
 	teamMatchmakingMutex.Lock()
 	defer teamMatchmakingMutex.Unlock()
 	teamMatchmakingPool = make(map[string]*TeamMatchmakingEntry)
@@ -93,8 +94,63 @@ func TestClaimMatchedTeamsClaimsOnceAndRestores(t *testing.T) {
 	}
 
 	// Restore puts both teams back, so a failed debate creation isn't fatal.
-	RestoreToMatchmaking(claimed)
+	ReleaseClaim(claimed, true)
 	if n := len(GetMatchmakingPool()); n != 2 {
 		t.Fatalf("restore must put both teams back, pool size = %d", n)
+	}
+}
+
+func TestClaimedTeamsStayReservedUntilReleased(t *testing.T) {
+	a, b := newPoolEntry(2, 1200), newPoolEntry(2, 1200)
+	resetTeamPool(a, b)
+
+	claimed, err := ClaimMatchedTeams(a.TeamID, b.TeamID)
+	if err != nil {
+		t.Fatalf("claim failed: %v", err)
+	}
+
+	// While the debate is being created, a claimed team must not be able to
+	// rejoin the pool (otherwise the same pair could be claimed twice).
+	if err := addTeamToPool(a.Team); !errors.Is(err, ErrTeamReserved) {
+		t.Fatalf("reserved team must not rejoin the pool, got %v", err)
+	}
+	if n := len(GetMatchmakingPool()); n != 0 {
+		t.Fatalf("pool must stay empty while teams are reserved, size = %d", n)
+	}
+
+	// After a successful debate (requeue=false) the reservation ends but the
+	// teams are not put back in the pool automatically.
+	ReleaseClaim(claimed, false)
+	if n := len(GetMatchmakingPool()); n != 0 {
+		t.Fatalf("release without requeue must not refill the pool, size = %d", n)
+	}
+	if err := addTeamToPool(a.Team); err != nil {
+		t.Fatalf("team should be able to rejoin after release, got %v", err)
+	}
+}
+
+func TestTeamsStillEligibleUsesCurrentTeamData(t *testing.T) {
+	mk := func(members, maxSize int, elo float64) *models.Team {
+		return &models.Team{
+			Members:    make([]models.TeamMember, members),
+			MaxSize:    maxSize,
+			AverageElo: elo,
+		}
+	}
+
+	if !TeamsStillEligible(mk(2, 2, 1200), mk(2, 2, 1300)) {
+		t.Fatal("full, same-size, close-Elo teams should be eligible")
+	}
+	// Team grew from size 2 to 4 after joining the pool and is not full.
+	if TeamsStillEligible(mk(2, 4, 1200), mk(2, 2, 1200)) {
+		t.Fatal("team whose size changed after joining must be ineligible")
+	}
+	// A member left after the team joined the pool.
+	if TeamsStillEligible(mk(1, 2, 1200), mk(2, 2, 1200)) {
+		t.Fatal("team that is no longer full must be ineligible")
+	}
+	// Elo drifted apart after joining.
+	if TeamsStillEligible(mk(2, 2, 1000), mk(2, 2, 1300)) {
+		t.Fatal("teams whose Elo gap grew past the limit must be ineligible")
 	}
 }
