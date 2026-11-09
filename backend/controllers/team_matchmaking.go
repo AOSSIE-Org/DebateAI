@@ -19,10 +19,6 @@ import (
 func JoinMatchmaking(c *gin.Context) {
 	teamID := c.Param("teamId")
 	objectID, err := primitive.ObjectIDFromHex(teamID)
-	if errors.Is(err, services.ErrTeamReserved) {
-		c.JSON(http.StatusConflict, gin.H{"error": "Team is being matched into a debate right now"})
-		return
-	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
 		return
@@ -60,6 +56,10 @@ func JoinMatchmaking(c *gin.Context) {
 
 	// Add to matchmaking
 	err = services.StartTeamMatchmaking(objectID)
+	if errors.Is(err, services.ErrTeamReserved) {
+		c.JSON(http.StatusConflict, gin.H{"error": "Team is being matched into a debate right now"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join matchmaking"})
 		return

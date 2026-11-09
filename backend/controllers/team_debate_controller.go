@@ -1,17 +1,18 @@
 package controllers
 
 import (
-	"context"
-	"net/http"
-	"time"
-
 	"arguehub/db"
 	"arguehub/models"
 	"arguehub/services"
+	"context"
+	"errors"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // CreateTeamDebate creates a new team debate between two matched teams
@@ -67,8 +68,13 @@ func CreateTeamDebate(c *gin.Context) {
 	defer func() { services.ReleaseClaim(claimed, requeue) }()
 
 	if err := collection.FindOne(ctx, bson.M{"_id": req.Team2ID}).Decode(&team2); err != nil {
-		requeue = false
-		c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			requeue = false
+			c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
+			return
+		}
+		// Transient failure: requeue stays true so captains can retry.
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load team 2"})
 		return
 	}
 
