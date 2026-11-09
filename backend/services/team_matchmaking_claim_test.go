@@ -13,9 +13,9 @@ import (
 // resetTeamPool replaces the package-level pool with exactly the given entries,
 // so each test starts from a known state.
 func resetTeamPool(entries ...*TeamMatchmakingEntry) {
-	reservedTeams = make(map[string]struct{})
 	teamMatchmakingMutex.Lock()
 	defer teamMatchmakingMutex.Unlock()
+	reservedTeams = make(map[string]struct{})
 	teamMatchmakingPool = make(map[string]*TeamMatchmakingEntry)
 	for _, e := range entries {
 		teamMatchmakingPool[e.TeamID.Hex()] = e
