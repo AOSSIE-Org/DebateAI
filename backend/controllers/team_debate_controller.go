@@ -1,17 +1,18 @@
 package controllers
 
 import (
-	"context"
-	"net/http"
-	"time"
-
 	"arguehub/db"
 	"arguehub/models"
 	"arguehub/services"
+	"context"
+	"errors"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // CreateTeamDebate creates a new team debate between two matched teams
@@ -21,26 +22,18 @@ func CreateTeamDebate(c *gin.Context) {
 		Team2ID primitive.ObjectID `json:"team2Id" binding:"required"`
 		Topic   string             `json:"topic" binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	collection := db.GetCollection("teams")
-	var team1, team2 models.Team
-
-	// Fetch team 1
-	err := collection.FindOne(context.Background(), bson.M{"_id": req.Team1ID}).Decode(&team1)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Team 1 not found"})
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-
-	// Fetch team 2
-	err = collection.FindOne(context.Background(), bson.M{"_id": req.Team2ID}).Decode(&team2)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
+	userID, ok := userIDVal.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
@@ -48,7 +41,53 @@ func CreateTeamDebate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot create a debate with the same team on both sides"})
 		return
 	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
 
+	collection := db.GetCollection("teams")
+	var team1, team2 models.Team
+
+	if err := collection.FindOne(ctx, bson.M{"_id": req.Team1ID}).Decode(&team1); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team 1 not found"})
+		return
+	}
+	if team1.CaptainID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the captain of the team can start a team debate"})
+		return
+	}
+
+	claimed, err := services.ClaimMatchedTeams(req.Team1ID, req.Team2ID)
+	if err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Teams are not currently matched in matchmaking"})
+		return
+	}
+	// Teams stay reserved until return. requeue decides whether they go back
+	// in the pool: only on transient failures, never after success or when
+	// the entries were stale.
+	requeue := true
+	defer func() { services.ReleaseClaim(claimed, requeue) }()
+
+	if err := collection.FindOne(ctx, bson.M{"_id": req.Team2ID}).Decode(&team2); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			requeue = false
+			c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
+			return
+		}
+		// Transient failure: requeue stays true so captains can retry.
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load team 2"})
+		return
+	}
+
+	if !services.TeamsStillEligible(&team1, &team2) {
+		requeue = false
+		c.JSON(http.StatusConflict, gin.H{"error": "Teams no longer meet the matchmaking criteria"})
+		return
+	}
+
+	if err := collection.FindOne(ctx, bson.M{"_id": req.Team2ID}).Decode(&team2); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
+		return
+	}
 	// Determine stances
 	var team1Stance, team2Stance string
 	stances := []string{"for", "against"}
@@ -84,17 +123,14 @@ func CreateTeamDebate(c *gin.Context) {
 
 	// Insert debate
 	debateCollection := db.GetCollection("team_debates")
-	result, err := debateCollection.InsertOne(context.Background(), debate)
+	result, err := debateCollection.InsertOne(ctx, debate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create debate"})
 		return
 	}
 
 	debate.ID = result.InsertedID.(primitive.ObjectID)
-
-	// Remove teams from matchmaking
-	services.RemoveFromMatchmaking(req.Team1ID)
-	services.RemoveFromMatchmaking(req.Team2ID)
+	requeue = false
 
 	// Notify all members of both teams
 	go func() {
