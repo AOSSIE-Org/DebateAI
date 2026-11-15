@@ -1024,45 +1024,59 @@ const DebateRoom: React.FC = () => {
             </div>
             {!state.isDebateEnded && (
               <div className="mt-3 flex gap-2 items-center">
-                <Textarea
-                  value={
-                    isRecognizing
-                      ? finalInput + (interimInput ? " " + interimInput : "")
-                      : finalInput
-                  }
-                  onChange={(e) =>
-                    !isRecognizing && setFinalInput(e.target.value)
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
+                <div className="relative flex-1">
+                  <Textarea
+                    value={
+                      isRecognizing
+                        ? finalInput + (interimInput ? " " + interimInput : "")
+                        : finalInput
                     }
-                  }}
-                  readOnly={isRecognizing}
-                  disabled={
-                    state.isBotTurn || state.timer === 0 || nextTurnPending
-                  }
-                  placeholder={
-                    currentTurnType === "statement"
-                      ? "Make your statement"
-                      : currentTurnType === "question"
-                        ? "Ask your question"
-                        : "Provide your answer"
-                  }
-                  className="flex-1 rounded-md text-sm border border-border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary"
-                />
+                    onChange={(e) =>
+                      !isRecognizing && setFinalInput(e.target.value)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                    readOnly={isRecognizing}
+                    disabled={
+                      state.isBotTurn || state.timer === 0 || nextTurnPending
+                    }
+                    placeholder={
+                      isRecognizing
+                        ? "Listening..."
+                        : currentTurnType === "statement"
+                          ? "Make your statement"
+                          : currentTurnType === "question"
+                            ? "Ask your question"
+                            : "Provide your answer"
+                    }
+                    className={`w-full rounded-md text-sm border bg-input text-foreground placeholder:text-muted-foreground focus:border-primary ${
+                      isRecognizing
+                        ? "border-red-500 ring-2 ring-red-400/50 animate-listening-border"
+                        : "border-border"
+                    }`}
+                  />
+                </div>
                 <Button
                   onClick={isRecognizing ? stopRecognition : startRecognition}
                   disabled={
                     state.isBotTurn || state.timer === 0 || nextTurnPending
                   }
-                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-md p-2"
+                  title={isRecognizing ? "Stop listening" : "Start voice input"}
+                  aria-label={isRecognizing ? "Stop listening" : "Start voice input"}
+                  className={`rounded-md p-2 ${
+                    isRecognizing
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                  }`}
                 >
                   {isRecognizing ? (
-                    <MicOff className="w-5 h-5" />
+                    <Mic className="w-5 h-5 animate-pulse" />
                   ) : (
-                    <Mic className="w-5 h-5" />
+                    <MicOff className="w-5 h-5" />
                   )}
                 </Button>
                 <Button
@@ -1094,6 +1108,20 @@ const DebateRoom: React.FC = () => {
         }
         .animate-glow {
           animation: glow 2s infinite;
+        }
+        @keyframes listening-border {
+          0% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+          }
+          70% {
+            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          }
+        }
+        .animate-listening-border {
+          animation: listening-border 1.5s infinite;
         }
       `}</style>
       <ConfirmationDialog
