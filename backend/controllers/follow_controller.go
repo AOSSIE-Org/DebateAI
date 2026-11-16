@@ -183,7 +183,12 @@ func GetFollowersHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"followers": users})
+	publicFollowers := make([]models.PublicUserDTO, 0, len(users))
+	for i := range users {
+		publicFollowers = append(publicFollowers, users[i].ToPublicDTO())
+	}
+
+	c.JSON(http.StatusOK, gin.H{"followers": publicFollowers})
 }
 
 // GetFollowingHandler gets users that a user is following
@@ -232,5 +237,10 @@ func GetFollowingHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"following": users})
+	publicFollowing := make([]models.PublicUserDTO, 0, len(users))
+	for i := range users {
+		publicFollowing = append(publicFollowing, users[i].ToPublicDTO())
+	}
+
+	c.JSON(http.StatusOK, gin.H{"following": publicFollowing})
 }
