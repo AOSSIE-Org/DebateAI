@@ -48,14 +48,17 @@ func CreateTeamDebate(c *gin.Context) {
 	var team1, team2 models.Team
 
 	if err := collection.FindOne(ctx, bson.M{"_id": req.Team1ID}).Decode(&team1); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Team 1 not found"})
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Team 1 not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load team 1"})
 		return
 	}
 	if team1.CaptainID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only the captain of the team can start a team debate"})
 		return
 	}
-
 	claimed, err := services.ClaimMatchedTeams(req.Team1ID, req.Team2ID)
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Teams are not currently matched in matchmaking"})
@@ -81,11 +84,6 @@ func CreateTeamDebate(c *gin.Context) {
 	if !services.TeamsStillEligible(&team1, &team2) {
 		requeue = false
 		c.JSON(http.StatusConflict, gin.H{"error": "Teams no longer meet the matchmaking criteria"})
-		return
-	}
-
-	if err := collection.FindOne(ctx, bson.M{"_id": req.Team2ID}).Decode(&team2); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Team 2 not found"})
 		return
 	}
 	// Determine stances

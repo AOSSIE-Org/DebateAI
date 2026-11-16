@@ -49,6 +49,7 @@ func StartTeamMatchmaking(teamID primitive.ObjectID) error {
 	return addTeamToPool(team)
 }
 
+// addTeamToPool inserts a team into the pool unless it is reserved.
 func addTeamToPool(team models.Team) error {
 	teamMatchmakingMutex.Lock()
 	defer teamMatchmakingMutex.Unlock()
@@ -97,14 +98,15 @@ func FindMatchingTeam(lookingTeamID primitive.ObjectID) (*models.Team, error) {
 	return nil, mongo.ErrNoDocuments
 }
 
+// maxMatchmakingEloDiff is the largest Elo gap allowed between matched teams.
 const maxMatchmakingEloDiff = 200
 
+// teamsCompatible reports whether two pool entries have the same size and a close Elo.
 func teamsCompatible(a, b *TeamMatchmakingEntry) bool {
 	return withinMatchCriteria(a.MaxSize, b.MaxSize, a.AverageElo, b.AverageElo)
 }
 
-// TeamsStillEligible re-checks the criteria against current team data; pool
-// entries are snapshots from when a team joined.
+// TeamsStillEligible re-checks the criteria against current team data;
 func TeamsStillEligible(a, b *models.Team) bool {
 	if len(a.Members) < a.MaxSize || len(b.Members) < b.MaxSize {
 		return false
@@ -112,6 +114,7 @@ func TeamsStillEligible(a, b *models.Team) bool {
 	return withinMatchCriteria(a.MaxSize, b.MaxSize, a.AverageElo, b.AverageElo)
 }
 
+// withinMatchCriteria applies the shared size and Elo matching rule.
 func withinMatchCriteria(size1, size2 int, elo1, elo2 float64) bool {
 	if size1 != size2 {
 		return false
@@ -123,16 +126,15 @@ func withinMatchCriteria(size1, size2 int, elo1, elo2 float64) bool {
 	return eloDiff <= maxMatchmakingEloDiff
 }
 
+// ErrTeamReserved is returned when a team joins while reserved for a debate being created.
 var ErrTeamReserved = errors.New("team is reserved for a debate being created")
 
-// ErrTeamsNotMatched is returned when two teams are not both in the
-// matchmaking pool or do not satisfy the matchmaking criteria.
+// ErrTeamsNotMatched is returned when the teams are not both matched in the pool.
 var ErrTeamsNotMatched = errors.New("teams are not matched in matchmaking")
 
 // ClaimMatchedTeams atomically verifies both teams are in the pool and
-// compatible, then removes them so no other request can reuse them. Callers
-// pool and reserves them so they cannot rejoin (or be claimed again) until the
-// caller finishes with ReleaseClaim.
+// compatible. It then removes them from the pool and reserves them. They
+// cannot rejoin (or be claimed again) until the caller calls ReleaseClaim.
 func ClaimMatchedTeams(team1ID, team2ID primitive.ObjectID) ([]*TeamMatchmakingEntry, error) {
 	teamMatchmakingMutex.Lock()
 	defer teamMatchmakingMutex.Unlock()
@@ -154,8 +156,7 @@ func ClaimMatchedTeams(team1ID, team2ID primitive.ObjectID) ([]*TeamMatchmakingE
 	return []*TeamMatchmakingEntry{entry1, entry2}, nil
 }
 
-// ReleaseClaim ends the reservation. requeue=true puts the teams back in the
-// pool (transient failure); false just releases them.
+// ReleaseClaim ends a reservation, optionally putting the teams back in the pool.
 func ReleaseClaim(entries []*TeamMatchmakingEntry, requeue bool) {
 	teamMatchmakingMutex.Lock()
 	defer teamMatchmakingMutex.Unlock()
