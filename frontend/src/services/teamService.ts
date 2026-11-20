@@ -27,6 +27,25 @@ export interface TeamMember {
   joinedAt: string;
 }
 
+// Public view of a team returned by GET /teams/available:
+// no invite code and no email addresses.
+export interface TeamSummaryMember {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  elo: number;
+}
+
+export interface TeamSummary {
+  id: string;
+  name: string;
+  captainId: string;
+  captainName: string;
+  members: TeamSummaryMember[];
+  maxSize: number;
+  averageElo: number;
+}
+
 export interface TeamDebate {
   id: string;
   team1Id: string;
@@ -138,7 +157,7 @@ export const getUserTeams = async (): Promise<Team[]> => {
 };
 
 // Get available teams
-export const getAvailableTeams = async (): Promise<Team[]> => {
+export const getAvailableTeams = async (): Promise<TeamSummary[]> => {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/teams/available`, {
     headers: {

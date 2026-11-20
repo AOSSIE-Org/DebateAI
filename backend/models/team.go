@@ -57,6 +57,62 @@ func (tm TeamMember) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// TeamSummaryMember is the public view of a team member: no email address.
+type TeamSummaryMember struct {
+	UserID      string  `json:"userId"`
+	DisplayName string  `json:"displayName"`
+	AvatarURL   string  `json:"avatarUrl,omitempty"`
+	Elo         float64 `json:"elo"`
+}
+
+// TeamSummary is the public view of a team, safe to show to users who are
+// not in it. It has no invite code and no email addresses.
+type TeamSummary struct {
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	CaptainID   string              `json:"captainId"`
+	CaptainName string              `json:"captainName"`
+	Members     []TeamSummaryMember `json:"members"`
+	MaxSize     int                 `json:"maxSize"`
+	AverageElo  float64             `json:"averageElo"`
+}
+
+// Summary returns the public view of the team.
+func (t Team) Summary() TeamSummary {
+	members := make([]TeamSummaryMember, 0, len(t.Members))
+	captainName := ""
+	for _, m := range t.Members {
+		if m.UserID == t.CaptainID {
+			captainName = m.DisplayName
+		}
+		members = append(members, TeamSummaryMember{
+			UserID:      m.UserID.Hex(),
+			DisplayName: m.DisplayName,
+			AvatarURL:   m.AvatarURL,
+			Elo:         m.Elo,
+		})
+	}
+	return TeamSummary{
+		ID:          t.ID.Hex(),
+		Name:        t.Name,
+		CaptainID:   t.CaptainID.Hex(),
+		CaptainName: captainName,
+		Members:     members,
+		MaxSize:     t.MaxSize,
+		AverageElo:  t.AverageElo,
+	}
+}
+
+// HasMember reports whether the user is a member of the team.
+func (t Team) HasMember(userID primitive.ObjectID) bool {
+	for _, m := range t.Members {
+		if m.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
 // TeamDebate represents a debate between two teams
 type TeamDebate struct {
 	ID            primitive.ObjectID      `bson:"_id,omitempty" json:"id,omitempty"`
