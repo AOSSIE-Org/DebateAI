@@ -13,6 +13,7 @@ import {
   updateTeamSize,
   transferTeamCaptain,
 } from "@/services/teamService";
+import type { TeamSummary, TeamSummaryMember } from "@/services/teamService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,7 +92,7 @@ const TeamBuilder: React.FC = () => {
   const [teamName, setTeamName] = useState("");
   const [maxSize, setMaxSize] = useState<number>(4);
   const [isCreating, setIsCreating] = useState(false);
-  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const [availableTeams, setAvailableTeams] = useState<TeamSummary[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -1089,7 +1090,7 @@ const TeamBuilder: React.FC = () => {
                             <div className="flex items-center gap-1 min-w-0 max-w-[200px] sm:max-w-xs">
                               <FaCrown className="text-primary flex-shrink-0" />
                               <div className="font-medium overflow-x-auto whitespace-nowrap pb-0.5 custom-scrollbar">
-                                {team.captainEmail}
+                                {team.captainName || "Team leader"}
                               </div>
                             </div>
                             <div className="flex items-center gap-1">
@@ -1117,7 +1118,7 @@ const TeamBuilder: React.FC = () => {
                             Current Members:
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {(team.members || []).map((member: TeamMember) => (
+                            {(team.members || []).map((member: TeamSummaryMember) => (
                               <Badge
                                 key={member.userId}
                                 variant="secondary"

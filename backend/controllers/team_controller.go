@@ -280,6 +280,18 @@ func GetTeam(c *gin.Context) {
 		return
 	}
 
+	// Only members may see the full team (invite code, members' emails).
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	requesterID, ok := userID.(primitive.ObjectID)
+	if !ok || !team.HasMember(requesterID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a member of this team"})
+		return
+	}
+
 	c.JSON(http.StatusOK, team)
 }
 
@@ -655,7 +667,14 @@ func GetAvailableTeams(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, teams)
+	// Any signed-in user can list open teams, so return only public fields:
+	// no invite codes and no email addresses.
+	summaries := make([]models.TeamSummary, 0, len(teams))
+	for _, team := range teams {
+		summaries = append(summaries, team.Summary())
+	}
+
+	c.JSON(http.StatusOK, summaries)
 }
 
 // TransferTeamCaptain transfers captaincy to an existing team member.
