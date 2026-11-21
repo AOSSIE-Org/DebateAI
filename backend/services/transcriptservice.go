@@ -152,6 +152,12 @@ func SubmitTranscripts(
 		if err != nil {
 			return nil, err
 		}
+		if err := validateSubmittedRole(caller.Role, role); err != nil {
+			return nil, err
+		}
+		if err := validateTranscriptPhases(role, transcripts); err != nil {
+			return nil, err
+		}
 		opponent, err := resolveRoomOpponent(participants, caller)
 		if err != nil {
 			return nil, err
@@ -577,6 +583,31 @@ func saveTeammateTranscripts(
 	return nil
 }
 
+func validateSubmittedRole(assignedRole, submittedRole string) error {
+	assignedRole = strings.ToLower(strings.TrimSpace(assignedRole))
+	if assignedRole == "" {
+		return nil
+	}
+	if submittedRole != assignedRole {
+		return fmt.Errorf("role %q does not match your assigned side %q", submittedRole, assignedRole)
+	}
+	return nil
+}
+
+func validateTranscriptPhases(role string, transcripts map[string]string) error {
+	allowed, ok := roleAllowedPhases[role]
+	if !ok {
+		return fmt.Errorf("invalid debate role %q", role)
+	}
+	for phase := range transcripts {
+		if allowed[phase] || phase == "topic" {
+			continue
+		}
+		return fmt.Errorf("phase %q is not allowed for role %q", phase, role)
+	}
+	return nil
+}
+
 var roleAllowedPhases = map[string]map[string]bool{
 	"for": {
 		"openingFor":       true,
@@ -727,6 +758,7 @@ func mergeTeamTranscripts(submissions ...map[string]string) map[string]string {
 type roomParticipant struct {
 	ID    string `bson:"id"`
 	Email string `bson:"email,omitempty"`
+	Role  string `bson:"role,omitempty"`
 }
 
 func loadRoomParticipants(ctx context.Context, roomID string) ([]roomParticipant, error) {

@@ -722,6 +722,35 @@ func handleLiveTranscript(room *Room, conn *websocket.Conn, message Message, cli
 }
 
 // handlePhaseChange handles phase changes
+func persistRoomDebaterRoles(roomID string, room *Room) {
+	if db.MongoDatabase == nil {
+		return
+	}
+
+	participants := make([]bson.M, 0, len(room.Clients))
+	for _, client := range room.Clients {
+		if client.IsSpectator {
+			continue
+		}
+		participants = append(participants, bson.M{
+			"id":          client.UserID,
+			"email":       client.Email,
+			"displayName": client.Username,
+			"role":        client.Role,
+		})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := db.MongoDatabase.Collection("rooms").UpdateOne(
+		ctx,
+		bson.M{"_id": roomID},
+		bson.M{"$set": bson.M{"participants": participants}},
+	); err != nil {
+		log.Printf("[ws] failed to persist debater roles: room=%s err=%v", roomID, err)
+	}
+}
+
 func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID string) {
 	type muteUpdate struct {
 		client   *Client
@@ -784,6 +813,7 @@ func handlePhaseChange(room *Room, conn *websocket.Conn, message Message, roomID
 				room.DebaterRoles[client.UserID] = client.Role
 			}
 		}
+		persistRoomDebaterRoles(roomID, room)
 	}
 	currentTurn := debatePhaseRole(room.Phase)
 	muteUpdates := make([]muteUpdate, 0, len(room.Clients))
