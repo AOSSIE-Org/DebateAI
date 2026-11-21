@@ -305,7 +305,7 @@ const StrengthenArgument: React.FC = () => {
             <Card className="mb-6 bg-card text-card-foreground shadow-lg">
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">
-                  Weak Opening Statement for {weakStatement.stance} the topic "{weakStatement.topic}"
+                  Weak Opening Statement ({weakStatement.stance.toLowerCase() === "against" ? "Against" : "For"}) on the topic "{weakStatement.topic}"
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -338,20 +338,29 @@ const StrengthenArgument: React.FC = () => {
         )}
       </div>
 
-      {/* Feedback Dialog (Unchanged) */}
+      {/* Feedback Dialog */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="bg-card text-card-foreground">
+        <DialogContent className="bg-card text-card-foreground sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Feedback</DialogTitle>
-            <DialogDescription className="flex flex-col items-center">
-              {score !== null && (
-                <p className="mb-4 text-6xl font-bold text-primary">
-                  {animatedScore.toString().padStart(2, "0")}
-                </p>
-              )}
-              {feedback && <p className="mt-2 text-center">{feedback}</p>}
+            <DialogDescription>
+              Review your argument score and feedback from the debate coach.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex flex-col items-center my-2">
+            {score !== null && (
+              <p className="mb-2 text-6xl font-bold text-primary">
+                {animatedScore.toString().padStart(2, "0")}
+              </p>
+            )}
+          </div>
+          {feedback && (
+            <div className="w-full bg-muted/50 rounded-md p-4 border border-border overflow-y-auto max-h-[50vh] text-left">
+              <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+                {feedback}
+              </p>
+            </div>
+          )}
           <Button
             onClick={handleTryAnother}
             className="mt-4 bg-destructive hover:bg-destructive/90"
