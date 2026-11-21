@@ -616,21 +616,13 @@ const OnlineDebateRoom = (): JSX.Element => {
     [roomId, setPopup, setRatingSummary]
   );
 
-  // Function to send transcripts to backend
+  // Function to send only the authenticated caller's side to the backend
   const sendTranscriptsToBackend = useCallback(
     async (
       roomId: string,
       role: DebateRole,
-      transcripts: { [key in DebatePhase]?: string },
-      opponentRole: DebateRole,
-      opponentId: string | null,
-      opponentEmail: string | null,
-      opponentTranscripts: { [key in DebatePhase]?: string }
+      transcripts: { [key in DebatePhase]?: string }
     ) => {
-      if (!isRoomOwner) {
-        return null;
-      }
-
       const token = getAuthToken();
       if (!token) {
         throw new Error("No auth token found. Please sign in again.");
@@ -643,15 +635,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            roomId,
-            role,
-            transcripts,
-            opponentRole,
-            opponentId,
-            opponentEmail,
-            opponentTranscripts,
-          }),
+          body: JSON.stringify({ roomId, role, transcripts }),
         });
 
         if (!response.ok) {
@@ -699,10 +683,10 @@ const OnlineDebateRoom = (): JSX.Element => {
 
       return null;
     },
-    [isRoomOwner, setPopup, setRatingSummary, startJudgmentPolling]
+    [setPopup, setRatingSummary, startJudgmentPolling]
   );
 
-  // Log message history, collect transcripts, and send to backend
+  // Every participant submits their own side; the server resolves the opponent
   const logMessageHistory = useCallback(async () => {
     if (submissionStartedRef.current) {
       return;
@@ -714,17 +698,6 @@ const OnlineDebateRoom = (): JSX.Element => {
         message: "Please select a role before the debate ends.",
         isJudging: false,
       });
-      return;
-    }
-
-    if (!isRoomOwner) {
-      submissionStartedRef.current = true;
-      setPopup({
-        show: true,
-        message: "Waiting for debate judgment...",
-        isJudging: true,
-      });
-      startJudgmentPolling(localRole);
       return;
     }
 
@@ -759,20 +732,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       }, {} as { [key in DebatePhase]?: string });
     };
 
-    const ownerTranscripts = gatherTranscriptsForRole(localRole);
-    const opponentRole: DebateRole = localRole === "for" ? "against" : "for";
-    const opponentTranscripts = gatherTranscriptsForRole(opponentRole);
-
-    const opponentDetails =
-      opponentUser ||
-      roomParticipants.find(
-        (participant) => participant.id !== currentUser?.id
-      ) ||
-      null;
-
-    const opponentId = opponentDetails?.id ?? null;
-    const opponentEmail =
-      (opponentDetails as UserDetails & { email?: string })?.email ?? null;
+    const ownTranscripts = gatherTranscriptsForRole(localRole);
 
     setRatingSummary(null);
     setPopup({
@@ -786,11 +746,7 @@ const OnlineDebateRoom = (): JSX.Element => {
         const judgment = await sendTranscriptsToBackend(
           roomId,
           localRole,
-          ownerTranscripts,
-          opponentRole,
-          opponentId,
-          opponentEmail,
-          opponentTranscripts
+          ownTranscripts
         );
         if (judgment) {
           setJudgmentData(judgment);
@@ -818,17 +774,7 @@ const OnlineDebateRoom = (): JSX.Element => {
       );
       setPopup({ show: false, message: "" });
     }
-  }, [
-    localRole,
-    roomId,
-    isRoomOwner,
-    speechTranscripts,
-    opponentUser,
-    roomParticipants,
-    currentUser,
-    sendTranscriptsToBackend,
-    startJudgmentPolling,
-  ]);
+  }, [localRole, roomId, speechTranscripts, sendTranscriptsToBackend]);
 
   const handleConcede = useCallback(() => {
     setIsConcedeDialogOpen(false);

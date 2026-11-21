@@ -153,3 +153,74 @@ func TestTeamDebateSubmittersFallBackToRosterForLegacyDebates(t *testing.T) {
 		t.Fatalf("teamDebateSubmitters() = %v, want [legacy-member@example.com]", submitters)
 	}
 }
+
+func TestResolveRoomOpponentUsesOnlyRoomParticipants(t *testing.T) {
+	caller := roomParticipant{ID: "user-1", Email: "caller@example.com"}
+	opponent := roomParticipant{ID: "user-2", Email: "opponent@example.com"}
+
+	got, err := resolveRoomOpponent([]roomParticipant{caller, opponent}, caller)
+	if err != nil {
+		t.Fatalf("resolveRoomOpponent() error = %v", err)
+	}
+	if got.ID != opponent.ID {
+		t.Fatalf("resolveRoomOpponent() = %#v, want opponent %#v", got, opponent)
+	}
+}
+
+func TestResolveRoomOpponentRejectsAmbiguousOrMissingParticipants(t *testing.T) {
+	caller := roomParticipant{ID: "user-1", Email: "caller@example.com"}
+	opponent := roomParticipant{ID: "user-2", Email: "opponent@example.com"}
+	third := roomParticipant{ID: "user-3", Email: "third@example.com"}
+
+	if _, err := resolveRoomOpponent([]roomParticipant{caller}, caller); err == nil {
+		t.Fatal("expected an error when the room has no opponent")
+	}
+	if _, err := resolveRoomOpponent([]roomParticipant{caller, opponent, third}, caller); err == nil {
+		t.Fatal("expected an error when the room has more than two participants")
+	}
+}
+
+func TestSameRoomParticipantMatchesByIDBeforeEmail(t *testing.T) {
+	a := roomParticipant{ID: "user-1", Email: "old@example.com"}
+	b := roomParticipant{ID: "user-1", Email: "new@example.com"}
+	if !sameRoomParticipant(a, b) {
+		t.Fatal("same user ID with a changed email should be the same participant")
+	}
+	c := roomParticipant{ID: "user-2", Email: "new@example.com"}
+	if sameRoomParticipant(b, c) {
+		t.Fatal("different user IDs should not match even when emails are equal")
+	}
+}
+
+func TestValidateSubmittedRole(t *testing.T) {
+	if err := validateSubmittedRole("for", "for"); err != nil {
+		t.Fatalf("matching assigned role rejected: %v", err)
+	}
+	if err := validateSubmittedRole("against", "for"); err == nil {
+		t.Fatal("expected an error when the submitted role differs from the assigned side")
+	}
+	if err := validateSubmittedRole("", "for"); err != nil {
+		t.Fatalf("legacy rooms without a stored role should not be blocked: %v", err)
+	}
+}
+
+func TestValidateTranscriptPhases(t *testing.T) {
+	ownPhases := map[string]string{
+		"openingFor":       "opening",
+		"crossForQuestion": "question",
+		"crossForAnswer":   "answer",
+		"closingFor":       "closing",
+		"topic":            "metadata",
+	}
+	if err := validateTranscriptPhases("for", ownPhases); err != nil {
+		t.Fatalf("own-side phases rejected: %v", err)
+	}
+
+	opponentPhase := map[string]string{"openingAgainst": "forged"}
+	if err := validateTranscriptPhases("for", opponentPhase); err == nil {
+		t.Fatal("expected opponent-side phases to be rejected")
+	}
+	if err := validateTranscriptPhases("unknown", ownPhases); err == nil {
+		t.Fatal("expected an unknown role to be rejected")
+	}
+}

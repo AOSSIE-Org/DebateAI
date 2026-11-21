@@ -55,10 +55,6 @@ func SubmitTranscripts(
 	role string,
 	email string,
 	transcripts map[string]string,
-	opponentRole string,
-	opponentID string,
-	opponentEmail string,
-	opponentTranscripts map[string]string,
 ) (map[string]interface{}, error) {
 	roomID = strings.ToLower(strings.TrimSpace(roomID))
 	if roomID == "" {
@@ -142,26 +138,47 @@ func SubmitTranscripts(
 			}, nil
 		}
 	} else {
+		if role != "for" && role != "against" {
+			return nil, fmt.Errorf("invalid debate role %q", role)
+		}
+
+		// The opponent is resolved from the room, never from the request. Only the
+		// authenticated participant may submit their own side of the debate.
+		participants, err := loadRoomParticipants(ctx, roomID)
+		if err != nil {
+			return nil, err
+		}
+		caller, err := resolveRoomCaller(ctx, participants, email)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateSubmittedRole(caller.Role, role); err != nil {
+			return nil, err
+		}
+		if err := validateTranscriptPhases(role, transcripts); err != nil {
+			return nil, err
+		}
+		opponent, err := resolveRoomOpponent(participants, caller)
+		if err != nil {
+			return nil, err
+		}
+		opponentEmail := opponent.Email
+		if opponentEmail == "" {
+			opponentEmail, err = getUserEmailByID(ctx, opponent.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve opponent identity: %w", err)
+			}
+		}
+		if opponentEmail == "" || strings.EqualFold(opponentEmail, email) {
+			return nil, errors.New("opponent must be a different room participant")
+		}
+		if err := verifyExistingSubmissions(ctx, transcriptCollection, roomID, role, email, opponentEmail); err != nil {
+			return nil, err
+		}
+
 		if len(transcripts) > 0 {
 			if err := upsertTranscript(ctx, transcriptCollection, roomID, role, email, transcripts); err != nil {
 				return nil, err
-			}
-		}
-
-		if opponentRole != "" && len(opponentTranscripts) > 0 {
-			resolvedEmail := opponentEmail
-			if resolvedEmail == "" && opponentID != "" {
-				if lookup, lookupErr := getUserEmailByID(ctx, opponentID); lookupErr == nil {
-					resolvedEmail = lookup
-				}
-			}
-			if resolvedEmail == "" && opponentID != "" {
-				resolvedEmail = opponentID
-			}
-			if resolvedEmail != "" {
-				if err := upsertTranscript(ctx, transcriptCollection, roomID, opponentRole, resolvedEmail, opponentTranscripts); err != nil {
-					return nil, err
-				}
 			}
 		}
 	}
@@ -566,6 +583,31 @@ func saveTeammateTranscripts(
 	return nil
 }
 
+func validateSubmittedRole(assignedRole, submittedRole string) error {
+	assignedRole = strings.ToLower(strings.TrimSpace(assignedRole))
+	if assignedRole == "" {
+		return nil
+	}
+	if submittedRole != assignedRole {
+		return fmt.Errorf("role %q does not match your assigned side %q", submittedRole, assignedRole)
+	}
+	return nil
+}
+
+func validateTranscriptPhases(role string, transcripts map[string]string) error {
+	allowed, ok := roleAllowedPhases[role]
+	if !ok {
+		return fmt.Errorf("invalid debate role %q", role)
+	}
+	for phase := range transcripts {
+		if allowed[phase] || phase == "topic" {
+			continue
+		}
+		return fmt.Errorf("phase %q is not allowed for role %q", phase, role)
+	}
+	return nil
+}
+
 var roleAllowedPhases = map[string]map[string]bool{
 	"for": {
 		"openingFor":       true,
@@ -711,6 +753,102 @@ func mergeTeamTranscripts(submissions ...map[string]string) map[string]string {
 		}
 	}
 	return merged
+}
+
+type roomParticipant struct {
+	ID    string `bson:"id"`
+	Email string `bson:"email,omitempty"`
+	Role  string `bson:"role,omitempty"`
+}
+
+func loadRoomParticipants(ctx context.Context, roomID string) ([]roomParticipant, error) {
+	if db.MongoDatabase == nil {
+		return nil, errors.New("database is not initialized")
+	}
+	var room struct {
+		Participants []roomParticipant `bson:"participants"`
+	}
+	if err := db.MongoDatabase.Collection("rooms").FindOne(ctx, bson.M{"_id": roomID}).Decode(&room); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, errors.New("debate room not found")
+		}
+		return nil, fmt.Errorf("failed to load debate room: %w", err)
+	}
+	if len(room.Participants) == 0 {
+		return nil, errors.New("debate room has no participants")
+	}
+	return room.Participants, nil
+}
+
+func resolveRoomCaller(ctx context.Context, participants []roomParticipant, email string) (roomParticipant, error) {
+	if db.MongoDatabase == nil {
+		return roomParticipant{}, errors.New("database is not initialized")
+	}
+	var user models.User
+	if err := findUserByIdentifier(ctx, db.MongoDatabase.Collection("users"), email, &user); err != nil {
+		return roomParticipant{}, errors.New("authenticated user is not registered")
+	}
+	for _, participant := range participants {
+		if participant.ID != "" && participant.ID == user.ID.Hex() {
+			return participant, nil
+		}
+		if participant.Email != "" && strings.EqualFold(participant.Email, user.Email) {
+			return participant, nil
+		}
+	}
+	return roomParticipant{}, errors.New("authenticated user is not a participant of this room")
+}
+
+func sameRoomParticipant(a, b roomParticipant) bool {
+	if a.ID != "" && b.ID != "" {
+		return a.ID == b.ID
+	}
+	return a.Email != "" && b.Email != "" && strings.EqualFold(a.Email, b.Email)
+}
+
+func resolveRoomOpponent(participants []roomParticipant, caller roomParticipant) (roomParticipant, error) {
+	var opponent roomParticipant
+	found := false
+	for _, participant := range participants {
+		if sameRoomParticipant(participant, caller) {
+			continue
+		}
+		if found {
+			return roomParticipant{}, errors.New("debate room must have exactly two participants")
+		}
+		opponent = participant
+		found = true
+	}
+	if !found {
+		return roomParticipant{}, errors.New("debate room has no opponent participant")
+	}
+	return opponent, nil
+}
+
+func verifyExistingSubmissions(ctx context.Context, collection *mongo.Collection, roomID, role, email, opponentEmail string) error {
+	for _, existingRole := range []string{"for", "against"} {
+		var existing models.DebateTranscript
+		err := collection.FindOne(ctx, bson.M{"roomId": roomID, "role": existingRole}).Decode(&existing)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if existingRole == role {
+			if !strings.EqualFold(existing.Email, email) {
+				return errors.New("this side already has a submission from another participant")
+			}
+			continue
+		}
+		if strings.EqualFold(existing.Email, email) {
+			return errors.New("authenticated user already submitted the opposing side")
+		}
+		if !strings.EqualFold(existing.Email, opponentEmail) {
+			return errors.New("opposing side was submitted by a non-participant")
+		}
+	}
+	return nil
 }
 
 func getUserEmailByID(ctx context.Context, userID string) (string, error) {

@@ -20,13 +20,9 @@ import (
 
 // SubmitTranscriptsRequest represents the request to submit debate transcripts
 type SubmitTranscriptsRequest struct {
-	RoomID              string            `json:"roomId" binding:"required"`
-	Role                string            `json:"role" binding:"required"`
-	Transcripts         map[string]string `json:"transcripts" binding:"required"`
-	OpponentRole        string            `json:"opponentRole"`
-	OpponentID          string            `json:"opponentId"`
-	OpponentEmail       string            `json:"opponentEmail"`
-	OpponentTranscripts map[string]string `json:"opponentTranscripts"`
+	RoomID      string            `json:"roomId" binding:"required"`
+	Role        string            `json:"role" binding:"required"`
+	Transcripts map[string]string `json:"transcripts" binding:"required"`
 }
 
 // SaveTranscriptRequest represents the request to save a debate transcript
@@ -65,10 +61,6 @@ func SubmitTranscripts(c *gin.Context) {
 		req.Role,
 		email,
 		req.Transcripts,
-		req.OpponentRole,
-		req.OpponentID,
-		req.OpponentEmail,
-		req.OpponentTranscripts,
 	)
 
 	if err != nil {
