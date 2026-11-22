@@ -47,6 +47,167 @@ interface Notification {
   variant: "default" | "destructive";
 }
 
+interface BodyContent {
+  type: "bullet" | "numbered" | "mixed-lines" | "paragraph" | "empty";
+  items?: string[];
+  raw?: string;
+}
+
+interface ParsedSection {
+  title: string;
+  content: BodyContent;
+}
+
+function findHeading(
+  text: string,
+  pattern: RegExp
+): { start: number; end: number; title: string } | null {
+  const match = pattern.exec(text);
+  if (!match) return null;
+  const fullMatch = match[0];
+  const matchIndex = match.index;
+  const leadingDelim = fullMatch.match(/^(?:\n|[.!?]\s+)/);
+  const delimLen = leadingDelim ? leadingDelim[0].length : 0;
+  return {
+    start: matchIndex + delimLen,
+    end: matchIndex + fullMatch.length,
+    title: match[1] || match[2] || match[0],
+  };
+}
+
+function parseBodyContent(bodyText: string): BodyContent {
+  const lines = bodyText.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return { type: "empty" };
+
+  const isBulletList = lines.every((l) => /^[-*•]\s+/.test(l));
+  const isNumberedList = lines.every((l) => /^\d+[\.\)]\s+/.test(l));
+
+  if (isBulletList) {
+    return {
+      type: "bullet",
+      items: lines.map((l) => l.replace(/^[-*•]\s+/, "")),
+    };
+  }
+  if (isNumberedList) {
+    return {
+      type: "numbered",
+      items: lines.map((l) => l.replace(/^\d+[\.\)]\s+/, "")),
+    };
+  }
+  const hasBulletsOrNumbers = lines.some((l) => /^[-*•]\s+|^\d+[\.\)]\s+/.test(l));
+  if (hasBulletsOrNumbers) {
+    return {
+      type: "mixed-lines",
+      items: lines,
+    };
+  }
+  return {
+    type: "paragraph",
+    raw: bodyText.trim(),
+  };
+}
+
+function renderFormattedFeedback(text: string) {
+  if (!text || !text.trim()) return null;
+
+  const sPattern =
+    /(?:^|\n|[.!?]\s+)(?:\*\*(strengths?)(?:\*\*\s*:|\s*:\*\*)|(strengths?)\s*:)\s*/i;
+  const iPattern =
+    /(?:^|\n|[.!?]\s+)(?:\*\*(areas?\s+for\s+improvement|areas?\s+to\s+improve|improvements?)(?:\*\*\s*:|\s*:\*\*)|(areas?\s+for\s+improvement|areas?\s+to\s+improve|improvements?)\s*:)\s*/i;
+
+  const sMatch = findHeading(text, sPattern);
+  const iMatch = findHeading(text, iPattern);
+
+  if (!sMatch && !iMatch) {
+    return (
+      <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+        {text.trim()}
+      </p>
+    );
+  }
+
+  const headings: { start: number; end: number; title: string }[] = [];
+  if (sMatch) headings.push({ ...sMatch, title: "Strengths" });
+  if (iMatch) headings.push({ ...iMatch, title: "Areas for Improvement" });
+  headings.sort((a, b) => a.start - b.start);
+
+  const introText = text.slice(0, headings[0].start).trim();
+  const rawSections: ParsedSection[] = [];
+
+  for (let idx = 0; idx < headings.length; idx++) {
+    const current = headings[idx];
+    const nextStart = idx + 1 < headings.length ? headings[idx + 1].start : text.length;
+    const bodyText = text.slice(current.end, nextStart).trim();
+    rawSections.push({
+      title: current.title,
+      content: parseBodyContent(bodyText),
+    });
+  }
+
+  const sections = rawSections.filter((s) => s.content.type !== "empty");
+
+  if (sections.length === 0) {
+    return (
+      <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+        {text.trim()}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {introText && (
+        <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+          {introText}
+        </p>
+      )}
+      {sections.map((section) => (
+        <div key={section.title} className="space-y-1.5">
+          <h4
+            className={`text-xs font-semibold uppercase tracking-wider ${
+              section.title === "Strengths" ? "text-primary" : "text-amber-500"
+            }`}
+          >
+            {section.title}
+          </h4>
+          {section.content.type === "bullet" && (
+            <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
+              {section.content.items?.map((item, idx) => (
+                <li key={idx} className="leading-relaxed">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
+          {section.content.type === "numbered" && (
+            <ol className="list-decimal list-inside space-y-1 text-sm text-foreground">
+              {section.content.items?.map((item, idx) => (
+                <li key={idx} className="leading-relaxed">
+                  {item}
+                </li>
+              ))}
+            </ol>
+          )}
+          {section.content.type === "paragraph" && (
+            <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+              {section.content.raw}
+            </p>
+          )}
+          {section.content.type === "mixed-lines" && (
+            <div className="space-y-1 text-sm text-foreground">
+              {section.content.items?.map((item, idx) => (
+                <p key={idx} className="leading-relaxed whitespace-pre-line">
+                  {item}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const StrengthenArgument: React.FC = () => {
   const [topic, setTopic] = useState<string>("");
   const [stance, setStance] = useState<string>("for");
@@ -356,9 +517,7 @@ const StrengthenArgument: React.FC = () => {
           </div>
           {feedback && (
             <div className="w-full bg-muted/50 rounded-md p-4 border border-border overflow-y-auto max-h-[50vh] text-left">
-              <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
-                {feedback}
-              </p>
+              {renderFormattedFeedback(feedback)}
             </div>
           )}
           <Button
