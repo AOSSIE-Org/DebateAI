@@ -109,7 +109,7 @@ func CreateCommentHandler(c *gin.Context) {
 						models.NotificationTypeComment,
 						"New Reply",
 						user.DisplayName+" replied to your comment",
-						"/debate/"+req.TranscriptID,
+						"/community/"+req.TranscriptID,
 					)
 				}
 			}
@@ -135,7 +135,7 @@ func CreateCommentHandler(c *gin.Context) {
 						models.NotificationTypeComment,
 						"New Comment",
 						user.DisplayName+" "+msg,
-						"/view-debate/"+req.TranscriptID,
+						"/community/",
 					)
 				}
 			}

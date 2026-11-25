@@ -390,7 +390,7 @@ func JoinTeam(c *gin.Context) {
 			models.NotificationTypeSystem,
 			"New Team Member",
 			user.DisplayName+" has joined your team "+team.Name,
-			"/team/"+teamID,
+			"/team-builder",
 		)
 	}()
 

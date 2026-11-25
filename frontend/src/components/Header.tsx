@@ -105,7 +105,19 @@ function Header() {
     }
 
     if (notification.link) {
-      navigate(notification.link);
+      let destination = notification.link;
+
+      // Support notifications created before the backend route fix.
+      if (
+        notification.title === "New Reply" ||
+        notification.title === "New Comment"
+      ) {
+        destination = "/community";
+      } else if (notification.title === "New Team Member") {
+        destination = "/team-builder";
+      }
+
+      navigate(destination);
       setIsNotificationsOpen(false);
     }
   };
