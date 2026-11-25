@@ -79,22 +79,24 @@ function parseBodyContent(bodyText: string): BodyContent {
   const lines = bodyText.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return { type: "empty" };
 
-  const isBulletList = lines.every((l) => /^[-*•]\s+/.test(l));
-  const isNumberedList = lines.every((l) => /^\d+[\.\)]\s+/.test(l));
+  const bulletPrefix = /^[-*•]\s+/;
+  const numberedPrefix = /^\d+[.)]\s+/;
+  const isBulletList = lines.every((l) => bulletPrefix.test(l));
+  const isNumberedList = lines.every((l) => numberedPrefix.test(l));
 
   if (isBulletList) {
     return {
       type: "bullet",
-      items: lines.map((l) => l.replace(/^[-*•]\s+/, "")),
+      items: lines.map((l) => l.replace(bulletPrefix, "")),
     };
   }
   if (isNumberedList) {
     return {
       type: "numbered",
-      items: lines.map((l) => l.replace(/^\d+[\.\)]\s+/, "")),
+      items: lines.map((l) => l.replace(numberedPrefix, "")),
     };
   }
-  const hasBulletsOrNumbers = lines.some((l) => /^[-*•]\s+|^\d+[\.\)]\s+/.test(l));
+  const hasBulletsOrNumbers = lines.some((l) => bulletPrefix.test(l) || numberedPrefix.test(l));
   if (hasBulletsOrNumbers) {
     return {
       type: "mixed-lines",
