@@ -87,10 +87,18 @@ Evaluation Criteria:
 Original Weak Statement: "%s"
 User's Improved Argument: "%s"
 
+Feedback Structure:
+Provide constructive feedback divided into two clearly identified sections:
+Strengths:
+- [Specific strengths regarding clarity, logic, or persuasiveness]
+
+Areas for Improvement:
+- [Specific actionable suggestions to strengthen the argument]
+
 Required Output Format:
 {
   "score": X,
-  "feedback": "text describing strengths and areas for improvement"
+  "feedback": "Strengths:\n- ...\n\nAreas for Improvement:\n- ..."
 }
 
 Provide ONLY the JSON output without additional text or markdown formatting.`,
