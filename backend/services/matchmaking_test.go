@@ -8,6 +8,10 @@ import (
 func TestMatchmakingService(t *testing.T) {
 	// Get the singleton service
 	ms := GetMatchmakingService()
+	t.Cleanup(func() {
+		ms.RemoveFromPool("user1")
+		ms.RemoveFromPool("user2")
+	})
 
 	// Test adding users to pool (but not starting matchmaking yet)
 	err := ms.AddToPool("user1", "Alice", 1200)
@@ -67,6 +71,11 @@ func TestMatchmakingService(t *testing.T) {
 
 func TestEloTolerance(t *testing.T) {
 	ms := GetMatchmakingService()
+	t.Cleanup(func() {
+		ms.RemoveFromPool("user1")
+		ms.RemoveFromPool("user2")
+		ms.RemoveFromPool("user3")
+	})
 
 	// Add users with different Elo ratings (but don't start matchmaking yet)
 	ms.AddToPool("user1", "Alice", 1200)  // Range: 1000-1400
