@@ -50,6 +50,7 @@ import {
   Image as ImageIcon,
   ChevronRight,
   Flame,
+  Swords,
 } from "lucide-react";
 import { FaTrophy, FaMedal, FaAward } from "react-icons/fa";
 import { format, isSameDay, subDays } from "date-fns";
@@ -79,6 +80,7 @@ import { getAuthToken } from "@/utils/auth";
 import { useNavigate } from "react-router-dom";
 import { DateRange } from "react-day-picker";
 import AvatarModal from "../components/AvatarModal";
+import ChallengeModal from "../components/ChallengeModal";
 import SavedTranscripts from "../components/SavedTranscripts";
 import ProfileHover from "../components/ProfileHover";
 import { useUser } from "../hooks/useUser";
@@ -169,6 +171,7 @@ const Profile: React.FC = () => {
     "7days" | "30days" | "all" | "custom"
   >("all");
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [debateStatsLoading, setDebateStatsLoading] = useState(true);
   const [usernameStatus, setUsernameStatus] = useState<
     "idle" | "checking" | "available" | "taken"
@@ -844,6 +847,14 @@ const Profile: React.FC = () => {
               Streak: {profile.currentStreak} days
             </p>
           )}
+          <Button
+            onClick={() => setShowChallengeModal(true)}
+            className="mt-3 w-full max-w-xs"
+            size="sm"
+          >
+            <Swords className="w-4 h-4 mr-2" />
+            Challenge a Friend
+          </Button>
         </div>
 
         <Separator className="my-2" />
@@ -1231,6 +1242,9 @@ const Profile: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+      {showChallengeModal && (
+        <ChallengeModal onClose={() => setShowChallengeModal(false)} />
+      )}
     </div>
   );
 };

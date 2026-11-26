@@ -140,7 +140,9 @@ func setupRouter(cfg *config.Config, configPath string) *gin.Engine {
 
 		auth.GET("/rooms", routes.GetRoomsHandler)
 		auth.POST("/rooms", routes.CreateRoomHandler)
+		auth.POST("/rooms/challenge", routes.CreateChallengeHandler)
 		auth.POST("/rooms/:id/join", routes.JoinRoomHandler)
+		auth.POST("/rooms/:id/rematch", routes.RematchHandler)
 		auth.GET("/rooms/:id/participants", routes.GetRoomParticipantsHandler)
 
 		routes.SetupTeamRoutes(auth)

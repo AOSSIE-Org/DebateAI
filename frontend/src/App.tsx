@@ -1,7 +1,14 @@
+
+import { useContext } from 'react';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { AuthProvider, AuthContext } from './context/authContext';
+import { ThemeProvider } from './context/theme-provider';
+
 import { useContext } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, AuthContext } from "./context/authContext";
 import { ThemeProvider } from "./context/theme-provider";
+
 // Pages
 import Home from "./Pages/Home";
 import Authentication from "./Pages/Authentication";
@@ -19,6 +26,19 @@ import PrivacyPolicy from "./Pages/PrivacyPolicy";
 import TermsOfService from "./Pages/TermsOfService";
 import NotFound from "./Pages/NotFound";
 // Layout
+
+import Layout from './components/Layout';
+import CoachPage from './Pages/CoachPage';
+import ChatRoom from './components/ChatRoom';
+import TournamentHub from './Pages/TournamentHub';
+import TournamentDetails from './Pages/TournamentDetails';
+import ProsConsChallenge from './Pages/ProsConsChallenge';
+import TeamBuilder from './Pages/TeamBuilder';
+import TeamDebateRoom from './Pages/TeamDebateRoom';
+import CommunityFeed from './Pages/CommunityFeed';
+import AdminSignup from './Pages/Admin/AdminSignup';
+import AdminDashboard from './Pages/Admin/AdminDashboard';
+import ViewDebate from './Pages/ViewDebate';
 import Layout from "./components/Layout";
 import CoachPage from "./Pages/CoachPage";
 import ChatRoom from "./components/ChatRoom";
@@ -37,9 +57,11 @@ import LoadingSpinner from "./components/LoadingSpinner";
 import TournamentBracket from "./Pages/TournamentBracketPage";
 import CreateTournament from "./Pages/CreateTournament";
 
+
 // Protects routes based on authentication status
 function ProtectedRoute() {
   const authContext = useContext(AuthContext);
+  const location = useLocation();
   if (!authContext) {
     throw new Error("ProtectedRoute must be used within an AuthProvider");
   }
@@ -47,7 +69,18 @@ function ProtectedRoute() {
   if (isLoading) {
     return <LoadingSpinner />;
   }
+
+  if (!isAuthenticated) {
+    sessionStorage.setItem(
+      'returnUrl',
+      location.pathname + location.search
+    );
+    return <Navigate to='/auth' replace />;
+  }
+  return <Outlet />;
+
   return isAuthenticated ? <Outlet /> : <Navigate to="/" replace />;
+
 }
 
 // Defines application routes
