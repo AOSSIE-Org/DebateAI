@@ -31,15 +31,15 @@ export default function TournamentBracket() {
         <div className="w-full flex justify-around mb-12 relative">
           {semiFinalWinners.map((finalist, index) => (
             <div key={index} className="flex flex-col items-center relative">
-              <div className={`w-12 h-12 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 ${finalist.id === champion.id ? winnerHighlight : 'border-border'}`}>
+              <div className={`w-12 h-12 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 dark:border-white ${finalist.id === champion.id ? winnerHighlight : 'border-border'}`}>
                 <img src={finalist.avatar} alt={finalist.name} className="w-full h-full object-cover" />
               </div>
               <div className="text-xs mt-1 text-muted-foreground">{finalist.name}</div>
-              <div className="absolute w-px h-6 bg-border -top-6 left-1/2 transform -translate-x-1/2" />
+              <div className="absolute w-px h-6 bg-border dark:bg-white -top-6 left-1/2 transform -translate-x-1/2" />
             </div>
           ))}
-          <div className="absolute h-px bg-border top-[-24px] left-[25%] w-[50%]" />
-          <div className="absolute w-px bg-border left-1/2 transform -translate-x-1/2 -top-12 h-6" />
+          <div className="absolute h-px bg-border dark:bg-white top-[-24px] left-[25%] w-[50%]" />
+          <div className="absolute w-px bg-border dark:bg-white left-1/2 transform -translate-x-1/2 -top-12 h-6" />
         </div>
         {/* Semifinals */}
         <div className="w-full grid grid-cols-2 gap-2 mb-12 relative">
@@ -52,16 +52,16 @@ export default function TournamentBracket() {
                 <div className="flex justify-around">
                   {[player1, player2].map((player) => (
                     <div key={player.id} className="flex flex-col items-center relative">
-                      <div className={`w-10 h-10 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 ${player.id === winner.id ? winnerHighlight : 'border-border'}`}>
+                      <div className={`w-10 h-10 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 dark:border-white ${player.id === winner.id ? winnerHighlight : 'border-border'}`}>
                         <img src={player.avatar} alt={player.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="text-xs mt-1 text-accent-foreground">{player.name}</div>
-                      <div className="absolute w-px h-6 bg-border -top-6 left-1/2 transform -translate-x-1/2" />
+                      <div className="absolute w-px h-6 bg-border dark:bg-white -top-6 left-1/2 transform -translate-x-1/2" />
                     </div>
                   ))}
                 </div>
-                <div className="absolute h-px bg-border top-[-24px] left-[25%] w-[50%]" />
-                <div className="absolute w-px bg-border left-1/2 transform -translate-x-1/2 -top-20 h-14" />
+                <div className="absolute h-px bg-border dark:bg-white top-[-24px] left-[25%] w-[50%]" />
+                <div className="absolute w-px bg-border dark:bg-white left-1/2 transform -translate-x-1/2 -top-20 h-14" />
               </div>
             );
           })}
@@ -77,16 +77,16 @@ export default function TournamentBracket() {
                 <div className="flex justify-around">
                   {[player1, player2].map((player) => (
                     <div key={player.id} className="flex flex-col items-center relative">
-                      <div className={`w-8 h-8 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 ${player.id === winner.id ? winnerHighlight : 'border-border'}`}>
+                      <div className={`w-8 h-8 rounded-full bg-card flex items-center justify-center overflow-hidden border-2 dark:border-white ${player.id === winner.id ? winnerHighlight : 'border-border'}`}>
                         <img src={player.avatar} alt={player.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="text-[10px] mt-1 text-foreground">{player.name}</div>
-                      <div className="absolute w-px h-6 bg-border -top-6 left-1/2 transform -translate-x-1/2" />
+                      <div className="absolute w-px h-6 bg-border dark:bg-white -top-6 left-1/2 transform -translate-x-1/2" />
                     </div>
                   ))}
                 </div>
-                <div className="absolute h-px bg-border top-[-24px] left-[25%] w-[50%]" />
-                <div className="absolute w-px bg-border left-1/2 transform -translate-x-1/2 -top-20 h-14" />
+                <div className="absolute h-px bg-border dark:bg-white top-[-24px] left-[25%] w-[50%]" />
+                <div className="absolute w-px bg-border dark:bg-white left-1/2 transform -translate-x-1/2 -top-20 h-14" />
               </div>
             );
           })}
@@ -101,4 +101,3 @@ export default function TournamentBracket() {
       </div>
     );
   }
-  

@@ -1,8 +1,10 @@
+import config from "../config/config";
 import React, { useState, useEffect, useCallback } from "react";
 import { useUser } from "../hooks/useUser";
 import CommentTree from "../components/CommentTree";
 import ProfileHover from "../components/ProfileHover";
 import { Button } from "../components/ui/button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import {
   Card,
   CardContent,
@@ -188,7 +190,8 @@ const CommunityFeed: React.FC = () => {
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<
     string | null
   >(null);
-  const baseURL = import.meta.env.VITE_BASE_URL || "http://localhost:1313";
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const baseURL = config.baseUrl || "http://localhost:1313";
   const normalizeObjectId = useCallback(
     (value: ObjectIdLike | undefined): string => {
       if (!value) {
@@ -401,17 +404,17 @@ const CommunityFeed: React.FC = () => {
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = (postId: string) => {
+    setPostToDelete(postId);
+  };
+
+  const confirmDeletePost = async () => {
+    if (!postToDelete) return;
+    const postId = postToDelete;
+    setPostToDelete(null);
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please log in to delete posts");
-      return;
-    }
-
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this post?"
-    );
-    if (!confirmDelete) {
       return;
     }
 
@@ -459,7 +462,7 @@ const CommunityFeed: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Community Feed</h1>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           See what the community is debating about
         </p>
       </div>
@@ -488,15 +491,15 @@ const CommunityFeed: React.FC = () => {
             return (
               <Card key={post.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-0">
+                    <div className="flex-1 w-full min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                         <ProfileHover userId={post.userId}>
                           {post.avatarUrl ? (
                             <img
                               src={post.avatarUrl}
                               alt={post.displayName || "User"}
-                              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors"
+                              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors flex-shrink-0"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = "none";
@@ -505,7 +508,7 @@ const CommunityFeed: React.FC = () => {
                                   const fallback =
                                     document.createElement("div");
                                   fallback.className =
-                                    "w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors";
+                                    "w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors flex-shrink-0";
                                   fallback.textContent =
                                     post.displayName?.charAt(0).toUpperCase() ||
                                     "U";
@@ -514,19 +517,19 @@ const CommunityFeed: React.FC = () => {
                               }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors flex-shrink-0">
                               {post.displayName?.charAt(0).toUpperCase() || "U"}
                             </div>
                           )}
                         </ProfileHover>
-                        <div className="flex-1">
-                          <CardTitle className="text-xl mb-1">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg sm:text-xl mb-1 truncate">
                             {post.topic}
                           </CardTitle>
-                          <div className="flex items-center gap-2 text-sm text-gray-500">
-                            <span>by {post.displayName}</span>
-                            <span>•</span>
-                            <span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-gray-500">
+                            <span className="truncate">by {post.displayName}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="whitespace-nowrap">
                               {new Date(post.createdAt).toLocaleDateString()}
                             </span>
                           </div>
@@ -536,9 +539,9 @@ const CommunityFeed: React.FC = () => {
                             variant="destructive"
                             size="sm"
                             onClick={() => handleDeletePost(post.id)}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-1 sm:gap-2 h-8 px-2 sm:px-3 text-xs sm:text-sm flex-shrink-0 ml-auto"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             <span>Delete</span>
                           </Button>
                         ) : (
@@ -552,16 +555,16 @@ const CommunityFeed: React.FC = () => {
                                   post.isFollowing || false
                                 )
                               }
-                              className="flex items-center gap-2"
+                              className="flex items-center gap-1 sm:gap-2 h-8 px-2 sm:px-3 text-xs sm:text-sm flex-shrink-0 ml-auto"
                             >
                               {post.isFollowing ? (
                                 <>
-                                  <UserCheck className="w-4 h-4" />
+                                  <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                   <span>Following</span>
                                 </>
                               ) : (
                                 <>
-                                  <UserPlus className="w-4 h-4" />
+                                  <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                   <span>Follow</span>
                                 </>
                               )}
@@ -571,7 +574,7 @@ const CommunityFeed: React.FC = () => {
                       </div>
                     </div>
                     <span
-                      className={`px-3 py-1 text-xs rounded-full font-medium ${
+                      className={`px-2.5 py-1 text-xs rounded-full font-medium flex-shrink-0 ${
                         post.result === "win"
                           ? "bg-green-100 text-green-800"
                           : post.result === "loss"
@@ -634,6 +637,19 @@ const CommunityFeed: React.FC = () => {
           })}
         </div>
       )}
+      <ConfirmationDialog
+        open={postToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPostToDelete(null);
+        }}
+        title="Delete post?"
+        description="This post and its associated content will be permanently deleted."
+        confirmLabel="Delete post"
+        onConfirm={() => {
+          void confirmDeletePost();
+        }}
+        destructive
+      />
     </div>
   );
 };

@@ -11,28 +11,27 @@ import {
   MessageCircle,
   Heart,
 } from 'lucide-react';
-import debateAiLogo from '@/assets/aossie.png';
+import { DebateAiLogo } from './DebateAiLogo';
 import { ThemeToggle } from './ThemeToggle';
 
 function Sidebar() {
   return (
-    <aside className='hidden md:flex flex-col w-64 border-r border-border bg-background'>
+    <aside className='hidden lg:flex flex-col w-64 border-r border-border bg-background'>
       {/* Logo / Brand */}
       <div className='flex items-center h-16 px-4 border-b border-border'>
         <div className='flex items-center gap-2'>
-          <span className='text-xl font-bold'>DebateAI by</span>
-          <a 
-            href="https://aossie.org" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="hover:opacity-80 transition-opacity"
-          >
-            <img
-              src={debateAiLogo}
-              alt='DebateAI Logo'
-              className='h-8 w-auto object-contain'
-            />
-          </a>
+          <DebateAiLogo className='h-8 w-auto' />
+          <div className='flex flex-col'>
+            <span className='text-xl font-bold leading-none'>DebateAI</span>
+            <a
+              href="https://aossie.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold hover:text-foreground transition-colors"
+            >
+              by AOSSIE
+            </a>
+          </div>
         </div>
       </div>
       {/* Nav links */}

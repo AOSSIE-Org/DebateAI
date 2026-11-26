@@ -37,3 +37,59 @@ func TestBuildParticipantsMessageIncludesRecoverableRoomState(t *testing.T) {
 		t.Fatalf("expected role=for, got %#v", participant["role"])
 	}
 }
+
+func TestDebateStartErrorLockedRequiresReadyOppositeRoles(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		clients map[*gorilla.Conn]*Client
+		wantErr bool
+	}{
+		{
+			name: "ready debaters with opposite roles",
+			clients: map[*gorilla.Conn]*Client{
+				&gorilla.Conn{}: {Role: "for", Ready: true},
+				&gorilla.Conn{}: {Role: "against", Ready: true},
+			},
+		},
+		{
+			name: "debater is not ready",
+			clients: map[*gorilla.Conn]*Client{
+				&gorilla.Conn{}: {Role: "for", Ready: true},
+				&gorilla.Conn{}: {Role: "against"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "both selected the same role",
+			clients: map[*gorilla.Conn]*Client{
+				&gorilla.Conn{}: {Role: "for", Ready: true},
+				&gorilla.Conn{}: {Role: "for", Ready: true},
+			},
+			wantErr: true,
+		},
+		{
+			name: "a debater has not selected a role",
+			clients: map[*gorilla.Conn]*Client{
+				&gorilla.Conn{}: {Role: "for", Ready: true},
+				&gorilla.Conn{}: {Ready: true},
+			},
+			wantErr: true,
+		},
+		{
+			name: "spectators are not counted as debaters",
+			clients: map[*gorilla.Conn]*Client{
+				&gorilla.Conn{}: {Role: "for", Ready: true},
+				&gorilla.Conn{}: {Role: "against", Ready: true},
+				&gorilla.Conn{}: {IsSpectator: true},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			room := &Room{Clients: test.clients}
+			err := debateStartErrorLocked(room)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("debateStartErrorLocked() error = %v, wantErr %v", err, test.wantErr)
+			}
+		})
+	}
+}

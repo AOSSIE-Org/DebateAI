@@ -24,3 +24,7 @@ type VerifyForgotPasswordRequest struct {
 	Code        string `json:"code" binding:"required"`
 	NewPassword string `json:"newPassword" binding:"required,min=8"`
 }
+
+type ResendVerificationRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}

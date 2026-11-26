@@ -97,6 +97,13 @@ func CreateRoomHandler(c *gin.Context) {
 		return
 	}
 
+	switch input.Type {
+	case "public", "private", "invite":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid room type"})
+		return
+	}
+
 	// Get user email from middleware-set context
 	email, exists := c.Get("email")
 	if !exists {
@@ -109,6 +116,12 @@ func CreateRoomHandler(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	emailStr, ok := email.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email format"})
+		return
+	}
+
 	var user struct {
 		ID          primitive.ObjectID `bson:"_id"`
 		Email       string             `bson:"email"`
@@ -117,7 +130,7 @@ func CreateRoomHandler(c *gin.Context) {
 		AvatarURL   string             `bson:"avatarUrl"`
 	}
 
-	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	err := userCollection.FindOne(ctx, bson.M{"email": emailStr}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -187,6 +200,12 @@ func JoinRoomHandler(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user email not found"})
 		return
 	}
+
+	// Query user document using email
+	userCollection := db.MongoDatabase.Collection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 
 	emailStr, ok := email.(string)
 	if !ok {
@@ -264,9 +283,30 @@ func JoinRoomHandler(c *gin.Context) {
 		return
 	}
 
+
+	// Use atomic operation to join room
+	roomCollection := db.MongoDatabase.Collection("rooms")
+
 	filter := bson.M{"_id": roomId}
-	update := bson.M{
-		"$addToSet": bson.M{"participants": participant},
+	update := mongo.Pipeline{
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "participants", Value: bson.D{{Key: "$cond", Value: bson.A{
+				bson.D{{Key: "$in", Value: bson.A{participant.ID, "$participants.id"}}},
+				bson.D{{Key: "$map", Value: bson.D{
+					{Key: "input", Value: "$participants"},
+					{Key: "as", Value: "existingParticipant"},
+					{Key: "in", Value: bson.D{{Key: "$cond", Value: bson.A{
+						bson.D{{Key: "$eq", Value: bson.A{"$$existingParticipant.id", participant.ID}}},
+						bson.D{{Key: "$literal", Value: participant}},
+						"$$existingParticipant",
+					}}}},
+				}}},
+				bson.D{{Key: "$concatArrays", Value: bson.A{
+					"$participants",
+					bson.A{bson.D{{Key: "$literal", Value: participant}}},
+				}}},
+			}}}},
+		}}},
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 

@@ -262,7 +262,7 @@ const Leaderboard: React.FC = () => {
   }
 
   return (
-    <div className="p-6 bg-background text-foreground">
+    <div className="p-4 sm:p-6 bg-background text-foreground min-w-0">
       <BadgeUnlocked
         badgeName={badgeUnlocked.badgeName}
         isOpen={badgeUnlocked.isOpen}
@@ -274,109 +274,111 @@ const Leaderboard: React.FC = () => {
         </p>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1">
-            <Card className="border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-24 text-muted-foreground pl-6">
-                      Rank
-                    </TableHead>
-                    <TableHead className="text-muted-foreground pl-6">
-                      Debater
-                    </TableHead>
-                    <TableHead
-                      className="text-right text-muted-foreground pr-6 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => handleSortCategory("score")}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        <FaRobot className="w-4 h-4" />
-                        <span>VS BOT</span>
-                        {sortCategory === "score" && (
-                          <span className="text-xs">↓</span>
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="text-right text-muted-foreground pr-6 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => handleSortCategory("rating")}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        <FaTrophy className="w-4 h-4" />
-                        <span>ELO RATING</span>
-                        {sortCategory === "rating" && (
-                          <span className="text-xs">↓</span>
-                        )}
-                      </div>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleDebaters.map((debater) => (
-                    <TableRow
-                      key={debater.id}
-                      className={`group hover:bg-accent/30 ${
-                        debater.currentUser ? "bg-primary/10" : ""
-                      }`}
-                    >
-                      <TableCell className="pl-6">
-                        <div
-                          className={`w-12 h-12 flex items-center justify-center rounded-lg ${getRankClasses(
-                            debater.rank
-                          )}`}
-                        >
-                          {debater.rank === 1 && (
-                            <FaCrown className="w-5 h-5 text-amber-600" />
-                          )}
-                          {debater.rank === 2 && (
-                            <FaChessQueen className="w-5 h-5 text-slate-600" />
-                          )}
-                          {debater.rank === 3 && (
-                            <FaMedal className="w-5 h-5 text-orange-600" />
-                          )}
-                          {debater.rank > 3 && (
-                            <span className="font-medium">#{debater.rank}</span>
+          <div className="flex-1 min-w-0">
+            <Card className="border overflow-hidden">
+              <div className="overflow-x-auto w-full">
+                <Table className="w-full min-w-[500px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-20 sm:w-24 text-muted-foreground pl-4 sm:pl-6">
+                        Rank
+                      </TableHead>
+                      <TableHead className="text-muted-foreground pl-4 sm:pl-6">
+                        Debater
+                      </TableHead>
+                      <TableHead
+                        className="text-right text-muted-foreground pr-4 sm:pr-6 cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSortCategory("score")}
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          <FaRobot className="w-4 h-4" />
+                          <span>VS BOT</span>
+                          {sortCategory === "score" && (
+                            <span className="text-xs">↓</span>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="pl-6">
-                        <div className="flex items-center space-x-4">
-                          <Avatar className="w-10 h-10 border-2 border-muted">
-                            <AvatarImage
-                              src={debater.avatarUrl}
-                              alt={debater.name}
-                            />
-                            <AvatarFallback className="bg-muted">
-                              {debater.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-foreground">
-                              {debater.name}
+                      </TableHead>
+                      <TableHead
+                        className="text-right text-muted-foreground pr-4 sm:pr-6 cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSortCategory("rating")}
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          <FaTrophy className="w-4 h-4" />
+                          <span>ELO RATING</span>
+                          {sortCategory === "rating" && (
+                            <span className="text-xs">↓</span>
+                          )}
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleDebaters.map((debater) => (
+                      <TableRow
+                        key={debater.id}
+                        className={`group hover:bg-accent/30 ${
+                          debater.currentUser ? "bg-primary/10" : ""
+                        }`}
+                      >
+                        <TableCell className="pl-4 sm:pl-6 py-3 sm:py-4">
+                          <div
+                            className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg ${getRankClasses(
+                              debater.rank
+                            )}`}
+                          >
+                            {debater.rank === 1 && (
+                              <FaCrown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
+                            )}
+                            {debater.rank === 2 && (
+                              <FaChessQueen className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
+                            )}
+                            {debater.rank === 3 && (
+                              <FaMedal className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
+                            )}
+                            {debater.rank > 3 && (
+                              <span className="font-medium text-sm sm:text-base">#{debater.rank}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="pl-4 sm:pl-6 py-3 sm:py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-3 sm:space-x-4">
+                            <Avatar className="w-9 h-9 sm:w-10 sm:h-10 border-2 border-muted flex-shrink-0">
+                              <AvatarImage
+                                src={debater.avatarUrl}
+                                alt={debater.name}
+                              />
+                              <AvatarFallback className="bg-muted">
+                                {debater.name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium text-foreground text-sm sm:text-base">
+                                {debater.name}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex items-center justify-end space-x-2">
-                          <span className="font-semibold text-foreground">
-                            {debater.score}
-                          </span>
-                          <div className="w-2 h-2 rounded-full bg-green-500" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex items-center justify-end space-x-2">
-                          <span className="font-semibold text-foreground">
-                            {debater.rating}
-                          </span>
-                          <div className="w-2 h-2 rounded-full bg-blue-500" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </TableCell>
+                        <TableCell className="text-right pr-4 sm:pr-6 py-3 sm:py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-end space-x-2">
+                            <span className="font-semibold text-foreground text-sm sm:text-base">
+                              {debater.score}
+                            </span>
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right pr-4 sm:pr-6 py-3 sm:py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-end space-x-2">
+                            <span className="font-semibold text-foreground text-sm sm:text-base">
+                              {debater.rating}
+                            </span>
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </Card>
 
             {visibleCount < sortedDebaters.length && (
@@ -392,21 +394,21 @@ const Leaderboard: React.FC = () => {
           </div>
 
           <div className="w-full lg:w-96">
-            <div className="p-6">
+            <div className="p-2 sm:p-6">
               <div className="grid grid-cols-2 gap-4">
                 {stats.map((stat, index) => (
                   <div
                     key={index}
-                    className="p-4 bg-card rounded-lg border hover:border-primary/50 transition-colors"
+                    className="p-4 sm:p-6 bg-card rounded-lg border hover:border-primary/50 transition-colors"
                   >
                     <div className="text-center">
-                      <div className="mb-3 text-2xl text-primary">
+                      <div className="mb-3 text-2xl sm:text-3xl text-primary">
                         {mapIcon(stat.icon)}
                       </div>
-                      <div className="text-2xl font-bold mb-2 text-foreground">
+                      <div className="text-2xl sm:text-3xl font-bold mb-2 text-foreground">
                         {stat.value}
                       </div>
-                      <div className="text-sm text-muted-foreground tracking-wide">
+                      <div className="text-sm text-muted-foreground tracking-wide font-medium">
                         {stat.label}
                       </div>
                     </div>

@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,7 +14,7 @@ interface Room {
   participants: Participant[] | null;
 }
 
-const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+const baseURL = config.baseUrl || 'http://localhost:1313';
 
 const RoomBrowser: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);

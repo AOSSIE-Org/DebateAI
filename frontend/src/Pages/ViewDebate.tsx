@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
@@ -81,7 +82,7 @@ export const ViewDebate: React.FC = () => {
     }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const apiUrl = import.meta.env.VITE_API_URL;
+    const apiUrl = config.baseUrl;
     let host = window.location.host;
     if (apiUrl) {
       try {

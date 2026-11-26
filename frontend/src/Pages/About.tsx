@@ -109,11 +109,6 @@ function About() {
         Thank you for being a part of DebateAI. Together, let’s make
         argumentation and critical thinking skills accessible to everyone!
       </p>
-
-      {/* Footer */}
-      <footer className="text-center text-xs md:text-sm text-muted-foreground mt-8">
-        © 2016-{new Date().getFullYear()} <a href="https://aossie.org" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">AOSSIE</a>. All rights reserved.
-      </footer>
     </div>
   );
 }

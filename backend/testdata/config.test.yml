@@ -1,0 +1,23 @@
+server:
+  port: 1313
+
+database:
+  uri: "mongodb://127.0.0.1:27017/unused"
+
+gemini:
+  apiKey: "test-gemini-key"
+
+jwt:
+  secret: "test-jwt-secret-for-debateai-suite"
+  expiry: 60
+
+smtp:
+  host: "127.0.0.1"
+  port: 2525
+  username: "test-user"
+  password: "test-password"
+  senderEmail: "noreply@debateai.test"
+  senderName: "DebateAI Test"
+
+googleOAuth:
+  clientID: "test-google-client-id"

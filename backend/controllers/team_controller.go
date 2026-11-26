@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	cryptoRand "crypto/rand"
+	"errors"
 	"math/big"
 	"net/http"
 	"strings"
@@ -655,4 +656,130 @@ func GetAvailableTeams(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, teams)
+}
+
+// TransferTeamCaptain transfers captaincy to an existing team member.
+func TransferTeamCaptain(c *gin.Context) {
+	teamID := c.Param("teamId")
+	teamObjectID, err := primitive.ObjectIDFromHex(teamID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
+		return
+	}
+
+	var request struct {
+		NewCaptainID string `json:"newCaptainId" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	newCaptainID, err := primitive.ObjectIDFromHex(request.NewCaptainID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid new captain ID"})
+		return
+	}
+
+	// Get the authenticated user from middleware context.
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	currentCaptainID, ok := userIDValue.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authenticated user"})
+		return
+	}
+
+	if newCaptainID == currentCaptainID {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "You are already the captain",
+		})
+		return
+	}
+
+	collection := db.GetCollection("teams")
+
+	var team models.Team
+	err = collection.FindOne(
+		c.Request.Context(),
+		bson.M{"_id": teamObjectID},
+	).Decode(&team)
+
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve team",
+		})
+		return
+	}
+
+	// Only the current captain can transfer captaincy.
+	if team.CaptainID != currentCaptainID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Only the captain can transfer captaincy",
+		})
+		return
+	}
+
+	// The new captain must already belong to this team.
+	var newCaptain *models.TeamMember
+	for i := range team.Members {
+		if team.Members[i].UserID == newCaptainID {
+			newCaptain = &team.Members[i]
+			break
+		}
+	}
+
+	if newCaptain == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "The new captain must be a member of this team",
+		})
+		return
+	}
+
+	// Ensure the captain has not changed and the target is still a member.
+	result, err := collection.UpdateOne(
+		c.Request.Context(),
+		bson.M{
+			"_id":            teamObjectID,
+			"captainId":      currentCaptainID,
+			"members.userId": newCaptainID,
+		},
+		bson.M{
+			"$set": bson.M{
+				"captainId":    newCaptainID,
+				"captainEmail": newCaptain.Email,
+				"updatedAt":    time.Now(),
+			},
+		},
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to transfer captaincy",
+		})
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "Team captain or membership changed. Please refresh and try again.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "Captaincy transferred successfully",
+		"newCaptainId":    newCaptainID.Hex(),
+		"newCaptainEmail": newCaptain.Email,
+	})
 }

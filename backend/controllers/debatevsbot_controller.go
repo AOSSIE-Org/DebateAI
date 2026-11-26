@@ -408,6 +408,12 @@ func updateGamificationAfterBotDebate(userID primitive.ObjectID, resultStatus, t
 		// Don't fail, continue with badge checks
 	}
 
+	// Update streak/activity on this verified debate completion before badge checks.
+	if err := updateStreakAndActivity(ctx, userID, &updatedUser); err != nil {
+		log.Printf("Error updating streak/activity for user %s: %v", userID.Hex(), err)
+		return
+	}
+
 	// Check for badges (FirstWin, etc.)
 	hasBadge := make(map[string]bool)
 	for _, badge := range updatedUser.Badges {

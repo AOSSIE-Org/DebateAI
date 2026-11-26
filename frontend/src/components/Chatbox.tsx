@@ -190,7 +190,7 @@ const Chatbox: React.FC<{
   return (
     <div className='rounded-xl bg-card text-card-foreground shadow flex flex-col h-full'>
       {/* Header */}
-      <div className='space-y-1.5 p-6 flex flex-row items-center justify-between'>
+      <div className='space-y-1.5 p-3 sm:p-6 flex flex-row items-center justify-between'>
         <div className='flex items-center space-x-4'>
           <div>
             <p className='text-sm leading-none'>Chat</p>
@@ -217,7 +217,7 @@ const Chatbox: React.FC<{
       </div>
 
       {/* Messages */}
-      <div className='p-6 pt-0 flex-1 overflow-y-auto'>
+      <div className='p-3 sm:p-6 pt-0 flex-1 overflow-y-auto'>
         <div className='space-y-4'>
           {messages.map((message, index) => (
             <div
@@ -319,7 +319,7 @@ const Chatbox: React.FC<{
       </div>
 
       {/* Input */}
-      <div className='flex items-center p-6 pt-0'>
+      <div className='flex items-center p-3 sm:p-6 pt-0 pb-safe sm:pb-6'>
         <form
           className='flex w-full items-center space-x-2'
           onSubmit={(e) => {

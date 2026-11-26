@@ -11,7 +11,7 @@ interface BadgeUnlockedProps {
 }
 
 const badgeIcons: Record<string, React.ReactNode> = {
-  Novice: <FaAward className="w-16 h-16 text-blue-500" />,
+  Novice: <FaAward className="w-16 h-16 text-primary" />,
   Streak5: <FaMedal className="w-16 h-16 text-yellow-500" />,
   FactMaster: <FaTrophy className="w-16 h-16 text-purple-500" />,
   FirstWin: <FaTrophy className="w-16 h-16 text-green-500" />,
@@ -72,7 +72,7 @@ const BadgeUnlocked: React.FC<BadgeUnlockedProps> = ({ badgeName, isOpen, onClos
           <DialogTitle className="text-2xl font-bold text-center mb-4">
             🎉 Badge Unlocked! 🎉
           </DialogTitle>
-          <DialogDescription className="text-center">
+          <DialogDescription asChild className="text-center">
             <div className="flex flex-col items-center justify-center space-y-4 py-4">
               <div className="animate-bounce">{badgeIcon}</div>
               <h3 className="text-xl font-semibold text-foreground">{badgeName}</h3>

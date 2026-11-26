@@ -92,8 +92,8 @@ export const AnonymousQA: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
+      <div className="bg-background rounded-lg shadow-lg border border-border p-4">
+        <h3 className="text-lg font-semibold mb-3 text-foreground">
           Ask a Question (Anonymous)
         </h3>
         
@@ -103,20 +103,20 @@ export const AnonymousQA: React.FC = () => {
             value={questionText}
             onChange={(e) => setQuestionText(e.target.value)}
             placeholder="Type your question..."
-            className="w-full pr-24"
+            className="w-full pr-24 border-border bg-background text-foreground"
             onFocus={() => {
               if (suggestions.length > 0) setShowSuggestions(true);
             }}
           />
           
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
+            <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
               {suggestions.map((suggestion, index) => (
                 <button
                   key={index}
                   type="button"
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-gray-100"
+                  className="w-full text-left px-4 py-2 hover:bg-accent text-sm text-popover-foreground"
                 >
                   {suggestion}
                 </button>
@@ -127,28 +127,28 @@ export const AnonymousQA: React.FC = () => {
           <Button
             type="submit"
             disabled={!questionText.trim()}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2"
+            className="absolute right-0 top-0 rounded-l-none"
           >
             Send
           </Button>
         </form>
 
         <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <h4 className="text-sm font-semibold text-foreground">
             Recent Questions ({questions.length})
           </h4>
           {questions.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+            <p className="text-sm text-muted-foreground italic">
               No questions yet. Be the first to ask!
             </p>
           ) : (
             questions.slice(-10).reverse().map((q) => (
               <div
                 key={q.qId}
-                className="text-sm p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600"
+                className="text-sm p-2 bg-muted rounded border border-border"
               >
-                <p className="text-gray-900 dark:text-gray-100">{q.text}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-foreground">{q.text}</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   {new Date(q.timestamp).toLocaleTimeString()}
                 </p>
               </div>

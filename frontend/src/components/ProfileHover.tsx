@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,7 +28,7 @@ const ProfileHover: React.FC<ProfileHoverProps> = ({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const userIdRef = useRef<string>(userId);
-  const baseURL = useMemo(() => import.meta.env.VITE_BASE_URL || 'http://localhost:1313', []);
+  const baseURL = useMemo(() => config.baseUrl || 'http://localhost:1313', []);
 
   // Reset profile when userId changes
   useEffect(() => {

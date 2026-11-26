@@ -1,0 +1,89 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "🚀 Features"
+    labels:
+      - "feature"
+      - "enhancement"
+      - "feat"
+  - title: "🐛 Bug Fixes"
+    labels:
+      - "fix"
+      - "bugfix"
+      - "bug"
+  - title: "🧰 Maintenance"
+    labels:
+      - "chore"
+      - "maintenance"
+      - "refactor"
+  - title: "📝 Documentation"
+    labels:
+      - "documentation"
+      - "docs"
+  - title: "🔧 Configuration"
+    labels:
+      - "configuration"
+      - "config"
+  - title: "🧪 Tests"
+    labels:
+      - "tests"
+      - "test"
+  - title: "⬆️ Dependencies"
+    labels:
+      - "dependencies"
+      - "deps"
+  - title: "🎨 Frontend"
+    labels:
+      - "frontend"
+      - "ui"
+  - title: "⚙️ Backend"
+    labels:
+      - "backend"
+      - "api"
+  - title: "🔐 Security"
+    labels:
+      - "security"
+  - title: "🐳 Docker"
+    labels:
+      - "docker"
+  - title: "🚀 CI/CD"
+    labels:
+      - "ci-cd"
+      - "github-actions"
+  - title: "👥 Contributors"
+    labels:
+      - "first-time-contributor"
+      - "external-contributor"
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&'
+
+template: |
+  # DebateAI $RESOLVED_VERSION
+
+  An open-source platform for structured human and AI debates,
+  real-time debate rooms, and AI-assisted judging.
+
+  ## What's Changed
+
+  $CHANGES
+
+  ## Contributors
+
+  $CONTRIBUTORS
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+exclude-labels:
+  - "skip-changelog"
+  - "no-changelog"
+  - "duplicate"
+  - "invalid"
+  - "wontfix"
+
+replacers:
+  - search: '/CVE-(\d{4})-(\d+)/g'
+    replace: "[CVE-$1-$2](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-$1-$2)"
+
+include-pre-releases: false

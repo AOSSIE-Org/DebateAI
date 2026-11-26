@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, {
   useCallback,
   useEffect,
@@ -5,8 +6,13 @@ import React, {
   useRef,
   useState,
 } from "react";
+
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+
+import { useParams, useNavigate } from "react-router-dom";
+
 import { Button } from "../components/ui/button";
+import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 
 import JudgmentPopup from "@/components/JudgementPopup";
 import SpeechTranscripts from "@/components/SpeechTranscripts";
@@ -110,6 +116,7 @@ interface WSMessage {
   // Automatic muting fields
   isMuted?: boolean;
   currentTurn?: string;
+  reason?: string;
   speechText?: string;
   liveTranscript?: string;
   requestId?: string;
@@ -142,7 +149,7 @@ const extractJSON = (response: string): string => {
   if (match && match[1]) return match[1].trim();
   return response;
 };
-const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
+const BASE_URL = config.baseUrl || window.location.origin;
 
 const WS_BASE_URL = BASE_URL.replace(
   /^https?/,
@@ -152,9 +159,12 @@ const WS_BASE_URL = BASE_URL.replace(
 
 const OnlineDebateRoom = (): JSX.Element => {
   const { roomId } = useParams<{ roomId: string }>();
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const inviteToken = searchParams.get("invite");
+  const navigate = useNavigate();
+
   const { user: currentUser } = useUser();
   const currentUserId = currentUser?.id ?? null;
   useDebateWS(roomId ?? null);
@@ -215,6 +225,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const animationRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const judgePollRef = useRef<NodeJS.Timeout | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submissionStartedRef = useRef(false);
   const joinAttemptedRef = useRef<string | null>(null);
 
@@ -224,6 +235,10 @@ const OnlineDebateRoom = (): JSX.Element => {
         clearInterval(judgePollRef.current);
         judgePollRef.current = null;
       }
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -232,6 +247,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [localRole, setLocalRole] = useState<DebateRole | null>(null);
   const [peerRole, setPeerRole] = useState<DebateRole | null>(null);
   const [localReady, setLocalReady] = useState(false);
+  const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
   const [peerReady, setPeerReady] = useState(false);
   const [debatePhase, setDebatePhase] = useState<DebatePhase>(
     DebatePhase.Setup
@@ -247,12 +263,15 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [speechTranscripts, setSpeechTranscripts] = useState<{
     [key: string]: string;
   }>({});
+  const speechTranscriptsRef = useRef(speechTranscripts);
 
   // Timer state
   const [timer, setTimer] = useState<number>(0);
 
   // Audio recording state
   const [, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [peerIsSpeaking, setPeerIsSpeaking] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
     null
   );
@@ -330,6 +349,10 @@ const OnlineDebateRoom = (): JSX.Element => {
     debatePhaseRef.current = debatePhase;
   }, [debatePhase]);
 
+
+  useEffect(() => {
+    speechTranscriptsRef.current = speechTranscripts;
+  }, [speechTranscripts]);
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
@@ -571,6 +594,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const [showSetupPopup, setShowSetupPopup] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [roomIdCopied, setRoomIdCopied] = useState(false);
 
   // Predefined debate topics
   const predefinedTopics = [
@@ -624,6 +648,9 @@ const OnlineDebateRoom = (): JSX.Element => {
       : debatePhase.includes("Against")
       ? "against"
       : null);
+  const rolesAreOpposite = Boolean(
+    localRole && peerRole && localRole !== peerRole
+  );
 
   const startJudgmentPolling = useCallback(
     (role: DebateRole) => {
@@ -644,17 +671,14 @@ const OnlineDebateRoom = (): JSX.Element => {
 
       judgePollRef.current = setInterval(async () => {
         try {
-          const pollResponse = await fetch(
-            `${BASE_URL}/submit-transcripts`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ roomId, role, transcripts: {} }),
-            }
-          );
+          const pollResponse = await fetch(`${BASE_URL}/submit-transcripts`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ roomId, role, transcripts: {} }),
+          });
 
           if (!pollResponse.ok) {
             if (pollResponse.status === 401) {
@@ -731,25 +755,22 @@ const OnlineDebateRoom = (): JSX.Element => {
       }
 
       try {
-        const response = await fetch(
-          `${BASE_URL}/submit-transcripts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              roomId,
-              role,
-              transcripts,
-              opponentRole,
-              opponentId,
-              opponentEmail,
-              opponentTranscripts,
-            }),
-          }
-        );
+        const response = await fetch(`${BASE_URL}/submit-transcripts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            roomId,
+            role,
+            transcripts,
+            opponentRole,
+            opponentId,
+            opponentEmail,
+            opponentTranscripts,
+          }),
+        });
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -928,14 +949,16 @@ const OnlineDebateRoom = (): JSX.Element => {
   ]);
 
   const handleConcede = useCallback(() => {
-    if (window.confirm("Are you sure you want to concede? This will count as a loss.")) {
+    setIsConcedeDialogOpen(false);
       if (wsRef.current) {
-        wsRef.current.send(JSON.stringify({
-          type: "concede",
-          room: roomId,
-          userId: currentUserId,
-          username: currentUser?.displayName || "User"
-        }));
+        wsRef.current.send(
+          JSON.stringify({
+            type: "concede",
+            room: roomId,
+            userId: currentUserId,
+            username: currentUser?.displayName || "User",
+          })
+        );
       }
       setDebatePhase(DebatePhase.Finished);
       setPopup({
@@ -943,10 +966,20 @@ const OnlineDebateRoom = (): JSX.Element => {
         message: "You have conceded the debate.",
         isJudging: false,
       });
-    }
   }, [roomId, currentUserId, currentUser, setDebatePhase, setPopup]);
 
   const handlePhaseDone = useCallback(() => {
+    if (!localRole || !peerRole) {
+      setPopup({
+        show: true,
+        message: "Both debaters must select roles to finish the debate.",
+      });
+      return;
+    }
+
+    // Only the debater whose turn is ending may request the next phase.
+    if (!isMyTurn) return;
+
     const currentIndex = phaseOrder.indexOf(debatePhase);
     console.debug(
       `handlePhaseDone called for ${localRole}. Current phase: ${debatePhase}, Index: ${currentIndex}`
@@ -956,62 +989,58 @@ const OnlineDebateRoom = (): JSX.Element => {
       console.debug(
         `Transitioning to next phase: ${nextPhase} for role: ${localRole}`
       );
-      setDebatePhase(nextPhase);
       wsRef.current?.send(
         JSON.stringify({ type: "phaseChange", phase: nextPhase })
       );
-    } else if (!localRole || !peerRole) {
-      setPopup({
-        show: true,
-        message: "Both debaters must select roles to finish the debate.",
-      });
     }
-  }, [debatePhase, localRole, peerRole, phaseOrder, setDebatePhase, setPopup]);
-
-  // Set timer based on phase duration
-  useEffect(() => {
-    if (phaseDurations[debatePhase]) {
-      setTimer(phaseDurations[debatePhase]!);
-    } else {
-      setTimer(0);
-    }
-  }, [debatePhase]);
-
-  // Timer countdown and phase transition
-  useEffect(() => {
-    if (timer > 0 && debatePhase !== DebatePhase.Finished) {
-      timerRef.current = setInterval(() => {
-        setTimer((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current!);
-            if (isMyTurn && localRole) {
-              // Save any existing transcript for this phase
-              const existingTranscript =
-                speechTranscripts[debatePhase] || "No response";
-              localStorage.setItem(
-                `${roomId}_${debatePhase}_${localRole}`,
-                existingTranscript
-              );
-              console.debug(
-                `Timer expired for ${localRole} in ${debatePhase}. Transcript saved:`,
-                existingTranscript
-              );
-            }
-            handlePhaseDone();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
   }, [
-    timer,
     debatePhase,
     isMyTurn,
-    speechTranscripts,
+    localRole,
+    peerRole,
+    phaseOrder,
+    setPopup,
+  ]);
+
+  // Keep one countdown interval per phase; rerendering the timer must not restart it.
+  useEffect(() => {
+    const duration = phaseDurations[debatePhase];
+    if (!duration) return;
+
+    let remainingSeconds = duration;
+    setTimer(duration);
+    const interval = setInterval(() => {
+      remainingSeconds -= 1;
+      setTimer(remainingSeconds);
+
+      if (remainingSeconds <= 0) {
+        clearInterval(interval);
+        if (isMyTurn && localRole) {
+          const existingTranscript =
+            speechTranscriptsRef.current[debatePhase] || "No response";
+          localStorage.setItem(
+            `${roomId}_${debatePhase}_${localRole}`,
+            existingTranscript
+          );
+          console.debug(
+            `Timer expired for ${localRole} in ${debatePhase}. Transcript saved:`,
+            existingTranscript
+          );
+          handlePhaseDone();
+        }
+      }
+    }, 1000);
+    timerRef.current = interval;
+
+    return () => {
+      clearInterval(interval);
+      if (timerRef.current === interval) {
+        timerRef.current = null;
+      }
+    };
+  }, [
+    debatePhase,
+    isMyTurn,
     localRole,
     roomId,
     handlePhaseDone,
@@ -1024,7 +1053,6 @@ const OnlineDebateRoom = (): JSX.Element => {
     try {
       const token = getAuthToken();
       const response = await fetch(`${BASE_URL}/rooms`, {
-
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1354,6 +1382,9 @@ const OnlineDebateRoom = (): JSX.Element => {
     rws.onopen = () => {
       setIsWsConnected(true);
       rws.send(JSON.stringify({ type: "join", room: roomId }));
+      if (manualRecordingRef.current) {
+        rws.send(JSON.stringify({ type: "speaking", isSpeaking: true }));
+      }
       // Wait a bit before fetching participants to ensure room is fully created
       participantFetchTimeout = window.setTimeout(() => {
         void fetchRoomParticipantsRef.current?.();
@@ -1364,10 +1395,12 @@ const OnlineDebateRoom = (): JSX.Element => {
 
     rws.onclose = () => {
       setIsWsConnected(false);
+      setPeerIsSpeaking(false);
     };
 
     rws.onerror = () => {
       setIsWsConnected(false);
+      setPeerIsSpeaking(false);
     };
 
     rws.onmessage = async (event) => {
@@ -1396,6 +1429,33 @@ const OnlineDebateRoom = (): JSX.Element => {
             }
           }
           break;
+        case "roleSelectionRejected":
+          if (data.role) {
+            setLocalRole(data.role);
+          } else {
+            setLocalRole(null);
+          }
+          setPopup({
+            show: true,
+            message: data.reason || "That stance could not be selected.",
+            isJudging: false,
+          });
+          break;
+        case "readyRejected":
+          if (data.ready !== undefined) setLocalReady(data.ready);
+          setPopup({
+            show: true,
+            message: data.reason || "You could not be marked ready.",
+            isJudging: false,
+          });
+          break;
+        case "phaseChangeRejected":
+          setPopup({
+            show: true,
+            message: data.reason || "The debate could not be started.",
+            isJudging: false,
+          });
+          break;
         case "phaseChange":
           if (data.phase) {
             console.debug(
@@ -1403,6 +1463,9 @@ const OnlineDebateRoom = (): JSX.Element => {
             );
             setDebatePhase(data.phase);
           }
+          break;
+        case "speakingIndicator":
+          setPeerIsSpeaking(data.isSpeaking ?? false);
           break;
         case "message":
           if (data.message && peerRoleRef.current) {
@@ -1467,6 +1530,9 @@ const OnlineDebateRoom = (): JSX.Element => {
           break;
         case "roomParticipants":
           if (data.roomParticipants) {
+            if (data.phase) {
+              setDebatePhase(data.phase);
+            }
             console.debug(
               "Received room participants update:",
               data.roomParticipants
@@ -1489,8 +1555,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               if (localParticipant) {
                 setLocalUser({
                   ...localParticipant,
-                  avatarUrl:
-                    activeUser.avatarUrl || localParticipant.avatarUrl,
+                  avatarUrl: activeUser.avatarUrl || localParticipant.avatarUrl,
                   displayName:
                     activeUser.displayName || localParticipant.displayName,
                 });
@@ -1538,7 +1603,9 @@ const OnlineDebateRoom = (): JSX.Element => {
           setDebatePhase(DebatePhase.Finished);
           setPopup({
             show: true,
-            message: `${data.username || "Opponent"} has conceded the debate. You win!`,
+            message: `${
+              data.username || "Opponent"
+            } has conceded the debate. You win!`,
             isJudging: false,
           });
           break;
@@ -1744,6 +1811,32 @@ const OnlineDebateRoom = (): JSX.Element => {
     roomId,
   ]);
 
+  // Host re-sends the chosen topic when the opponent joins or the socket reconnects,
+  // so the joiner's read-only topic box stays in sync.
+  // topicRef lets the effect read the latest topic without re-running on every change.
+  const topicRef = useRef(topic);
+  useEffect(() => {
+    topicRef.current = topic;
+  }, [topic]);
+
+  useEffect(() => {
+    if (
+      isRoomOwner &&
+      isWsConnected &&
+      roomParticipants.length >= 2 &&
+      topicRef.current
+    ) {
+      wsRef.current?.send(
+        JSON.stringify({ type: "topicChange", topic: topicRef.current })
+      );
+    }
+  }, [isRoomOwner, isWsConnected, roomParticipants.length]);
+
+  // Retry any queued spectator offers once stream, user, and socket are ready.
+  useEffect(() => {
+    flushSpectatorOfferQueue();
+  }, [flushSpectatorOfferQueue]);
+
   useEffect(() => {
     flushSpectatorOfferQueue();
   }, [flushSpectatorOfferQueue]);
@@ -1775,7 +1868,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   }, [localStream, remoteStream]);
 
   // Initialize Audio Recording
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const initializeAudio = async () => {
       try {
@@ -1817,36 +1910,23 @@ const OnlineDebateRoom = (): JSX.Element => {
             : "audio/ogg",
         });
 
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && isMyTurn && localRole) {
-            // Send indicator that user is speaking
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(
-                JSON.stringify({
-                  type: "speaking",
-                  userId: currentUser?.id,
-                  isSpeaking: true,
-                })
-              );
-            }
-          }
-        };
-
         recorder.onstart = () => {
           setIsRecording(true);
+          setIsSpeaking(true);
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+              JSON.stringify({ type: "speaking", isSpeaking: true })
+            );
+          }
         };
 
         recorder.onstop = () => {
           setIsRecording(false);
+          setIsSpeaking(false);
 
-          // Send indicator that user stopped speaking
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(
-              JSON.stringify({
-                type: "speaking",
-                userId: currentUser?.id,
-                isSpeaking: false,
-              })
+              JSON.stringify({ type: "speaking", isSpeaking: false })
             );
           }
         };
@@ -1886,7 +1966,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   }, []);
 
   // Initialize Speech Recognition
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const initializeSpeechRecognition = () => {
       if (
@@ -2312,6 +2392,7 @@ const OnlineDebateRoom = (): JSX.Element => {
   const handleTopicChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
+    if (!isRoomOwner) return; // only the host can set the topic
     const newTopic = e.target.value;
     setTopic(newTopic);
     const message = JSON.stringify({ type: "topicChange", topic: newTopic });
@@ -2360,19 +2441,21 @@ const OnlineDebateRoom = (): JSX.Element => {
 
   // Manage setup popup visibility
   useEffect(() => {
-    if (localReady && peerReady) {
+    if (localReady && peerReady && rolesAreOpposite) {
       setShowSetupPopup(false);
-      setCountdown(3);
+      setCountdown(debatePhase === DebatePhase.Setup ? 3 : null);
     } else {
       setShowSetupPopup(true);
+      setCountdown(null);
     }
-  }, [localReady, peerReady]);
+  }, [localReady, peerReady, rolesAreOpposite, debatePhase]);
 
   // Countdown logic
   useEffect(() => {
     if (countdown !== null && countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
+
     } else if (countdown === 0) {
       setDebatePhase(DebatePhase.OpeningFor);
       wsRef.current?.send(
@@ -2384,6 +2467,27 @@ const OnlineDebateRoom = (): JSX.Element => {
       void establishDebateConnection();
     }
   }, [countdown, localRole, establishDebateConnection]);
+
+    } else if (countdown === 0 && debatePhase === DebatePhase.Setup) {
+      if (localRole === "for") {
+        wsRef.current?.send(
+          JSON.stringify({ type: "phaseChange", phase: DebatePhase.OpeningFor })
+        );
+        console.debug(
+          `Countdown finished. Requesting debate start at ${DebatePhase.OpeningFor}`
+        );
+        pcRef.current
+          ?.createOffer()
+          .then((offer) =>
+            pcRef.current!.setLocalDescription(offer).then(() => offer)
+          )
+          .then((offer) =>
+            wsRef.current?.send(JSON.stringify({ type: "offer", offer }))
+          );
+      }
+    }
+  }, [countdown, debatePhase, localRole]);
+
 
   // Clear input fields on phase change
   useEffect(() => {
@@ -2432,6 +2536,7 @@ const OnlineDebateRoom = (): JSX.Element => {
     );
   }
 
+
   if (joinError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -2448,54 +2553,116 @@ const OnlineDebateRoom = (): JSX.Element => {
     );
   }
 
+  const handleCopyRoomId = async () => {
+    if (!roomId) return;
+
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setRoomIdCopied(true);
+
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+
+      copyTimeoutRef.current = setTimeout(() => {
+        setRoomIdCopied(false);
+        copyTimeoutRef.current = null;
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy room code:", error);
+    }
+  };
+
+
   // Render UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-4">
       <div className="w-full max-w-5xl mx-auto py-2">
         <div className="bg-gradient-to-r from-orange-100 via-white to-orange-100 rounded-xl p-4 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 break-words">
             Debate: {topic || "No topic set"}
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Phase: <span className="font-medium">{debatePhase}</span> |
-            Participants:{" "}
-            <span className="font-medium">{roomParticipants.length}/2</span> |
-            Spectators: <span className="font-medium">{spectatorPresence}</span>{" "}
-            | Current Turn:{" "}
+          <p className="mt-2 text-xs sm:text-sm text-gray-700 flex flex-wrap justify-center gap-1">
+            <span>Phase: <span className="font-medium">{debatePhase}</span> |</span>
+            <span>Participants:{" "}
+            <span className="font-medium">{roomParticipants.length}/2</span></span>
+            <span className="hidden sm:inline"> | Spectators: <span className="font-medium">{spectatorPresence}</span></span>{" "}
+            <span>| Current Turn:{" "}
             <span className="font-semibold text-orange-600">
               {isMyTurn ? "You" : "Opponent"} to{" "}
               {debatePhase.includes("Question")
-                ? "ask a question"
+                ? "ask"
                 : debatePhase.includes("Answer")
                 ? "answer"
-                : "make a statement"}
+                : "state"}
             </span>
             {isAutoMuted && (
               <span className="ml-2 text-red-500 font-medium">
                 🔇 Auto-muted (not your turn)
               </span>
-            )}
+            )}</span>
           </p>
-          {debatePhase !== DebatePhase.Finished && debatePhase !== DebatePhase.Setup && (
-            <div className="mt-2">
-              <Button
-                onClick={handleConcede}
-                className="bg-red-500 hover:bg-red-600 text-white rounded-md px-3 text-sm"
-              >
-                Concede
-              </Button>
-            </div>
-          )}
+          {debatePhase !== DebatePhase.Finished &&
+            debatePhase !== DebatePhase.Setup && (
+              <div className="mt-2">
+                <Button
+                  onClick={() => setIsConcedeDialogOpen(true)}
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-md px-3 text-sm"
+                >
+                  Concede
+                </Button>
+              </div>
+            )}
         </div>
       </div>
 
       {/* Setup Popup */}
       {showSetupPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-card text-foreground p-6 rounded-lg shadow-lg max-w-md w-full">
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+          onClick={() => setShowSetupPopup(false)}
+        >
+          <div
+            className="bg-card text-foreground p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header with title and close icon */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Debate Setup</h2>
+
+              <button
+                type="button"
+                onClick={() => setShowSetupPopup(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close debate setup"
+              >
+                <span className="text-2xl leading-none">{"\u00D7"}</span>
+              </button>
+            </div>
+
+            {/* Room Code */}
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground mb-2">
+                Share this room code with your opponent
+              </p>
+
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 border border-border rounded-md px-3 py-2 bg-muted overflow-x-auto">
+                  <span className="text-sm text-muted-foreground mr-2 whitespace-nowrap">
+                    Room Code:
+                  </span>
+
+                  <span className="font-semibold tracking-wider break-all">{roomId}</span>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleCopyRoomId}
+                  className="px-4 flex-shrink-0"
+                >
+                  {roomIdCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
             </div>
 
             {/* Loading State */}
@@ -2513,25 +2680,33 @@ const OnlineDebateRoom = (): JSX.Element => {
                 {/* Debate Topic */}
                 <div className="mb-6">
                   <label className="block text-lg mb-2">Debate Topic</label>
-                  <select
-                    value={topic}
-                    onChange={(e) => handleTopicChange(e)}
-                    className="border border-border rounded p-2 w-full bg-input text-foreground mb-2"
-                  >
-                    <option value="">Select a topic or enter custom</option>
-                    {predefinedTopics.map((predefinedTopic, index) => (
-                      <option key={index} value={predefinedTopic}>
-                        {predefinedTopic}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={handleTopicChange}
-                    placeholder="Or enter a custom debate topic"
-                    className="border border-border rounded p-2 w-full bg-input text-foreground"
-                  />
+                  {isRoomOwner ? (
+                    <>
+                      <select
+                        value={topic}
+                        onChange={(e) => handleTopicChange(e)}
+                        className="border border-border rounded p-2 w-full bg-input text-foreground mb-2"
+                      >
+                        <option value="">Select a topic or enter custom</option>
+                        {predefinedTopics.map((predefinedTopic, index) => (
+                          <option key={index} value={predefinedTopic}>
+                            {predefinedTopic}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={topic}
+                        onChange={handleTopicChange}
+                        placeholder="Or enter a custom debate topic"
+                        className="border border-border rounded p-2 w-full bg-input text-foreground"
+                      />
+                    </>
+                  ) : (
+                    <div className="border border-border rounded p-2 w-full bg-muted text-foreground">
+                      {topic || "Waiting for the host to choose a topic..."}
+                    </div>
+                  )}
                 </div>
                 {/* Avatars and Role Selection */}
                 <div className="mb-6 flex justify-around">
@@ -2696,6 +2871,14 @@ const OnlineDebateRoom = (): JSX.Element => {
                 <p className="text-gray-700 text-center text-sm">
                   {popup.message}
                 </p>
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    onClick={() => setPopup({ show: false, message: "" })}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
               </>
             )}
           </div>
@@ -2732,9 +2915,17 @@ const OnlineDebateRoom = (): JSX.Element => {
           }
           opponentAvatarUrl={opponentUser?.avatarUrl || null}
           ratingSummary={ratingSummary}
+
           showRematch={isChallengeRoom}
           onRematch={handleRematch}
           onClose={() => setShowJudgment(false)}
+
+          topic={topic}
+          onClose={() => {
+            setShowJudgment(false);
+            navigate("/startDebate");
+          }}
+
         />
       )}
 
@@ -2745,7 +2936,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             isMyTurn && debatePhase !== DebatePhase.Finished
               ? "animate-glow"
               : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          } bg-white border border-gray-200 shadow-md h-[350px] sm:h-[450px] md:h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -2762,6 +2953,12 @@ const OnlineDebateRoom = (): JSX.Element => {
             <div className="flex flex-col">
               <div className="text-sm font-medium text-gray-800">
                 {localUser?.displayName || currentUser?.displayName || "You"}
+                {isSpeaking && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-green-700">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                    Speaking
+                  </span>
+                )}
               </div>
               <div className="text-xs text-gray-500">
                 Role: {localRole || "Not selected"} | Rating:{" "}
@@ -2782,7 +2979,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               autoPlay
               muted
               playsInline
-              className="w-full h-80 object-cover"
+              className="w-full h-36 sm:h-64 md:h-80 object-cover"
             />
             {/* Speaking Controls */}
             <div className="mt-3 flex flex-col items-center gap-2">
@@ -2810,7 +3007,7 @@ const OnlineDebateRoom = (): JSX.Element => {
             !isMyTurn && debatePhase !== DebatePhase.Finished
               ? "animate-glow"
               : ""
-          } bg-white border border-gray-200 shadow-md h-[540px] flex flex-col`}
+          } bg-white border border-gray-200 shadow-md h-[350px] sm:h-[450px] md:h-[540px] flex flex-col`}
         >
           <div className="p-2 bg-gray-50 flex items-center gap-2">
             <div className="w-12 h-12 flex-shrink-0">
@@ -2828,6 +3025,12 @@ const OnlineDebateRoom = (): JSX.Element => {
                 {opponentUser?.displayName ||
                   opponentUser?.username ||
                   "Opponent"}
+                {peerIsSpeaking && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-green-700">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                    Speaking
+                  </span>
+                )}
               </div>
               <div className="text-xs text-gray-500">
                 Role: {peerRole || "Not selected"} | Rating:{" "}
@@ -2847,7 +3050,7 @@ const OnlineDebateRoom = (): JSX.Element => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              className="w-full h-80 object-cover"
+              className="w-full h-48 sm:h-64 md:h-80 object-cover"
             />
           </div>
         </div>
@@ -2973,6 +3176,15 @@ const OnlineDebateRoom = (): JSX.Element => {
           animation: glow 2s infinite;
         }
       `}</style>
+      <ConfirmationDialog
+        open={isConcedeDialogOpen}
+        onOpenChange={setIsConcedeDialogOpen}
+        title="Concede debate?"
+        description="Are you sure you want to concede? This will count as a loss."
+        confirmLabel="Concede"
+        onConfirm={handleConcede}
+        destructive
+      />
     </div>
   );
 };

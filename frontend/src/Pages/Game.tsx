@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import PlayerCard from "../components/PlayerCard";
@@ -14,7 +15,7 @@ const Game: React.FC = () => {
     gameResult: {
       isReady: false,
       isWinner: false,
-      points: false,
+      points: 0,
       totalPoints: 0,
       evaluationMessage: "no data",
     },
@@ -32,17 +33,6 @@ const Game: React.FC = () => {
   });
 
   const websocketRef = useRef<WebSocket | null>(null);
-  const lastTypingStateRef = useRef<boolean>(false);
-  const lastSpeakingStateRef = useRef<boolean>(false);
-
-  const sendWebSocketMessage = useCallback((payload: Record<string, unknown>) => {
-    const ws = websocketRef.current;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(payload));
-    } else {
-      console.warn("Attempted to send message while WebSocket was not open.", payload);
-    }
-  }, []);
 
   type GameWebSocketMessage = {
     type: string;
@@ -274,7 +264,7 @@ const Game: React.FC = () => {
   );
 
   useEffect(() => {
-    const wsURL = `${import.meta.env.VITE_BASE_URL}/ws?userId=${userId}`;
+    const wsURL = `${config.baseUrl}/ws?userId=${userId}`;
     const ws = new WebSocket(wsURL);
     ws.binaryType = "arraybuffer";
     websocketRef.current = ws;
@@ -438,3 +428,4 @@ const Game: React.FC = () => {
 };
 
 export default Game;
+

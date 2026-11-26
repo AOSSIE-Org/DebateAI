@@ -1,3 +1,4 @@
+import config from "../config/config";
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
@@ -8,7 +9,7 @@ interface DebatePopupProps {
   onClose: () => void;
 }
 
-const baseURL = import.meta.env.VITE_BASE_URL || 'http://localhost:1313';
+const baseURL = config.baseUrl || 'http://localhost:1313';
 
 const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
   const navigate = useNavigate();
@@ -155,7 +156,7 @@ const DebatePopup: React.FC<DebatePopupProps> = ({ onClose }) => {
             />
             <button
               onClick={handleJoinRoom}
-              className='bg-secondary text-secondary-foreground px-6 py-3 rounded-lg hover:bg-secondary/90 transition w-full'
+              className='bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition w-full'
             >
               Join Room
             </button>

@@ -1,0 +1,126 @@
+name: Version Release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "Release version (e.g. 0.1.0)"
+                required: true
+                type: string
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        if: ${{ github.repository_owner == 'AOSSIE-Org' }}
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Validate version
+              id: get_version
+              env:
+                  INPUT_VERSION: ${{ inputs.version }}
+              run: |
+                  VERSION="${INPUT_VERSION#v}"
+
+                  if ! [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+                    echo "Error: enter a version such as 0.1.0"
+                    exit 1
+                  fi
+
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+            - name: Check if tag already exists
+              env:
+                  TAG: ${{ steps.get_version.outputs.tag }}
+              run: |
+                  git fetch --tags
+
+                  if git show-ref --tags --verify --quiet "refs/tags/$TAG"; then
+                    echo "Error: tag $TAG already exists"
+                    exit 1
+                  fi
+
+            - name: Find draft release
+              id: draft
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const { owner, repo } = context.repo;
+                      const { data: releases } = await github.rest.repos.listReleases({
+                        owner,
+                        repo,
+                        per_page: 100
+                      });
+
+                      const drafts = releases.filter(r => r.draft);
+
+                      if (drafts.length !== 1) {
+                        core.setFailed(
+                          `Expected exactly one draft release, found ${drafts.length}.`
+                        );
+                        return;
+                      }
+
+                      core.setOutput('release_id', String(drafts[0].id));
+
+            - name: Create and push tag
+              env:
+                  TAG: ${{ steps.get_version.outputs.tag }}
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git tag -a "$TAG" -m "Release $TAG"
+                  git push origin "$TAG"
+
+            - name: Publish draft release
+              uses: actions/github-script@v7
+              env:
+                  TAG: ${{ steps.get_version.outputs.tag }}
+                  RELEASE_ID: ${{ steps.draft.outputs.release_id }}
+              with:
+                  script: |
+                      const { owner, repo } = context.repo;
+                      const releaseId = Number(process.env.RELEASE_ID);
+                      const tag = process.env.TAG;
+
+                      const { data: release } = await github.rest.repos.getRelease({
+                        owner,
+                        repo,
+                        release_id: releaseId
+                      });
+
+                      if (!release.draft) {
+                        core.setFailed('The selected release is no longer a draft.');
+                        return;
+                      }
+
+                      await github.rest.repos.updateRelease({
+                        owner,
+                        repo,
+                        release_id: releaseId,
+                        tag_name: tag,
+                        name: `DebateAI ${tag}`,
+                        draft: false,
+                        prerelease: false
+                      });
+
+                      core.notice(`Published DebateAI ${tag}`);
+
+            - name: Release summary
+              if: always()
+              env:
+                  VERSION: ${{ steps.get_version.outputs.tag }}
+              run: |
+                  {
+                    echo "## DebateAI Release"
+                    echo "- Version: ${VERSION:-Not validated}"
+                    echo "- Status: ${{ job.status }}"
+                  } >> "$GITHUB_STEP_SUMMARY"

@@ -41,3 +41,7 @@ func GetMatchmakingPoolStatusHandler(c *gin.Context) {
 	}
 	c.JSON(403, gin.H{"error": "forbidden"})
 }
+
+func ResendVerificationRouteHandler(c *gin.Context) {
+	controllers.ResendVerification(c)
+}
