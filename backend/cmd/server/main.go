@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -103,6 +104,10 @@ func setupRouter(cfg *config.Config, configPath string) *gin.Engine {
 
 	router.OPTIONS("/*path", func(c *gin.Context) {
 		c.Status(204)
+	})
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	router.POST("/signup", routes.SignUpRouteHandler)
