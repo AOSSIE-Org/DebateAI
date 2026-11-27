@@ -29,6 +29,9 @@ const ProsConsChallenge: React.FC = () => {
   const [pros, setPros] = useState<string[]>(["", "", "", "", ""]);
   const [cons, setCons] = useState<string[]>(["", "", "", "", ""]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  // Number of arguments actually submitted; the score maximum is based on this,
+  // not on how many entries the evaluation response happens to contain.
+  const [submittedCount, setSubmittedCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -100,6 +103,7 @@ const ProsConsChallenge: React.FC = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to evaluate arguments");
       setEvaluation(data);
+      setSubmittedCount(validPros.length + validCons.length);
       setCurrentStep(3);
     } catch (err: any) {
       setError(err.message);
@@ -113,6 +117,7 @@ const ProsConsChallenge: React.FC = () => {
     setPros(["", "", "", "", ""]);
     setCons(["", "", "", "", ""]);
     setEvaluation(null);
+    setSubmittedCount(0);
     setCurrentStep(1);
     setError(null);
   };
@@ -218,7 +223,7 @@ const ProsConsChallenge: React.FC = () => {
           <CardContent>
             <div className="text-center mb-6">
               <h2 className="text-3xl font-bold text-primary">
-                Final Score: {evaluation.score}/{(evaluation.pros.length + evaluation.cons.length) * MAX_SCORE_PER_ARGUMENT}
+                Final Score: {evaluation.score}/{submittedCount * MAX_SCORE_PER_ARGUMENT}
               </h2>
               <p className="text-muted-foreground">Based on {evaluation.pros.length} pros and {evaluation.cons.length} cons submitted</p>
             </div>
