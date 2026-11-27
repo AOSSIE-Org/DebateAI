@@ -19,6 +19,10 @@ interface Evaluation {
 
 const baseURL = config.baseUrl || 'http://localhost:1313';
 
+// Each argument is scored out of 10 and the final score is their sum
+// (see EvaluateProsCons in backend/services/pros_cons.go).
+const MAX_SCORE_PER_ARGUMENT = 10;
+
 const ProsConsChallenge: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [topic, setTopic] = useState<string | null>(null);
@@ -213,7 +217,9 @@ const ProsConsChallenge: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold text-primary">Final Score: {evaluation.score}/100</h2>
+              <h2 className="text-3xl font-bold text-primary">
+                Final Score: {evaluation.score}/{(evaluation.pros.length + evaluation.cons.length) * MAX_SCORE_PER_ARGUMENT}
+              </h2>
               <p className="text-muted-foreground">Based on {evaluation.pros.length} pros and {evaluation.cons.length} cons submitted</p>
             </div>
             <div className="grid grid-cols-2 gap-6">
