@@ -108,6 +108,8 @@ describe('SavedTranscripts', () => {
     expect(within(dialog).getByText('Innovation needs freedom')).toBeInTheDocument();
     expect(within(dialog).getByText('AI')).toBeInTheDocument();
     expect(within(dialog).getByText('comments')).toBeInTheDocument();
+    expect(within(dialog).getByText('User vs Bot')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/vs_bot/i)).not.toBeInTheDocument();
   });
 
   it('shares a transcript to the community feed', async () => {
