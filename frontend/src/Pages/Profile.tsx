@@ -78,6 +78,7 @@ import {
 import { getAuthToken } from "@/utils/auth";
 import { useNavigate } from "react-router-dom";
 import { DateRange } from "react-day-picker";
+import { formatDebateType } from "@/utils/debateType";
 import AvatarModal from "../components/AvatarModal";
 import SavedTranscripts from "../components/SavedTranscripts";
 import ProfileHover from "../components/ProfileHover";
@@ -1146,7 +1147,7 @@ const Profile: React.FC = () => {
                 </div>
                 <div>
                   <span className="font-semibold">Type:</span>
-                  <p className="text-muted-foreground capitalize">{selectedDebate.debateType.replace("_", " ")}</p>
+                  <p className="text-muted-foreground">{formatDebateType(selectedDebate.debateType)}</p>
                 </div>
                 <div>
                   <span className="font-semibold">Result:</span>
@@ -1168,10 +1169,10 @@ const Profile: React.FC = () => {
               <div>
                 <h4 className="font-semibold mb-3">Debate Summary</h4>
                 <p className="text-sm text-muted-foreground">
-                  This debate was a {selectedDebate.debateType.replace("_", " ")} debate about "{selectedDebate.topic}" against {selectedDebate.opponent}. The result was a {selectedDebate.result}.
-                  {selectedDebate.eloChange && selectedDebate.eloChange !== 0 && (
+                  This debate was a {formatDebateType(selectedDebate.debateType)} debate about "{selectedDebate.topic}" against {selectedDebate.opponent}. The result was a {selectedDebate.result}.
+                  {selectedDebate.eloChange ? (
                     <span> Your Elo rating changed by {selectedDebate.eloChange > 0 ? "+" : ""}{selectedDebate.eloChange}.</span>
-                  )}
+                  ) : null}
                 </p>
               </div>
               <Separator />

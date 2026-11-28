@@ -44,6 +44,7 @@ import { format } from 'date-fns';
 import CommentTree from './CommentTree';
 import { Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { formatDebateType } from '@/utils/debateType';
 
 interface SavedTranscriptsProps {
   className?: string;
@@ -465,8 +466,8 @@ const SavedTranscripts: React.FC<SavedTranscriptsProps> = ({ className }) => {
                 </div>
                 <div>
                   <span className='font-semibold'>Type:</span>
-                  <p className='text-muted-foreground capitalize'>
-                    {selectedTranscript.debateType.replace('_', ' ')}
+                  <p className='text-muted-foreground'>
+                    {formatDebateType(selectedTranscript.debateType)}
                   </p>
                 </div>
                 <div>
